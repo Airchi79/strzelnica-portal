@@ -1,44 +1,65 @@
-# Uruchomienie: docker compose up -d --build
-# Aplikacja nasłuchuje na porcie 8000 hosta. HTTPS zapewnia reverse proxy (np. Nginx Proxy Manager, Caddy, Traefik).
+# Strzelnica Sątok — uruchomienie: docker compose up -d --build
+# Instrukcja dla Unraid: docs/WDROZENIE-UNRAID.md
+#
+# Wszystkie dane trwałe leżą w folderze projektu (a nie w wolumenach Dockera), żeby przetrwały
+# odtworzenie docker.img na Unraid i były objęte kopią zapasową appdata:
+#   ./data/postgres  — baza danych
+#   ./data/private   — pliki prywatne (skany dokumentów do weryfikacji)
+#   ./backups        — codzienne kopie bazy (7 ostatnich)
+
+x-app: &app
+  build: .
+  image: strzelnica-portal:latest
+  restart: unless-stopped
+  env_file: .env
+  user: "${PUID:-99}:${PGID:-100}"
+  environment:
+    POSTGRES_HOST: db
+  volumes:
+    - ./data/private:/data/private
+  depends_on:
+    db:
+      condition: service_healthy
+
 services:
   db:
     image: postgres:16
     restart: unless-stopped
     env_file: .env
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
-      retries: 5
+      retries: 10
 
   app:
-    build: .
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      POSTGRES_HOST: db
-    depends_on:
-      db:
-        condition: service_healthy
+    <<: *app
     ports:
-      - "8000:8000"
-    volumes:
-      - private_media:/data/private
+      - "${APP_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
-  # Zadania okresowe (co godzinę): przypomnienia o rezerwacjach i wygaszanie dokumentów; codzienna kopia bazy (7 ostatnich).
+  # Zadania okresowe (co godzinę): przypomnienia, rozliczenia rezerwacji, wygaszanie dokumentów, czyszczenie książki pobytu.
   cron:
-    build: .
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      POSTGRES_HOST: db
+    <<: *app
     depends_on:
-      db:
+      app:
         condition: service_healthy
     command: >
-      sh -c 'while true; do python manage.py send_reminders; python manage.py settle_reservations; python manage.py expire_credentials; python manage.py purge_logbook; sleep 3600; done'
+      sh -c 'while true; do
+        python manage.py send_reminders;
+        python manage.py settle_reservations;
+        python manage.py expire_credentials;
+        python manage.py purge_logbook;
+        sleep 3600;
+      done'
 
+  # Codzienna kopia bazy danych (format pg_dump -Fc), 7 ostatnich plików.
   backup:
     image: postgres:16
     restart: unless-stopped
@@ -52,12 +73,9 @@ services:
       - ./backups:/backups
     entrypoint: >
       sh -c 'export PGPASSWORD=$$POSTGRES_PASSWORD;
+      sleep 300;
       while true; do
         pg_dump -U $$POSTGRES_USER -d $$POSTGRES_DB -Fc -f /backups/satok-$$(date +%F).dump &&
         ls -1t /backups/satok-*.dump | tail -n +8 | xargs -r rm --;
         sleep 86400;
       done'
-
-volumes:
-  db_data:
-  private_media:

@@ -20,4 +20,5 @@ urlpatterns = [
     path("techniczny/", admin.site.urls),
     path("manifest.webmanifest", core_views.manifest, name="manifest"),
     path("sw.js", core_views.service_worker, name="service_worker"),
+    path("healthz", core_views.healthz, name="healthz"),
 ]

@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+# HOME=/tmp: kontener może działać jako dowolny użytkownik (na Unraid 99:100), gunicorn potrzebuje zapisywalnego katalogu domowego
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/tmp
 WORKDIR /app
 
 RUN useradd --create-home --uid 1000 app

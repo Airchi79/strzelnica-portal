@@ -152,3 +152,12 @@ def panel_audit(request):
             qs = qs.filter(Q(action__icontains=q) | Q(summary__icontains=q) | Q(actor__email__icontains=q))
     page = Paginator(qs, 50).get_page(request.GET.get("page"))
     return render(request, "panel/audit.html", {"page": page, "tab": tab, "q": q})
+
+
+def healthz(request):
+    """Kontrola stanu dla Dockera: aplikacja odpowiada i ma połączenie z bazą."""
+    from django.db import connection
+
+    with connection.cursor() as cur:
+        cur.execute("SELECT 1")
+    return HttpResponse("ok", content_type="text/plain")

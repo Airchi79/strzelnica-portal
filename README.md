@@ -8,6 +8,8 @@ Specyfikacja: [`docs/SPEC-etap-1-2.md`](docs/SPEC-etap-1-2.md).
 
 ## Uruchomienie produkcyjne (Docker)
 
+Instrukcja krok po kroku dla serwera Unraid: [`docs/WDROZENIE-UNRAID.md`](docs/WDROZENIE-UNRAID.md).
+
 ```bash
 cp .env.example .env          # uzupełnij sekrety i adres
 docker compose up -d --build
@@ -16,7 +18,7 @@ docker compose exec app python manage.py create_owner --email ty@example.pl --fi
 
 Aplikacja nasłuchuje na porcie 8000. HTTPS zapewnia reverse proxy (np. Nginx Proxy Manager, Caddy).
 Przy pierwszym logowaniu właściciel konfiguruje aplikację uwierzytelniającą (2FA — wymagana w panelu zarządu).
-Kopie bazy trafiają codziennie do `./backups` (7 ostatnich).
+Dane trwałe: `./data/postgres`, `./data/private`; kopie bazy codziennie w `./backups` (7 ostatnich).
 
 ## Praca deweloperska
 

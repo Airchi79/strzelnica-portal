@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Kod weryfikacyjny{% endblock %}
+{% block content %}
+<h1>Podaj kod z aplikacji</h1>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Zweryfikuj</button></form></div>
+<p class="small muted">Utraciłeś telefon? Skontaktuj się z właścicielem systemu, który zresetuje drugi składnik w panelu technicznym.</p>
+{% endblock %}

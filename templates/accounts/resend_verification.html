@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Link aktywacyjny{% endblock %}
+{% block content %}
+<h1>Wyślij ponownie link aktywacyjny</h1>
+<div class="card"><form method="post">{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Wyślij</button></form></div>
+{% endblock %}

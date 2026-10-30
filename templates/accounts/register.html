@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Załóż konto{% endblock %}
+{% block content %}
+<h1>Załóż konto</h1>
+<div class="card">
+<form method="post" novalidate>{% csrf_token %}
+  {% include "partials/form.html" %}
+  <p class="small muted">Po rejestracji wyślemy link potwierdzający adres e-mail. Dane przetwarzamy zgodnie z <a href="{% url 'regulations:list' %}">informacją RODO</a>.</p>
+  <button class="btn" type="submit">Załóż konto</button>
+</form>
+</div>
+<p>Masz już konto? <a href="{% url 'accounts:login' %}">Zaloguj się</a></p>
+{% endblock %}

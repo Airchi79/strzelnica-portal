@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% load satok %}
+{% block title %}Mój pulpit{% endblock %}
+{% block content %}
+<h1>Witaj, {{ user.first_name }}</h1>
+{% if missing_profile %}<div class="msg warning">Uzupełnij dane kontaktowe i adres w <a href="{% url 'accounts:profile' %}">profilu</a>.</div>{% endif %}
+<div class="grid">
+  <a class="card tile" href="{% url 'credentials:my_list' %}">
+    <strong>Moje dokumenty i uprawnienia</strong>
+    <span class="muted">
+      {% if is_ps %}Prowadzący strzelanie — zweryfikowany{% elif credentials %}{{ credentials|length }} dokument(y){% else %}Dodaj pozwolenie i uprawnienia PS{% endif %}
+    </span>
+  </a>
+  <div class="card tile">
+    <strong>Rezerwacje osi</strong>
+    <span class="muted">{% if is_ps %}Dostępne wkrótce (etap 2).{% else %}Rezerwować może osoba ze zweryfikowanymi uprawnieniami prowadzącego strzelanie.{% endif %}</span>
+  </div>
+  <a class="card tile" href="{% url 'accounts:profile' %}"><strong>Profil i bezpieczeństwo</strong><span class="muted">Dane, hasło, logowanie dwuskładnikowe</span></a>
+  <a class="card tile" href="{% url 'regulations:list' %}"><strong>Regulaminy</strong><span class="muted">Aktualne dokumenty stowarzyszenia</span></a>
+</div>
+{% if credentials %}
+<h2>Status dokumentów</h2>
+<div class="card table-wrap"><table>
+  <tr><th>Dokument</th><th>Numer</th><th>Status</th></tr>
+  {% for c in credentials %}<tr><td>{{ c.get_kind_display }}</td><td>{{ c.number }}</td><td><span class="badge {{ c.effective_status|status_class }}">{{ c.get_effective_status_display }}</span></td></tr>{% endfor %}
+</table></div>
+{% endif %}
+{% endblock %}

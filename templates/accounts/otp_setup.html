@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Logowanie dwuskładnikowe{% endblock %}
+{% block content %}
+<h1>Włącz logowanie dwuskładnikowe</h1>
+<div class="card">
+  {% if required %}<p>Dostęp do panelu zarządu wymaga drugiego składnika logowania.</p>{% endif %}
+  <ol>
+    <li>Zainstaluj aplikację uwierzytelniającą (np. Aegis, Google Authenticator, Microsoft Authenticator).</li>
+    <li>Zeskanuj kod QR albo wpisz klucz ręcznie.</li>
+    <li>Wpisz 6-cyfrowy kod wyświetlony w aplikacji.</li>
+  </ol>
+  <div class="qr"><img src="{{ qr }}" alt="Kod QR do konfiguracji aplikacji uwierzytelniającej"></div>
+  <p class="small">Klucz: <code class="secret">{{ secret }}</code></p>
+  <form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Potwierdź</button></form>
+</div>
+{% endblock %}

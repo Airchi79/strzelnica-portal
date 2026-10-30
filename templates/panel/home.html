@@ -1,0 +1,12 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Panel zarządu{% endblock %}
+{% block panel %}
+<h1>Panel zarządu</h1>
+<div class="grid">
+  {% if perms.credentials.review_credential %}
+  <a class="card tile" href="{% url 'panel:credentials' %}"><span class="stat">{{ stats.pending_credentials }}</span><strong>dokumentów do weryfikacji</strong></a>
+  {% endif %}
+  <div class="card tile"><span class="stat">{{ stats.users }}</span><strong>aktywnych kont</strong></div>
+  <div class="card tile"><span class="stat">{{ stats.ps }}</span><strong>zweryfikowanych prowadzących strzelanie</strong></div>
+</div>
+{% endblock %}

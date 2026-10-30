@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Sprawdź skrzynkę{% endblock %}
+{% block content %}
+<h1>Sprawdź skrzynkę e-mail</h1>
+<div class="card"><p>Wysłaliśmy link potwierdzający na adres <strong>{{ email }}</strong>. Kliknij go, aby aktywować konto.</p>
+<p class="small muted">Nie dotarł? Sprawdź folder SPAM lub <a href="{% url 'accounts:resend_verification' %}">wyślij link ponownie</a>.</p></div>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% if page.has_other_pages %}
+<div class="pagination">
+  {% if page.has_previous %}<a class="btn secondary" href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page.previous_page_number }}">←</a>{% endif %}
+  <span>Strona {{ page.number }} z {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="btn secondary" href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page.next_page_number }}">→</a>{% endif %}
+</div>
+{% endif %}

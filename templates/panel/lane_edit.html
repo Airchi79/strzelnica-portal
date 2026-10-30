@@ -1,0 +1,40 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}{{ lane.name }}{% endblock %}
+{% block panel %}
+<h1>{{ lane.name }}</h1>
+<form method="post" novalidate>{% csrf_token %}
+  <div class="card">{% include "partials/form.html" with form=form %}</div>
+  <h2>Godziny otwarcia</h2>
+  <div class="card">
+    {{ hours.management_form }}
+    {% if hours.non_form_errors %}<div class="msg error">{{ hours.non_form_errors }}</div>{% endif %}
+    <div id="hours-table" class="hours-list">
+      {% for f in hours %}
+      <div class="hours-row">{% for hidden in f.hidden_fields %}{{ hidden }}{% endfor %}
+        <div class="hours-day"><label for="{{ f.weekday.id_for_label }}">Dzień</label>{{ f.weekday }}</div>
+        <div><label for="{{ f.opens.id_for_label }}">Od</label>{{ f.opens }}</div>
+        <div><label for="{{ f.closes.id_for_label }}">Do</label>{{ f.closes }}</div>
+        {% if f.instance.pk %}<div class="hours-del"><label>{{ f.DELETE }} Usuń</label></div>{% endif %}
+        {% if f.errors %}<div class="hours-day">{{ f.non_field_errors }}{{ f.weekday.errors }}{{ f.opens.errors }}{{ f.closes.errors }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <template id="hours-empty"><div class="hours-row">{{ hours.empty_form.lane }}{{ hours.empty_form.id }}
+      <div class="hours-day"><label>Dzień</label>{{ hours.empty_form.weekday }}</div>
+      <div><label>Od</label>{{ hours.empty_form.opens }}</div>
+      <div><label>Do</label>{{ hours.empty_form.closes }}</div></div></template>
+    <button class="btn secondary" type="button" data-add-form="hours">Dodaj dzień</button>
+    <p class="small muted">Dzień bez wpisu oznacza, że oś jest tego dnia zamknięta.</p>
+  </div>
+  <div class="actions"><button class="btn" type="submit">Zapisz</button><a class="btn secondary" href="{% url 'panel:lanes' %}">Wróć</a></div>
+</form>
+<h2>Cennik</h2>
+<div class="card">
+  <div class="table-wrap"><table>
+    <tr><th>Od</th><th>Za osobę / h</th><th>Ryczałt / h</th></tr>
+    {% for r in rules %}<tr><td>{{ r.valid_from|date:"d.m.Y" }}</td><td>{{ r.per_person_hourly|pln }}</td><td>{{ r.flat_hourly|pln }}</td></tr>
+    {% empty %}<tr><td colspan="3" class="muted">Brak cennika.</td></tr>{% endfor %}
+  </table></div>
+  <div class="actions"><a class="btn secondary" href="{% url 'panel:price_add' lane.pk %}">Dodaj cennik od wybranej daty</a></div>
+</div>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Dezaktywacja konta{% endblock %}
+{% block content %}
+<h1>Dezaktywacja konta</h1>
+<div class="card">
+  <p>Po dezaktywacji nie zalogujesz się do systemu. Wpisy, które przepisy nakazują przechowywać (np. książka pobytu, rozliczenia), pozostaną w archiwum przez wymagany okres.</p>
+  <form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn danger" type="submit">Dezaktywuj konto</button></form>
+</div>
+{% endblock %}

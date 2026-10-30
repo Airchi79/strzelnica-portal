@@ -1,0 +1,6 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Stowarzyszenie{% endblock %}
+{% block panel %}
+<h1>Dane stowarzyszenia</h1>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Zapisz</button></form></div>
+{% endblock %}

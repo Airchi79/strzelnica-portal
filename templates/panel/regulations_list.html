@@ -1,0 +1,25 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Regulaminy{% endblock %}
+{% block panel %}
+<h1>Regulaminy</h1>
+<p class="muted">Opublikowanej wersji nie można zmienić. Po publikacji, od daty „obowiązuje od”, każdy użytkownik musi zaakceptować nową wersję.</p>
+{% for doc, current, versions in docs %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+    <h2 style="margin:0">{{ doc.title }}</h2>
+    <a class="btn secondary" href="{% url 'panel:regulation_new' doc.pk %}">Nowa wersja</a>
+  </div>
+  <div class="table-wrap"><table>
+    <tr><th>Wersja</th><th>Obowiązuje od</th><th>Status</th><th></th></tr>
+    {% for v in versions %}
+    <tr><td>{{ v.number }}</td><td>{{ v.effective_from|date:"d.m.Y H:i" }}</td>
+      <td>{% if v == current %}<span class="badge ok">obowiązująca</span>{% elif v.is_published %}<span class="badge">opublikowana</span>{% else %}<span class="badge warn">robocza</span>{% endif %}</td>
+      <td>{% if v.is_published %}<a href="{% url 'regulations:version' v.pk %}">Podgląd</a>
+          {% else %}<a href="{% url 'panel:regulation_edit' doc.pk v.pk %}">Edytuj</a>
+          <form class="inline-form" method="post" action="{% url 'panel:regulation_publish' v.pk %}" data-confirm="Opublikować wersję {{ v.number }}? Po publikacji nie będzie można jej zmienić.">{% csrf_token %}<button class="btn" type="submit">Publikuj</button></form>
+          <form class="inline-form" method="post" action="{% url 'panel:regulation_delete' v.pk %}" data-confirm="Usunąć wersję roboczą?">{% csrf_token %}<button class="btn secondary" type="submit">Usuń</button></form>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4" class="muted">Brak wersji — dodaj treść dokumentu.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endfor %}
+{% endblock %}

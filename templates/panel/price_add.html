@@ -1,0 +1,9 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Nowy cennik{% endblock %}
+{% block panel %}
+<h1>Nowy cennik — {{ lane.name }}</h1>
+<p class="muted">Opłata za godzinę = mniejsza z kwot: liczba osób × stawka za osobę albo ryczałt. Rezerwacje utworzone wcześniej zachowują swoją cenę.</p>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
+  <div class="actions"><button class="btn" type="submit">Dodaj</button><a class="btn secondary" href="{% url 'panel:lane' lane.pk %}">Anuluj</a></div>
+</form></div>
+{% endblock %}

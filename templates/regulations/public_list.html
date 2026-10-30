@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Regulaminy{% endblock %}
+{% block content %}
+<h1>Regulaminy i dokumenty</h1>
+{% for doc, version in docs %}
+<div class="card">
+  <strong>{{ doc.title }}</strong>
+  {% if version %}<div class="small muted">Wersja {{ version.number }}, obowiązuje od {{ version.effective_from|date:"d.m.Y" }}</div>
+  <div class="actions"><a class="btn secondary" href="{% url 'regulations:version' version.pk %}">Czytaj</a></div>
+  {% else %}<div class="small muted">Dokument w przygotowaniu.</div>{% endif %}
+</div>
+{% endfor %}
+{% endblock %}

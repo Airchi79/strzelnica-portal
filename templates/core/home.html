@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Strona główna{% endblock %}
+{% block content %}
+<h1>{{ association.name }}</h1>
+<div class="card">
+  <p>Strzelnica niekomercyjna w Sątoku koło Bierutowa. Z infrastruktury korzystają osoby posiadające pozwolenie na broń
+  oraz uprawnienia prowadzącego strzelanie, a także kluby sportowe — zgodnie z regulaminem stowarzyszenia.</p>
+  <div class="actions">
+    {% if user.is_authenticated %}<a class="btn" href="{% url 'core:dashboard' %}">Przejdź do pulpitu</a>
+    {% else %}<a class="btn" href="{% url 'accounts:register' %}">Załóż konto</a><a class="btn secondary" href="{% url 'accounts:login' %}">Zaloguj się</a>{% endif %}
+  </div>
+</div>
+<h2>Osie strzeleckie</h2>
+<div class="grid">
+  {% for lane in lanes %}
+    <div class="card"><strong>{{ lane.name }}</strong><div class="muted small">{{ lane.get_kind_display }}{% if lane.length_m %} · {{ lane.length_m }} m{% endif %}{% if lane.exclusive_only %} · tylko na wyłączność{% endif %}</div></div>
+  {% endfor %}
+</div>
+<p><a href="{% url 'core:lanes' %}">Godziny otwarcia i cennik →</a></p>
+{% endblock %}

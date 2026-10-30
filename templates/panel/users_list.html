@@ -1,0 +1,16 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Użytkownicy{% endblock %}
+{% block panel %}
+<h1>Użytkownicy</h1>
+<form method="get" class="card"><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ q }}" placeholder="nazwisko lub e-mail"></form>
+<div class="card table-wrap"><table>
+  <tr><th>Imię i nazwisko</th><th class="hide-sm">E-mail</th><th>Status</th><th></th></tr>
+  {% for u in page %}
+  <tr><td>{{ u.full_name }}{% if u.is_superuser %} <span class="badge ok">właściciel</span>{% elif u.is_staff %} <span class="badge">zarząd</span>{% endif %}</td>
+      <td class="hide-sm">{{ u.email }}</td>
+      <td>{% if not u.is_active %}<span class="badge bad">nieaktywne</span>{% elif not u.email_verified %}<span class="badge warn">niepotwierdzone</span>{% else %}<span class="badge ok">aktywne</span>{% endif %}</td>
+      <td><a href="{% url 'panel:user' u.pk %}">Otwórz</a></td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Brak wyników.</td></tr>{% endfor %}
+</table></div>
+{% include "partials/pagination.html" %}
+{% endblock %}

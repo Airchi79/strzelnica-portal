@@ -1,0 +1,17 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Osie i cennik{% endblock %}
+{% block panel %}
+<h1>Osie, godziny otwarcia i cennik</h1>
+{% for facility, lanes in facilities %}
+<h2>{{ facility.name }}{% if not facility.is_active %} <span class="badge">nieaktywny</span>{% endif %}</h2>
+<div class="card table-wrap"><table>
+  <tr><th>Oś</th><th class="hide-sm">Godziny</th><th>Cena / h</th><th></th></tr>
+  {% for lane, rule in lanes %}
+  <tr><td>{{ lane.name }}{% if not lane.is_active %} <span class="badge bad">nieaktywna</span>{% endif %}<div class="small muted">{{ lane.get_kind_display }}{% if lane.length_m %} · {{ lane.length_m }} m{% endif %}</div></td>
+    <td class="hide-sm small">{% for h in lane.opening_hours.all %}{{ h }}<br>{% empty %}—{% endfor %}</td>
+    <td>{% if rule %}{% if rule.per_person_hourly %}{{ rule.per_person_hourly|pln }}/os., maks. {{ rule.flat_hourly|pln }}{% else %}{{ rule.flat_hourly|pln }} ryczałt{% endif %}{% else %}<span class="badge warn">brak cennika</span>{% endif %}</td>
+    <td><a href="{% url 'panel:lane' lane.pk %}">Edytuj</a></td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Brak osi.</td></tr>{% endfor %}
+</table></div>
+{% endfor %}
+{% endblock %}

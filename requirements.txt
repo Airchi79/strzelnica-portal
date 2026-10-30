@@ -1,0 +1,9 @@
+argon2-cffi==25.1.0
+Django==5.2.18
+django-otp==1.7.5
+gunicorn==26.2.0
+pillow==13.0.0
+psycopg==3.3.6
+psycopg-binary==3.3.6
+qrcode==8.2
+whitenoise==6.12.0

@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% load satok %}
+{% block title %}{{ version.document.title }}{% endblock %}
+{% block content %}
+<h1>{{ version.document.title }}</h1>
+<p class="muted small">Wersja {{ version.number }} · obowiązuje od {{ version.effective_from|date:"d.m.Y H:i" }}</p>
+<div class="card regulation">{{ version.content|regulation_text }}</div>
+{% endblock %}

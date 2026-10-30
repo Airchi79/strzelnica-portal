@@ -1,0 +1,63 @@
+# Uruchomienie: docker compose up -d --build
+# Aplikacja nasłuchuje na porcie 8000 hosta. HTTPS zapewnia reverse proxy (np. Nginx Proxy Manager, Caddy, Traefik).
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - private_media:/data/private
+
+  # Zadania okresowe: wygaszanie dokumentów raz na dobę oraz codzienna kopia bazy (7 ostatnich).
+  cron:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c 'while true; do python manage.py expire_credentials; sleep 86400; done'
+
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PGHOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backups:/backups
+    entrypoint: >
+      sh -c 'export PGPASSWORD=$$POSTGRES_PASSWORD;
+      while true; do
+        pg_dump -U $$POSTGRES_USER -d $$POSTGRES_DB -Fc -f /backups/satok-$$(date +%F).dump &&
+        ls -1t /backups/satok-*.dump | tail -n +8 | xargs -r rm --;
+        sleep 86400;
+      done'
+
+volumes:
+  db_data:
+  private_media:

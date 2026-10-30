@@ -1,0 +1,31 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}{{ subject.full_name }}{% endblock %}
+{% block panel %}
+<h1>{{ subject.full_name }}</h1>
+<div class="card"><table>
+  <tr><th>E-mail</th><td>{{ subject.email }}{% if not subject.email_verified %} <span class="badge warn">niepotwierdzony</span>{% endif %}</td></tr>
+  <tr><th>Telefon</th><td>{{ subject.phone|default:"—" }}</td></tr>
+  <tr><th>Adres</th><td>{{ subject.address|default:"—" }}</td></tr>
+  <tr><th>Rejestracja</th><td>{{ subject.date_joined|date:"d.m.Y" }}</td></tr>
+  <tr><th>Konto</th><td>{% if subject.is_active %}aktywne{% else %}nieaktywne{% endif %}</td></tr>
+</table></div>
+<h2>Dokumenty</h2>
+<div class="card table-wrap"><table>
+  {% for c in credentials %}<tr><td>{{ c.get_kind_display }}</td><td>{{ c.number }}</td><td><span class="badge {{ c.effective_status|status_class }}">{{ c.get_effective_status_display }}</span></td>
+  <td>{% if perms.credentials.review_credential %}<a href="{% url 'panel:credential' c.pk %}">Otwórz</a>{% endif %}</td></tr>
+  {% empty %}<tr><td class="muted">Brak dokumentów.</td></tr>{% endfor %}
+</table></div>
+<h2>Uprawnienia w panelu zarządu</h2>
+<div class="card">
+{% if subject.is_superuser %}<p>Właściciel systemu — pełne uprawnienia.</p>
+{% elif can_manage %}
+  <form method="post">{% csrf_token %}
+    <ul class="checks">{% for cb in form.permissions %}<li><label>{{ cb.tag }} {{ cb.choice_label }}</label></li>{% endfor %}</ul>
+    <p class="small muted">Nadanie dowolnego uprawnienia daje dostęp do panelu i wymaga od tej osoby logowania dwuskładnikowego.</p>
+    <button class="btn" type="submit">Zapisz uprawnienia</button>
+  </form>
+{% else %}
+  <ul>{% for code in form.initial.permissions %}<li>{{ code }}</li>{% empty %}<li class="muted">Brak uprawnień.</li>{% endfor %}</ul>
+{% endif %}
+</div>
+{% endblock %}

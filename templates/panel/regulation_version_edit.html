@@ -1,0 +1,8 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{{ doc.title }}{% endblock %}
+{% block panel %}
+<h1>{{ doc.title }} — {% if version.pk %}wersja {{ version.number }} (robocza){% else %}nowa wersja{% endif %}</h1>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
+  <div class="actions"><button class="btn" type="submit">Zapisz wersję roboczą</button><a class="btn secondary" href="{% url 'panel:regulations' %}">Anuluj</a></div>
+</form></div>
+{% endblock %}

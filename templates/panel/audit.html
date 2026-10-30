@@ -1,0 +1,19 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Dziennik{% endblock %}
+{% block panel %}
+<h1>Dziennik</h1>
+<div class="tabs"><a href="?tab=zdarzenia" class="{% if tab != 'wglad' %}active{% endif %}">Zdarzenia</a><a href="?tab=wglad" class="{% if tab == 'wglad' %}active{% endif %}">Wgląd w dane wrażliwe</a></div>
+<form method="get" class="card"><input type="hidden" name="tab" value="{{ tab }}"><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ q }}"></form>
+<div class="card table-wrap"><table>
+{% if tab == 'wglad' %}
+  <tr><th>Czas</th><th>Kto</th><th>Czyje dane</th><th>Zasób / cel</th><th class="hide-sm">IP</th></tr>
+  {% for e in page %}<tr><td>{{ e.at|date:"d.m.Y H:i:s" }}</td><td>{{ e.actor.full_name|default:"—" }}</td><td>{{ e.subject.full_name|default:"—" }}</td><td>{{ e.resource }}<div class="small muted">{{ e.reason }}</div></td><td class="hide-sm">{{ e.ip|default:"" }}</td></tr>
+  {% empty %}<tr><td class="muted">Brak wpisów.</td></tr>{% endfor %}
+{% else %}
+  <tr><th>Czas</th><th>Kto</th><th>Zdarzenie</th><th class="hide-sm">IP</th></tr>
+  {% for e in page %}<tr><td>{{ e.at|date:"d.m.Y H:i:s" }}</td><td>{{ e.actor.full_name|default:"—" }}</td><td>{{ e.action }}<div class="small muted">{{ e.summary }}{% if e.changes %} · {{ e.changes }}{% endif %}</div></td><td class="hide-sm">{{ e.ip|default:"" }}</td></tr>
+  {% empty %}<tr><td class="muted">Brak wpisów.</td></tr>{% endfor %}
+{% endif %}
+</table></div>
+{% include "partials/pagination.html" %}
+{% endblock %}

@@ -1,0 +1,9 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+aby aktywować konto w systemie Strzelnicy Sątok, kliknij link:
+{{ site_url }}{{ path }}
+
+Jeśli to nie Ty zakładałeś konto, zignoruj tę wiadomość.
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

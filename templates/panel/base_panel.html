@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<nav class="tabs" aria-label="Panel zarządu">
+  {% with u=request.resolver_match.url_name %}
+  <a href="{% url 'panel:home' %}" class="{% if u == 'home' %}active{% endif %}">Start</a>
+  {% if perms.credentials.review_credential %}<a href="{% url 'panel:credentials' %}" class="{% if 'credential' in u %}active{% endif %}">Weryfikacja</a>{% endif %}
+  {% if perms.accounts.view_users %}<a href="{% url 'panel:users' %}" class="{% if 'user' in u %}active{% endif %}">Użytkownicy</a>{% endif %}
+  {% if perms.facilities.manage_facilities %}<a href="{% url 'panel:lanes' %}" class="{% if 'lane' in u or 'price' in u %}active{% endif %}">Osie i cennik</a>{% endif %}
+  {% if perms.regulations.publish_regulation %}<a href="{% url 'panel:regulations' %}" class="{% if 'regulation' in u %}active{% endif %}">Regulaminy</a>{% endif %}
+  {% if perms.core.manage_settings %}<a href="{% url 'panel:settings' %}" class="{% if u == 'settings' %}active{% endif %}">Stowarzyszenie</a>{% endif %}
+  {% if perms.audit.view_auditlog %}<a href="{% url 'panel:audit' %}" class="{% if u == 'audit' %}active{% endif %}">Dziennik</a>{% endif %}
+  {% endwith %}
+</nav>
+{% block panel %}{% endblock %}
+{% endblock %}

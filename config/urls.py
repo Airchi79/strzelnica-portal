@@ -14,6 +14,7 @@ urlpatterns = [
     path("dokumenty/", include("apps.credentials.urls")),
     path("regulamin/", include("apps.regulations.urls")),
     path("rezerwacje/", include("apps.bookings.urls")),
+    path("ksiazka/", include("apps.logbook.urls")),
     path("panel/", include("apps.core.panel_urls")),
     path("techniczny/", admin.site.urls),
     path("manifest.webmanifest", core_views.manifest, name="manifest"),

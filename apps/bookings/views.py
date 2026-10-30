@@ -17,6 +17,8 @@ from apps.core.models import AssociationSettings, Notification
 from apps.core.permissions import panel_required
 from apps.facilities.models import Lane, format_pln
 
+from apps.logbook.views import reservation_qr_context
+
 from . import services
 from .forms import (
     BlockForm,
@@ -137,6 +139,8 @@ def detail(request, pk):
             "form": form,
             "late": timezone.now() > reservation.free_cancel_deadline,
             "association": AssociationSettings.load(),
+            "log_entries": reservation.log_entries.order_by("entered_at"),
+            **reservation_qr_context(request, reservation),
         },
     )
 

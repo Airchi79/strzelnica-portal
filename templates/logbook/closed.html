@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Książka pobytu{% endblock %}
+{% block content %}
+<h1>Książka pobytu</h1>
+<div class="card">
+{% if gate_invalid %}<p>Ten kod QR jest nieaktualny. Użyj kodu wywieszonego przy wejściu lub kodu rezerwacji od prowadzącego strzelanie.</p>
+{% elif no_own_reservation %}<p>Aby dopisać {{ person.full_name }}, musisz mieć trwającą rezerwację (od 30 minut przed jej początkiem do końca).</p>
+{% else %}<p>Rezerwacja {{ reservation.lane }}, {{ reservation.starts_at|date:"j.m.Y H:i" }}–{{ reservation.ends_at|time:"H:i" }} nie trwa teraz — wpis jest możliwy krótko przed jej początkiem i w jej trakcie.</p>{% endif %}
+</div>
+{% endblock %}

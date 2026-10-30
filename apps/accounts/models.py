@@ -1,7 +1,13 @@
+import secrets
+
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
+
+
+def new_qr_secret():
+    return secrets.token_hex(16)
 
 
 class UserManager(BaseUserManager):
@@ -48,6 +54,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     email_verified_at = models.DateTimeField("e-mail potwierdzony", null=True, blank=True)
     date_joined = models.DateTimeField("data rejestracji", default=timezone.now)
     deactivated_at = models.DateTimeField("dezaktywowane", null=True, blank=True)
+    # Sekret stałego kodu QR strzelca; zmiana unieważnia wcześniej wydane kody.
+    qr_secret = models.CharField(max_length=32, default=new_qr_secret, editable=False)
 
     objects = UserManager()
 

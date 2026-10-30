@@ -3,6 +3,7 @@ from django.urls import path
 from apps.bookings import views as bookings_views
 from apps.credentials import views as credentials_views
 from apps.facilities import views as facilities_views
+from apps.logbook import views as logbook_views
 from apps.regulations import views as regulations_views
 
 from . import views
@@ -33,6 +34,12 @@ urlpatterns = [
     path("blokady/", bookings_views.panel_blocks, name="blocks"),
     path("blokady/nowa/", bookings_views.panel_block_new, name="block_new"),
     path("blokady/<int:pk>/usun/", bookings_views.panel_block_delete, name="block_delete"),
+    path("ksiazka/", logbook_views.panel_list, name="logbook"),
+    path("ksiazka/druk/", logbook_views.panel_print, name="logbook_print"),
+    path("ksiazka/ustawienia/", logbook_views.panel_settings, name="logbook_settings"),
+    path("ksiazka/ustawienia/nowy-kod/", logbook_views.panel_rotate_gate, name="logbook_rotate"),
+    path("ksiazka/plakat/", logbook_views.panel_gate_poster, name="logbook_poster"),
+    path("ksiazka/<int:pk>/", logbook_views.panel_detail, name="logbook_entry"),
     path("powiadomienia/", bookings_views.panel_notifications, name="notifications"),
     path("powiadomienia/<int:pk>/", bookings_views.panel_notification_open, name="notification"),
     path("dziennik/", views.panel_audit, name="audit"),

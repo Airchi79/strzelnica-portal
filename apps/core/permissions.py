@@ -9,6 +9,8 @@ from apps.accounts.views import SESSION_2FA_NEXT
 
 # Uprawnienia, które można nadawać w panelu zarządu (właściciel systemu ma wszystkie jako superużytkownik).
 PANEL_PERMISSIONS = [
+    ("logbook.view_logbook", "Książka pobytu: przegląd i wydruk"),
+    ("logbook.manage_logbook", "Książka pobytu: ustawienia i kod QR wejścia"),
     ("bookings.manage_reservations", "Rezerwacje, blokady osi i rozliczenia rezerwacji"),
     ("credentials.review_credential", "Weryfikacja dokumentów i uprawnień"),
     ("accounts.view_users", "Przeglądanie kont użytkowników"),

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Wpisano{% endblock %}
+{% block content %}
+<h1>Wpis zapisany</h1>
+<div class="card">
+  <p class="stat">{{ entry.number }}</p>
+  <p>{{ entry.full_name }} · {{ entry.get_purpose_display }} · wejście {{ entry.entered_at|time:"H:i" }}</p>
+  <p class="small muted">Przy wyjściu możesz zapisać godzinę wyjścia (nieobowiązkowe). Zachowaj tę stronę lub dodaj ją do zakładek.</p>
+  <div class="actions"><a class="btn secondary" href="{% url 'logbook:exit' exit_token %}">Wychodzę — zapisz wyjście</a></div>
+</div>
+{% endblock %}

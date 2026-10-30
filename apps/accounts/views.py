@@ -1,8 +1,5 @@
 import base64
-from io import BytesIO
 
-import qrcode
-import qrcode.image.svg
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
@@ -20,6 +17,7 @@ from django_otp.plugins.otp_totp.models import TOTPDevice
 from apps.audit.context import client_ip
 from apps.audit.services import diff, log_event
 from apps.core.notifications import notify_user
+from apps.core.qr import qr_svg_data_uri
 
 from . import ratelimit
 from .backends import EmailBackend
@@ -119,13 +117,6 @@ def _pending_2fa_user(request):
     return User.objects.filter(pk=pk, is_active=True).first() if pk else None
 
 
-def _qr_svg_data_uri(text):
-    img = qrcode.make(text, image_factory=qrcode.image.svg.SvgPathImage, box_size=8)
-    buf = BytesIO()
-    img.save(buf)
-    return "data:image/svg+xml;base64," + base64.b64encode(buf.getvalue()).decode()
-
-
 def _finish_2fa_login(request, user, device):
     nxt = request.session.pop(SESSION_2FA_NEXT, reverse("core:dashboard"))
     request.session.pop(SESSION_2FA_USER, None)
@@ -163,7 +154,7 @@ def otp_setup(request):
     return render(
         request,
         "accounts/otp_setup.html",
-        {"form": form, "qr": _qr_svg_data_uri(device.config_url), "secret": secret, "required": user.requires_2fa},
+        {"form": form, "qr": qr_svg_data_uri(device.config_url), "secret": secret, "required": user.requires_2fa},
     )
 
 

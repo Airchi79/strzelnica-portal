@@ -1,0 +1,21 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{{ e.number }}{% endblock %}
+{% block panel %}
+<h1>Wpis {{ e.number }}</h1>
+<div class="card"><table>
+  <tr><th>Wejście</th><td>{{ e.entered_at|date:"l, j E Y, H:i:s" }}</td></tr>
+  <tr><th>Wyjście</th><td>{{ e.exited_at|date:"j.m.Y H:i"|default:"nie zapisano" }}</td></tr>
+  <tr><th>Imię i nazwisko</th><td>{{ e.full_name }}{% if e.user %} <span class="badge">konto</span>{% endif %}</td></tr>
+  <tr><th>{% if e.has_permit %}Pozwolenie na broń{% else %}Adres{% endif %}</th><td>{% if e.has_permit %}nr {{ e.permit_number }}, {{ e.permit_issuer }}{% else %}{{ e.address }}{% endif %}</td></tr>
+  <tr><th>Cel pobytu</th><td>{{ e.get_purpose_display }}{% if e.purpose_note %}: {{ e.purpose_note }}{% endif %}</td></tr>
+  {% if e.reservation %}<tr><th>Rezerwacja</th><td><a href="{% url 'panel:reservation' e.reservation.pk %}">{{ e.reservation.number }}</a> · {{ e.reservation.lane }}</td></tr>
+  <tr><th>Prowadzący strzelanie</th><td>{{ e.range_officer.full_name }}</td></tr>{% endif %}
+  <tr><th>Sposób wpisu</th><td>{{ e.get_source_display }}{% if e.created_by %} ({{ e.created_by.full_name }}){% endif %}</td></tr>
+  <tr><th>Oświadczenie</th><td>{{ e.statement }}{% if e.regulation_version %}<div class="small muted">Regulamin: wersja {{ e.regulation_version.number }}</div>{% endif %}</td></tr>
+  <tr><th>Podpis</th><td><div class="qr"><img src="{{ signature }}" alt="Podpis" style="width:auto;height:90px"></div></td></tr>
+  <tr><th>Integralność</th><td>{% if e.integrity_ok %}<span class="badge ok">dane i podpis bez zmian</span>{% else %}<span class="badge bad">NIEZGODNOŚĆ sumy kontrolnej</span>{% endif %}
+    <div class="small muted">SHA-256: {{ e.content_sha256 }}</div></td></tr>
+  <tr><th>Urządzenie</th><td class="small">{{ e.ip|default:"" }} · {{ e.user_agent|truncatechars:80 }}</td></tr>
+</table></div>
+<p><a href="{% url 'panel:logbook' %}">← Książka pobytu</a></p>
+{% endblock %}

@@ -1,0 +1,7 @@
+<div class="field{% if field.widget_type == 'checkbox' %} checkbox{% endif %}" data-field="{{ field.name }}">
+  {% if field.widget_type == 'checkbox' %}<label>{{ field }} {{ field.label }}</label>
+  {% elif field.widget_type == 'radioselect' %}<fieldset class="radios"><legend>{{ field.label }}</legend>{% for r in field %}<label>{{ r.tag }} {{ r.choice_label }}</label>{% endfor %}</fieldset>
+  {% else %}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% endif %}
+  {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+  {{ field.errors }}
+</div>

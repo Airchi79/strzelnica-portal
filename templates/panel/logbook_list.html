@@ -1,0 +1,24 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Książka pobytu{% endblock %}
+{% block panel %}
+<h1>Książka pobytu</h1>
+<form method="get" class="card filters">
+  <div><label for="f-od">Od</label><input type="date" id="f-od" name="od" value="{{ f.od|date:'Y-m-d' }}"></div>
+  <div><label for="f-do">Do</label><input type="date" id="f-do" name="do" value="{{ f.do|date:'Y-m-d' }}"></div>
+  <div><label for="f-cel">Cel</label><select id="f-cel" name="cel"><option value="">wszystkie</option>{% for v, l in purposes %}<option value="{{ v }}"{% if f.cel == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div><label for="f-q">Szukaj</label><input type="search" id="f-q" name="q" value="{{ f.q }}" placeholder="nazwisko, nr wpisu, nr pozwolenia"></div>
+  <div class="actions"><button class="btn" type="submit">Filtruj</button>
+    <a class="btn secondary" href="{% url 'panel:logbook_print' %}?{{ request.GET.urlencode }}" target="_blank" rel="noopener">Wydruk / PDF</a>
+    {% if perms.logbook.manage_logbook %}<a class="btn secondary" href="{% url 'panel:logbook_settings' %}">Ustawienia i kod QR</a>{% endif %}</div>
+</form>
+<div class="card table-wrap"><table>
+  <tr><th>Wejście</th><th>Osoba</th><th>Cel</th><th class="hide-sm">Prowadzący / oś</th><th class="hide-sm">Wyjście</th></tr>
+  {% for e in page %}
+  <tr><td><a href="{% url 'panel:logbook_entry' e.pk %}">{{ e.entered_at|date:"j.m.Y H:i" }}</a><div class="small muted">{{ e.number }}</div></td>
+    <td>{{ e.full_name }}</td><td>{{ e.get_purpose_display }}</td>
+    <td class="hide-sm">{% if e.range_officer %}{{ e.range_officer.full_name }}<div class="small muted">{{ e.reservation.lane }}</div>{% else %}—{% endif %}</td>
+    <td class="hide-sm">{{ e.exited_at|time:"H:i"|default:"—" }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Brak wpisów w wybranym okresie.</td></tr>{% endfor %}
+</table></div>
+{% include "partials/pagination.html" %}
+{% endblock %}

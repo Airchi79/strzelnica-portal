@@ -83,6 +83,9 @@ class Reservation(models.Model):
     )
     payment_marked_at = models.DateTimeField(null=True, blank=True)
     reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    # Rozliczenie po zakończeniu: dopłata, gdy w książce pobytu było więcej strzelających niż zadeklarowano.
+    settled_at = models.DateTimeField("rozliczono po terminie", null=True, blank=True)
+    declared_persons = models.PositiveIntegerField("zadeklarowana liczba osób", null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     created_at = models.DateTimeField("utworzono", auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

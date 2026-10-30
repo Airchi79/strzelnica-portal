@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "apps.regulations",
     "apps.facilities",
     "apps.bookings",
+    "apps.logbook",
 ]
 
 MIDDLEWARE = [

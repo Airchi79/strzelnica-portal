@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Mój kod QR{% endblock %}
+{% block content %}
+<h1>Mój kod QR</h1>
+<div class="card" style="text-align:center">
+  <div class="qr"><img src="{{ qr }}" alt="Twój stały kod QR do książki pobytu"></div>
+  <p class="small">Pokaż ten kod prowadzącemu strzelanie — zeskanuje go i dopisze Cię do książki pobytu. Kod nie zawiera Twoich danych.</p>
+  <form method="post" data-confirm="Wygenerować nowy kod? Poprzedni przestanie działać.">{% csrf_token %}<button class="btn secondary" type="submit">Wygeneruj nowy kod</button></form>
+</div>
+<h2>Moje pobyty</h2>
+<div class="card table-wrap"><table>
+  <tr><th>Wejście</th><th>Cel</th><th class="hide-sm">Oś</th><th>Nr</th></tr>
+  {% for e in entries %}<tr><td>{{ e.entered_at|date:"j.m.Y H:i" }}</td><td>{{ e.get_purpose_display }}</td><td class="hide-sm">{{ e.reservation.lane|default:"—" }}</td><td>{{ e.number }}</td></tr>
+  {% empty %}<tr><td class="muted" colspan="4">Brak wpisów.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

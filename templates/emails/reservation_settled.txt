@@ -1,0 +1,10 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
+
+po zakończeniu rezerwacji rozliczyliśmy ją według książki pobytu: strzelało {{ reservation.persons }} os.
+(zadeklarowano {{ reservation.declared_persons }}). Opłata nie przekracza ryczałtu za oś.
+
+{% include "emails/_reservation_summary.txt" %}
+Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

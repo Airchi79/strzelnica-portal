@@ -11,6 +11,21 @@
   <tr><th>Płatność</th><td>{{ r.get_payment_status_display }}</td></tr>
   {% if r.notes %}<tr><th>Uwagi</th><td>{{ r.notes }}</td></tr>{% endif %}
 </table></div>
+{% if entry_qr %}
+<div class="card" style="text-align:center">
+  <h2 style="margin-top:0">Kod QR do książki pobytu</h2>
+  <div class="qr"><img src="{{ entry_qr }}" alt="Kod QR wpisu do książki pobytu dla tej rezerwacji"></div>
+  <p class="small">Pokaż kod uczestnikom — każdy skanuje go swoim telefonem i wpisuje się do książki.
+  {% if not entry_open %}<br>Wpisy będą możliwe od {{ entry_opens_at|date:"j.m.Y H:i" }}.{% endif %}</p>
+  <p class="small muted">Masz osobę z kontem? Zeskanuj jej „Mój kod QR” aparatem telefonu, aby ją dopisać.</p>
+</div>
+{% endif %}
+{% if log_entries %}
+<div class="card">
+  <h2 style="margin-top:0">Książka pobytu ({{ log_entries|length }})</h2>
+  <table>{% for e in log_entries %}<tr><td>{{ e.entered_at|time:"H:i" }}</td><td>{{ e.full_name }}</td><td class="small">{{ e.get_purpose_display }}</td></tr>{% endfor %}</table>
+</div>
+{% endif %}
 {% if r.payment_status == 'do_zaplaty' %}
 <div class="card">
   <h2 style="margin-top:0">Jak zapłacić</h2>

@@ -1,0 +1,16 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Ustawienia książki pobytu{% endblock %}
+{% block panel %}
+<h1>Ustawienia książki pobytu</h1>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Zapisz</button></form>
+<p class="small muted">Wpisy starsze niż okres przechowywania są usuwane automatycznie (zadanie okresowe).</p></div>
+<h2>Kod QR przy wejściu</h2>
+<div class="card">
+  <p>Plakat z kodem wywieś przy wejściu na strzelnicę.{% if cfg.gate_token_rotated_at %} Kod zmieniono {{ cfg.gate_token_rotated_at|date:"j.m.Y H:i" }}.{% endif %}</p>
+  <div class="actions">
+    <a class="btn" href="{% url 'panel:logbook_poster' %}" target="_blank" rel="noopener">Plakat do druku</a>
+    <form method="post" action="{% url 'panel:logbook_rotate' %}" data-confirm="Wygenerować nowy kod? Wywieszony plakat przestanie działać.">{% csrf_token %}<button class="btn secondary" type="submit">Wygeneruj nowy kod</button></form>
+  </div>
+  <p class="small muted">Wymień kod, jeśli podejrzewasz, że ktoś używa go spoza strzelnicy (np. ze zdjęcia).</p>
+</div>
+{% endblock %}

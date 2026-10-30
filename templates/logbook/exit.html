@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Wyjście{% endblock %}
+{% block content %}
+<h1>Wyjście ze strzelnicy</h1>
+<div class="card">
+  <p>{{ entry.number }} · {{ entry.full_name }} · wejście {{ entry.entered_at|date:"j.m.Y H:i" }}</p>
+  {% if entry.exited_at %}<p>Wyjście zapisane: <strong>{{ entry.exited_at|time:"H:i" }}</strong>.</p>
+  {% else %}<form method="post">{% csrf_token %}<button class="btn" type="submit">Zapisz wyjście teraz</button></form>{% endif %}
+</div>
+{% endblock %}

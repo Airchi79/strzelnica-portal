@@ -37,7 +37,7 @@ services:
       db:
         condition: service_healthy
     command: >
-      sh -c 'while true; do python manage.py send_reminders; python manage.py expire_credentials; sleep 3600; done'
+      sh -c 'while true; do python manage.py send_reminders; python manage.py settle_reservations; python manage.py expire_credentials; python manage.py purge_logbook; sleep 3600; done'
 
   backup:
     image: postgres:16

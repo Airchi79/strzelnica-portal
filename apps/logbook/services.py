@@ -18,6 +18,7 @@ from apps.audit.services import log_event
 from apps.bookings.models import Reservation
 from apps.core.notifications import notify_board, notify_user
 from apps.credentials.models import Credential, valid_credentials
+from apps.payments.services import apply_wallet
 from apps.regulations.models import RegulationDocument
 
 from .models import STATEMENT_TEXT, Entry, EntrySequence, LogbookSettings
@@ -266,6 +267,8 @@ def settle_finished_reservations(now=None):
                             str(r),
                             changes={"osoby": [before[0], shooters], "kwota_gr": [before[1], r.amount]},
                         )
+                        apply_wallet(r.user)
+                        r.refresh_from_db()
                         notify_user(r.user, f"Rozliczenie rezerwacji {r.number}", "emails/reservation_settled.txt", reservation=r)
                     else:
                         r.save(update_fields=["settled_at"])

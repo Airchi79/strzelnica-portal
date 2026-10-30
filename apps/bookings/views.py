@@ -1,6 +1,7 @@
 import csv
 from datetime import date, timedelta
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -18,6 +19,8 @@ from apps.core.permissions import panel_required
 from apps.facilities.models import Lane, format_pln
 
 from apps.logbook.views import reservation_qr_context
+
+from apps.payments.services import balance_of
 
 from . import services
 from .forms import (
@@ -140,6 +143,7 @@ def detail(request, pk):
             "late": timezone.now() > reservation.free_cancel_deadline,
             "association": AssociationSettings.load(),
             "log_entries": reservation.log_entries.order_by("entered_at"),
+            "tpay_enabled": settings.TPAY_ENABLED,
             **reservation_qr_context(request, reservation),
         },
     )
@@ -250,7 +254,14 @@ def panel_detail(request, pk):
     return render(
         request,
         "panel/booking_detail.html",
-        {"r": r, "cancel_form": cancel_form, "persons_form": persons_form, "started": r.starts_at <= timezone.now()},
+        {
+            "r": r,
+            "cancel_form": cancel_form,
+            "persons_form": persons_form,
+            "started": r.starts_at <= timezone.now(),
+            "wallet_balance": balance_of(r.user),
+            "remaining_pln": f"{(r.amount - r.paid_amount) / 100:.2f}".replace(".", ","),
+        },
     )
 
 

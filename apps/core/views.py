@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.views.decorators.cache import cache_control
 
 from apps.bookings.models import Reservation
+from apps.payments.services import balance_of
 from apps.audit.models import AuditLog, SensitiveAccessLog
 from apps.audit.services import diff, log_event, log_sensitive_access
 from apps.credentials.models import Credential, is_range_officer
@@ -39,6 +40,8 @@ def dashboard(request):
             "credentials": credentials,
             "is_ps": is_range_officer(request.user),
             "missing_profile": not (request.user.phone and request.user.city),
+            "balance": balance_of(request.user),
+            "due_count": request.user.reservations.filter(payment_status="do_zaplaty").count(),
             "upcoming": request.user.reservations.filter(status="potwierdzona", ends_at__gt=timezone.now()).select_related("lane").order_by("starts_at").first(),
         },
     )

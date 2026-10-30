@@ -112,3 +112,7 @@ input[type=radio] { width: 20px; height: 20px; margin-right: 6px; }
 
 /* Długie wartości (sumy kontrolne, opisy urządzeń) zawijają się zamiast rozpychać tabelę */
 td { overflow-wrap: anywhere; }
+
+/* Płatności */
+td.neg, .neg { color: var(--bad); } td.pos { color: var(--ok); }
+.code { font-family: ui-monospace, monospace; letter-spacing: .03em; }

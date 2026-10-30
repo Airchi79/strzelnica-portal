@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "apps.facilities",
     "apps.bookings",
     "apps.logbook",
+    "apps.payments",
 ]
 
 MIDDLEWARE = [
@@ -177,3 +178,10 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO")},
 }
+
+# Tpay (Open API). Bez kompletu danych płatności online są wyłączone.
+TPAY_CLIENT_ID = env("TPAY_CLIENT_ID", "")
+TPAY_CLIENT_SECRET = env("TPAY_CLIENT_SECRET", "")
+TPAY_SECURITY_CODE = env("TPAY_SECURITY_CODE", "")
+TPAY_SANDBOX = env_bool("TPAY_SANDBOX", True)
+TPAY_ENABLED = bool(TPAY_CLIENT_ID and TPAY_CLIENT_SECRET and TPAY_SECURITY_CODE)

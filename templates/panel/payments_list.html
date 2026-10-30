@@ -1,0 +1,20 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Wpłaty{% endblock %}
+{% block panel %}
+<h1>Wpłaty</h1>
+{% include "panel/_payments_tabs.html" %}
+{% if unmatched %}<div class="msg warning"><a href="?status=nieprzypisana">{{ unmatched }} wpłat(y) czeka na przypisanie</a> — tytuł przelewu nie zawierał rozpoznawalnego kodu.</div>{% endif %}
+<form method="get" class="card filters">
+  <div><label for="f-st">Status</label><select id="f-st" name="status"><option value="">wszystkie</option>{% for v, l in statuses %}<option value="{{ v }}"{% if status == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div><label for="f-q">Szukaj</label><input type="search" id="f-q" name="q" value="{{ q }}" placeholder="tytuł, wpłacający, nazwisko"></div>
+  <div class="actions"><button class="btn" type="submit">Filtruj</button></div>
+</form>
+<div class="card table-wrap"><table>
+  <tr><th>Data</th><th>Kwota</th><th>Sposób</th><th>Strzelec / wpłacający</th><th>Status</th></tr>
+  {% for p in page %}<tr><td><a href="{% url 'panel:payment' p.pk %}">{{ p.booked_on|default:p.created_at|date:"j.m.Y" }}</a></td><td>{{ p.amount|pln }}</td><td>{{ p.get_method_display }}</td>
+    <td>{{ p.user.full_name|default:p.payer_name }}<div class="small muted">{{ p.title|truncatechars:60 }}</div></td>
+    <td><span class="badge {% if p.status == 'zaksiegowana' %}ok{% elif p.status == 'nieprzypisana' %}warn{% elif p.status == 'nieudana' %}bad{% endif %}">{{ p.get_status_display }}</span></td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Brak wpłat.</td></tr>{% endfor %}
+</table></div>
+{% include "partials/pagination.html" %}
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Przyjmij wpłatę{% endblock %}
+{% block panel %}
+<h1>Przyjmij wpłatę</h1>
+{% include "panel/_payments_tabs.html" %}
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
+  <p class="small muted">Kwota trafi na saldo strzelca, a należności za rezerwacje zostaną z niego opłacone automatycznie.</p>
+  <button class="btn" type="submit">Zaksięguj wpłatę</button></form></div>
+{% endblock %}

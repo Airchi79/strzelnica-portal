@@ -1,0 +1,24 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Saldo — {{ subject.full_name }}{% endblock %}
+{% block panel %}
+<h1>{{ subject.full_name }}</h1>
+{% include "panel/_payments_tabs.html" %}
+{% if not consistent %}<div class="msg error">Saldo nie zgadza się z sumą operacji — zgłoś to administratorowi.</div>{% endif %}
+<div class="grid">
+  <div class="card"><span class="muted small">Saldo</span><div class="stat">{{ balance|pln }}</div><div class="small muted">Kod przelewu: {{ topup_code }}</div></div>
+  <div class="card"><span class="muted small">Rezerwacje do zapłaty</span><div class="stat">{{ due|length }}</div>
+    {% for r in due %}<div class="small"><a href="{% url 'panel:reservation' r.pk %}">{{ r.number }}</a> · {{ r.amount|sub:r.paid_amount|pln }}</div>{% endfor %}</div>
+</div>
+<div class="actions" style="margin-top:0;margin-bottom:16px"><a class="btn" href="{% url 'panel:payment_manual' %}?user={{ subject.pk }}">Przyjmij wpłatę</a></div>
+<h2>Historia</h2>
+<div class="card table-wrap"><table>
+  <tr><th>Data</th><th>Operacja</th><th>Kwota</th><th>Saldo</th></tr>
+  {% for e in page %}<tr><td>{{ e.created_at|date:"j.m.Y H:i" }}</td><td>{{ e.description }}{% if e.created_by %}<div class="small muted">{{ e.created_by.full_name }}</div>{% endif %}</td>
+    <td class="{% if e.amount < 0 %}neg{% else %}pos{% endif %}">{% if e.amount > 0 %}+{% endif %}{{ e.amount|pln }}</td><td>{{ e.balance_after|pln }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Brak operacji.</td></tr>{% endfor %}
+</table></div>
+{% include "partials/pagination.html" %}
+<h2>Korekta salda</h2>
+<div class="card"><form method="post" novalidate data-confirm="Zaksięgować korektę salda?">{% csrf_token %}{% include "partials/form.html" %}<button class="btn secondary" type="submit">Zaksięguj korektę</button></form>
+<p class="small muted">Korekta jest nową operacją w historii — wcześniejszych operacji nie można zmienić ani usunąć.</p></div>
+{% endblock %}

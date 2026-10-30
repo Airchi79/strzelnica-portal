@@ -43,6 +43,7 @@ python -m pytest
 | `apps/regulations` | wersjonowane regulaminy, publikacja, wymuszona akceptacja |
 | `apps/bookings` | rezerwacje osi (blokada całej osi), blokady zarządu, rozliczenia ręczne, przypomnienia |
 | `apps/logbook` | elektroniczna książka rejestru pobytu: kody QR, podpis na ekranie, wydruk, rozliczenie wg wpisów |
+| `apps/payments` | saldo strzelca, księga sald, wpłaty (przelew/CSV, gotówka, BLIK, Tpay), import wyciągu |
 | `apps/facilities` | obiekty, osie, godziny otwarcia, cennik (kwoty w groszach) |
 | `apps/audit` | dziennik zdarzeń i rejestr wglądu w dane wrażliwe (niezmienialne — trigger w bazie) |
 | `apps/core` | strona główna, pulpit, panel zarządu, uprawnienia, PWA, powiadomienia e-mail |

@@ -17,14 +17,18 @@
 </table></div>
 
 <h2>Rozliczenie</h2>
-<div class="card"><form method="post" class="actions" style="margin-top:0">{% csrf_token %}
+<div class="card">
+  <p>Zapłacono: <strong>{{ r.paid_amount|pln }}</strong> z {{ r.amount|pln }} · saldo strzelca: <a href="{% url 'panel:wallet' r.user.pk %}">{{ wallet_balance|pln }}</a></p>
+  <form method="post" class="actions" style="margin-top:0">{% csrf_token %}
   {% if r.payment_status == 'do_zaplaty' %}
-    <button class="btn" name="action" value="paid">Oznacz jako opłaconą</button>
-    <button class="btn secondary" name="action" value="waive" data-confirm-click="Zwolnić z opłaty?">Zwolnij z opłaty</button>
-  {% elif r.payment_status == 'oplacona' or r.payment_status == 'zwolniona' %}
-    <button class="btn secondary" name="action" value="due">Cofnij — do zapłaty</button>
+    <a class="btn" href="{% url 'panel:payment_manual' %}?user={{ r.user.pk }}&amp;kwota={{ remaining_pln }}">Przyjmij wpłatę (gotówka / BLIK)</a>
+    <button class="btn secondary" name="action" value="waive" data-confirm-click="Zwolnić z pozostałej opłaty?">Zwolnij z opłaty</button>
+  {% elif r.payment_status == 'zwolniona' %}
+    <button class="btn secondary" name="action" value="unwaive">Cofnij zwolnienie</button>
+  {% elif r.payment_status == 'oplacona' %}<span class="badge ok">opłacona</span>
   {% else %}<span class="muted">Brak należności.</span>{% endif %}
-</form></div>
+  </form>
+</div>
 
 {% if r.status == 'potwierdzona' %}
 <h2>Zmiany</h2>

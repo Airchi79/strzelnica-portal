@@ -1,0 +1,24 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Wpłata{% endblock %}
+{% block panel %}
+<h1>Wpłata {{ p.amount|pln }}</h1>
+{% include "panel/_payments_tabs.html" %}
+<div class="card"><table>
+  <tr><th>Sposób</th><td>{{ p.get_method_display }}</td></tr>
+  <tr><th>Status</th><td>{{ p.get_status_display }}{% if p.completed_at %} · {{ p.completed_at|date:"j.m.Y H:i" }}{% endif %}</td></tr>
+  <tr><th>Data operacji</th><td>{{ p.booked_on|date:"j.m.Y"|default:"—" }}</td></tr>
+  <tr><th>Tytuł</th><td>{{ p.title|default:"—" }}</td></tr>
+  <tr><th>Wpłacający</th><td>{{ p.payer_name|default:"—" }}</td></tr>
+  <tr><th>Strzelec</th><td>{% if p.user %}<a href="{% url 'panel:wallet' p.user.pk %}">{{ p.user.full_name }}</a>{% else %}—{% endif %}</td></tr>
+  {% if p.reservation %}<tr><th>Rezerwacja</th><td><a href="{% url 'panel:reservation' p.reservation.pk %}">{{ p.reservation.number }}</a></td></tr>{% endif %}
+  {% if p.note %}<tr><th>Uwagi</th><td>{{ p.note }}</td></tr>{% endif %}
+  {% if p.created_by %}<tr><th>Zarejestrował</th><td>{{ p.created_by.full_name }}</td></tr>{% endif %}
+</table></div>
+{% if p.status == 'nieprzypisana' %}
+<div class="card"><form method="post">{% csrf_token %}
+  {% include "partials/form.html" %}
+  <div class="actions"><button class="btn" name="action" value="assign">Przypisz i zaksięguj na saldzie</button>
+    <button class="btn secondary" name="action" value="ignore">Pomiń (nie dotyczy salda)</button></div>
+</form></div>
+{% endif %}
+{% endblock %}

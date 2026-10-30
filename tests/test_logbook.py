@@ -285,7 +285,9 @@ def test_settlement_no_change_when_flat_or_fewer(ps, sig):
 
 def test_settlement_of_paid_reservation_only_flags(ps, owner, sig):
     r = _reservation(ps, "Oś 25 m nr 1", 1)
-    booking_services.set_payment(r, "paid", owner)
+    from apps.payments.services import register_manual_payment
+
+    register_manual_payment(ps, r.amount, "gotowka", owner)
     _shooters(r, 2, sig)
     services.settle_finished_reservations(now=r.ends_at + timedelta(minutes=1))
     r.refresh_from_db()

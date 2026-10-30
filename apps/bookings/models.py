@@ -69,6 +69,7 @@ class Reservation(models.Model):
     price_rule = models.ForeignKey(PriceRule, verbose_name="cennik", on_delete=models.PROTECT, related_name="+")
     hourly_amount = models.PositiveIntegerField("stawka za godzinę [gr]")
     amount = models.PositiveIntegerField("należność [gr]")
+    paid_amount = models.PositiveIntegerField("zapłacono [gr]", default=0)
 
     status = models.CharField("status", max_length=16, choices=Status.choices, default=Status.CONFIRMED, db_index=True)
     payment_status = models.CharField("płatność", max_length=16, choices=Payment.choices, default=Payment.DUE, db_index=True)

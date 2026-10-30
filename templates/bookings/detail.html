@@ -28,9 +28,13 @@
 {% endif %}
 {% if r.payment_status == 'do_zaplaty' %}
 <div class="card">
-  <h2 style="margin-top:0">Jak zapłacić</h2>
-  <p>Gotówką lub BLIK-iem na miejscu albo przelewem{% if association.bank_account %} na rachunek <strong>{{ association.bank_account }}</strong>{% endif %}, w tytule: <strong>{{ r.number }}</strong>.</p>
-  <p class="small muted">Płatności online i saldo konta zostaną uruchomione w kolejnym etapie.</p>
+  <h2 style="margin-top:0">Do zapłaty: {{ r.amount|sub:r.paid_amount|pln }}</h2>
+  <p class="small">Opłata zostanie pobrana automatycznie z Twojego salda, gdy będzie na nim wystarczająco środków.</p>
+  <div class="actions">
+    {% if tpay_enabled %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}"><button class="btn" type="submit">Zapłać online</button></form>{% endif %}
+    <a class="btn secondary" href="{% url 'payments:wallet' %}">Saldo i inne sposoby płatności</a>
+  </div>
+  <p class="small muted">Przelew: w tytule wpisz <strong>{{ r.number }}</strong>{% if association.bank_account %}, rachunek {{ association.bank_account }}{% endif %}. Na miejscu: gotówka lub BLIK na telefon.</p>
 </div>
 {% endif %}
 {% if r.can_user_cancel %}

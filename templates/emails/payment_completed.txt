@@ -1,0 +1,9 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ payment.user.first_name }},
+
+zaksięgowaliśmy wpłatę {{ payment.amount|pln }} ({{ payment.get_method_display }}).
+Saldo po rozliczeniu należności: {{ balance|pln }}.
+
+Szczegóły: {{ site_url }}{% url 'payments:wallet' %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

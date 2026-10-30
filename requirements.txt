@@ -7,3 +7,4 @@ psycopg==3.3.6
 psycopg-binary==3.3.6
 qrcode==8.2
 whitenoise==6.12.0
+cryptography==50.0.2

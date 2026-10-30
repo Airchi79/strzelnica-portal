@@ -14,6 +14,8 @@ from apps.core.notifications import notify_board, notify_user
 from apps.credentials.models import is_range_officer
 from apps.regulations.models import pending_acceptances
 
+from apps.payments.services import apply_wallet, reconcile_reservation, refund_reservation
+
 from .models import Block, BookingSettings, NumberSequence, Reservation
 
 PERM = "bookings.manage_reservations"
@@ -163,6 +165,9 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
         changes={"osoby": persons, "kwota_gr": reservation.amount, "dla": user.email},
         actor=created_by or user,
     )
+    # Opłata pobierana od razu z salda, jeśli wystarcza środków (w przeciwnym razie należność „do zapłaty”).
+    apply_wallet(user, by=created_by)
+    reservation.refresh_from_db()
     notify_user(user, f"Rezerwacja {reservation.number} potwierdzona", "emails/reservation_created.txt", reservation=reservation)
     notify_board(
         f"Nowa rezerwacja: {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m %H:%M}",
@@ -195,9 +200,11 @@ def cancel_reservation(reservation, by, reason="", as_board=False, now=None):
     reservation.cancelled_by = by
     reservation.cancel_reason = reason.strip()[:255]
     reservation.late_cancellation = late
-    if reservation.payment_status == Reservation.Payment.DUE and not late:
+    if not late:
         reservation.payment_status = Reservation.Payment.NONE
     reservation.save()
+    if not late:
+        reservation = refund_reservation(reservation, by=by)
     log_event(
         "rezerwacja.anulowanie",
         reservation,
@@ -231,6 +238,7 @@ def change_persons(reservation, persons, by):
     reservation.hourly_amount = reservation.price_rule.hourly_amount(persons)
     reservation.amount = reservation.hourly_amount * reservation.hours
     reservation.save()
+    reservation = reconcile_reservation(reservation, by=by)
     log_event(
         "rezerwacja.zmiana_osob",
         reservation,
@@ -243,15 +251,14 @@ def change_persons(reservation, persons, by):
 
 
 PAYMENT_TRANSITIONS = {
-    "paid": (Reservation.Payment.PAID, {Reservation.Payment.DUE}),
     "waive": (Reservation.Payment.WAIVED, {Reservation.Payment.DUE}),
-    "due": (Reservation.Payment.DUE, {Reservation.Payment.PAID, Reservation.Payment.WAIVED}),
+    "unwaive": (Reservation.Payment.DUE, {Reservation.Payment.WAIVED}),
 }
 
 
 @transaction.atomic
 def set_payment(reservation, action, by):
-    """Ręczne rozliczenie przez zarząd (do czasu modułu płatności w etapie 4)."""
+    """Zwolnienie z (pozostałej) opłaty lub jego cofnięcie. Wpłaty przyjmuje się w module płatności."""
     reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
     target, allowed_from = PAYMENT_TRANSITIONS[action]
     if reservation.payment_status not in allowed_from:
@@ -262,6 +269,9 @@ def set_payment(reservation, action, by):
     reservation.payment_marked_at = timezone.now()
     reservation.save()
     log_event("rezerwacja.platnosc", reservation, str(reservation), changes={"platnosc": [before, target]}, actor=by)
+    if target == Reservation.Payment.DUE:
+        apply_wallet(reservation.user, by=by)
+        reservation.refresh_from_db()
     return reservation
 
 

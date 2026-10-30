@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.db import connection
 from django.utils import timezone
 
+from apps.accounts.models import User
 from apps.audit.models import AuditLog
 from apps.bookings import services
 from apps.bookings.models import Block, BookingSettings, Reservation
@@ -188,13 +189,14 @@ def test_board_cancellation_is_free_even_late(ps, lane, owner):
 
 def test_payment_transitions(ps, lane, owner):
     r = book(ps, lane)
-    r = services.set_payment(r, "paid", owner)
-    assert r.payment_status == Reservation.Payment.PAID
-    with pytest.raises(ValidationError):
-        services.set_payment(r, "paid", owner)
-    r = services.set_payment(r, "due", owner)
     r = services.set_payment(r, "waive", owner)
     assert r.payment_status == Reservation.Payment.WAIVED
+    with pytest.raises(ValidationError):
+        services.set_payment(r, "waive", owner)
+    r = services.set_payment(r, "unwaive", owner)
+    assert r.payment_status == Reservation.Payment.DUE
+    with pytest.raises(KeyError):
+        services.set_payment(r, "paid", owner)  # opłacenie tylko przez wpłatę na saldo
 
 
 # --- blokady --------------------------------------------------------------
@@ -343,12 +345,15 @@ def test_panel_pages_and_actions(owner_client, ps, lane):
     body = owner_client.get(f"/panel/rezerwacje/?dzien={day:%Y-%m-%d}").content.decode()
     assert ps.last_name in body
     assert owner_client.get("/panel/rezerwacje/lista/").status_code == 200
-    owner_client.post(f"/panel/rezerwacje/{r.pk}/", {"action": "paid"})
+    from apps.payments.services import balance_of, register_manual_payment
+
+    register_manual_payment(ps, r.amount, "gotowka", User.objects.get(is_superuser=True))
     r.refresh_from_db()
-    assert r.payment_status == Reservation.Payment.PAID
+    assert r.payment_status == Reservation.Payment.PAID and r.paid_amount == r.amount
     owner_client.post(f"/panel/rezerwacje/{r.pk}/", {"action": "persons", "p-persons": "5"})
     r.refresh_from_db()
     assert r.persons == 5 and r.amount == 2 * 20000
+    assert r.payment_status == Reservation.Payment.DUE and balance_of(ps) == 0  # dopłata, saldo puste
     response = owner_client.post(f"/panel/rezerwacje/{r.pk}/", {"action": "cancel", "c-reason": ""})
     r.refresh_from_db()
     assert r.status == Reservation.Status.CONFIRMED  # powód wymagany

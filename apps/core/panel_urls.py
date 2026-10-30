@@ -4,6 +4,7 @@ from apps.bookings import views as bookings_views
 from apps.credentials import views as credentials_views
 from apps.facilities import views as facilities_views
 from apps.logbook import views as logbook_views
+from apps.payments import views as payments_views
 from apps.regulations import views as regulations_views
 
 from . import views
@@ -40,6 +41,12 @@ urlpatterns = [
     path("ksiazka/ustawienia/nowy-kod/", logbook_views.panel_rotate_gate, name="logbook_rotate"),
     path("ksiazka/plakat/", logbook_views.panel_gate_poster, name="logbook_poster"),
     path("ksiazka/<int:pk>/", logbook_views.panel_detail, name="logbook_entry"),
+    path("platnosci/", payments_views.panel_payments, name="payments"),
+    path("platnosci/wplata/", payments_views.panel_manual, name="payment_manual"),
+    path("platnosci/import/", payments_views.panel_import, name="payment_import"),
+    path("platnosci/<uuid:pk>/", payments_views.panel_payment, name="payment"),
+    path("salda/", payments_views.panel_wallets, name="wallets"),
+    path("salda/<int:user_pk>/", payments_views.panel_wallet, name="wallet"),
     path("powiadomienia/", bookings_views.panel_notifications, name="notifications"),
     path("powiadomienia/<int:pk>/", bookings_views.panel_notification_open, name="notification"),
     path("dziennik/", views.panel_audit, name="audit"),

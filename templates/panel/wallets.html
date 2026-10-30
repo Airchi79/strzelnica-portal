@@ -1,0 +1,14 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Salda{% endblock %}
+{% block panel %}
+<h1>Salda strzelców</h1>
+{% include "panel/_payments_tabs.html" %}
+<form method="get" class="card filters"><div><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ q }}"></div>
+  <div class="actions"><button class="btn" type="submit">Szukaj</button><a class="btn secondary" href="?filtr=ujemne">Tylko ujemne</a></div></form>
+<div class="card table-wrap"><table>
+  <tr><th>Strzelec</th><th>Saldo</th></tr>
+  {% for w in page %}<tr><td><a href="{% url 'panel:wallet' w.user.pk %}">{{ w.user.full_name }}</a><div class="small muted">{{ w.user.email }}</div></td><td class="{% if w.balance < 0 %}neg{% endif %}">{{ w.balance|pln }}</td></tr>
+  {% empty %}<tr><td colspan="2" class="muted">Brak sald.</td></tr>{% endfor %}
+</table></div>
+{% include "partials/pagination.html" %}
+{% endblock %}

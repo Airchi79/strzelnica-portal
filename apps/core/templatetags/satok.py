@@ -31,3 +31,11 @@ def regulation_text(text):
 @register.filter
 def status_class(status):
     return {"zweryfikowany": "ok", "oczekuje": "warn", "odrzucony": "bad", "wygasly": "bad"}.get(status, "")
+
+
+@register.filter
+def sub(value, arg):
+    try:
+        return int(value) - int(arg)
+    except (TypeError, ValueError):
+        return value

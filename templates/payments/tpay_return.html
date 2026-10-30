@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% load satok %}
+{% block title %}Płatność{% endblock %}
+{% block content %}
+<h1>{% if payment.status == 'zaksiegowana' %}Płatność zaksięgowana{% elif ok %}Dziękujemy — czekamy na potwierdzenie{% else %}Płatność nie została zakończona{% endif %}</h1>
+<div class="card">
+  <p>Kwota: <strong>{{ payment.amount|pln }}</strong></p>
+  {% if payment.status == 'zaksiegowana' %}<p>Środki są na Twoim saldzie{% if payment.reservation %}, rezerwacja {{ payment.reservation.number }} została opłacona{% endif %}.</p>
+  {% elif ok %}<p>Tpay potwierdzi płatność w ciągu kilku chwil — wtedy środki pojawią się na saldzie. Odśwież stronę za moment.</p>
+  {% else %}<p>Możesz spróbować ponownie albo zapłacić przelewem.</p>{% endif %}
+  <div class="actions"><a class="btn" href="{% url 'payments:wallet' %}">Saldo i płatności</a></div>
+</div>
+{% endblock %}

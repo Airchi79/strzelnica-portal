@@ -1,0 +1,16 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Import wyciągu{% endblock %}
+{% block panel %}
+<h1>Import wyciągu bankowego</h1>
+{% include "panel/_payments_tabs.html" %}
+<div class="card"><form method="post" enctype="multipart/form-data" novalidate>{% csrf_token %}{% include "partials/form.html" %}
+  <p class="small muted">Wczytywane są tylko wpływy. System rozpoznaje w tytule numer rezerwacji (SATOK-R-…) lub osobisty kod strzelca (SATOK-K-…).
+  Wiersze już wczytane wcześniej są pomijane, więc ten sam wyciąg można wgrać ponownie bez dublowania.</p>
+  <button class="btn" type="submit">Wczytaj</button></form></div>
+<h2>Ostatnie importy</h2>
+<div class="card table-wrap"><table>
+  <tr><th>Data</th><th>Plik</th><th>Wpływów</th><th>Nowych</th><th>Przypisanych</th></tr>
+  {% for i in imports %}<tr><td>{{ i.created_at|date:"j.m.Y H:i" }}</td><td>{{ i.filename }}</td><td>{{ i.rows_total }}</td><td>{{ i.rows_new }}</td><td>{{ i.rows_matched }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Brak importów.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

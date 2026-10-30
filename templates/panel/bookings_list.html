@@ -1,0 +1,25 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Lista rezerwacji{% endblock %}
+{% block panel %}
+<h1>Lista rezerwacji</h1>
+{% include "panel/_bookings_tabs.html" %}
+<form method="get" class="card filters">
+  <div><label for="f-od">Od</label><input type="date" id="f-od" name="od" value="{{ f.od }}"></div>
+  <div><label for="f-do">Do</label><input type="date" id="f-do" name="do" value="{{ f.do }}"></div>
+  <div><label for="f-os">Oś</label><select id="f-os" name="os"><option value="">wszystkie</option>{% for l in lanes %}<option value="{{ l.pk }}"{% if f.os == l.pk|stringformat:'d' %} selected{% endif %}>{{ l.name }}</option>{% endfor %}</select></div>
+  <div><label for="f-st">Status</label><select id="f-st" name="status"><option value="">wszystkie</option>{% for v, l in statuses %}<option value="{{ v }}"{% if f.status == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div><label for="f-pl">Płatność</label><select id="f-pl" name="platnosc"><option value="">wszystkie</option>{% for v, l in payments %}<option value="{{ v }}"{% if f.platnosc == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div><label for="f-q">Szukaj</label><input type="search" id="f-q" name="q" value="{{ f.q }}" placeholder="numer, nazwisko, e-mail"></div>
+  <div class="actions"><button class="btn" type="submit">Filtruj</button><button class="btn secondary" type="submit" name="format" value="csv">Eksport CSV</button></div>
+</form>
+<div class="card table-wrap"><table>
+  <tr><th>Termin</th><th>Oś</th><th>Rezerwujący</th><th class="hide-sm">Osób</th><th>Należność</th><th>Status</th></tr>
+  {% for r in page %}
+  <tr><td><a href="{% url 'panel:reservation' r.pk %}">{{ r.starts_at|date:"j.m.Y H:i" }}–{{ r.ends_at|time:"H:i" }}</a><div class="small muted">{{ r.number }}</div></td>
+    <td>{{ r.lane }}</td><td>{{ r.user.full_name }}</td><td class="hide-sm">{{ r.persons }}</td>
+    <td>{{ r.amount|pln }}<div class="small muted">{{ r.get_payment_status_display }}</div></td>
+    <td>{{ r.display_status }}{% if r.late_cancellation %} <span class="badge warn">po terminie</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Brak rezerwacji.</td></tr>{% endfor %}
+</table></div>
+{% include "partials/pagination.html" %}
+{% endblock %}

@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.audit.services import log_event
@@ -35,6 +36,8 @@ def submit(credential, changed_fields=None):
             "Nowy dokument do weryfikacji",
             "emails/credential_submitted.txt",
             permission_codename="credentials.review_credential",
+            url=reverse("panel:credential", args=[credential.pk]),
+            body=f"{credential.user.full_name}: {credential.get_kind_display()}",
             credential=credential,
         )
 

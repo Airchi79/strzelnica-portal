@@ -32,12 +32,9 @@ def notify_user(user, subject, template, **context):
     _send(subject, template, {"user": user, **context}, [user.email])
 
 
-def board_recipients(permission_codename=None):
-    """Adres powiadomień stowarzyszenia oraz aktywni członkowie zarządu z danym uprawnieniem."""
-    from apps.core.models import AssociationSettings
-
+def board_users(permission_codename=None):
+    """Aktywni członkowie zarządu z danym uprawnieniem (właściciel zawsze)."""
     User = get_user_model()
-    emails = {AssociationSettings.load().notify_email}
     staff = User.objects.filter(is_active=True, is_staff=True)
     if permission_codename:
         app_label, codename = permission_codename.split(".")
@@ -45,9 +42,25 @@ def board_recipients(permission_codename=None):
             groups__permissions__codename=codename, groups__permissions__content_type__app_label=app_label
         )
         staff = staff.filter(Q(is_superuser=True) | perm_q)
-    emails.update(staff.values_list("email", flat=True).distinct())
+    return staff.distinct()
+
+
+def board_recipients(permission_codename=None):
+    """Adres powiadomień stowarzyszenia oraz aktywni członkowie zarządu z danym uprawnieniem."""
+    from apps.core.models import AssociationSettings
+
+    emails = {AssociationSettings.load().notify_email}
+    emails.update(board_users(permission_codename).values_list("email", flat=True))
     return emails
 
 
-def notify_board(subject, template, permission_codename=None, **context):
+def notify_board(subject, template, permission_codename=None, url="", body="", **context):
+    """E-mail do zarządu oraz powiadomienie w panelu (gdy podano `url` lub `body`)."""
+    from apps.core.models import Notification
+
+    if url or body:
+        Notification.objects.bulk_create(
+            Notification(recipient=u, title=subject[:160], body=body[:500], url=url[:255])
+            for u in board_users(permission_codename)
+        )
     _send(subject, template, context, board_recipients(permission_codename))

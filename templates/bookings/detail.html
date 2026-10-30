@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% load satok %}
+{% block title %}Rezerwacja {{ r.number }}{% endblock %}
+{% block content %}
+<h1>Rezerwacja {{ r.number }}</h1>
+<div class="card"><table>
+  <tr><th>Oś</th><td>{{ r.lane }}</td></tr>
+  <tr><th>Termin</th><td>{{ r.starts_at|date:"l, j E Y" }}, {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</td></tr>
+  <tr><th>Liczba osób</th><td>{{ r.persons }}</td></tr>
+  <tr><th>Należność</th><td><strong>{{ r.amount|pln }}</strong> ({{ r.hourly_amount|pln }} / h)</td></tr>
+  <tr><th>Status</th><td>{{ r.display_status }}{% if r.cancel_reason %} — {{ r.cancel_reason }}{% endif %}</td></tr>
+  <tr><th>Płatność</th><td>{{ r.get_payment_status_display }}</td></tr>
+  {% if r.notes %}<tr><th>Uwagi</th><td>{{ r.notes }}</td></tr>{% endif %}
+</table></div>
+{% if r.payment_status == 'do_zaplaty' %}
+<div class="card">
+  <h2 style="margin-top:0">Jak zapłacić</h2>
+  <p>Gotówką lub BLIK-iem na miejscu albo przelewem{% if association.bank_account %} na rachunek <strong>{{ association.bank_account }}</strong>{% endif %}, w tytule: <strong>{{ r.number }}</strong>.</p>
+  <p class="small muted">Płatności online i saldo konta zostaną uruchomione w kolejnym etapie.</p>
+</div>
+{% endif %}
+{% if r.can_user_cancel %}
+<div class="card">
+  <h2 style="margin-top:0">Anulowanie</h2>
+  {% if late %}<div class="msg warning">Minął termin bezpłatnego anulowania ({{ r.free_cancel_deadline|date:"j.m.Y H:i" }}). Po anulowaniu należność {{ r.amount|pln }} pozostanie do zapłaty.</div>
+  {% else %}<p>Bezpłatnie do {{ r.free_cancel_deadline|date:"j.m.Y H:i" }}.</p>{% endif %}
+  <form method="post" data-confirm="Anulować rezerwację {{ r.number }}?">{% csrf_token %}{% include "partials/form.html" %}<button class="btn danger" type="submit">Anuluj rezerwację</button></form>
+</div>
+{% endif %}
+<p><a href="{% url 'bookings:my_list' %}">← Moje rezerwacje</a></p>
+{% endblock %}

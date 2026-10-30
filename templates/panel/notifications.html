@@ -1,0 +1,12 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Powiadomienia{% endblock %}
+{% block panel %}
+<h1>Powiadomienia</h1>
+<form method="post" style="margin-bottom:12px">{% csrf_token %}<button class="btn secondary" type="submit">Oznacz wszystkie jako przeczytane</button></form>
+<div class="card table-wrap"><table>
+  {% for n in page %}<tr class="{% if not n.read_at %}unread{% endif %}"><td>{{ n.created_at|date:"j.m.Y H:i" }}</td>
+    <td>{% if n.url %}<a href="{% url 'panel:notification' n.pk %}">{{ n.title }}</a>{% else %}{{ n.title }}{% endif %}<div class="small muted">{{ n.body }}</div></td></tr>
+  {% empty %}<tr><td class="muted">Brak powiadomień.</td></tr>{% endfor %}
+</table></div>
+{% include "partials/pagination.html" %}
+{% endblock %}

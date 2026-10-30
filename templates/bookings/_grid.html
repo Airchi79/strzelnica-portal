@@ -1,0 +1,24 @@
+{# Siatka dnia. rows = [(godzina, [(oś, Slot|None)])]. panel=True: nazwiska i akcje zarządu. #}
+<div class="table-wrap">
+<table class="daygrid">
+  <thead><tr><th class="hcol">Godz.</th>{% for lane in lanes %}<th>{{ lane.name }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for hour, cells in rows %}
+    <tr><th class="hcol">{{ hour|stringformat:"02d" }}:00</th>
+    {% for lane, s in cells %}
+      {% if not s %}<td class="cell closed">—</td>
+      {% elif s.state == 'wolne' %}<td class="cell free">
+        {% if panel %}<a href="{% url 'panel:reservation_new' %}?os={{ lane.pk }}&amp;dzien={{ day|date:'Y-m-d' }}&amp;od={{ hour }}">wolne</a>
+        {% elif can_book %}<a href="{% url 'bookings:new' %}?os={{ lane.pk }}&amp;dzien={{ day|date:'Y-m-d' }}&amp;od={{ hour }}">wolne</a>
+        {% else %}wolne{% endif %}</td>
+      {% elif s.state == 'zajete' %}<td class="cell busy">
+        {% if panel %}<a href="{% url 'panel:reservation' s.reservation.pk %}">{{ s.reservation.user.last_name }}<br><span class="small">{{ s.reservation.persons }} os.</span></a>
+        {% else %}zajęte{% endif %}</td>
+      {% elif s.state == 'blokada' %}<td class="cell blocked">{% if panel %}{{ s.block.title }}{% else %}niedostępne{% endif %}</td>
+      {% else %}<td class="cell past">minęło</td>{% endif %}
+    {% endfor %}</tr>
+  {% empty %}<tr><td class="muted" colspan="{{ lanes|length|add:1 }}">Tego dnia żadna oś nie jest czynna.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>

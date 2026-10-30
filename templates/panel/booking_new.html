@@ -1,0 +1,9 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Nowa rezerwacja{% endblock %}
+{% block panel %}
+<h1>Nowa rezerwacja w imieniu strzelca</h1>
+{% include "panel/_bookings_tabs.html" %}
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
+  <p class="small muted">Rezerwujący musi mieć zweryfikowane uprawnienia PS i zaakceptowane regulaminy. Otrzyma potwierdzenie e-mail.</p>
+  <button class="btn" type="submit">Zarezerwuj</button></form></div>
+{% endblock %}

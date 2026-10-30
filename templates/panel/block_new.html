@@ -1,0 +1,25 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Nowa blokada{% endblock %}
+{% block panel %}
+<h1>Nowa blokada osi</h1>
+{% include "panel/_bookings_tabs.html" %}
+<form method="post" novalidate>{% csrf_token %}
+  {% if conflicts %}
+  <div class="card">
+    <div class="msg warning">Blokada koliduje z {{ conflicts|length }} rezerwacją(-ami). Zdecyduj, co z nimi zrobić.</div>
+    <div class="table-wrap"><table>
+      {% for r in conflicts %}<tr><td>{{ r.starts_at|date:"j.m.Y H:i" }}–{{ r.ends_at|time:"H:i" }}</td><td>{{ r.lane }}</td><td>{{ r.user.full_name }}</td><td>{{ r.number }}</td></tr>{% endfor %}
+    </table></div>
+    <div class="actions">
+      <button class="btn danger" type="submit" name="decision" value="cancel">Utwórz blokadę i anuluj te rezerwacje</button>
+      <button class="btn secondary" type="submit" name="decision" value="keep">Utwórz blokadę, rezerwacje zostaw</button>
+    </div>
+    <p class="small muted">W obu przypadkach strzelcy otrzymają e-mail.</p>
+  </div>
+  {% endif %}
+  <div class="card">
+    {% include "partials/form.html" %}
+    <button class="btn" type="submit">{% if conflicts %}Sprawdź ponownie{% else %}Utwórz blokadę{% endif %}</button>
+  </div>
+</form>
+{% endblock %}

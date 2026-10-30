@@ -1,0 +1,11 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
+
+rezerwacja {{ reservation.number }} została anulowana{% if reservation.cancel_reason %}: {{ reservation.cancel_reason }}{% endif %}.
+
+{% include "emails/_reservation_summary.txt" %}{% if reservation.late_cancellation %}
+Anulowanie nastąpiło po terminie bezpłatnego anulowania — należność {{ reservation.amount|pln }} pozostaje do zapłaty zgodnie z regulaminem.{% endif %}
+
+Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

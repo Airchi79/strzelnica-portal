@@ -1,0 +1,10 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+zarząd wprowadził blokadę osi „{{ title }}”, która obejmuje termin Twojej rezerwacji. Rezerwacja pozostaje aktywna,
+ale skontaktuj się z zarządem w sprawie dalszych ustaleń.
+
+{% include "emails/_reservation_summary.txt" %}
+Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

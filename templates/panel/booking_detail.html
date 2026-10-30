@@ -1,0 +1,45 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}{{ r.number }}{% endblock %}
+{% block panel %}
+<h1>Rezerwacja {{ r.number }}</h1>
+{% include "panel/_bookings_tabs.html" %}
+<div class="card"><table>
+  <tr><th>Oś</th><td>{{ r.lane }}</td></tr>
+  <tr><th>Termin</th><td>{{ r.starts_at|date:"l, j E Y" }}, {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }} ({{ r.hours }} h)</td></tr>
+  <tr><th>Rezerwujący (PS)</th><td>{{ r.user.full_name }} · {{ r.user.email }}{% if r.user.phone %} · {{ r.user.phone }}{% endif %}</td></tr>
+  <tr><th>Liczba osób</th><td>{{ r.persons }}</td></tr>
+  <tr><th>Należność</th><td><strong>{{ r.amount|pln }}</strong> ({{ r.hourly_amount|pln }} / h, cennik od {{ r.price_rule.valid_from|date:"j.m.Y" }})</td></tr>
+  <tr><th>Status</th><td>{{ r.display_status }}{% if r.late_cancellation %} <span class="badge warn">anulowana po terminie bezpłatnego anulowania</span>{% endif %}
+    {% if r.cancelled_at %}<div class="small muted">{{ r.cancelled_at|date:"j.m.Y H:i" }}, {{ r.cancelled_by.full_name }}{% if r.cancel_reason %} — {{ r.cancel_reason }}{% endif %}</div>{% endif %}</td></tr>
+  <tr><th>Płatność</th><td>{{ r.get_payment_status_display }}{% if r.payment_marked_by %}<div class="small muted">{{ r.payment_marked_by.full_name }}, {{ r.payment_marked_at|date:"j.m.Y H:i" }}</div>{% endif %}</td></tr>
+  {% if r.notes %}<tr><th>Uwagi</th><td>{{ r.notes }}</td></tr>{% endif %}
+  <tr><th>Utworzono</th><td>{{ r.created_at|date:"j.m.Y H:i" }}</td></tr>
+</table></div>
+
+<h2>Rozliczenie</h2>
+<div class="card"><form method="post" class="actions" style="margin-top:0">{% csrf_token %}
+  {% if r.payment_status == 'do_zaplaty' %}
+    <button class="btn" name="action" value="paid">Oznacz jako opłaconą</button>
+    <button class="btn secondary" name="action" value="waive" data-confirm-click="Zwolnić z opłaty?">Zwolnij z opłaty</button>
+  {% elif r.payment_status == 'oplacona' or r.payment_status == 'zwolniona' %}
+    <button class="btn secondary" name="action" value="due">Cofnij — do zapłaty</button>
+  {% else %}<span class="muted">Brak należności.</span>{% endif %}
+</form></div>
+
+{% if r.status == 'potwierdzona' %}
+<h2>Zmiany</h2>
+<div class="card">
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="persons">
+    {% include "partials/form.html" with form=persons_form %}
+    <button class="btn secondary" type="submit">Zmień liczbę osób i przelicz</button></form>
+</div>
+{% if started %}
+<div class="card"><form method="post">{% csrf_token %}<button class="btn secondary" name="action" value="no_show">Oznacz jako nieodbytą</button></form></div>
+{% endif %}
+<div class="card">
+  <form method="post" data-confirm="Anulować rezerwację {{ r.number }}? Strzelec otrzyma e-mail.">{% csrf_token %}<input type="hidden" name="action" value="cancel">
+    {% include "partials/form.html" with form=cancel_form %}
+    <button class="btn danger" type="submit">Anuluj rezerwację (bez opłat)</button></form>
+</div>
+{% endif %}
+{% endblock %}

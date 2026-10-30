@@ -5,6 +5,11 @@ document.addEventListener("submit", (e) => {
 });
 
 document.addEventListener("click", (e) => {
+  const confirmBtn = e.target.closest("[data-confirm-click]");
+  if (confirmBtn && !window.confirm(confirmBtn.dataset.confirmClick)) {
+    e.preventDefault();
+    return;
+  }
   const btn = e.target.closest("[data-add-form]");
   if (!btn) return;
   const prefix = btn.dataset.addForm;

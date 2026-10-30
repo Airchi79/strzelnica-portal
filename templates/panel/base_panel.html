@@ -3,6 +3,8 @@
 <nav class="tabs" aria-label="Panel zarządu">
   {% with u=request.resolver_match.url_name %}
   <a href="{% url 'panel:home' %}" class="{% if u == 'home' %}active{% endif %}">Start</a>
+  <a href="{% url 'panel:notifications' %}" class="{% if 'notification' in u %}active{% endif %}">Powiadomienia{% if unread_notifications %} <span class="badge warn">{{ unread_notifications }}</span>{% endif %}</a>
+  {% if perms.bookings.manage_reservations %}<a href="{% url 'panel:bookings' %}" class="{% if 'booking' in u or 'reservation' in u or 'block' in u %}active{% endif %}">Rezerwacje</a>{% endif %}
   {% if perms.credentials.review_credential %}<a href="{% url 'panel:credentials' %}" class="{% if 'credential' in u %}active{% endif %}">Weryfikacja</a>{% endif %}
   {% if perms.accounts.view_users %}<a href="{% url 'panel:users' %}" class="{% if 'user' in u %}active{% endif %}">Użytkownicy</a>{% endif %}
   {% if perms.facilities.manage_facilities %}<a href="{% url 'panel:lanes' %}" class="{% if 'lane' in u or 'price' in u %}active{% endif %}">Osie i cennik</a>{% endif %}

@@ -1,0 +1,8 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Ustawienia rezerwacji{% endblock %}
+{% block panel %}
+<h1>Ustawienia rezerwacji</h1>
+{% include "panel/_bookings_tabs.html" %}
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Zapisz</button></form>
+<p class="small muted">Godziny otwarcia i cennik ustawiasz osobno dla każdej osi w zakładce „Osie i cennik”.</p></div>
+{% endblock %}

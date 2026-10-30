@@ -8,8 +8,10 @@ from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.views.decorators.cache import cache_control
 
+from apps.bookings.models import Reservation
 from apps.audit.models import AuditLog, SensitiveAccessLog
 from apps.audit.services import diff, log_event, log_sensitive_access
 from apps.credentials.models import Credential, is_range_officer
@@ -37,6 +39,7 @@ def dashboard(request):
             "credentials": credentials,
             "is_ps": is_range_officer(request.user),
             "missing_profile": not (request.user.phone and request.user.city),
+            "upcoming": request.user.reservations.filter(status="potwierdzona", ends_at__gt=timezone.now()).select_related("lane").order_by("starts_at").first(),
         },
     )
 
@@ -63,6 +66,8 @@ def offline(request):
 @panel_required()
 def panel_home(request):
     stats = {
+        "upcoming_reservations": Reservation.objects.filter(status="potwierdzona", starts_at__gte=timezone.now()).count(),
+        "due_reservations": Reservation.objects.filter(payment_status="do_zaplaty").exclude(status="anulowana", late_cancellation=False).count(),
         "pending_credentials": Credential.objects.filter(status=Credential.Status.PENDING).count(),
         "users": User.objects.filter(is_active=True).count(),
         "ps": Credential.objects.filter(kind=Credential.Kind.RANGE_OFFICER, status=Credential.Status.VERIFIED).values("user").distinct().count(),

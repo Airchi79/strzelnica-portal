@@ -1,0 +1,12 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+potwierdzamy rezerwację osi.
+
+{% include "emails/_reservation_summary.txt" %}
+Bezpłatne anulowanie do: {{ reservation.free_cancel_deadline|date:"j.m.Y H:i" }}.
+Płatność: gotówką lub BLIK na miejscu albo przelewem z tytułem {{ reservation.number }}.
+
+Szczegóły i anulowanie: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

@@ -41,10 +41,11 @@ python -m pytest
 | `apps/accounts` | konta, logowanie e-mailem, 2FA (TOTP), limit prób logowania, reset hasła |
 | `apps/credentials` | pozwolenia i uprawnienia PS, weryfikacja przez zarząd, automatyczne wygasanie |
 | `apps/regulations` | wersjonowane regulaminy, publikacja, wymuszona akceptacja |
+| `apps/bookings` | rezerwacje osi (blokada całej osi), blokady zarządu, rozliczenia ręczne, przypomnienia |
 | `apps/facilities` | obiekty, osie, godziny otwarcia, cennik (kwoty w groszach) |
 | `apps/audit` | dziennik zdarzeń i rejestr wglądu w dane wrażliwe (niezmienialne — trigger w bazie) |
 | `apps/core` | strona główna, pulpit, panel zarządu, uprawnienia, PWA, powiadomienia e-mail |
 
 ## Zadania okresowe
 
-`python manage.py expire_credentials` — raz na dobę (w Dockerze robi to usługa `cron`).
+`python manage.py send_reminders` i `python manage.py expire_credentials` — co godzinę (w Dockerze robi to usługa `cron`).

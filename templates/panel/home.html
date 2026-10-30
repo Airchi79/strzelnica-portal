@@ -6,6 +6,10 @@
   {% if perms.credentials.review_credential %}
   <a class="card tile" href="{% url 'panel:credentials' %}"><span class="stat">{{ stats.pending_credentials }}</span><strong>dokumentów do weryfikacji</strong></a>
   {% endif %}
+  {% if perms.bookings.manage_reservations %}
+  <a class="card tile" href="{% url 'panel:bookings' %}"><span class="stat">{{ stats.upcoming_reservations }}</span><strong>nadchodzących rezerwacji</strong></a>
+  <a class="card tile" href="{% url 'panel:reservations' %}?platnosc=do_zaplaty"><span class="stat">{{ stats.due_reservations }}</span><strong>rezerwacji do rozliczenia</strong></a>
+  {% endif %}
   <div class="card tile"><span class="stat">{{ stats.users }}</span><strong>aktywnych kont</strong></div>
   <div class="card tile"><span class="stat">{{ stats.ps }}</span><strong>zweryfikowanych prowadzących strzelanie</strong></div>
 </div>

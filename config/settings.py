@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
     "django_otp",
     "django_otp.plugins.otp_totp",
     "apps.core",
@@ -45,6 +46,7 @@ INSTALLED_APPS = [
     "apps.credentials",
     "apps.regulations",
     "apps.facilities",
+    "apps.bookings",
 ]
 
 MIDDLEWARE = [

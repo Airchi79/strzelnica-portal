@@ -10,10 +10,12 @@
       {% if is_ps %}Prowadzący strzelanie — zweryfikowany{% elif credentials %}{{ credentials|length }} dokument(y){% else %}Dodaj pozwolenie i uprawnienia PS{% endif %}
     </span>
   </a>
-  <div class="card tile">
-    <strong>Rezerwacje osi</strong>
-    <span class="muted">{% if is_ps %}Dostępne wkrótce (etap 2).{% else %}Rezerwować może osoba ze zweryfikowanymi uprawnieniami prowadzącego strzelanie.{% endif %}</span>
-  </div>
+  <a class="card tile" href="{% if is_ps %}{% url 'bookings:new' %}{% else %}{% url 'bookings:calendar' %}{% endif %}">
+    <strong>{% if is_ps %}Zarezerwuj oś{% else %}Zajętość osi{% endif %}</strong>
+    <span class="muted">{% if is_ps %}Wybierz oś, dzień i godziny.{% else %}Rezerwować może osoba ze zweryfikowanymi uprawnieniami prowadzącego strzelanie.{% endif %}</span>
+  </a>
+  <a class="card tile" href="{% url 'bookings:my_list' %}"><strong>Moje rezerwacje</strong>
+    <span class="muted">{% if upcoming %}Najbliższa: {{ upcoming.lane }}, {{ upcoming.starts_at|date:"j.m H:i" }}{% else %}Brak nadchodzących{% endif %}</span></a>
   <a class="card tile" href="{% url 'accounts:profile' %}"><strong>Profil i bezpieczeństwo</strong><span class="muted">Dane, hasło, logowanie dwuskładnikowe</span></a>
   <a class="card tile" href="{% url 'regulations:list' %}"><strong>Regulaminy</strong><span class="muted">Aktualne dokumenty stowarzyszenia</span></a>
 </div>

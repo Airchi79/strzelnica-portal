@@ -1,0 +1,5 @@
+{% load satok %}Numer: {{ reservation.number }}
+Oś: {{ reservation.lane }}
+Termin: {{ reservation.starts_at|date:"l, j E Y" }}, {{ reservation.starts_at|time:"H:i" }}–{{ reservation.ends_at|time:"H:i" }}
+Liczba osób: {{ reservation.persons }}
+Należność: {{ reservation.amount|pln }} ({{ reservation.get_payment_status_display }})

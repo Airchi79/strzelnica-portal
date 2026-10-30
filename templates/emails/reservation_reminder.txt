@@ -1,0 +1,10 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+przypominamy o rezerwacji:
+
+{% include "emails/_reservation_summary.txt" %}
+Pamiętaj o dokumentach i zasadach regulaminu strzelnicy.
+Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

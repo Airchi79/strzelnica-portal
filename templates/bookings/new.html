@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% load satok %}
+{% block title %}Nowa rezerwacja{% endblock %}
+{% block content %}
+<h1>Nowa rezerwacja</h1>
+{% if preview %}
+<div class="card">
+  <h2 style="margin-top:0">Sprawdź i potwierdź</h2>
+  <table>
+    <tr><th>Oś</th><td>{{ form.cleaned_data.lane }}</td></tr>
+    <tr><th>Termin</th><td>{{ preview.starts_at|date:"l, j E Y" }}, {{ preview.starts_at|time:"H:i" }}–{{ preview.ends_at|time:"H:i" }} ({{ preview.hours }} h)</td></tr>
+    <tr><th>Liczba osób</th><td>{{ form.cleaned_data.persons }}</td></tr>
+    <tr><th>Stawka</th><td>{{ preview.hourly|pln }} / h</td></tr>
+    <tr><th>Należność</th><td><strong>{{ preview.amount|pln }}</strong></td></tr>
+  </table>
+  <p class="small">Rezerwacja obejmuje całą oś. Bezpłatne anulowanie do <strong>{{ preview.free_cancel_until|date:"j.m.Y H:i" }}</strong>; później należność pozostaje do zapłaty.</p>
+  <form method="post">{% csrf_token %}
+    {% for field in form %}<input type="hidden" name="{{ field.html_name }}" value="{{ field.value|default_if_none:'' }}">{% endfor %}
+    <div class="actions"><button class="btn" type="submit" name="action" value="confirm">Rezerwuję</button>
+      <button class="btn secondary" type="submit" name="action" value="edit">Zmień</button></div>
+  </form>
+</div>
+{% else %}
+{% if lane %}
+<div class="card">
+  <strong>{{ lane.name }} — {{ day|date:"j E Y" }}</strong>
+  <div class="slots">{% for s in slots %}<span class="cell {% if s.state == 'wolne' %}free{% elif s.state == 'zajete' %}busy{% elif s.state == 'blokada' %}blocked{% else %}past{% endif %}">{{ s.label }}</span>{% empty %}<span class="muted">Oś jest tego dnia zamknięta.</span>{% endfor %}</div>
+</div>
+{% endif %}
+<div class="card">
+<form method="post" novalidate id="booking-form">{% csrf_token %}
+  {% include "partials/form.html" %}
+  <div class="actions"><button class="btn" type="submit" name="action" value="preview">Dalej — podsumowanie</button>
+    <a class="btn secondary" href="{% url 'bookings:calendar' %}?dzien={{ day|date:'Y-m-d' }}">Kalendarz</a></div>
+</form>
+</div>
+<script>
+  // Po zmianie osi lub dnia odśwież dostępność (GET z wybranymi wartościami).
+  document.querySelectorAll('#id_lane, #id_day').forEach((el) => el.addEventListener('change', () => {
+    const f = document.getElementById('booking-form');
+    const p = new URLSearchParams({os: f.lane.value, dzien: f.day.value, od: f.start_hour.value});
+    window.location.search = p.toString();
+  }));
+</script>
+{% endif %}
+{% endblock %}

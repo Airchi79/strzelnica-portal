@@ -1,0 +1,8 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Rezerwacje{% endblock %}
+{% block panel %}
+<h1>Rezerwacje — kalendarz dnia</h1>
+{% include "panel/_bookings_tabs.html" %}
+{% include "bookings/_daynav.html" %}
+{% include "bookings/_grid.html" with panel=True %}
+{% endblock %}

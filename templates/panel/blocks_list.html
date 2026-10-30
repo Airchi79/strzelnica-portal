@@ -1,0 +1,16 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Blokady osi{% endblock %}
+{% block panel %}
+<h1>Blokady osi</h1>
+{% include "panel/_bookings_tabs.html" %}
+<div class="actions" style="margin-top:0;margin-bottom:16px"><a class="btn" href="{% url 'panel:block_new' %}">Nowa blokada</a></div>
+<div class="card table-wrap"><table>
+  <tr><th>Termin</th><th>Tytuł</th><th>Osie</th><th></th></tr>
+  {% for b in blocks %}
+  <tr><td>{{ b.starts_at|date:"j.m.Y H:i" }} – {{ b.ends_at|date:"j.m.Y H:i" }}</td><td>{{ b.title }}{% if b.reason %}<div class="small muted">{{ b.reason }}</div>{% endif %}</td>
+    <td class="small">{% for l in b.lanes.all %}{{ l.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+    <td><form method="post" action="{% url 'panel:block_delete' b.pk %}" data-confirm="Usunąć tę blokadę?">{% csrf_token %}<button class="btn secondary" type="submit">Usuń</button></form>
+        <form method="post" action="{% url 'panel:block_delete' b.pk %}" data-confirm="Usunąć wszystkie terminy tej serii?">{% csrf_token %}<input type="hidden" name="series" value="1"><button class="btn secondary" type="submit">Usuń serię</button></form></td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Brak nadchodzących blokad.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

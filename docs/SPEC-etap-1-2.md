@@ -3,7 +3,7 @@
 **Projekt:** `strzelnica-satok`
 **Właściciel:** Stowarzyszenie zwykłe STRZELNICA SĄTOK (Sątok k. Bierutowa)
 **Wersja dokumentu:** 0.2, 2026-10-30
-**Status:** zaakceptowana przez właściciela; etap 1 zbudowany, etap 2 w kolejce
+**Status:** zaakceptowana przez właściciela; etap 1 i etap 2 zbudowane (bez kodów dostępu dla klubów — pkt 5.5)
 
 ---
 
@@ -151,7 +151,7 @@ Należność zapisuje się przy rezerwacji ze statusem płatności `do zapłaty`
 - Zarząd blokuje jedną lub wiele osi na przedział czasu (zawody, prace, awaria), także cyklicznie.
 - Jeśli blokada koliduje z istniejącymi rezerwacjami, system pokazuje listę kolizji. Zarząd decyduje, czy je anulować, a strzelcy otrzymują e-mail.
 
-### 5.5 Kody dostępu dla klubów (propozycja, do decyzji)
+### 5.5 Kody dostępu dla klubów (propozycja, do decyzji — NIE wdrożone, czeka na decyzję właściciela)
 
 - Zarząd tworzy kod z: nazwą (np. klub X), okresem ważności, dozwolonymi osiami, limitem godzin lub rezerwacji, **stawką umowną** (np. stała kwota za godzinę albo pakiet opłacony z góry).
 - Rezerwujący wpisuje kod, a cena liczy się według kodu. Wykorzystanie kodu widać w panelu zarządu.
@@ -240,3 +240,16 @@ Zmiany względem wersji 0.1 wynikające z decyzji:
 - pkt 5.1: rezerwujący musi sam mieć zweryfikowane uprawnienia PS; pola „PS” w rezerwacji nie ma;
 - pkt 5.1: minimalna długość 1 h, brak maksymalnej, brak minimalnego wyprzedzenia (początek nie może być w przeszłości);
 - pkt 5.2: anulowanie przez strzelca na 48 h lub więcej przed terminem jest bezpłatne; później — zgodnie z regulaminem rezerwacji (do doprecyzowania w etapie 4).
+
+## 10. Stan wdrożenia etapu 2 (30.10.2026)
+
+- Rezerwacja blokuje całą oś; nakładanie się rezerwacji na jednej osi blokuje baza danych (ograniczenie wykluczające).
+- Rezerwuje wyłącznie zweryfikowany PS z potwierdzonym e-mailem i zaakceptowanymi regulaminami.
+- Pełne godziny w godzinach otwarcia osi; bez limitu długości; można zarezerwować bieżącą, rozpoczętą godzinę.
+- Domyślne ustawienia (zmienialne w panelu): bezpłatne anulowanie 48 h, rezerwacja do 180 dni naprzód, maks. 50 osób.
+- Anulowanie przez strzelca po terminie: rezerwacja anulowana, należność pozostaje „do zapłaty”; zarząd może zwolnić z opłaty.
+- Anulowanie przez zarząd: zawsze bez opłaty, z podaniem powodu.
+- Numer rezerwacji `SATOK-R-RRRR-NNNN` służy jako tytuł przelewu; rozliczenie ręczne w panelu do czasu etapu 4.
+- Blokady jednorazowe i cotygodniowe; przy kolizji zarząd wybiera: anulować rezerwacje albo je pozostawić (strzelcy dostają e-mail).
+- Powiadomienia: e-mail strzelca (utworzenie, zmiana, anulowanie, przypomnienie ~24 h przed), e-mail i lista powiadomień w panelu zarządu.
+- Eksport listy rezerwacji do CSV (Excel, separator „;”).

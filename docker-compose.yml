@@ -26,7 +26,7 @@ services:
     volumes:
       - private_media:/data/private
 
-  # Zadania okresowe: wygaszanie dokumentów raz na dobę oraz codzienna kopia bazy (7 ostatnich).
+  # Zadania okresowe (co godzinę): przypomnienia o rezerwacjach i wygaszanie dokumentów; codzienna kopia bazy (7 ostatnich).
   cron:
     build: .
     restart: unless-stopped
@@ -37,7 +37,7 @@ services:
       db:
         condition: service_healthy
     command: >
-      sh -c 'while true; do python manage.py expire_credentials; sleep 86400; done'
+      sh -c 'while true; do python manage.py send_reminders; python manage.py expire_credentials; sleep 3600; done'
 
   backup:
     image: postgres:16

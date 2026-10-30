@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Zajętość osi{% endblock %}
+{% block content %}
+<h1>Zajętość osi</h1>
+{% include "bookings/_daynav.html" %}
+{% include "bookings/_grid.html" %}
+<p class="legend small"><span class="cell free">wolne</span> <span class="cell busy">zajęte</span> <span class="cell blocked">niedostępne</span></p>
+{% if can_book %}<p>Kliknij wolną godzinę, aby zarezerwować, lub <a href="{% url 'bookings:new' %}?dzien={{ day|date:'Y-m-d' }}">utwórz rezerwację</a>.</p>
+{% elif user.is_authenticated %}<p class="muted">Rezerwować może osoba ze zweryfikowanymi uprawnieniami prowadzącego strzelanie. <a href="{% url 'credentials:my_list' %}">Moje dokumenty</a></p>
+{% else %}<p class="muted"><a href="{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}">Zaloguj się</a>, aby zarezerwować.</p>{% endif %}
+{% endblock %}

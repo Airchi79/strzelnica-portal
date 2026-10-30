@@ -21,7 +21,8 @@ def _clear_cache(db):
 
 
 def make_user(email="jan@example.com", verified=True, **extra):
-    user = User.objects.create_user(email=email, password=PASSWORD, first_name="Jan", last_name="Kowalski", **extra)
+    extra = {"first_name": "Jan", "last_name": "Kowalski", **extra}
+    user = User.objects.create_user(email=email, password=PASSWORD, **extra)
     if verified:
         user.email_verified_at = timezone.now()
         user.save()

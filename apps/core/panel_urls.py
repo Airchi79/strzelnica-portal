@@ -1,5 +1,6 @@
 from django.urls import path
 
+from apps.bookings import views as bookings_views
 from apps.credentials import views as credentials_views
 from apps.facilities import views as facilities_views
 from apps.regulations import views as regulations_views
@@ -24,5 +25,15 @@ urlpatterns = [
     path("osie/<int:pk>/", facilities_views.panel_lane, name="lane"),
     path("osie/<int:pk>/cennik/", facilities_views.panel_price_add, name="price_add"),
     path("ustawienia/", views.panel_settings, name="settings"),
+    path("rezerwacje/", bookings_views.panel_calendar, name="bookings"),
+    path("rezerwacje/lista/", bookings_views.panel_list, name="reservations"),
+    path("rezerwacje/nowa/", bookings_views.panel_new, name="reservation_new"),
+    path("rezerwacje/ustawienia/", bookings_views.panel_settings, name="booking_settings"),
+    path("rezerwacje/<int:pk>/", bookings_views.panel_detail, name="reservation"),
+    path("blokady/", bookings_views.panel_blocks, name="blocks"),
+    path("blokady/nowa/", bookings_views.panel_block_new, name="block_new"),
+    path("blokady/<int:pk>/usun/", bookings_views.panel_block_delete, name="block_delete"),
+    path("powiadomienia/", bookings_views.panel_notifications, name="notifications"),
+    path("powiadomienia/<int:pk>/", bookings_views.panel_notification_open, name="notification"),
     path("dziennik/", views.panel_audit, name="audit"),
 ]

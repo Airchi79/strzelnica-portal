@@ -1,0 +1,9 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+zarząd zmienił Twoją rezerwację. Aktualne dane:
+
+{% include "emails/_reservation_summary.txt" %}
+Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

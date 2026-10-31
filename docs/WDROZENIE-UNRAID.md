@@ -125,6 +125,7 @@ Zmień (strzałki — poruszanie, `Ctrl+O` `Enter` — zapis, `Ctrl+X` — wyjś
 | `SITE_URL` | `https://rezerwacje.twoja-domena.pl` |
 | `POSTGRES_PASSWORD` | wygenerowane hasło (ustaw **przed** pierwszym uruchomieniem) |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | dane serwera poczty (od dostawcy skrzynki) |
+| `EMAIL_USE_TLS` / `EMAIL_USE_SSL` | port 587 → `TLS=true`, `SSL=false`; port 465 (np. LH.pl) → `TLS=false`, `SSL=true` |
 | `DEFAULT_FROM_EMAIL` | np. `Strzelnica Sątok <rezerwacje@twoja-domena.pl>` |
 | `TPAY_*` | na razie puste — płatności online uruchomisz później (punkt 10) |
 

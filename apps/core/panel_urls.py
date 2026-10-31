@@ -1,5 +1,6 @@
 from django.urls import path
 
+from apps.association import views as association_views
 from apps.bookings import views as bookings_views
 from apps.credentials import views as credentials_views
 from apps.facilities import views as facilities_views
@@ -47,6 +48,23 @@ urlpatterns = [
     path("platnosci/<uuid:pk>/", payments_views.panel_payment, name="payment"),
     path("salda/", payments_views.panel_wallets, name="wallets"),
     path("salda/<int:user_pk>/", payments_views.panel_wallet, name="wallet"),
+    path("czlonkowie/", association_views.panel_members, name="members"),
+    path("czlonkowie/nowy/", association_views.panel_member_new, name="member_new"),
+    path("czlonkowie/<int:pk>/", association_views.panel_member, name="member"),
+    path("deklaracje/", association_views.panel_applications, name="applications"),
+    path("skladki/", association_views.panel_fees, name="fees"),
+    path("skladki/<int:pk>/wplata/", association_views.panel_fee_pay, name="fee_pay"),
+    path("uchwaly/", association_views.panel_resolutions, name="resolutions"),
+    path("uchwaly/nowa/", association_views.panel_resolution_new, name="resolution_new"),
+    path("uchwaly/historyczna/", association_views.panel_resolution_historical, name="resolution_historical"),
+    path("uchwaly/<uuid:pk>/", association_views.panel_resolution, name="resolution"),
+    path("uchwaly/<uuid:pk>/druk/", association_views.panel_resolution_print, name="resolution_print"),
+    path("uchwaly/<uuid:pk>/skan/", association_views.panel_resolution_attachment, name="resolution_attachment"),
+    path("zebrania/", association_views.panel_meetings, name="meetings"),
+    path("zebrania/<int:pk>/", association_views.panel_meeting, name="meeting"),
+    path("kluby/", association_views.panel_clubs, name="clubs"),
+    path("kluby/<int:pk>/", association_views.panel_club, name="club"),
+    path("raporty/", association_views.panel_reports, name="reports"),
     path("powiadomienia/", bookings_views.panel_notifications, name="notifications"),
     path("powiadomienia/<int:pk>/", bookings_views.panel_notification_open, name="notification"),
     path("dziennik/", views.panel_audit, name="audit"),

@@ -17,6 +17,7 @@
   <a class="card tile" href="{% url 'bookings:my_list' %}"><strong>Moje rezerwacje</strong>
     <span class="muted">{% if upcoming %}Najbliższa: {{ upcoming.lane }}, {{ upcoming.starts_at|date:"j.m H:i" }}{% else %}Brak nadchodzących{% endif %}</span></a>
   <a class="card tile" href="{% url 'payments:wallet' %}"><strong>{% if WALLET_ENABLED %}Saldo i płatności{% else %}Moje płatności{% endif %}</strong><span class="muted">{% if WALLET_ENABLED %}Saldo: {{ balance|pln }} · {% endif %}do zapłaty: {{ due_count }}</span></a>
+  <a class="card tile" href="{% url 'association:membership' %}"><strong>Stowarzyszenie</strong><span class="muted">{% if user.member and user.member.status != 'wykreslony' %}Członek nr {{ user.member.number }} · {{ user.member.get_status_display|lower }}{% else %}Deklaracja członkowska{% endif %}</span></a>
   <a class="card tile" href="{% url 'logbook:my_qr' %}"><strong>Mój kod QR i pobyty</strong><span class="muted">Kod do książki pobytu, historia pobytów</span></a>
   <a class="card tile" href="{% url 'accounts:profile' %}"><strong>Profil i bezpieczeństwo</strong><span class="muted">Dane, hasło, logowanie dwuskładnikowe</span></a>
   <a class="card tile" href="{% url 'regulations:list' %}"><strong>Regulaminy</strong><span class="muted">Aktualne dokumenty stowarzyszenia</span></a>

@@ -46,10 +46,11 @@ python -m pytest
 | `apps/bookings` | rezerwacje osi (blokada całej osi), blokady zarządu, rozliczenia ręczne, przypomnienia |
 | `apps/logbook` | elektroniczna książka rejestru pobytu: kody QR, podpis na ekranie, wydruk, rozliczenie wg wpisów |
 | `apps/payments` | saldo strzelca, księga sald, wpłaty (przelew/CSV, gotówka, BLIK, Tpay), import wyciągu |
+| `apps/association` | członkowie, deklaracje, składki, uchwały i głosowania, Walne Zebranie, kluby i kody dostępu, raporty |
 | `apps/facilities` | obiekty, osie, godziny otwarcia, cennik (kwoty w groszach) |
 | `apps/audit` | dziennik zdarzeń i rejestr wglądu w dane wrażliwe (niezmienialne — trigger w bazie) |
 | `apps/core` | strona główna, pulpit, panel zarządu, uprawnienia, PWA, powiadomienia e-mail |
 
 ## Zadania okresowe
 
-`send_reminders`, `settle_reservations`, `expire_credentials`, `purge_logbook` (polecenia `python manage.py …`) — co godzinę (w Dockerze robi to usługa `cron`).
+`send_reminders`, `settle_reservations`, `expire_credentials`, `purge_logbook`, `association_tasks` (polecenia `python manage.py …`) — co godzinę (w Dockerze robi to usługa `cron`).

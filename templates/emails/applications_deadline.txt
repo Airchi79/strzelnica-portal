@@ -1,0 +1,5 @@
+{% autoescape off %}Zbliża się 2-miesięczny termin na decyzję w sprawie deklaracji członkowskich (§ 32 Regulaminu):
+{% for a in applications %}- {{ a.user.full_name }} — do {{ a.deadline|date:"j.m.Y" }}
+{% endfor %}
+{{ site_url }}{% url 'panel:applications' %}
+{% endautoescape %}

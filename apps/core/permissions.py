@@ -9,6 +9,10 @@ from apps.accounts.views import SESSION_2FA_NEXT
 
 # Uprawnienia, które można nadawać w panelu zarządu (właściciel systemu ma wszystkie jako superużytkownik).
 PANEL_PERMISSIONS = [
+    ("association.manage_members", "Stowarzyszenie: członkowie, deklaracje i składki"),
+    ("association.manage_resolutions", "Stowarzyszenie: uchwały i zebrania"),
+    ("association.manage_clubs", "Kluby i kody dostępu"),
+    ("association.view_reports", "Raporty"),
     ("payments.manage_payments", "Płatności: wpłaty, import wyciągu, salda i korekty"),
     ("logbook.view_logbook", "Książka pobytu: przegląd i wydruk"),
     ("logbook.manage_logbook", "Książka pobytu: ustawienia i kod QR wejścia"),

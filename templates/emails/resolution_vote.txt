@@ -1,0 +1,5 @@
+{% autoescape off %}Projekt uchwały Zarządu czeka na Twój głos:
+{{ resolution.title }}
+
+{{ site_url }}{% url 'panel:resolution' resolution.pk %}
+{% endautoescape %}

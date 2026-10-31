@@ -56,6 +56,7 @@ services:
         python manage.py settle_reservations;
         python manage.py expire_credentials;
         python manage.py purge_logbook;
+        python manage.py association_tasks;
         sleep 3600;
       done'
 

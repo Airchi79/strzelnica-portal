@@ -39,3 +39,11 @@ def sub(value, arg):
         return int(value) - int(arg)
     except (TypeError, ValueError):
         return value
+
+
+@register.filter
+def get(mapping, key):
+    try:
+        return mapping.get(key, "")
+    except AttributeError:
+        return ""

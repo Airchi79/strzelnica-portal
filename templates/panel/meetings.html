@@ -1,0 +1,15 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Zebrania{% endblock %}
+{% block panel %}
+<h1>Zebrania członków</h1>
+{% include "panel/_assoc_tabs.html" %}
+<div class="card table-wrap"><table>
+  <tr><th>Zebranie</th><th>Miejsce</th><th>Obecnych</th><th>Protokół</th></tr>
+  {% for m in meetings %}<tr><td><a href="{% url 'panel:meeting' m.pk %}">{{ m }}</a></td><td>{{ m.place }}</td><td>{{ m.n }}</td><td>{% if m.closed %}zamknięty{% else %}otwarty{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Brak zebrań.</td></tr>{% endfor %}
+</table></div>
+<h2>Nowe zebranie</h2>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
+  <p class="small muted">Termin i miejsce WZC publikuje się co najmniej 14 dni przed zebraniem, także e-mailem (§ 15).</p>
+  <button class="btn" type="submit">Utwórz</button></form></div>
+{% endblock %}

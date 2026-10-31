@@ -1,0 +1,24 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Deklaracje{% endblock %}
+{% block panel %}
+<h1>Deklaracje członkowskie</h1>
+{% include "panel/_assoc_tabs.html" %}
+<p class="muted">Zarząd ma 2 miesiące od złożenia deklaracji na podjęcie uchwały (§ 32 Regulaminu).</p>
+<form method="get" action="{% url 'panel:resolution_new' %}">
+<input type="hidden" name="organ" value="zarzad">
+<div class="card table-wrap"><table>
+  <tr><th></th><th>Osoba</th><th>Złożona</th><th>Termin decyzji</th></tr>
+  {% for a in pending %}<tr><td><input type="checkbox" class="pick" value="{{ a.pk }}"></td><td>{{ a.user.full_name }}<div class="small muted">{{ a.user.email }}{% if a.motivation %} · {{ a.motivation|truncatechars:80 }}{% endif %}</div></td>
+    <td>{{ a.submitted_at|date:"j.m.Y" }}</td><td>{% if a.deadline < today %}<span class="badge bad">po terminie</span>{% endif %} {{ a.deadline|date:"j.m.Y" }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Brak deklaracji do rozpatrzenia.</td></tr>{% endfor %}
+</table></div>
+{% if pending %}<input type="hidden" name="deklaracje" id="picked"><div class="actions">
+  <button class="btn" name="skutek" value="przyjecie" onclick="document.getElementById('picked').value=[...document.querySelectorAll('.pick:checked')].map(c=>c.value).join(',')">Projekt uchwały o przyjęciu zaznaczonych</button>
+  <button class="btn secondary" name="skutek" value="odmowa" onclick="document.getElementById('picked').value=[...document.querySelectorAll('.pick:checked')].map(c=>c.value).join(',')">Projekt uchwały o odmowie</button></div>{% endif %}
+</form>
+<h2>Rozpatrzone</h2>
+<div class="card table-wrap"><table>
+  {% for a in decided %}<tr><td>{{ a.user.full_name }}</td><td>{{ a.get_status_display }}</td><td>{% if a.resolution %}<a href="{% url 'panel:resolution' a.resolution.pk %}">{{ a.resolution.display_number }}</a>{% endif %}</td></tr>
+  {% empty %}<tr><td class="muted">Brak.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

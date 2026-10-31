@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ r.display_number }}</title>
+<style>
+  body { font: 15px/1.6 Georgia, "Times New Roman", serif; color: #000; background: #fff; max-width: 760px; margin: 24px auto; padding: 0 16px; }
+  h1 { font-size: 20px; text-align: center; margin: 0; } .sub { text-align: center; margin: 4px 0 24px; }
+  .content { white-space: pre-wrap; } table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 16px; }
+  th, td { border: 1px solid #777; padding: 4px 6px; text-align: left; } .sign { display: flex; justify-content: space-around; margin-top: 64px; text-align: center; font-size: 13px; }
+  .noprint { font-family: system-ui, sans-serif; margin-bottom: 16px; } @media print { .noprint { display: none; } }
+</style></head>
+<body>
+<div class="noprint"><button onclick="window.print()">Drukuj / zapisz jako PDF</button> <a href="javascript:history.back()">Wróć</a></div>
+<p style="text-align:right">{{ association.address|default:"Sątok 4, 56-420 Bierutów" }}{% if r.adopted_on %}, {{ r.adopted_on|date:"j E Y" }} r.{% endif %}</p>
+<h1>{{ r.display_number }}</h1>
+<p class="sub">{% if r.adopted_on %}z dnia {{ r.adopted_on|date:"j E Y" }} r.<br>{% endif %}w sprawie: {{ r.title }}</p>
+<div class="content">{{ r.content }}</div>
+{% if r.status == 'uchylona' %}<p><strong>Uchwała uchylona{% if r.repealed_by %} — {{ r.repealed_by.display_number }}{% endif %}.</strong></p>{% endif %}
+{% if votes and not public %}
+<table><tr><th>Głosujący</th><th>Głos</th><th>Waga</th><th>Pełnomocnik</th></tr>
+{% for v in votes %}<tr><td>{{ v.member.full_name }}</td><td>{{ v.get_choice_display }}</td><td>{{ v.weight }}</td><td>{{ v.proxy.full_name|default:"" }}</td></tr>{% endfor %}
+<tr><th>Wynik</th><td colspan="3">za: {{ r.votes_for }} · przeciw: {{ r.votes_against }} · wstrzymało się: {{ r.votes_abstain }} — {{ r.get_status_display|lower }}</td></tr></table>
+{% elif not r.historical and r.status != 'projekt' %}<p>Wynik głosowania: za {{ r.votes_for }}, przeciw {{ r.votes_against }}, wstrzymało się {{ r.votes_abstain }}.</p>{% endif %}
+<div class="sign">
+  {% if r.organ == 'zarzad' %}{% for m in board %}<div>…………………………<br>{{ m.full_name }}<br>{{ m.get_board_role_display }}</div>{% endfor %}
+  {% else %}<div>…………………………<br>(protokolant)</div><div>…………………………<br>(przewodniczący zebrania)</div>{% endif %}
+</div>
+</body></html>

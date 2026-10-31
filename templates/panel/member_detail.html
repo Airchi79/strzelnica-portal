@@ -1,0 +1,29 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}{{ m.full_name }}{% endblock %}
+{% block panel %}
+<h1>{{ m.number }}. {{ m.full_name }}</h1>
+{% include "panel/_assoc_tabs.html" %}
+<div class="card"><table>
+  <tr><th>Rodzaj</th><td>{{ m.get_kind_display }}{% if m.founder %} · założyciel{% endif %}</td></tr>
+  <tr><th>Status</th><td>{{ m.get_status_display }}{% if m.status_note %}<div class="small muted">{{ m.status_note }}</div>{% endif %}{% if m.appeal_until %}<div class="small">odwołanie do WZC do {{ m.appeal_until|date:"j.m.Y" }}</div>{% endif %}</td></tr>
+  <tr><th>Funkcja</th><td>{{ m.get_board_role_display|default:"—" }}</td></tr>
+  <tr><th>Przyjęty</th><td>{{ m.joined_on|date:"j.m.Y" }}{% if m.removed_on %} · wykreślony {{ m.removed_on|date:"j.m.Y" }}{% endif %}</td></tr>
+  <tr><th>Konto</th><td>{% if m.user %}{{ m.user.email }}{% else %}<span class="muted">brak — członek bez konta w systemie</span>{% endif %}</td></tr>
+  <tr><th>E-mail / adres</th><td>{{ m.contact_email|default:"—" }}<div class="small">{{ m.address }}</div></td></tr>
+</table></div>
+<h2>Składki i wpisowe</h2>
+<div class="card table-wrap"><table>
+  {% for f in fees %}<tr><td>{{ f.label }}</td><td>{{ f.amount|pln }}</td><td>{{ f.due_on|date:"j.m.Y" }}</td><td>{{ f.get_status_display }}{% if f.note %}<div class="small muted">{{ f.note }}</div>{% endif %}</td>
+    <td>{% if f.status == 'do_zaplaty' %}<form method="post" action="{% url 'panel:fee_pay' f.pk %}" class="actions" style="margin:0">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}">{{ pay_form.method }}<button class="btn secondary" type="submit">Przyjmij wpłatę</button></form>{% endif %}</td></tr>
+  {% empty %}<tr><td class="muted">{% if m.kind == 'nadzwyczajny' %}Członek nadzwyczajny — zwolniony ze składek.{% else %}Brak należności.{% endif %}</td></tr>{% endfor %}
+</table>
+{% if m.kind == 'zwyczajny' %}<form method="post" style="margin-top:8px">{% csrf_token %}<input type="hidden" name="action" value="fees"><button class="btn secondary" type="submit">Nalicz wpisowe i składkę bieżącego roku</button></form>{% endif %}</div>
+<h2>Uchwały dotyczące członka</h2>
+<div class="card">{% for r in resolutions %}<div><a href="{% url 'panel:resolution' r.pk %}">{{ r.display_number }}</a> — {{ r.title }}</div>{% empty %}<span class="muted">Brak.</span>{% endfor %}
+  <div class="actions"><a class="btn secondary" href="{% url 'panel:resolution_new' %}?skutek=zawieszenie">Projekt uchwały…</a></div></div>
+<h2>Dane i ustawienia</h2>
+<div class="card"><form method="post">{% csrf_token %}<input type="hidden" name="action" value="edit">{% include "partials/form.html" with form=edit %}<button class="btn secondary" type="submit">Zapisz dane</button></form></div>
+<div class="card"><form method="post">{% csrf_token %}<input type="hidden" name="action" value="role">{% include "partials/form.html" with form=role %}<button class="btn secondary" type="submit">Zapisz funkcję</button></form>
+  <p class="small muted">Funkcję w Zarządzie ustala Walne Zebranie (§ 13). Członek Zarządu potrzebuje konta z dostępem do panelu, aby głosować online.</p></div>
+{% if not m.user %}<div class="card"><form method="post">{% csrf_token %}<input type="hidden" name="action" value="link">{% include "partials/form.html" with form=link %}<button class="btn secondary" type="submit">Połącz z kontem</button></form></div>{% endif %}
+{% endblock %}

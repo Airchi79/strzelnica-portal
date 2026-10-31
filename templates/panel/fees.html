@@ -1,0 +1,27 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Składki{% endblock %}
+{% block panel %}
+<h1>Składki i wpisowe {{ year }}</h1>
+{% include "panel/_assoc_tabs.html" %}
+<div class="grid">
+  <div class="card"><span class="muted small">Obowiązujące stawki</span><div>składka roczna <strong>{{ cfg.annual_fee|pln }}</strong> · wpisowe <strong>{{ cfg.entry_fee|pln }}</strong></div>
+    <div class="small muted">termin: {{ cfg.due_day }}.{{ cfg.due_month|stringformat:"02d" }}; zmiana stawek — uchwałą Zarządu (§ 27)</div></div>
+  {% with p=summary|get:"skladka:oplacona" d=summary|get:"skladka:do_zaplaty" %}
+  <div class="card"><span class="muted small">Składki {{ year }}</span><div>opłacone: <strong>{{ p.n|default:0 }}</strong> ({{ p.s|default:0|pln }})</div><div>do zapłaty: <strong>{{ d.n|default:0 }}</strong> ({{ d.s|default:0|pln }})</div></div>
+  {% endwith %}
+  <div class="card"><span class="muted small">Zaległe (po terminie, wszystkie lata)</span><div class="stat">{{ overdue }}</div><div class="small muted">zawieszenie możliwe po 1 miesiącu zaległości — uchwałą Zarządu (§ 37)</div></div>
+</div>
+<form method="get" class="card filters">
+  <div><label for="f-r">Rok</label><input type="number" id="f-r" name="rok" value="{{ year }}"></div>
+  <div><label for="f-s">Status</label><select id="f-s" name="status"><option value="">wszystkie</option>{% for v, l in statuses %}<option value="{{ v }}"{% if status == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="actions"><button class="btn" type="submit">Pokaż</button></div>
+</form>
+<form method="post" class="actions" style="margin-top:0;margin-bottom:12px">{% csrf_token %}<input type="hidden" name="action" value="ensure"><button class="btn secondary" type="submit">Nalicz składkę {{ year }} wszystkim członkom zwyczajnym</button></form>
+<div class="card table-wrap"><table>
+  <tr><th>Członek</th><th>Należność</th><th>Kwota</th><th>Termin</th><th>Status</th><th></th></tr>
+  {% for f in fees %}<tr><td><a href="{% url 'panel:member' f.member.pk %}">{{ f.member.number }}. {{ f.member.full_name }}</a></td><td>{{ f.label }}</td><td>{{ f.amount|pln }}</td>
+    <td>{% if f.status == 'do_zaplaty' and f.due_on < today %}<span class="badge bad">po terminie</span> {% endif %}{{ f.due_on|date:"j.m.Y" }}</td><td>{{ f.get_status_display }}</td>
+    <td>{% if f.status == 'do_zaplaty' %}<form method="post" action="{% url 'panel:fee_pay' f.pk %}" class="actions" style="margin:0">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">{{ pay_form.method }}<button class="btn secondary" type="submit">Przyjmij</button></form>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Brak należności.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

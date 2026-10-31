@@ -1,0 +1,5 @@
+{% autoescape off %}Nowa deklaracja członkowska: {{ application.user.full_name }} ({{ application.user.email }}).
+Termin podjęcia uchwały: {{ application.deadline|date:"j.m.Y" }}.
+
+{{ site_url }}{% url 'panel:applications' %}
+{% endautoescape %}

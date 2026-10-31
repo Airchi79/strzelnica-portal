@@ -1,0 +1,39 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{{ meeting }}{% endblock %}
+{% block panel %}
+<h1>{{ meeting }}</h1>
+{% include "panel/_assoc_tabs.html" %}
+<div class="card small">{{ meeting.place }}{% if meeting.chair %} · przewodniczący: {{ meeting.chair }}{% endif %}{% if meeting.secretary %} · protokolant: {{ meeting.secretary }}{% endif %}
+  {% if meeting.notes %}<div style="white-space:pre-wrap;margin-top:8px">{{ meeting.notes }}</div>{% endif %}</div>
+<h2>Lista obecności i pełnomocnictwa</h2>
+<form method="post" class="card table-wrap">{% csrf_token %}<input type="hidden" name="action" value="attendance">
+<table><tr><th>Członek</th><th>Waga</th><th>Obecność</th></tr>
+{% for m in members %}{% with a=attendance|get:m.pk %}
+  <tr><td>{{ m.number }}. {{ m.full_name }}{% if m.board_role %} <span class="badge">{{ m.get_board_role_display }}</span>{% endif %}</td><td>{% if meeting.kind == 'wzc' %}{{ m.vote_weight }}{% else %}1{% endif %}</td>
+  <td><select name="att_{{ m.pk }}" {% if meeting.closed %}disabled{% endif %}>
+    <option value="">nieobecny</option>
+    <option value="osobiscie"{% if a and not a.proxy_id %} selected{% endif %}>obecny osobiście</option>
+    {% for p in members %}{% if p.pk != m.pk %}<option value="przez_{{ p.pk }}"{% if a.proxy_id == p.pk %} selected{% endif %}>przez pełnomocnika: {{ p.full_name }}</option>{% endif %}{% endfor %}
+  </select></td></tr>{% endwith %}
+{% empty %}<tr><td class="muted">Brak uprawnionych członków.</td></tr>{% endfor %}
+</table>
+<p class="small muted">Pełnomocnictwo musi być pisemne; pełnomocnik obecny osobiście; członek zwyczajny może reprezentować najwyżej 2 osoby (§ 21).</p>
+{% if not meeting.closed %}<button class="btn secondary" type="submit">Zapisz obecność</button>{% endif %}
+</form>
+<p>Obecnych (z pełnomocnikami): <strong>{{ present|length }}</strong>{% if meeting.kind == 'wzc' %} · suma wag: <strong>{{ total_weight }}</strong>{% endif %}</p>
+
+<h2>Uchwały na zebraniu</h2>
+{% for r in resolutions %}
+<div class="card">
+  <strong>{{ r.display_number }}</strong> — {{ r.title }} <span class="badge">{{ r.get_status_display }}</span>
+  {% if r.status == 'projekt' and not meeting.closed %}
+  <form method="post" style="margin-top:8px">{% csrf_token %}<input type="hidden" name="action" value="vote"><input type="hidden" name="resolution" value="{{ r.pk }}">
+    <table>{% for a in present %}<tr><td>{{ a.member.full_name }}{% if a.proxy %} <span class="small muted">(przez {{ a.proxy.full_name }})</span>{% endif %}</td>
+      <td><select name="v_{{ a.member_id }}"><option value="">—</option>{% for v, l in choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></td></tr>{% endfor %}</table>
+    <button class="btn" type="submit">Zapisz głosy i rozstrzygnij</button></form>
+  {% else %}<div class="small">za {{ r.votes_for }} · przeciw {{ r.votes_against }} · wstrzymało się {{ r.votes_abstain }} · <a href="{% url 'panel:resolution' r.pk %}">szczegóły</a></div>{% endif %}
+</div>
+{% empty %}<div class="card muted">Brak uchwał. Utwórz projekt uchwały i wybierz to zebranie.</div>{% endfor %}
+<div class="actions"><a class="btn secondary" href="{% url 'panel:resolution_new' %}?organ={% if meeting.kind == 'wzc' %}wzc{% else %}nadzwyczajni{% endif %}">Nowy projekt uchwały</a>
+  {% if not meeting.closed %}<form method="post" data-confirm="Zamknąć protokół? Nie będzie można zmieniać obecności i głosów.">{% csrf_token %}<input type="hidden" name="action" value="close"><button class="btn secondary" type="submit">Zamknij protokół</button></form>{% endif %}</div>
+{% endblock %}

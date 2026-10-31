@@ -1,0 +1,58 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}{{ r.display_number }}{% endblock %}
+{% block panel %}
+<h1>{{ r.display_number }}</h1>
+{% if perms.association.manage_resolutions %}{% include "panel/_assoc_tabs.html" %}{% endif %}
+<div class="card">
+  <p><strong>w sprawie: {{ r.title }}</strong></p>
+  <p><span class="badge {% if r.status == 'przyjeta' %}ok{% elif r.status == 'odrzucona' %}bad{% else %}warn{% endif %}">{{ r.get_status_display }}</span>
+    {% if r.adopted_on %} · {{ r.adopted_on|date:"j.m.Y" }}{% endif %}{% if r.meeting %} · {{ r.meeting }}{% endif %}{% if r.historical %} · wprowadzona z dokumentu{% endif %}</p>
+  <div style="white-space:pre-wrap">{{ r.content }}</div>
+  {% if r.action %}<p class="small">Skutek: <strong>{{ r.get_action_display }}</strong>{% if r.action_applied_at %} — wykonany {{ r.action_applied_at|date:"j.m.Y H:i" }}{% endif %}</p>
+    {% for a in r.target_applications.all %}<div class="small">• deklaracja: {{ a.user.full_name }}</div>{% endfor %}
+    {% for m in r.target_members.all %}<div class="small">• {{ m }}</div>{% endfor %}
+    {% if r.params.annual_fee is not None and r.action == 'skladki' %}<div class="small">• składka {{ r.params.annual_fee|pln }}, wpisowe {{ r.params.entry_fee|pln }}</div>{% endif %}
+    {% if r.params.kind %}<div class="small">• nowy rodzaj: {{ r.params.kind }}</div>{% endif %}{% endif %}
+  {% if not r.historical and r.status != 'projekt' and r.status != 'glosowanie' %}<p class="small">Głosy: za {{ r.votes_for }} · przeciw {{ r.votes_against }} · wstrzymało się {{ r.votes_abstain }}</p>{% endif %}
+  {% if r.repealed_by %}<p class="small">Uchylona przez <a href="{% url 'panel:resolution' r.repealed_by.pk %}">{{ r.repealed_by.display_number }}</a></p>{% endif %}
+  <div class="actions">
+    <a class="btn secondary" href="{% url 'panel:resolution_print' r.pk %}" target="_blank" rel="noopener">Wydruk / PDF</a>
+    {% if r.attachment %}<a class="btn secondary" href="{% url 'panel:resolution_attachment' r.pk %}" target="_blank" rel="noopener">Skan</a>{% endif %}
+  </div>
+</div>
+
+{% if r.organ == 'zarzad' and not r.historical %}
+<h2>Głosowanie Zarządu</h2>
+<div class="card">
+  <table>{% for m in board %}<tr><td>{{ m.full_name }} <span class="muted small">{{ m.get_board_role_display }}</span></td>
+    <td>{% for v in votes %}{% if v.member_id == m.pk %}{{ v.get_choice_display }}{% endif %}{% endfor %}</td></tr>
+  {% empty %}<tr><td class="muted">W rejestrze członków nie oznaczono Prezesa i Wiceprezesa.</td></tr>{% endfor %}</table>
+  {% if r.status == 'projekt' and perms.association.manage_resolutions %}
+    <form method="post" style="margin-top:8px">{% csrf_token %}<input type="hidden" name="action" value="start"><button class="btn" type="submit">Rozpocznij głosowanie</button></form>
+  {% elif r.status == 'glosowanie' and me %}
+    <form method="post" style="margin-top:8px">{% csrf_token %}<input type="hidden" name="action" value="vote">
+      <fieldset class="radios"><legend>Twój głos{% if my_vote %} (oddany: {{ my_vote.get_choice_display }} — możesz zmienić do rozstrzygnięcia){% endif %}</legend>
+      {% for c in vote_form.choice %}<label>{{ c.tag }} {{ c.choice_label }}</label>{% endfor %}</fieldset>
+      <button class="btn" type="submit">Oddaj głos</button></form>
+  {% elif r.status == 'glosowanie' %}<p class="small muted">Głosują członkowie Zarządu w swoich kontach.</p>{% endif %}
+</div>
+{% elif r.status == 'projekt' %}
+<div class="card small">Głosowanie nad tą uchwałą odbywa się na zebraniu — {% if r.meeting %}<a href="{% url 'panel:meeting' r.meeting.pk %}">{{ r.meeting }}</a>{% else %}przypisz projekt do zebrania (utwórz projekt z wybranym zebraniem){% endif %}.</div>
+{% endif %}
+{% if votes and r.organ != 'zarzad' %}
+<h2>Głosy</h2>
+<div class="card table-wrap"><table><tr><th>Członek</th><th>Głos</th><th>Waga</th><th>Pełnomocnik</th></tr>
+  {% for v in votes %}<tr><td>{{ v.member.full_name }}</td><td>{{ v.get_choice_display }}</td><td>{{ v.weight }}</td><td>{{ v.proxy.full_name|default:"" }}</td></tr>{% endfor %}</table></div>
+{% endif %}
+
+{% if perms.association.manage_resolutions %}
+{% if r.status == 'przyjeta' %}
+<h2>Uchylenie</h2>
+<div class="card"><form method="post" data-confirm="Oznaczyć uchwałę jako uchyloną?">{% csrf_token %}<input type="hidden" name="action" value="repeal">
+  <label for="rep">Uchylona przez (przyjętą uchwałę)</label><select id="rep" name="repealing">{% for o in adopted_others %}<option value="{{ o.pk }}">{{ o.display_number }} — {{ o.title|truncatechars:60 }}</option>{% endfor %}</select>
+  <div class="actions"><button class="btn secondary" type="submit">Oznacz jako uchyloną</button></div></form></div>
+{% elif r.status == 'projekt' %}
+<form method="post" data-confirm="Usunąć projekt?">{% csrf_token %}<input type="hidden" name="action" value="delete"><button class="btn secondary" type="submit">Usuń projekt</button></form>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Nowy członek{% endblock %}
+{% block panel %}
+<h1>Wpis do rejestru członków</h1>
+{% include "panel/_assoc_tabs.html" %}
+<p class="muted">Służy do wprowadzenia członków przyjętych poza systemem (np. założycieli). Nowe osoby składają deklarację online i są przyjmowane uchwałą Zarządu.</p>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Wpisz do rejestru</button></form></div>
+<h2>Utwórz konto dla osoby</h2>
+<div class="card"><form method="post" novalidate>{% csrf_token %}<input type="hidden" name="action" value="account">{% include "partials/form.html" with form=account_form %}
+  <p class="small muted">Osoba dostanie e-mail z linkiem do ustawienia hasła. Potem wybierzesz jej konto w formularzu powyżej.</p>
+  <button class="btn secondary" type="submit">Utwórz konto</button></form></div>
+{% endblock %}

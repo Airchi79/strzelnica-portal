@@ -1,0 +1,17 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Uchwały{% endblock %}
+{% block panel %}
+<h1>Rejestr uchwał</h1>
+{% include "panel/_assoc_tabs.html" %}
+{% if voting %}<div class="msg warning">Trwa głosowanie: {% for r in voting %}<a href="{% url 'panel:resolution' r.pk %}">{{ r.title }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+<div class="actions" style="margin-top:0;margin-bottom:12px"><a class="btn" href="{% url 'panel:resolution_new' %}">Nowy projekt uchwały</a>
+  <a class="btn secondary" href="{% url 'panel:resolution_historical' %}">Wprowadź uchwałę z dokumentu</a></div>
+<div class="tabs"><a href="?" class="{% if not organ %}active{% endif %}">Wszystkie</a>{% for v, l in organs %}<a href="?organ={{ v }}" class="{% if organ == v %}active{% endif %}">{{ l }}</a>{% endfor %}</div>
+<div class="card table-wrap"><table>
+  <tr><th>Numer</th><th>W sprawie</th><th>Data</th><th>Status</th></tr>
+  {% for r in resolutions %}<tr><td><a href="{% url 'panel:resolution' r.pk %}">{% if r.number %}{{ r.number }}/{{ r.year }}{% else %}projekt{% endif %}</a><div class="small muted">{{ r.get_organ_display }}</div></td>
+    <td>{{ r.title }}{% if r.action %}<div class="small muted">skutek: {{ r.get_action_display|lower }}</div>{% endif %}</td><td>{{ r.adopted_on|date:"j.m.Y"|default:"—" }}</td>
+    <td><span class="badge {% if r.status == 'przyjeta' %}ok{% elif r.status == 'glosowanie' or r.status == 'projekt' %}warn{% elif r.status == 'odrzucona' %}bad{% endif %}">{{ r.get_status_display }}</span>{% if r.historical %} <span class="badge">z dokumentu</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Brak uchwał.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

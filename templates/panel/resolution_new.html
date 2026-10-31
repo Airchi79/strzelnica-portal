@@ -1,0 +1,15 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Projekt uchwały{% endblock %}
+{% block panel %}
+<h1>Projekt uchwały</h1>
+{% include "panel/_assoc_tabs.html" %}
+<div class="card small">
+  <strong>Kto podejmuje jakie uchwały (Regulamin):</strong>
+  <ul>
+    <li><b>Zarząd</b> — przyjęcie i skreślenie członków, zawieszenie, umorzenia, wysokość składek (§ 27); głosowanie online, zwykła większość w obecności całego Zarządu, przy równości decyduje Prezes (§ 25).</li>
+    <li><b>Walne Zebranie Członków</b> — kierunki działania, zmiany Regulaminu, wybór Zarządu, odwołania od uchwał Zarządu (§ 18); głosy ważone 1/50 przy obecności Prezesa (§ 19).</li>
+    <li><b>Członkowie nadzwyczajni</b> — zmiana rodzaju członkostwa (§ 31 pkt 4); większość, quorum połowa uprawnionych.</li>
+  </ul>
+</div>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Zapisz projekt</button></form></div>
+{% endblock %}

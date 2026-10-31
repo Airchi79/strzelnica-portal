@@ -1,0 +1,13 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
+
+przypominamy o zaległych należnościach członkowskich:
+{% for f in fees %}- {{ f.label }}: {{ f.amount|pln }} (termin {{ f.due_on|date:"j.m.Y" }})
+{% endfor %}Razem: {{ total|pln }}
+
+Zapłacisz online w systemie albo przelewem z tytułem {{ code }}:
+{{ site_url }}{% url 'payments:wallet' %}
+
+Zgodnie z § 37 Regulaminu zaległość powyżej miesiąca może skutkować zawieszeniem w prawach członka.
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

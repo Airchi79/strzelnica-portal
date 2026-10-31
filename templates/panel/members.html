@@ -1,0 +1,26 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Członkowie{% endblock %}
+{% block panel %}
+<h1>Rejestr członków</h1>
+{% include "panel/_assoc_tabs.html" %}
+<div class="grid">
+  <div class="card tile"><span class="stat">{{ stats|get:"razem_aktywni"|default:0 }}</span><strong>aktywnych członków</strong>
+    <span class="muted small">zwyczajni: {{ stats|get:"aktywny:zwyczajny"|default:0 }} · nadzwyczajni: {{ stats|get:"aktywny:nadzwyczajny"|default:0 }}</span></div>
+  <a class="card tile" href="{% url 'panel:applications' %}"><span class="stat">{{ pending_apps }}</span><strong>deklaracji do rozpatrzenia</strong></a>
+</div>
+<form method="get" class="card filters">
+  <div><label for="f-st">Status</label><select id="f-st" name="status"><option value="">wszystkie</option>{% for v, l in statuses %}<option value="{{ v }}"{% if f.status == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div><label for="f-k">Rodzaj</label><select id="f-k" name="kind"><option value="">wszystkie</option>{% for v, l in kinds %}<option value="{{ v }}"{% if f.kind == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div><label for="f-q">Szukaj</label><input type="search" id="f-q" name="q" value="{{ f.q }}"></div>
+  <div class="actions"><button class="btn" type="submit">Filtruj</button><button class="btn secondary" name="format" value="csv">Eksport CSV</button>
+    <a class="btn secondary" href="{% url 'panel:member_new' %}">Wpisz członka</a></div>
+</form>
+<div class="card table-wrap"><table>
+  <tr><th>Nr</th><th>Imię i nazwisko</th><th>Rodzaj</th><th>Status</th><th class="hide-sm">Konto</th></tr>
+  {% for m in page %}<tr><td>{{ m.number }}</td><td><a href="{% url 'panel:member' m.pk %}">{{ m.full_name }}</a>{% if m.board_role %} <span class="badge ok">{{ m.get_board_role_display }}</span>{% endif %}</td>
+    <td>{{ m.get_kind_display }}</td><td><span class="badge {% if m.status == 'aktywny' %}ok{% elif m.status == 'zawieszony' %}warn{% else %}bad{% endif %}">{{ m.get_status_display }}</span></td>
+    <td class="hide-sm">{% if m.user %}{{ m.user.email }}{% else %}<span class="muted">brak</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Rejestr jest pusty.</td></tr>{% endfor %}
+</table></div>
+{% include "partials/pagination.html" %}
+{% endblock %}

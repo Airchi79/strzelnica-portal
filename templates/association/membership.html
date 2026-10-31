@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% load satok %}
+{% block title %}Stowarzyszenie{% endblock %}
+{% block content %}
+<h1>Stowarzyszenie „Strzelnica Sątok”</h1>
+{% if member and member.status != 'wykreslony' %}
+<div class="card">
+  <div class="stat">Nr {{ member.number }}</div>
+  <p>{{ member.get_kind_display }}{% if member.board_role %} · {{ member.get_board_role_display }}{% endif %} · członek od {{ member.joined_on|date:"j.m.Y" }}</p>
+  <p>Status: <span class="badge {% if member.status == 'aktywny' %}ok{% else %}warn{% endif %}">{{ member.get_status_display }}</span>
+  {% if member.status == 'zawieszony' and member.appeal_until %}<br><span class="small">Odwołanie do Walnego Zebrania Członków możesz złożyć do {{ member.appeal_until|date:"j.m.Y" }} (§ 38 Regulaminu).</span>{% endif %}</p>
+</div>
+<h2>Składki i wpisowe</h2>
+<div class="card table-wrap"><table>
+  {% for f in fees %}<tr><td>{{ f.label }}</td><td>{{ f.amount|pln }}</td><td>termin {{ f.due_on|date:"j.m.Y" }}</td>
+    <td><span class="badge {% if f.status == 'oplacona' %}ok{% elif f.status == 'do_zaplaty' %}warn{% endif %}">{{ f.get_status_display }}</span></td></tr>
+  {% empty %}<tr><td class="muted">{% if member.kind == 'nadzwyczajny' %}Członkowie nadzwyczajni są zwolnieni ze składek (§ 31 Regulaminu).{% else %}Brak należności.{% endif %}</td></tr>{% endfor %}
+</table>
+<p class="small"><a href="{% url 'payments:wallet' %}">Jak zapłacić →</a></p></div>
+<h2>Uchwały</h2>
+<div class="card table-wrap"><table>
+  {% for r in resolutions %}<tr><td><a href="{% url 'association:resolution' r.pk %}">{{ r.display_number }}</a><div class="small muted">{{ r.title }}</div></td><td>{{ r.adopted_on|date:"j.m.Y" }}</td>
+    <td>{% if r.status == 'uchylona' %}<span class="badge">uchylona</span>{% endif %}</td></tr>
+  {% empty %}<tr><td class="muted">Brak uchwał w rejestrze.</td></tr>{% endfor %}
+</table></div>
+{% if meetings %}<h2>Zebrania</h2>
+<div class="card">{% for m in meetings %}<div>{{ m }} — {{ m.place }}</div>{% endfor %}</div>{% endif %}
+{% else %}
+{% if pending %}
+<div class="card">
+  <p>Twoja deklaracja członkowska z {{ pending.submitted_at|date:"j.m.Y" }} czeka na decyzję Zarządu (najpóźniej do {{ pending.deadline|date:"j.m.Y" }}).</p>
+  <form method="post" data-confirm="Wycofać deklarację?">{% csrf_token %}<input type="hidden" name="action" value="withdraw"><button class="btn secondary" type="submit">Wycofaj deklarację</button></form>
+</div>
+{% elif can_apply %}
+<div class="card">
+  <h2 style="margin-top:0">Deklaracja członkowska</h2>
+  <p>Członkiem może zostać każdy, kto złoży oświadczenie o przystąpieniu i akceptacji Regulaminu (§ 29). Zarząd podejmuje uchwałę w ciągu 2 miesięcy (§ 32).</p>
+  <p>Wpisowe: <strong>{{ cfg.entry_fee|pln }}</strong> (jednorazowo) · składka roczna: <strong>{{ cfg.annual_fee|pln }}</strong>, płatna do {{ cfg.due_day }}.{{ cfg.due_month|stringformat:"02d" }} (przy przyjęciu w trakcie roku — pełna kwota).</p>
+  {% if rules %}<p><a href="{% url 'regulations:version' rules.pk %}" target="_blank" rel="noopener">Regulamin Stowarzyszenia →</a></p>{% endif %}
+  <p class="small muted">Członkostwo nie zmienia cennika korzystania ze strzelnicy — zgodnie z § 40 Regulaminu majątek Stowarzyszenia udostępniany jest członkom na tych samych zasadach co innym osobom.</p>
+  <form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Składam deklarację</button></form>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

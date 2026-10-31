@@ -1,0 +1,7 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+{{ resolution.display_number }} z dnia {{ resolution.adopted_on|date:"j.m.Y" }} Zarząd nie przyjął Twojej deklaracji członkowskiej.
+Uzasadnienie: {{ resolution.content }}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

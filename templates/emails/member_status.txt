@@ -1,0 +1,8 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+{{ resolution.display_number }} z dnia {{ resolution.adopted_on|date:"j.m.Y" }} (w sprawie: {{ resolution.title }})
+Twój status członkowski: {{ member.get_status_display }}.
+{% if member.appeal_until %}Od uchwały przysługuje odwołanie do Walnego Zebrania Członków w terminie 7 dni, tj. do {{ member.appeal_until|date:"j.m.Y" }} (§ 38 Regulaminu).
+{% endif %}
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

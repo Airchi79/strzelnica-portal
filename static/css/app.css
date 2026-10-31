@@ -116,3 +116,6 @@ td { overflow-wrap: anywhere; }
 /* Płatności */
 td.neg, .neg { color: var(--bad); } td.pos { color: var(--ok); }
 .code { font-family: ui-monospace, monospace; letter-spacing: .03em; }
+
+.badge { white-space: nowrap; }
+table.report th, table.report td { font-size: .8rem; padding: 6px 4px; white-space: nowrap; }

@@ -1,0 +1,14 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Kluby{% endblock %}
+{% block panel %}
+<h1>Kluby i kody dostępu</h1>
+{% include "panel/_assoc_tabs.html" %}
+<p class="muted">Klub dostaje kod dostępu na okres umowy. Rezerwacje z kodem nie są opłacane przez strzelca — rozliczenie z klubem odbywa się osobno, wg umowy.</p>
+<div class="card table-wrap"><table>
+  <tr><th>Klub</th><th>Kody</th><th>Status</th></tr>
+  {% for c in clubs %}<tr><td><a href="{% url 'panel:club' c.pk %}">{{ c.name }}</a><div class="small muted">{{ c.contact_name }}</div></td><td>{{ c.n }}</td><td>{% if c.is_active %}aktywny{% else %}nieaktywny{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="3" class="muted">Brak klubów.</td></tr>{% endfor %}
+</table></div>
+<h2>Nowy klub</h2>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Dodaj klub</button></form></div>
+{% endblock %}

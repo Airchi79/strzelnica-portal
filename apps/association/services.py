@@ -252,7 +252,7 @@ def mark_fee_paid(fee, method, by, note=""):
     from apps.payments.models import Payment
     from apps.payments.services import register_manual_payment
 
-    fee = Fee.objects.select_for_update().select_related("member__user").get(pk=fee.pk)
+    fee = Fee.objects.select_for_update(of=("self",)).select_related("member__user").get(pk=fee.pk)
     if fee.status != Fee.Status.DUE:
         raise ValidationError("Ta należność nie jest do zapłaty.")
     if fee.member.user_id:
@@ -597,14 +597,16 @@ def code_usage(code):
 
 def membership_stats():
     agg = Member.objects.values("status", "kind").annotate(n=Count("pk"))
-    return {(r["status"], r["kind"]): r["n"] for r in agg}
+    out = {f'{r["status"]}:{r["kind"]}': r["n"] for r in agg}
+    out["razem_aktywni"] = sum(r["n"] for r in agg if r["status"] == Member.Status.ACTIVE)
+    return out
 
 
 def fees_summary(year):
     qs = Fee.objects.filter(Q(year=year) | Q(kind=Fee.Kind.ENTRY, due_on__year=year))
     out = {}
     for row in qs.values("kind", "status").annotate(n=Count("pk"), s=Sum("amount")):
-        out[(row["kind"], row["status"])] = (row["n"], row["s"] or 0)
+        out[f'{row["kind"]}:{row["status"]}'] = {"n": row["n"], "s": row["s"] or 0}
     return out
 
 

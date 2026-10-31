@@ -1,0 +1,37 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Raporty {{ year }}{% endblock %}
+{% block panel %}
+<h1>Raporty {{ year }}</h1>
+{% include "panel/_assoc_tabs.html" %}
+<form method="get" class="card filters"><div><label for="r">Rok</label><input type="number" id="r" name="rok" value="{{ year }}"></div>
+  <div class="actions"><button class="btn" type="submit">Pokaż</button><button class="btn secondary" name="format" value="csv">Eksport CSV</button></div></form>
+<div class="grid">
+  <div class="card"><span class="muted small">Zarezerwowane godziny</span><div class="stat">{{ occ_total }}</div></div>
+  <div class="card"><span class="muted small">Wpływy (zaksięgowane)</span><div class="stat">{{ inc_total|pln }}</div></div>
+  <div class="card"><span class="muted small">Aktywni członkowie</span><div class="stat">{{ stats|get:"razem_aktywni"|default:0 }}</div></div>
+</div>
+<h2>Obłożenie osi [godziny]</h2>
+<div class="card table-wrap"><table class="report">
+  <tr><th>Oś</th>{% for m in months %}<th>{{ m|stringformat:"02d" }}</th>{% endfor %}<th>Razem</th></tr>
+  {% for lane, vals, total in occ_rows %}<tr><td>{{ lane.name }}</td>{% for v in vals %}<td>{{ v|default:"" }}</td>{% endfor %}<td><strong>{{ total }}</strong></td></tr>{% endfor %}
+</table></div>
+<h2>Wpływy według miesięcy i kanałów</h2>
+<div class="card table-wrap"><table class="report">
+  <tr><th>Miesiąc</th>{% for k, l in methods %}<th>{{ l }}</th>{% endfor %}<th>Razem</th></tr>
+  {% for m, vals, total in inc_rows %}<tr><td>{{ m|stringformat:"02d" }}</td>{% for v in vals %}<td>{% if v %}{{ v|pln }}{% endif %}</td>{% endfor %}<td><strong>{% if total %}{{ total|pln }}{% endif %}</strong></td></tr>{% endfor %}
+</table></div>
+<h2>Składki {{ year }}</h2>
+<div class="card table-wrap"><table>
+  {% with a=fees|get:"skladka:oplacona" b=fees|get:"skladka:do_zaplaty" c=fees|get:"skladka:umorzona" e=fees|get:"wpisowe:oplacona" %}
+  <tr><td>Składki opłacone</td><td>{{ a.n|default:0 }}</td><td>{{ a.s|default:0|pln }}</td></tr>
+  <tr><td>Składki do zapłaty</td><td>{{ b.n|default:0 }}</td><td>{{ b.s|default:0|pln }}</td></tr>
+  <tr><td>Składki umorzone</td><td>{{ c.n|default:0 }}</td><td>{{ c.s|default:0|pln }}</td></tr>
+  <tr><td>Wpisowe opłacone</td><td>{{ e.n|default:0 }}</td><td>{{ e.s|default:0|pln }}</td></tr>
+  {% endwith %}
+</table></div>
+<h2>Kody klubów</h2>
+<div class="card table-wrap"><table>
+  {% for code, u in club_rows %}<tr><td>{{ code.club }}</td><td>{{ code.code }}</td><td>{{ u.hours }} h · {{ u.reservations }} rez.</td><td>{% if code.contract_hourly %}{{ u.value|pln }}{% endif %}</td></tr>
+  {% empty %}<tr><td class="muted">Brak rezerwacji z kodami.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

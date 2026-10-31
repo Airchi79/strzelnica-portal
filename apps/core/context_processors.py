@@ -10,7 +10,10 @@ def site(request):
         pending = pending_acceptances(user)
         if user.is_staff:
             unread = user.notifications.filter(read_at__isnull=True).count()
+    from apps.payments.models import PaymentSettings
+
     return {
+        "WALLET_ENABLED": PaymentSettings.load().wallet_enabled,
         "SITE_NAME": "Strzelnica Sątok",
         "SITE_URL": settings.SITE_URL,
         "pending_regulations": pending,

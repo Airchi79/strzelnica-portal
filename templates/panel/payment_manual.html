@@ -3,7 +3,8 @@
 {% block panel %}
 <h1>Przyjmij wpłatę</h1>
 {% include "panel/_payments_tabs.html" %}
+{% if reservation %}<div class="msg">Wpłata za rezerwację <strong>{{ reservation.number }}</strong>.</div>{% endif %}
 <div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
-  <p class="small muted">Kwota trafi na saldo strzelca, a należności za rezerwacje zostaną z niego opłacone automatycznie.</p>
+  <p class="small muted">{% if reservation %}Wpłata opłaci wskazaną rezerwację; ewentualna nadwyżka zostanie zapisana jako nadpłata.{% elif WALLET_ENABLED %}Kwota trafi na saldo strzelca, a należności zostaną z niego opłacone automatycznie.{% else %}Wpłata bez wskazanej rezerwacji pokryje zaległe składki członkowskie strzelca; nadwyżka zostanie zapisana jako nadpłata.{% endif %}</p>
   <button class="btn" type="submit">Zaksięguj wpłatę</button></form></div>
 {% endblock %}

@@ -9,10 +9,14 @@
     <tr><th>Oś</th><td>{{ form.cleaned_data.lane }}</td></tr>
     <tr><th>Termin</th><td>{{ preview.starts_at|date:"l, j E Y" }}, {{ preview.starts_at|time:"H:i" }}–{{ preview.ends_at|time:"H:i" }} ({{ preview.hours }} h)</td></tr>
     <tr><th>Liczba osób</th><td>{{ form.cleaned_data.persons }}</td></tr>
+    {% if preview.code %}
+    <tr><th>Rozliczenie</th><td><strong>wg umowy klubu {{ preview.code.club }}</strong> (kod {{ preview.code.code }}) — bez płatności w systemie</td></tr>
+    {% else %}
     <tr><th>Stawka</th><td>{{ preview.hourly|pln }} / h</td></tr>
     <tr><th>Należność</th><td><strong>{{ preview.amount|pln }}</strong></td></tr>
+    {% endif %}
   </table>
-  <p class="small">Rezerwacja obejmuje całą oś. Bezpłatne anulowanie do <strong>{{ preview.free_cancel_until|date:"j.m.Y H:i" }}</strong>; później należność pozostaje do zapłaty.</p>
+  <p class="small">Rezerwacja obejmuje całą oś.{% if not preview.code %} Płatność online, przelewem z numerem rezerwacji w tytule albo na miejscu.{% endif %} Bezpłatne anulowanie do <strong>{{ preview.free_cancel_until|date:"j.m.Y H:i" }}</strong>; później należność pozostaje do zapłaty.</p>
   <form method="post">{% csrf_token %}
     {% for field in form %}<input type="hidden" name="{{ field.html_name }}" value="{{ field.value|default_if_none:'' }}">{% endfor %}
     <div class="actions"><button class="btn" type="submit" name="action" value="confirm">Rezerwuję</button>

@@ -120,10 +120,18 @@ def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: i
     return starts_at, ends_at, rule
 
 
-def quote(lane, day, start_hour, end_hour, persons, now=None):
+def quote(lane, day, start_hour, end_hour, persons, now=None, access_code=""):
     starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, persons, now)
+    hours = end_hour - start_hour
+    if access_code:
+        # Kod klubu: rozliczenie wg umowy z klubem, poza płatnościami strzelca. Kwota tylko informacyjnie (stawka umowna).
+        from apps.association.services import find_access_code
+
+        code = find_access_code(access_code, lane, day, hours)
+        hourly = code.contract_hourly or 0
+        return {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "hourly": hourly, "amount": hourly * hours, "code": code}
     hourly = rule.hourly_amount(persons)
-    return {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "hourly": hourly, "amount": hourly * (end_hour - start_hour)}
+    return {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "hourly": hourly, "amount": hourly * hours, "code": None}
 
 
 def _next_number(year):
@@ -134,11 +142,12 @@ def _next_number(year):
     return f"SATOK-R-{year}-{seq.last:04d}"
 
 
-def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="", created_by=None, now=None):
+def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="", created_by=None, now=None, access_code=""):
     reasons = check_can_book(user)
     if reasons:
         raise ValidationError(reasons)
-    q = quote(lane, day, start_hour, end_hour, persons, now)
+    q = quote(lane, day, start_hour, end_hour, persons, now, access_code=access_code)
+    code = q.get("code")
     try:
         with transaction.atomic():
             reservation = Reservation.objects.create(
@@ -153,6 +162,8 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
                 hourly_amount=q["hourly"],
                 amount=q["amount"],
                 created_by=created_by or user,
+                access_code=code,
+                payment_status=Reservation.Payment.CONTRACT if code else Reservation.Payment.DUE,
             )
     except IntegrityError as e:
         if "reservation_no_overlap" in str(e):
@@ -202,7 +213,7 @@ def cancel_reservation(reservation, by, reason="", as_board=False, now=None):
     reservation.late_cancellation = late
     if not late:
         reservation.payment_status = Reservation.Payment.NONE
-    reservation.save()
+    reservation.save()  # anulowanie po terminie: należność (lub rozliczenie wg umowy klubu) pozostaje
     if not late:
         reservation = refund_reservation(reservation, by=by)
     log_event(
@@ -235,10 +246,12 @@ def change_persons(reservation, persons, by):
         raise ValidationError("Nieprawidłowa liczba osób.")
     before = (reservation.persons, reservation.amount)
     reservation.persons = persons
-    reservation.hourly_amount = reservation.price_rule.hourly_amount(persons)
-    reservation.amount = reservation.hourly_amount * reservation.hours
+    if reservation.access_code_id is None:
+        reservation.hourly_amount = reservation.price_rule.hourly_amount(persons)
+        reservation.amount = reservation.hourly_amount * reservation.hours
     reservation.save()
-    reservation = reconcile_reservation(reservation, by=by)
+    if reservation.access_code_id is None:
+        reservation = reconcile_reservation(reservation, by=by)
     log_event(
         "rezerwacja.zmiana_osob",
         reservation,
@@ -270,7 +283,7 @@ def set_payment(reservation, action, by):
     reservation.save()
     log_event("rezerwacja.platnosc", reservation, str(reservation), changes={"platnosc": [before, target]}, actor=by)
     if target == Reservation.Payment.DUE:
-        apply_wallet(reservation.user, by=by)
+        apply_wallet(reservation.user, by=by, targets=[reservation])
         reservation.refresh_from_db()
     return reservation
 

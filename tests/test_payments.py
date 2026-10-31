@@ -24,6 +24,16 @@ from .conftest import add_credential, grant, login_with_otp, make_user
 pytestmark = pytest.mark.django_db
 
 
+@pytest.fixture(autouse=True)
+def wallet_on(db):
+    """Testy w tym pliku sprawdzają tryb salda (przedpłaty). Tryb bezpośredni: test_direct_payment_mode_*."""
+    from apps.payments.models import PaymentSettings
+
+    cfg = PaymentSettings.load()
+    cfg.wallet_enabled = True
+    cfg.save()
+
+
 @pytest.fixture
 def ps(db):
     user = make_user("ps@example.com", first_name="Piotr", last_name="Prowadzący")
@@ -413,3 +423,50 @@ def test_panel_payments_permissions_and_flows(owner_client, ps, owner):
     login_with_otp(client, staff)
     assert client.get("/panel/platnosci/").status_code == 403
     assert client.post("/panel/platnosci/wplata/", {"user": ps.pk, "amount": "1000", "method": "gotowka"}).status_code == 403
+
+
+# --- tryb domyślny: płatność bezpośrednia (saldo wyłączone) ----------------------------------
+
+
+def _wallet_off():
+    from apps.payments.models import PaymentSettings
+
+    cfg = PaymentSettings.load()
+    cfg.wallet_enabled = False
+    cfg.save()
+
+
+def test_direct_mode_payment_pays_only_its_reservation(ps, owner):
+    _wallet_off()
+    r1 = book(ps, days=5)
+    r2 = book(ps, lane_name="Oś 35 m", persons=1, days=3, start=9, end=10)
+    services.register_manual_payment(ps, 30000, Payment.Method.CASH, owner, reservation=r1)
+    r1.refresh_from_db()
+    r2.refresh_from_db()
+    assert r1.payment_status == Reservation.Payment.PAID
+    assert r2.payment_status == Reservation.Payment.DUE  # nadpłata nie opłaca automatycznie innej rezerwacji
+    assert services.balance_of(ps) == 6000  # nadpłata widoczna dla zarządu
+
+
+def test_direct_mode_no_auto_charge_at_booking(ps, owner):
+    _wallet_off()
+    services.correction(ps, 50000, "nadpłata z poprzedniego okresu", owner)
+    r = book(ps)
+    assert r.payment_status == Reservation.Payment.DUE and services.balance_of(ps) == 50000
+
+
+def test_direct_mode_topup_refused(client, ps, tpay_keys):
+    _wallet_off()
+    client.force_login(ps)
+    client.post("/platnosci/tpay/start/", {"amount": "50"})
+    assert not Payment.objects.exists()
+    assert "Doładuj saldo" not in client.get("/platnosci/").content.decode()
+
+
+def test_direct_mode_bank_transfer_with_reservation_number(ps, owner):
+    _wallet_off()
+    r = book(ps)
+    raw = PKO_CSV.format(d=timezone.localdate().isoformat(), title=r.number).encode()
+    services.import_bank_csv(raw, "pko.csv", owner)
+    r.refresh_from_db()
+    assert r.payment_status == Reservation.Payment.PAID

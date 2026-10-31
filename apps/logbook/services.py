@@ -251,6 +251,9 @@ def settle_finished_reservations(now=None):
             r = Reservation.objects.select_for_update().select_related("price_rule", "user", "lane").get(pk=r.pk)
             shooters = r.log_entries.filter(purpose=Entry.Purpose.SHOOTING).count()
             r.settled_at = now
+            if r.access_code_id:  # rezerwacja klubowa — rozliczenie wg umowy z klubem
+                r.save(update_fields=["settled_at"])
+                continue
             if shooters > r.persons:
                 new_hourly = r.price_rule.hourly_amount(shooters)
                 if new_hourly > r.hourly_amount:
@@ -267,7 +270,7 @@ def settle_finished_reservations(now=None):
                             str(r),
                             changes={"osoby": [before[0], shooters], "kwota_gr": [before[1], r.amount]},
                         )
-                        apply_wallet(r.user)
+                        apply_wallet(r.user, targets=[r])
                         r.refresh_from_db()
                         notify_user(r.user, f"Rozliczenie rezerwacji {r.number}", "emails/reservation_settled.txt", reservation=r)
                     else:

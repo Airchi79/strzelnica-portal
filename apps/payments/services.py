@@ -19,7 +19,7 @@ from django.utils import timezone
 from apps.audit.services import log_event
 from apps.core.notifications import notify_user
 
-from .models import BankImport, LedgerEntry, Payment, Wallet
+from .models import BankImport, LedgerEntry, Payment, PaymentSettings, Wallet
 
 User = get_user_model()
 
@@ -95,35 +95,70 @@ def post(user, amount, kind, description, *, payment=None, reservation=None, by=
     )
 
 
-@transaction.atomic
-def apply_wallet(user, by=None):
-    """Opłaca z salda należności za rezerwacje, od najstarszych, dopóki wystarcza środków. Zwraca liczbę opłaconych."""
+def wallet_enabled():
+    return PaymentSettings.load().wallet_enabled
+
+
+def _due_items(user):
+    """Należności użytkownika (rezerwacje i składki) w kolejności terminów."""
+    from apps.association.models import Fee
+    from apps.bookings.models import Reservation
+
+    items = [(timezone.localtime(r.starts_at).date(), 1, r) for r in Reservation.objects.filter(user=user, payment_status=Reservation.Payment.DUE)]
+    items += [(f.due_on, 0, f) for f in Fee.objects.filter(member__user=user, status=Fee.Status.DUE)]
+    return [obj for _, _, obj in sorted(items, key=lambda x: (x[0], x[1], x[2].pk))]
+
+
+def _pay_item(user, item, by):
+    """Pokrywa należność ze środków na saldzie (jeśli wystarczą). Zwraca True, gdy opłacono."""
+    from apps.association.models import Fee
     from apps.bookings.models import Reservation
 
     wallet = _locked_wallet(user)
-    paid = 0
-    due = (
-        Reservation.objects.select_for_update()
-        .filter(user=user, payment_status=Reservation.Payment.DUE)
-        .order_by("starts_at", "pk")
-    )
-    for r in due:
+    if isinstance(item, Reservation):
+        r = Reservation.objects.select_for_update().get(pk=item.pk)
+        if r.payment_status != Reservation.Payment.DUE:
+            return False
         remaining = r.amount - r.paid_amount
-        if remaining <= 0:
-            r.payment_status = Reservation.Payment.PAID
-            r.save(update_fields=["payment_status", "updated_at"])
-            continue
-        if wallet.balance < remaining:
-            break
-        post(user, -remaining, LedgerEntry.Kind.RESERVATION_FEE, f"Opłata za rezerwację {r.number}", reservation=r, by=by)
-        wallet.refresh_from_db()
-        r.paid_amount += remaining
+        if remaining > 0:
+            if wallet.balance < remaining:
+                return False
+            post(user, -remaining, LedgerEntry.Kind.RESERVATION_FEE, f"Opłata za rezerwację {r.number}", reservation=r, by=by)
+            r.paid_amount += remaining
         r.payment_status = Reservation.Payment.PAID
         r.payment_marked_at = timezone.now()
         r.payment_marked_by = by
         r.save(update_fields=["paid_amount", "payment_status", "payment_marked_at", "payment_marked_by", "updated_at"])
-        log_event("rezerwacja.oplacona_z_salda", r, f"{r.number}: {remaining / 100:.2f} zł", actor=by)
-        paid += 1
+        log_event("rezerwacja.oplacona", r, f"{r.number}: {remaining / 100:.2f} zł", actor=by)
+        return True
+    fee = Fee.objects.select_for_update().get(pk=item.pk)
+    if fee.status != Fee.Status.DUE or wallet.balance < fee.amount:
+        return False
+    post(user, -fee.amount, LedgerEntry.Kind.MEMBERSHIP_FEE, f"{fee.label} — członek nr {fee.member.number}", by=by)
+    fee.status = Fee.Status.PAID
+    fee.paid_at = timezone.now()
+    fee.save(update_fields=["status", "paid_at"])
+    log_event("skladka.oplacona", fee, str(fee), actor=by)
+    return True
+
+
+@transaction.atomic
+def apply_wallet(user, by=None, targets=None):
+    """Opłaca należności ze środków na saldzie.
+
+    targets — konkretne należności (rezerwacje / składki), np. te, których dotyczy wpłata; opłacane zawsze.
+    Bez targets: automatyczne pobieranie od najstarszej należności — tylko gdy saldo strzelca jest włączone.
+    Zwraca liczbę opłaconych należności."""
+    if user is None:
+        return 0
+    if targets is None:
+        if not wallet_enabled():
+            return 0
+        targets = _due_items(user)
+    paid = 0
+    for item in targets:
+        if item is not None and _pay_item(user, item, by):
+            paid += 1
     return paid
 
 
@@ -154,7 +189,7 @@ def reconcile_reservation(reservation, by=None):
         r.paid_amount = r.amount
     r.payment_status = Reservation.Payment.PAID if r.paid_amount >= r.amount else Reservation.Payment.DUE
     r.save(update_fields=["paid_amount", "payment_status", "updated_at"])
-    apply_wallet(r.user, by=by)
+    apply_wallet(r.user, by=by, targets=[r])
     r.refresh_from_db()
     return r
 
@@ -186,21 +221,29 @@ def complete_payment(payment, user=None, by=None, note=""):
         by=by,
     )
     log_event("platnosc.zaksiegowana", payment, str(payment), changes={"dla": payment.user.email}, actor=by)
-    apply_wallet(payment.user, by=by)
+    if payment.reservation_id or payment.fee_id:
+        apply_wallet(payment.user, by=by, targets=[payment.reservation or payment.fee])
+    elif wallet_enabled():
+        apply_wallet(payment.user, by=by)
+    else:
+        # Wpłata bez wskazania (np. przelew z osobistym kodem SATOK-K): pokrywa zaległe składki członkowskie.
+        from apps.association.models import Fee
+
+        apply_wallet(payment.user, by=by, targets=list(Fee.objects.filter(member__user=payment.user, status=Fee.Status.DUE).order_by("due_on")))
     notify_user(payment.user, "Wpłata zaksięgowana", "emails/payment_completed.txt", payment=payment, balance=balance_of(payment.user))
     return payment
 
 
 @transaction.atomic
-def register_manual_payment(user, amount, method, by, reservation=None, note=""):
+def register_manual_payment(user, amount, method, by, reservation=None, note="", fee=None):
     """Gotówka lub BLIK na telefon przyjęte przez zarząd/obsługę."""
     if method not in (Payment.Method.CASH, Payment.Method.BLIK_PHONE, Payment.Method.TRANSFER):
         raise ValidationError("Nieprawidłowy sposób płatności.")
     if amount <= 0:
         raise ValidationError("Kwota musi być dodatnia.")
     payment = Payment.objects.create(
-        user=user, amount=amount, method=method, reservation=reservation, created_by=by, note=note[:255],
-        title=reservation.number if reservation else "", booked_on=timezone.localdate(),
+        user=user, amount=amount, method=method, reservation=reservation, fee=fee, created_by=by, note=note[:255],
+        title=reservation.number if reservation else (fee.label if fee else ""), booked_on=timezone.localdate(),
     )
     return complete_payment(payment, by=by)
 
@@ -212,7 +255,7 @@ def correction(user, amount, reason, by):
     entry = post(user, amount, LedgerEntry.Kind.CORRECTION, f"Korekta: {reason.strip()}", by=by)
     log_event("saldo.korekta", entry, reason, changes={"kwota_gr": amount, "dla": user.email}, actor=by)
     if amount > 0:
-        apply_wallet(user, by=by)
+        apply_wallet(user, by=by)  # tylko przy włączonym saldzie
     return entry
 
 

@@ -6,7 +6,8 @@
   <tr><th>Oś</th><td>{{ r.lane }}</td></tr>
   <tr><th>Termin</th><td>{{ r.starts_at|date:"l, j E Y" }}, {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</td></tr>
   <tr><th>Liczba osób</th><td>{{ r.persons }}</td></tr>
-  <tr><th>Należność</th><td><strong>{{ r.amount|pln }}</strong> ({{ r.hourly_amount|pln }} / h)</td></tr>
+  {% if r.access_code %}<tr><th>Rozliczenie</th><td>wg umowy klubu {{ r.access_code.club }}</td></tr>
+  {% else %}<tr><th>Należność</th><td><strong>{{ r.amount|pln }}</strong> ({{ r.hourly_amount|pln }} / h)</td></tr>{% endif %}
   <tr><th>Status</th><td>{{ r.display_status }}{% if r.cancel_reason %} — {{ r.cancel_reason }}{% endif %}</td></tr>
   <tr><th>Płatność</th><td>{{ r.get_payment_status_display }}</td></tr>
   {% if r.notes %}<tr><th>Uwagi</th><td>{{ r.notes }}</td></tr>{% endif %}
@@ -29,10 +30,10 @@
 {% if r.payment_status == 'do_zaplaty' %}
 <div class="card">
   <h2 style="margin-top:0">Do zapłaty: {{ r.amount|sub:r.paid_amount|pln }}</h2>
-  <p class="small">Opłata zostanie pobrana automatycznie z Twojego salda, gdy będzie na nim wystarczająco środków.</p>
+  {% if WALLET_ENABLED %}<p class="small">Opłata zostanie pobrana automatycznie z Twojego salda, gdy będzie na nim wystarczająco środków.</p>{% endif %}
   <div class="actions">
     {% if tpay_enabled %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}"><button class="btn" type="submit">Zapłać online</button></form>{% endif %}
-    <a class="btn secondary" href="{% url 'payments:wallet' %}">Saldo i inne sposoby płatności</a>
+    <a class="btn secondary" href="{% url 'payments:wallet' %}">Moje płatności</a>
   </div>
   <p class="small muted">Przelew: w tytule wpisz <strong>{{ r.number }}</strong>{% if association.bank_account %}, rachunek {{ association.bank_account }}{% endif %}. Na miejscu: gotówka lub BLIK na telefon.</p>
 </div>

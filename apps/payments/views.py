@@ -32,7 +32,10 @@ PERM = "payments.manage_payments"
 
 @login_required
 def wallet(request):
+    from apps.association.models import Fee
+
     due = request.user.reservations.filter(payment_status=Reservation.Payment.DUE).order_by("starts_at")
+    fees = Fee.objects.filter(member__user=request.user, status=Fee.Status.DUE).order_by("due_on")
     ledger = Paginator(request.user.ledger.select_related("reservation"), 30).get_page(request.GET.get("page"))
     pending = request.user.payments.filter(status=Payment.Status.PENDING, method=Payment.Method.TPAY)[:5]
     return render(
@@ -42,6 +45,8 @@ def wallet(request):
             "balance": services.balance_of(request.user),
             "due": due,
             "due_total": sum(r.amount - r.paid_amount for r in due),
+            "fees": fees,
+            "fees_total": sum(f.amount for f in fees),
             "page": ledger,
             "pending": pending,
             "topup_code": services.topup_code(request.user),
@@ -59,30 +64,38 @@ def tpay_start(request):
     if not settings.TPAY_ENABLED:
         messages.error(request, "Płatności online są chwilowo niedostępne.")
         return redirect("payments:wallet")
-    reservation = None
-    if request.POST.get("reservation"):
+    reservation = fee = None
+    if request.POST.get("fee"):
+        from apps.association.models import Fee
+
+        fee = get_object_or_404(Fee, pk=request.POST["fee"], member__user=request.user, status=Fee.Status.DUE)
+        amount = fee.amount
+    elif request.POST.get("reservation"):
         reservation = get_object_or_404(Reservation, pk=request.POST["reservation"], user=request.user, payment_status=Reservation.Payment.DUE)
         amount = max(reservation.amount - reservation.paid_amount - max(services.balance_of(request.user), 0), 0)
         if amount == 0:
-            services.apply_wallet(request.user)
+            services.apply_wallet(request.user, targets=[reservation])
             messages.success(request, "Rezerwacja została opłacona z salda.")
             return redirect("bookings:detail", pk=reservation.pk)
         amount = max(amount, 100)  # minimalna kwota transakcji
     else:
+        if not services.wallet_enabled():
+            messages.error(request, "Doładowanie salda jest wyłączone — zapłać za konkretną rezerwację lub składkę.")
+            return redirect("payments:wallet")
         form = TopupForm(request.POST)
         if not form.is_valid():
             messages.error(request, form.errors["amount"][0])
             return redirect("payments:wallet")
         amount = form.cleaned_data["amount"]
     payment = Payment.objects.create(
-        user=request.user, amount=amount, method=Payment.Method.TPAY, reservation=reservation,
-        title=reservation.number if reservation else services.topup_code(request.user), created_by=request.user,
+        user=request.user, amount=amount, method=Payment.Method.TPAY, reservation=reservation, fee=fee,
+        title=reservation.number if reservation else (fee.label if fee else services.topup_code(request.user)), created_by=request.user,
     )
     base = settings.SITE_URL
     try:
         tx = tpay.create_transaction(
             amount_grosze=amount,
-            description=f"Strzelnica Sątok — {'rezerwacja ' + reservation.number if reservation else 'doładowanie salda'}",
+            description="Strzelnica Sątok — " + (f"rezerwacja {reservation.number}" if reservation else (fee.label if fee else "doładowanie salda")),
             hidden_description=str(payment.pk),
             payer_email=request.user.email,
             payer_name=request.user.full_name,
@@ -196,13 +209,21 @@ def panel_manual(request):
         initial["user"] = request.GET["user"]
     if request.GET.get("kwota"):
         initial["amount"] = request.GET["kwota"]
+    if request.GET.get("rezerwacja", "").isdigit():
+        initial["reservation"] = request.GET["rezerwacja"]
     form = ManualPaymentForm(request.POST or None, initial=initial)
+    reservation = None
+    rid = form.data.get("reservation") or initial.get("reservation")
+    if rid and str(rid).isdigit():
+        reservation = Reservation.objects.filter(pk=int(rid)).first()
     if request.method == "POST" and form.is_valid():
         d = form.cleaned_data
-        payment = services.register_manual_payment(d["user"], d["amount"], d["method"], request.user, note=d["note"])
+        if reservation is not None and reservation.user_id != d["user"].pk:
+            reservation = None
+        payment = services.register_manual_payment(d["user"], d["amount"], d["method"], request.user, note=d["note"], reservation=reservation)
         messages.success(request, f"Przyjęto wpłatę {format_pln(d['amount'])}. Saldo: {format_pln(services.balance_of(d['user']))}.")
         return redirect("panel:wallet", user_pk=payment.user_id)
-    return render(request, "panel/payment_manual.html", {"form": form})
+    return render(request, "panel/payment_manual.html", {"form": form, "reservation": reservation})
 
 
 @panel_required(PERM)

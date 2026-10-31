@@ -287,7 +287,7 @@ def test_settlement_of_paid_reservation_only_flags(ps, owner, sig):
     r = _reservation(ps, "Oś 25 m nr 1", 1)
     from apps.payments.services import register_manual_payment
 
-    register_manual_payment(ps, r.amount, "gotowka", owner)
+    register_manual_payment(ps, r.amount, "gotowka", owner, reservation=r)
     _shooters(r, 2, sig)
     services.settle_finished_reservations(now=r.ends_at + timedelta(minutes=1))
     r.refresh_from_db()

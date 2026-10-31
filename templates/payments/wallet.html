@@ -1,46 +1,57 @@
 {% extends "base.html" %}{% load satok %}
-{% block title %}Saldo i płatności{% endblock %}
+{% block title %}Płatności{% endblock %}
 {% block content %}
-<h1>Saldo i płatności</h1>
+<h1>{% if WALLET_ENABLED %}Saldo i płatności{% else %}Moje płatności{% endif %}</h1>
 <div class="grid">
-  <div class="card"><span class="muted small">Saldo</span><div class="stat">{{ balance|pln }}</div></div>
-  <div class="card"><span class="muted small">Do zapłaty</span><div class="stat">{{ due_total|pln }}</div>
-    {% if due_total and balance < due_total %}<span class="small">Brakuje {{ due_total|sub:balance|pln }}</span>{% endif %}</div>
+  {% if WALLET_ENABLED or balance %}
+  <div class="card"><span class="muted small">{% if WALLET_ENABLED %}Saldo{% else %}Nadpłata (do rozliczenia z zarządem){% endif %}</span><div class="stat">{{ balance|pln }}</div></div>
+  {% endif %}
+  <div class="card"><span class="muted small">Do zapłaty</span><div class="stat">{{ due_total|add:fees_total|pln }}</div></div>
 </div>
-<p class="muted small">Wpłaty trafiają na saldo, a opłaty za rezerwacje są pobierane z salda automatycznie (od najstarszej). Zwroty za anulowane rezerwacje wracają na saldo.</p>
+{% if WALLET_ENABLED %}<p class="muted small">Wpłaty trafiają na saldo, a opłaty za rezerwacje i składki są pobierane z salda automatycznie (od najstarszej).</p>
+{% else %}<p class="muted small">Każdą rezerwację i składkę opłacasz osobno: online, przelewem z podanym tytułem albo na miejscu.</p>{% endif %}
 
 {% if due %}
 <h2>Rezerwacje do zapłaty</h2>
 <div class="card table-wrap"><table>
-  {% for r in due %}<tr><td><a href="{% url 'bookings:detail' r.pk %}">{{ r.number }}</a><div class="small muted">{{ r.lane }}, {{ r.starts_at|date:"j.m.Y H:i" }}</div></td>
+  {% for r in due %}<tr><td><a href="{% url 'bookings:detail' r.pk %}">{{ r.number }}</a><div class="small muted">{{ r.lane }}, {{ r.starts_at|date:"j.m.Y H:i" }} · tytuł przelewu: {{ r.number }}</div></td>
     <td>{{ r.amount|sub:r.paid_amount|pln }}</td>
     <td>{% if tpay_enabled %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}"><button class="btn" type="submit">Zapłać online</button></form>{% endif %}</td></tr>{% endfor %}
 </table></div>
 {% endif %}
 
+{% if fees %}
+<h2>Składki członkowskie do zapłaty</h2>
+<div class="card table-wrap"><table>
+  {% for f in fees %}<tr><td>{{ f.label }}<div class="small muted">termin {{ f.due_on|date:"j.m.Y" }} · tytuł przelewu: {{ topup_code }}</div></td><td>{{ f.amount|pln }}</td>
+    <td>{% if tpay_enabled %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="fee" value="{{ f.pk }}"><button class="btn" type="submit">Zapłać online</button></form>{% endif %}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+
+{% if WALLET_ENABLED and tpay_enabled %}
 <h2>Doładuj saldo</h2>
-{% if tpay_enabled %}
 <div class="card">
   <form method="post" action="{% url 'payments:tpay_start' %}" novalidate>{% csrf_token %}{% include "partials/form.html" %}
     <button class="btn" type="submit">Zapłać online (BLIK, przelew, karta — Tpay)</button></form>
 </div>
 {% endif %}
+<h2>Przelew tradycyjny</h2>
 <div class="card">
-  <strong>Przelew tradycyjny</strong>
   {% if association.bank_account %}<p>Rachunek: <strong>{{ association.bank_account }}</strong><br>Odbiorca: {{ association.name }}</p>{% else %}<p class="muted">Numer rachunku pojawi się po uzupełnieniu danych przez zarząd.</p>{% endif %}
-  <p>Tytuł przelewu: <strong class="code">{{ topup_code }}</strong> <span class="small muted">(Twój stały kod — wpłata trafi na Twoje saldo)</span></p>
-  <p class="small muted">Za konkretną rezerwację możesz też wpisać w tytule jej numer (np. SATOK-R-2026-0001). Przelewy księgujemy po wczytaniu wyciągu bankowego.</p>
+  <p class="small">Tytuł przelewu: <strong>numer rezerwacji</strong> (np. SATOK-R-2026-0001) — za rezerwację,
+  albo Twój kod <strong class="code">{{ topup_code }}</strong> — za składki członkowskie{% if WALLET_ENABLED %} lub doładowanie salda{% endif %}.</p>
+  <p class="small muted">Przelewy księgujemy po wczytaniu wyciągu bankowego.</p>
 </div>
 <div class="card"><strong>Na miejscu</strong><p class="small">Gotówka lub BLIK na telefon — wpłatę rejestruje zarząd.</p></div>
 
 {% if pending %}<h2>Płatności w toku</h2>
 <div class="card">{% for p in pending %}<div class="small">{{ p.created_at|date:"j.m.Y H:i" }} · {{ p.amount|pln }} · oczekuje na potwierdzenie z Tpay</div>{% endfor %}</div>{% endif %}
 
-<h2>Historia salda</h2>
+<h2>Historia</h2>
 <div class="card table-wrap"><table>
-  <tr><th>Data</th><th>Operacja</th><th>Kwota</th><th class="hide-sm">Saldo</th></tr>
+  <tr><th>Data</th><th>Operacja</th><th>Kwota</th>{% if WALLET_ENABLED %}<th class="hide-sm">Saldo</th>{% endif %}</tr>
   {% for e in page %}<tr><td>{{ e.created_at|date:"j.m.Y H:i" }}</td><td>{{ e.description }}</td>
-    <td class="{% if e.amount < 0 %}neg{% else %}pos{% endif %}">{% if e.amount > 0 %}+{% endif %}{{ e.amount|pln }}</td><td class="hide-sm">{{ e.balance_after|pln }}</td></tr>
+    <td class="{% if e.amount < 0 %}neg{% else %}pos{% endif %}">{% if e.amount > 0 %}+{% endif %}{{ e.amount|pln }}</td>{% if WALLET_ENABLED %}<td class="hide-sm">{{ e.balance_after|pln }}</td>{% endif %}</tr>
   {% empty %}<tr><td colspan="4" class="muted">Brak operacji.</td></tr>{% endfor %}
 </table></div>
 {% include "partials/pagination.html" %}

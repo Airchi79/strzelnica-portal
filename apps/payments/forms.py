@@ -38,6 +38,7 @@ class ManualPaymentForm(forms.Form):
         choices=[(Payment.Method.CASH, "Gotówka"), (Payment.Method.BLIK_PHONE, "BLIK na telefon"), (Payment.Method.TRANSFER, "Przelew (ręcznie)")],
     )
     note = forms.CharField(label="Uwagi", max_length=255, required=False)
+    reservation = forms.IntegerField(widget=forms.HiddenInput, required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

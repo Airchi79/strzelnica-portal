@@ -24,6 +24,11 @@ class ReservationForm(forms.Form):
     end_hour = forms.TypedChoiceField(label="Do", choices=HOUR_END, coerce=int)
     persons = forms.IntegerField(label="Liczba osób", min_value=1, initial=1, widget=forms.NumberInput(attrs={"inputmode": "numeric"}))
     notes = forms.CharField(label="Uwagi dla zarządu", max_length=500, required=False, widget=forms.Textarea(attrs={"rows": 2}))
+    access_code = forms.CharField(
+        label="Kod dostępu klubu", max_length=16, required=False,
+        help_text="Tylko dla klubów z umową — rezerwacja jest wtedy rozliczana wg umowy z klubem.",
+        widget=forms.TextInput(attrs={"autocomplete": "off", "autocapitalize": "characters"}),
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -51,7 +56,7 @@ def range_officers():
 class BoardReservationForm(ReservationForm):
     user = forms.ModelChoiceField(label="Rezerwujący (zweryfikowany PS)", queryset=get_user_model().objects.none())
 
-    field_order = ["user", "lane", "day", "start_hour", "end_hour", "persons", "notes"]
+    field_order = ["user", "lane", "day", "start_hour", "end_hour", "persons", "access_code", "notes"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

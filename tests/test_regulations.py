@@ -22,7 +22,7 @@ def create_and_publish(client, doc, content="§ 1\n\nTreść", effective=None):
 
 
 def test_seeded_documents():
-    assert set(RegulationDocument.objects.values_list("slug", flat=True)) == {"regulamin-strzelnicy", "regulamin-rezerwacji", "rodo"}
+    assert set(RegulationDocument.objects.values_list("slug", flat=True)) == {"regulamin-strzelnicy", "regulamin-rezerwacji", "rodo", "regulamin-stowarzyszenia"}
 
 
 def test_publish_requires_acceptance_and_new_version_requires_it_again(owner_client, client, user):

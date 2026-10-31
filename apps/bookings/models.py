@@ -55,6 +55,7 @@ class Reservation(models.Model):
         PAID = "oplacona", "Opłacona"
         WAIVED = "zwolniona", "Zwolniona z opłaty"
         NONE = "brak", "Bez opłaty (anulowana)"
+        CONTRACT = "umowa", "Rozliczana wg umowy z klubem"
 
     number = models.CharField("numer", max_length=24, unique=True)
     lane = models.ForeignKey(Lane, verbose_name="oś", on_delete=models.PROTECT, related_name="reservations")
@@ -70,6 +71,10 @@ class Reservation(models.Model):
     hourly_amount = models.PositiveIntegerField("stawka za godzinę [gr]")
     amount = models.PositiveIntegerField("należność [gr]")
     paid_amount = models.PositiveIntegerField("zapłacono [gr]", default=0)
+    access_code = models.ForeignKey(
+        "association.AccessCode", verbose_name="kod dostępu klubu", null=True, blank=True,
+        on_delete=models.PROTECT, related_name="reservations",
+    )
 
     status = models.CharField("status", max_length=16, choices=Status.choices, default=Status.CONFIRMED, db_index=True)
     payment_status = models.CharField("płatność", max_length=16, choices=Payment.choices, default=Payment.DUE, db_index=True)

@@ -18,10 +18,11 @@
 
 <h2>Rozliczenie</h2>
 <div class="card">
-  <p>Zapłacono: <strong>{{ r.paid_amount|pln }}</strong> z {{ r.amount|pln }} · saldo strzelca: <a href="{% url 'panel:wallet' r.user.pk %}">{{ wallet_balance|pln }}</a></p>
+  {% if r.access_code %}<p>Rozliczenie wg umowy klubu <strong>{{ r.access_code.club }}</strong> (kod {{ r.access_code.code }}).</p>{% endif %}
+  <p>Zapłacono: <strong>{{ r.paid_amount|pln }}</strong> z {{ r.amount|pln }} · {% if WALLET_ENABLED %}saldo{% else %}nadpłata{% endif %} strzelca: <a href="{% url 'panel:wallet' r.user.pk %}">{{ wallet_balance|pln }}</a></p>
   <form method="post" class="actions" style="margin-top:0">{% csrf_token %}
   {% if r.payment_status == 'do_zaplaty' %}
-    <a class="btn" href="{% url 'panel:payment_manual' %}?user={{ r.user.pk }}&amp;kwota={{ remaining_pln }}">Przyjmij wpłatę (gotówka / BLIK)</a>
+    <a class="btn" href="{% url 'panel:payment_manual' %}?user={{ r.user.pk }}&amp;kwota={{ remaining_pln }}&amp;rezerwacja={{ r.pk }}">Przyjmij wpłatę (gotówka / BLIK)</a>
     <button class="btn secondary" name="action" value="waive" data-confirm-click="Zwolnić z pozostałej opłaty?">Zwolnij z opłaty</button>
   {% elif r.payment_status == 'zwolniona' %}
     <button class="btn secondary" name="action" value="unwaive">Cofnij zwolnienie</button>

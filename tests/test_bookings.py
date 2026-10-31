@@ -347,7 +347,7 @@ def test_panel_pages_and_actions(owner_client, ps, lane):
     assert owner_client.get("/panel/rezerwacje/lista/").status_code == 200
     from apps.payments.services import balance_of, register_manual_payment
 
-    register_manual_payment(ps, r.amount, "gotowka", User.objects.get(is_superuser=True))
+    register_manual_payment(ps, r.amount, "gotowka", User.objects.get(is_superuser=True), reservation=r)
     r.refresh_from_db()
     assert r.payment_status == Reservation.Payment.PAID and r.paid_amount == r.amount
     owner_client.post(f"/panel/rezerwacje/{r.pk}/", {"action": "persons", "p-persons": "5"})

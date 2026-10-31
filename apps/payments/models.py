@@ -4,6 +4,28 @@ from django.conf import settings
 from django.db import models
 
 
+class PaymentSettings(models.Model):
+    """Tryb rozliczeń. Domyślnie (decyzja właściciela 31.10.2026) każda rezerwacja i składka jest opłacana bezpośrednio;
+    saldo z przedpłatami i automatycznym pobieraniem opłat można włączyć później."""
+
+    wallet_enabled = models.BooleanField(
+        "saldo strzelca (przedpłaty, automatyczne pobieranie opłat)", default=False,
+        help_text="Wyłączone: wpłata opłaca tylko wskazaną rezerwację lub składkę; nadpłaty widzi zarząd jako kwoty do zwrotu.",
+    )
+
+    class Meta:
+        verbose_name = "ustawienia płatności"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class Wallet(models.Model):
     """Saldo strzelca. Saldo jest zawsze równe sumie operacji w `LedgerEntry` (sprawdzane w testach)."""
 
@@ -49,6 +71,9 @@ class Payment(models.Model):
     reservation = models.ForeignKey(
         "bookings.Reservation", verbose_name="za rezerwację", null=True, blank=True, on_delete=models.PROTECT, related_name="payments"
     )
+    fee = models.ForeignKey(
+        "association.Fee", verbose_name="za składkę / wpisowe", null=True, blank=True, on_delete=models.PROTECT, related_name="payments"
+    )
     note = models.CharField("uwagi", max_length=255, blank=True)
     raw = models.JSONField("dane źródłowe", default=dict, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
@@ -71,6 +96,7 @@ class LedgerEntry(models.Model):
     class Kind(models.TextChoices):
         DEPOSIT = "wplata", "Wpłata"
         RESERVATION_FEE = "oplata", "Opłata za rezerwację"
+        MEMBERSHIP_FEE = "skladka", "Składka / wpisowe"
         REFUND = "zwrot", "Zwrot za rezerwację"
         CHARGEBACK = "zwrot_tpay", "Zwrot płatności do wpłacającego"
         CORRECTION = "korekta", "Korekta zarządu"

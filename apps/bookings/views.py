@@ -92,11 +92,12 @@ def new(request):
         try:
             if request.POST.get("action") == "confirm":
                 reservation = services.create_reservation(
-                    request.user, d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"], d["notes"]
+                    request.user, d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"], d["notes"],
+                    access_code=d["access_code"],
                 )
                 messages.success(request, f"Zarezerwowano: {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m.%Y %H:%M}. Potwierdzenie wysłaliśmy e-mailem.")
                 return redirect("bookings:detail", pk=reservation.pk)
-            preview = services.quote(d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"])
+            preview = services.quote(d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"], access_code=d["access_code"])
             preview["hours"] = d["end_hour"] - d["start_hour"]
             preview["free_cancel_until"] = preview["starts_at"] - timedelta(hours=BookingSettings.load().free_cancel_hours)
         except ValidationError as e:
@@ -278,7 +279,8 @@ def panel_new(request):
         d = form.cleaned_data
         try:
             r = services.create_reservation(
-                d["user"], d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"], d["notes"], created_by=request.user
+                d["user"], d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"], d["notes"], created_by=request.user,
+                access_code=d["access_code"],
             )
         except ValidationError as e:
             for m in _messages_from(e):

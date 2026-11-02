@@ -7,6 +7,7 @@
   <tr><th>Termin</th><td>{{ r.starts_at|date:"l, j E Y" }}, {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</td></tr>
   <tr><th>Liczba osób</th><td>{{ r.persons }}</td></tr>
   {% if r.access_code %}<tr><th>Rozliczenie</th><td>wg umowy klubu {{ r.access_code.club }}</td></tr>
+  {% elif r.client_pass %}<tr><th>Rozliczenie</th><td>kod wejścia {{ r.client_pass.code }} ({{ r.client_pass.get_kind_display|lower }})</td></tr>
   {% else %}<tr><th>Należność</th><td><strong>{{ r.amount|pln }}</strong> ({{ r.hourly_amount|pln }} / h)</td></tr>{% endif %}
   <tr><th>Status</th><td>{{ r.display_status }}{% if r.cancel_reason %} — {{ r.cancel_reason }}{% endif %}</td></tr>
   <tr><th>Płatność</th><td>{{ r.get_payment_status_display }}</td></tr>

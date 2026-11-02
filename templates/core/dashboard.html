@@ -23,6 +23,9 @@
   <a class="card tile" href="{% url 'regulations:list' %}"><strong>Regulaminy</strong><span class="muted">Aktualne dokumenty stowarzyszenia</span></a>
 </div>
 {% if credentials %}
+{% if passes %}<h2>Moje kody wejścia</h2>
+<div class="card"><table>{% for p in passes %}<tr><td><strong class="code">{{ p.code }}</strong></td><td>{{ p.get_kind_display }}{% if p.entries_limit %} — zostało {{ p.remaining }} z {{ p.entries_limit }}{% endif %}</td><td>do {{ p.valid_until|date:"j.m.Y" }}{% if not p.is_paid %} <span class="badge warn">czeka na opłacenie</span>{% endif %}</td></tr>{% endfor %}</table>
+<p class="small muted">Wpisz kod w polu „Kod klubu lub kod wejścia” przy rezerwacji. Jedno wejście = jedna rezerwacja.</p></div>{% endif %}
 <h2>Status dokumentów</h2>
 <div class="card table-wrap"><table>
   <tr><th>Dokument</th><th>Numer</th><th>Status</th></tr>

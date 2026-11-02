@@ -97,7 +97,9 @@ def new(request):
                 )
                 messages.success(request, f"Zarezerwowano: {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m.%Y %H:%M}. Potwierdzenie wysłaliśmy e-mailem.")
                 return redirect("bookings:detail", pk=reservation.pk)
-            preview = services.quote(d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"], access_code=d["access_code"])
+            preview = services.quote(
+                d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"], access_code=d["access_code"], user=request.user
+            )
             preview["hours"] = d["end_hour"] - d["start_hour"]
             preview["free_cancel_until"] = preview["starts_at"] - timedelta(hours=BookingSettings.load().free_cancel_hours)
         except ValidationError as e:
@@ -384,7 +386,7 @@ def panel_days(request):
     }
     start = _parse_day(request.GET.get("od"), today - timedelta(days=2))
     span = 14
-    qs = Reservation.objects.select_related("lane", "user", "access_code__club").annotate(
+    qs = Reservation.objects.select_related("lane", "user", "access_code__club", "client_pass").annotate(
         shooters=Count("log_entries", filter=Q(log_entries__purpose=Entry.Purpose.SHOOTING), distinct=True),
         entries=Count("log_entries", distinct=True),
     ).prefetch_related(Prefetch("payments", queryset=Payment.objects.filter(status=Payment.Status.COMPLETED).order_by("-completed_at"), to_attr="done_payments"))
@@ -412,6 +414,8 @@ def panel_days(request):
         pay = r.done_payments[0] if r.done_payments else None
         if r.access_code_id:
             r.pay_label = f"Kod klubu {r.access_code.club}"
+        elif r.client_pass_id:
+            r.pay_label = f"Kod wejścia {r.client_pass.code}"
         elif pay:
             r.pay_label = PAYMENT_LABELS.get(pay.method, pay.get_method_display())
         else:

@@ -25,8 +25,8 @@ class ReservationForm(forms.Form):
     persons = forms.IntegerField(label="Liczba osób", min_value=1, initial=1, widget=forms.NumberInput(attrs={"inputmode": "numeric"}))
     notes = forms.CharField(label="Uwagi dla zarządu", max_length=500, required=False, widget=forms.Textarea(attrs={"rows": 2}))
     access_code = forms.CharField(
-        label="Kod dostępu klubu", max_length=16, required=False,
-        help_text="Tylko dla klubów z umową — rezerwacja jest wtedy rozliczana wg umowy z klubem.",
+        label="Kod klubu lub kod wejścia", max_length=16, required=False,
+        help_text="Kod klubu — rozliczenie wg umowy z klubem. Twój kod wejścia (karnet, abonament) — rezerwacja bez dopłaty.",
         widget=forms.TextInput(attrs={"autocomplete": "off", "autocapitalize": "characters"}),
     )
 

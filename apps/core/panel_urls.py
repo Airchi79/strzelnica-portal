@@ -4,6 +4,7 @@ from apps.association import views as association_views
 from apps.bookings import views as bookings_views
 from apps.credentials import views as credentials_views
 from apps.facilities import views as facilities_views
+from apps.clients import views as clients_views
 from apps.logbook import views as logbook_views
 from apps.payments import views as payments_views
 from apps.regulations import views as regulations_views
@@ -17,7 +18,11 @@ urlpatterns = [
     path("weryfikacja/", credentials_views.panel_list, name="credentials"),
     path("weryfikacja/<int:pk>/", credentials_views.panel_detail, name="credential"),
     path("weryfikacja/<int:pk>/skan/", credentials_views.panel_scan, name="credential_scan"),
-    path("uzytkownicy/", views.panel_users, name="users"),
+    path("uzytkownicy/", clients_views.panel_list, name="users"),
+    path("uzytkownicy/<int:pk>/kartoteka/", clients_views.profile_update, name="client_profile"),
+    path("uzytkownicy/<int:pk>/zatwierdzenie/", clients_views.approve, name="client_approve"),
+    path("uzytkownicy/<int:pk>/kod-wejscia/", clients_views.pass_new, name="client_pass_new"),
+    path("kody-wejscia/<int:pk>/", clients_views.pass_action, name="client_pass_action"),
     path("uzytkownicy/<int:pk>/", views.panel_user, name="user"),
     path("regulaminy/", regulations_views.panel_list, name="regulations"),
     path("regulaminy/<int:doc_pk>/nowa/", regulations_views.panel_version_edit, name="regulation_new"),

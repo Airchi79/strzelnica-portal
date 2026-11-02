@@ -1,14 +1,64 @@
 {% extends "panel/base_panel.html" %}{% load satok %}
 {% block title %}{{ subject.full_name }}{% endblock %}
 {% block panel %}
-<h1>{{ subject.full_name }}</h1>
+<h1>{{ subject.full_name|default:subject.email }}</h1>
+<p><span class="badge {% if subject.client_type == 'czlonek' %}ok{% elif subject.client_type == 'nowy' %}warn{% endif %}">{{ subject.client_type_label }}</span>
+  <span class="badge {% if subject.ps_status == 'wazne' %}ok{% elif subject.ps_status == 'do_weryfikacji' %}warn{% elif subject.ps_status == 'wygasle' %}bad{% endif %}">PS: {{ subject.ps_label }}</span>
+  <span class="muted small">wizyty: {{ subject.visits }}{% if subject.last_visit %}, ostatnia {{ subject.last_visit|date:"j.m.Y" }}{% endif %}</span></p>
 <div class="card"><table>
   <tr><th>E-mail</th><td>{{ subject.email }}{% if not subject.email_verified %} <span class="badge warn">niepotwierdzony</span>{% endif %}</td></tr>
   <tr><th>Telefon</th><td>{{ subject.phone|default:"—" }}</td></tr>
   <tr><th>Adres</th><td>{{ subject.address|default:"—" }}</td></tr>
   <tr><th>Rejestracja</th><td>{{ subject.date_joined|date:"d.m.Y" }}</td></tr>
   <tr><th>Konto</th><td>{% if subject.is_active %}aktywne{% else %}nieaktywne{% endif %}</td></tr>
+  <tr><th>Stowarzyszenie</th><td>{% if member %}{% if perms.association.manage_members %}<a href="{% url 'panel:member' member.pk %}">{% endif %}członek nr {{ member.number }} — {{ member.get_kind_display|lower }}, {{ member.get_status_display|lower }}{% if perms.association.manage_members %}</a>{% endif %}{% else %}—{% endif %}</td></tr>
 </table></div>
+
+<h2 id="kartoteka">Kartoteka</h2>
+<div class="card">
+  {% if profile.approved_at %}<p><span class="badge ok">zatwierdzony</span> {{ profile.approved_at|date:"j.m.Y" }}{% if profile.approved_by %} przez {{ profile.approved_by.full_name }}{% endif %}</p>
+    {% if perms.clients.manage_clients %}<form method="post" action="{% url 'panel:client_approve' subject.pk %}" class="actions" style="margin-top:0">{% csrf_token %}<input type="hidden" name="approved" value="0"><button class="btn secondary small-btn" type="submit">Cofnij zatwierdzenie</button></form>{% endif %}
+  {% elif subject.client_type == 'nowy' %}<p><span class="badge warn">nowy, niezatwierdzony</span> <span class="small muted">— zatwierdzenie oznacza go jako stałego klienta, zanim przyjdzie pierwszy raz</span></p>
+    {% if perms.clients.manage_clients %}<form method="post" action="{% url 'panel:client_approve' subject.pk %}" class="actions" style="margin-top:0">{% csrf_token %}<input type="hidden" name="approved" value="1"><button class="btn small-btn" type="submit">Zatwierdź klienta</button></form>{% endif %}
+  {% endif %}
+  {% if perms.clients.manage_clients %}
+  <form method="post" action="{% url 'panel:client_profile' subject.pk %}" novalidate>{% csrf_token %}{% include "partials/form.html" with form=profile_form %}<button class="btn" type="submit">Zapisz notatki i tagi</button></form>
+  {% else %}
+  <p>{{ profile.notes|default:"Brak notatek."|linebreaksbr }}</p>
+  <p>{% for t in profile.tags.all %}<span class="badge">{{ t.name }}</span> {% endfor %}</p>
+  {% endif %}
+</div>
+
+<h2 id="kody">Kody wejścia</h2>
+<div class="card">
+  {% if passes %}<div class="table-wrap"><table class="days">
+    <tr class="head"><th>Kod</th><th>Rodzaj</th><th>Wejścia</th><th>Ważność</th><th>Zapłata</th><th></th></tr>
+    {% for p in passes %}<tr>
+      <td><strong class="code">{{ p.code }}</strong>{% if p.note %}<div class="small muted">{{ p.note }}</div>{% endif %}</td>
+      <td data-label="Rodzaj">{{ p.get_kind_display }}<div class="small muted">do {{ p.max_hours }} h, {{ p.max_persons }} os.{% if p.lanes.all %}; {{ p.lanes.all|join:", " }}{% endif %}</div></td>
+      <td data-label="Wejścia">{% if p.entries_limit %}{{ p.uses }} z {{ p.entries_limit }}<div class="small muted">zostało {{ p.remaining }}</div>{% else %}{{ p.uses }} <span class="small muted">(bez limitu)</span>{% endif %}</td>
+      <td data-label="Ważność">{{ p.valid_from|date:"j.m.Y" }}–{{ p.valid_until|date:"j.m.Y" }}{% if not p.is_active %} <span class="badge bad">wyłączony</span>{% elif p.expired %} <span class="badge">wygasł</span>{% endif %}</td>
+      <td data-label="Zapłata">{{ p.price|pln }}<div class="small">{% if p.is_paid %}<span class="badge ok">{{ p.get_paid_with_display|lower }}</span>{% else %}<span class="badge warn">nieopłacony</span>{% endif %}</div></td>
+      <td>{% if perms.clients.manage_clients and p.is_active %}
+        {% if not p.is_paid %}<form method="post" action="{% url 'panel:client_pass_action' p.pk %}">{% csrf_token %}<input type="hidden" name="action" value="paid">{{ paid_form.paid_with }} <button class="btn secondary small-btn" type="submit">Opłacony</button></form>{% endif %}
+        <form method="post" action="{% url 'panel:client_pass_action' p.pk %}" data-confirm="Wyłączyć kod {{ p.code }}? Nie będzie można go użyć do nowych rezerwacji.">{% csrf_token %}<input type="hidden" name="action" value="deactivate"><button class="btn secondary small-btn" type="submit">Wyłącz</button></form>
+      {% endif %}</td></tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">Brak kodów wejścia.</p>{% endif %}
+  {% if perms.clients.manage_clients %}<div class="actions"><a class="btn secondary" href="{% url 'panel:client_pass_new' subject.pk %}">+ Wydaj kod wejścia</a></div>{% endif %}
+</div>
+
+<h2>Historia wizyt</h2>
+<div class="card">
+  <div class="table-wrap"><table class="days">
+    <tr class="head"><th>Rezerwacja</th><th>Oś</th><th>Status</th><th>Rozliczenie</th></tr>
+    {% for r in reservations %}<tr><td><a href="{% url 'panel:reservation' r.pk %}">{{ r.starts_at|date:"j.m.Y H:i" }}</a><div class="small muted code">{{ r.number }}</div></td><td data-label="Oś">{{ r.lane }}</td><td data-label="Status">{{ r.display_status }}</td>
+      <td data-label="Rozliczenie">{% if r.client_pass %}kod {{ r.client_pass.code }}{% elif r.access_code %}klub {{ r.access_code.club }}{% else %}{{ r.amount|pln }} · {{ r.get_payment_status_display|lower }}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4" class="muted">Brak rezerwacji.</td></tr>{% endfor %}
+  </table></div>
+  {% if perms.logbook.view_logbook %}<h3>Wpisy w książce pobytu (na konto)</h3>
+  <table>{% for e in log_entries %}<tr><td><a href="{% url 'panel:logbook_entry' e.pk %}">{{ e.entered_at|date:"j.m.Y H:i" }}</a></td><td>{{ e.get_purpose_display }}</td><td>{% if e.reservation %}{{ e.reservation.lane }}{% endif %}</td></tr>
+  {% empty %}<tr><td class="muted">Brak wpisów.</td></tr>{% endfor %}</table>{% endif %}
+</div>
 <h2>Dokumenty</h2>
 <div class="card table-wrap"><table>
   {% for c in credentials %}<tr><td>{{ c.get_kind_display }}</td><td>{{ c.number }}</td><td><span class="badge {{ c.effective_status|status_class }}">{{ c.get_effective_status_display }}</span></td>

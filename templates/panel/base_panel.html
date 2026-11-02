@@ -9,7 +9,7 @@
   {% if perms.association.manage_members or perms.association.manage_resolutions or perms.association.manage_clubs or perms.association.view_reports %}<a href="{% if perms.association.manage_members %}{% url 'panel:members' %}{% elif perms.association.manage_resolutions %}{% url 'panel:resolutions' %}{% elif perms.association.manage_clubs %}{% url 'panel:clubs' %}{% else %}{% url 'panel:reports' %}{% endif %}" class="{% if 'member' in u or 'resolution' in u or 'meeting' in u or 'club' in u or u == 'fees' or u == 'applications' or u == 'reports' %}active{% endif %}">Stowarzyszenie</a>{% endif %}
   {% if perms.logbook.view_logbook %}<a href="{% url 'panel:logbook' %}" class="{% if 'logbook' in u %}active{% endif %}">Książka pobytu</a>{% endif %}
   {% if perms.credentials.review_credential %}<a href="{% url 'panel:credentials' %}" class="{% if 'credential' in u %}active{% endif %}">Weryfikacja</a>{% endif %}
-  {% if perms.accounts.view_users %}<a href="{% url 'panel:users' %}" class="{% if 'user' in u %}active{% endif %}">Użytkownicy</a>{% endif %}
+  {% if perms.accounts.view_users %}<a href="{% url 'panel:users' %}" class="{% if 'user' in u or 'client' in u %}active{% endif %}">Klienci</a>{% endif %}
   {% if perms.facilities.manage_facilities %}<a href="{% url 'panel:lanes' %}" class="{% if 'lane' in u or 'price' in u %}active{% endif %}">Osie i cennik</a>{% endif %}
   {% if perms.regulations.publish_regulation %}<a href="{% url 'panel:regulations' %}" class="{% if 'regulation' in u %}active{% endif %}">Regulaminy</a>{% endif %}
   {% if perms.core.manage_settings %}<a href="{% url 'panel:settings' %}" class="{% if u == 'settings' %}active{% endif %}">Dane stowarzyszenia</a>{% endif %}

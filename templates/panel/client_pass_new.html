@@ -1,0 +1,9 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Nowy kod wejścia{% endblock %}
+{% block panel %}
+<h1>Nowy kod wejścia</h1>
+<p>Dla: <a href="{% url 'panel:user' subject.pk %}">{{ subject.full_name }}</a> ({{ subject.email }})</p>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
+  <p class="small muted">Jedno wejście = jedna rezerwacja klienta (w granicach godzin i osób). Pojedyncze wejście ma zawsze 1 wejście, abonament — bez limitu. Rezerwacja anulowana bezpłatnie zwraca wejście.</p>
+  <button class="btn" type="submit">Wydaj kod</button> <a class="btn secondary" href="{% url 'panel:user' subject.pk %}">Anuluj</a></form></div>
+{% endblock %}

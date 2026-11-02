@@ -1,16 +1,28 @@
 {% extends "panel/base_panel.html" %}
-{% block title %}Użytkownicy{% endblock %}
+{% block title %}Klienci{% endblock %}
 {% block panel %}
-<h1>Użytkownicy</h1>
-<form method="get" class="card"><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ q }}" placeholder="nazwisko lub e-mail"></form>
-<div class="card table-wrap"><table>
-  <tr><th>Imię i nazwisko</th><th class="hide-sm">E-mail</th><th>Status</th><th></th></tr>
+<h1>Klienci</h1>
+<form method="get" class="card filters">
+  <div><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ f.q }}" placeholder="nazwisko, e-mail, telefon"></div>
+  <div><label for="f-typ">Typ</label><select id="f-typ" name="typ"><option value="">wszyscy</option>{% for v, l in types %}<option value="{{ v }}"{% if f.typ == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div><label for="f-ps">Uprawnienia PS</label><select id="f-ps" name="ps"><option value="">dowolne</option>{% for v, l in ps_choices %}<option value="{{ v }}"{% if f.ps == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  {% if tags %}<div><label for="f-tag">Tag</label><select id="f-tag" name="tag"><option value="">dowolny</option>{% for t in tags %}<option{% if f.tag == t.name %} selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>{% endif %}
+  <div class="checkbox"><label><input type="checkbox" name="nieaktywne" value="1"{% if f.nieaktywne %} checked{% endif %}> także nieaktywne konta</label></div>
+  <div class="actions"><button class="btn" type="submit">Pokaż</button><a class="btn secondary" href="{% url 'panel:users' %}">Wyczyść</a></div>
+</form>
+<p class="muted small">{{ page.paginator.count }} klientów</p>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Klient</th><th>Typ</th><th>Uprawnienia PS</th><th>Wizyty</th><th>Ostatnia wizyta</th><th>Kody wejścia</th></tr>
   {% for u in page %}
-  <tr><td>{{ u.full_name }}{% if u.is_superuser %} <span class="badge ok">właściciel</span>{% elif u.is_staff %} <span class="badge">zarząd</span>{% endif %}</td>
-      <td class="hide-sm">{{ u.email }}</td>
-      <td>{% if not u.is_active %}<span class="badge bad">nieaktywne</span>{% elif not u.email_verified %}<span class="badge warn">niepotwierdzone</span>{% else %}<span class="badge ok">aktywne</span>{% endif %}</td>
-      <td><a href="{% url 'panel:user' u.pk %}">Otwórz</a></td></tr>
-  {% empty %}<tr><td colspan="4" class="muted">Brak wyników.</td></tr>{% endfor %}
-</table></div>
+  <tr><td><a href="{% url 'panel:user' u.pk %}">{{ u.full_name|default:u.email }}</a>{% if u.is_superuser %} <span class="badge ok">właściciel</span>{% elif u.is_staff %} <span class="badge">obsługa</span>{% endif %}{% if not u.is_active %} <span class="badge bad">nieaktywne</span>{% endif %}
+      <div class="small muted">{{ u.email }}{% if u.phone %} · {{ u.phone }}{% endif %}</div>
+      {% if u.profile %}{% for t in u.profile.tags.all %}<span class="badge">{{ t.name }}</span> {% endfor %}{% endif %}</td>
+    <td data-label="Typ"><span class="badge {% if u.client_type == 'czlonek' %}ok{% elif u.client_type == 'nowy' %}warn{% endif %}">{{ u.client_type_label }}</span></td>
+    <td data-label="Uprawnienia PS"><span class="badge {% if u.ps_status == 'wazne' %}ok{% elif u.ps_status == 'do_weryfikacji' %}warn{% elif u.ps_status == 'wygasle' %}bad{% endif %}">{{ u.ps_label }}</span></td>
+    <td data-label="Wizyty">{{ u.visits }}</td>
+    <td data-label="Ostatnia wizyta">{{ u.last_visit|date:"j.m.Y"|default:"—" }}</td>
+    <td data-label="Kody wejścia">{% for p in u.active_passes %}<span class="badge code">{{ p.code }}</span> {% empty %}<span class="muted">—</span>{% endfor %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Brak wyników.</td></tr>{% endfor %}
+</table></div></section>
 {% include "partials/pagination.html" %}
 {% endblock %}

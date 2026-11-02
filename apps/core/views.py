@@ -33,11 +33,17 @@ def home(request):
 @login_required
 def dashboard(request):
     credentials = list(request.user.credentials.all())
+    from apps.clients.services import pass_uses
+
+    passes = list(request.user.client_passes.filter(is_active=True, valid_until__gte=timezone.localdate()))
+    for p in passes:
+        p.remaining = None if p.entries_limit is None else max(0, p.entries_limit - pass_uses(p))
     return render(
         request,
         "core/dashboard.html",
         {
             "credentials": credentials,
+            "passes": passes,
             "is_ps": is_range_officer(request.user),
             "missing_profile": not (request.user.phone and request.user.city),
             "balance": balance_of(request.user),
@@ -92,16 +98,6 @@ def panel_settings(request):
     return render(request, "panel/settings.html", {"form": form})
 
 
-@panel_required("accounts.view_users")
-def panel_users(request):
-    q = request.GET.get("q", "").strip()
-    qs = User.objects.all()
-    if q:
-        qs = qs.filter(Q(email__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q))
-    page = Paginator(qs, 30).get_page(request.GET.get("page"))
-    return render(request, "panel/users_list.html", {"page": page, "q": q})
-
-
 def _perm_objects(codes):
     out = []
     for code in codes:
@@ -132,10 +128,30 @@ def panel_user(request, pk):
             messages.success(request, "Zapisano uprawnienia." + (" Osoba skonfiguruje logowanie dwuskładnikowe przy wejściu do panelu." if chosen else ""))
             return redirect("panel:user", pk=subject.pk)
     log_sensitive_access(subject, f"konto:{subject.pk}", "podgląd konta w panelu")
+    from apps.association.models import Member
+    from apps.clients import services as client_services
+    from apps.clients.forms import PassPaidForm, ProfileForm
+
+    client_services.annotate_clients([subject])
+    profile = subject.profile
+    passes = list(subject.client_passes.prefetch_related("lanes"))
+    for p in passes:
+        p.uses = client_services.pass_uses(p)
+        p.remaining = None if p.entries_limit is None else max(0, p.entries_limit - p.uses)
+        p.expired = p.valid_until < timezone.localdate()
+    profile_form = ProfileForm(initial={
+        "notes": profile.notes if profile else "", "tags": ", ".join(t.name for t in profile.tags.all()) if profile else "",
+    })
     return render(
         request,
         "panel/user_detail.html",
-        {"subject": subject, "credentials": subject.credentials.all(), "form": form, "can_manage": can_manage},
+        {
+            "subject": subject, "credentials": subject.credentials.all(), "form": form, "can_manage": can_manage,
+            "profile": profile, "profile_form": profile_form, "passes": passes, "paid_form": PassPaidForm(),
+            "member": Member.objects.filter(user=subject).first(),
+            "reservations": subject.reservations.select_related("lane", "client_pass", "access_code__club").order_by("-starts_at")[:30],
+            "log_entries": subject.log_entries.select_related("reservation__lane").order_by("-entered_at")[:30],
+        },
     )
 
 

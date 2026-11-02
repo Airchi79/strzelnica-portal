@@ -120,18 +120,25 @@ def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: i
     return starts_at, ends_at, rule
 
 
-def quote(lane, day, start_hour, end_hour, persons, now=None, access_code=""):
+def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", user=None):
     starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, persons, now)
     hours = end_hour - start_hour
+    base = {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "code": None, "client_pass": None}
     if access_code:
+        # Kod wejścia klienta (przedpłacony karnet/abonament): rezerwacja bez osobnej należności.
+        from apps.clients.services import find_client_pass
+
+        client_pass = find_client_pass(access_code, user, lane, day, hours, persons)
+        if client_pass is not None:
+            return {**base, "hourly": 0, "amount": 0, "client_pass": client_pass}
         # Kod klubu: rozliczenie wg umowy z klubem, poza płatnościami strzelca. Kwota tylko informacyjnie (stawka umowna).
         from apps.association.services import find_access_code
 
         code = find_access_code(access_code, lane, day, hours)
         hourly = code.contract_hourly or 0
-        return {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "hourly": hourly, "amount": hourly * hours, "code": code}
+        return {**base, "hourly": hourly, "amount": hourly * hours, "code": code}
     hourly = rule.hourly_amount(persons)
-    return {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "hourly": hourly, "amount": hourly * hours, "code": None}
+    return {**base, "hourly": hourly, "amount": hourly * hours}
 
 
 def _next_number(year):
@@ -146,10 +153,15 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     reasons = check_can_book(user)
     if reasons:
         raise ValidationError(reasons)
-    q = quote(lane, day, start_hour, end_hour, persons, now, access_code=access_code)
-    code = q.get("code")
+    q = quote(lane, day, start_hour, end_hour, persons, now, access_code=access_code, user=user)
+    code, client_pass = q["code"], q["client_pass"]
     try:
         with transaction.atomic():
+            if client_pass is not None:
+                # Blokada wiersza kodu: równoległe rezerwacje nie przekroczą limitu wejść.
+                from apps.clients.services import find_client_pass
+
+                client_pass = find_client_pass(access_code, user, lane, day, end_hour - start_hour, persons, lock=True)
             reservation = Reservation.objects.create(
                 number=_next_number(day.year),
                 lane=lane,
@@ -163,7 +175,10 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
                 amount=q["amount"],
                 created_by=created_by or user,
                 access_code=code,
-                payment_status=Reservation.Payment.CONTRACT if code else Reservation.Payment.DUE,
+                client_pass=client_pass,
+                payment_status=(
+                    Reservation.Payment.CONTRACT if code else Reservation.Payment.PASS if client_pass else Reservation.Payment.DUE
+                ),
             )
     except IntegrityError as e:
         if "reservation_no_overlap" in str(e):
@@ -245,12 +260,14 @@ def change_persons(reservation, persons, by):
     if persons < 1 or persons > BookingSettings.load().max_persons:
         raise ValidationError("Nieprawidłowa liczba osób.")
     before = (reservation.persons, reservation.amount)
+    if reservation.client_pass_id and persons > reservation.client_pass.max_persons:
+        raise ValidationError(f"Kod wejścia obejmuje najwyżej {reservation.client_pass.max_persons} os. — anuluj i zarezerwuj bez kodu.")
     reservation.persons = persons
-    if reservation.access_code_id is None:
+    if reservation.access_code_id is None and reservation.client_pass_id is None:
         reservation.hourly_amount = reservation.price_rule.hourly_amount(persons)
         reservation.amount = reservation.hourly_amount * reservation.hours
     reservation.save()
-    if reservation.access_code_id is None:
+    if reservation.access_code_id is None and reservation.client_pass_id is None:
         reservation = reconcile_reservation(reservation, by=by)
     log_event(
         "rezerwacja.zmiana_osob",

@@ -13,7 +13,7 @@ FEED_GROUPS = {
     "rezerwacje": ("rezerwacja.", "blokada."),
     "platnosci": ("platnosc.", "platnosci.", "skladka.", "saldo."),
     "ksiega": ("ksiazka.",),
-    "klienci": ("konto.rejestracja", "dokument.", "deklaracja.", "czlonek."),
+    "klienci": ("konto.rejestracja", "dokument.", "deklaracja.", "czlonek.", "klient.", "kod_wejscia."),
 }
 
 FEED_LABELS = {
@@ -56,6 +56,14 @@ FEED_LABELS = {
     "ksiazka.nowy_kod_osobisty": "Nowy kod osobisty",
     "ksiazka.nowy_kod_wejscia": "Nowy kod wejścia",
     "ksiazka.ustawienia": "Zmiana ustawień książki",
+    "ksiazka.eksport": "Eksport książki pobytu (XLSX)",
+    "ksiazka.wypis_auto": "Automatyczne zamknięcie pobytów",
+    "klient.kartoteka": "Zmiana w kartotece klienta",
+    "klient.zatwierdzenie": "Zatwierdzenie klienta",
+    "klient.cofniecie_zatwierdzenia": "Cofnięcie zatwierdzenia klienta",
+    "kod_wejscia.wydanie": "Wydanie kodu wejścia",
+    "kod_wejscia.zaplata": "Opłacenie kodu wejścia",
+    "kod_wejscia.dezaktywacja": "Wyłączenie kodu wejścia",
 }
 
 

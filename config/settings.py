@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "apps.logbook",
     "apps.payments",
     "apps.association",
+    "apps.clients",
 ]
 
 MIDDLEWARE = [

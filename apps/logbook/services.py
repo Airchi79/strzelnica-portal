@@ -310,7 +310,7 @@ def settle_finished_reservations(now=None):
             r = Reservation.objects.select_for_update().select_related("price_rule", "user", "lane").get(pk=r.pk)
             shooters = r.log_entries.filter(purpose=Entry.Purpose.SHOOTING).count()
             r.settled_at = now
-            if r.access_code_id:  # rezerwacja klubowa — rozliczenie wg umowy z klubem
+            if r.access_code_id or r.client_pass_id:  # kod klubu (umowa) lub kod wejścia (przedpłata) — bez dopłat
                 r.save(update_fields=["settled_at"])
                 continue
             if shooters > r.persons:

@@ -56,6 +56,7 @@ class Reservation(models.Model):
         WAIVED = "zwolniona", "Zwolniona z opłaty"
         NONE = "brak", "Bez opłaty (anulowana)"
         CONTRACT = "umowa", "Rozliczana wg umowy z klubem"
+        PASS = "kod", "Opłacona kodem wejścia"
 
     number = models.CharField("numer", max_length=24, unique=True)
     lane = models.ForeignKey(Lane, verbose_name="oś", on_delete=models.PROTECT, related_name="reservations")
@@ -73,6 +74,10 @@ class Reservation(models.Model):
     paid_amount = models.PositiveIntegerField("zapłacono [gr]", default=0)
     access_code = models.ForeignKey(
         "association.AccessCode", verbose_name="kod dostępu klubu", null=True, blank=True,
+        on_delete=models.PROTECT, related_name="reservations",
+    )
+    client_pass = models.ForeignKey(
+        "clients.ClientPass", verbose_name="kod wejścia klienta", null=True, blank=True,
         on_delete=models.PROTECT, related_name="reservations",
     )
 
@@ -104,6 +109,7 @@ class Reservation(models.Model):
         constraints = [
             models.CheckConstraint(condition=Q(ends_at__gt=models.F("starts_at")), name="reservation_positive_length"),
             models.CheckConstraint(condition=Q(persons__gte=1), name="reservation_persons_min"),
+            models.CheckConstraint(condition=Q(access_code__isnull=True) | Q(client_pass__isnull=True), name="reservation_one_code"),
             # Gwarancja na poziomie bazy: na jednej osi aktywne rezerwacje nie mogą się nakładać w czasie.
             ExclusionConstraint(
                 name="reservation_no_overlap",

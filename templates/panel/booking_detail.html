@@ -22,6 +22,7 @@
 <h2>Rozliczenie</h2>
 <div class="card">
   {% if r.access_code %}<p>Rozliczenie wg umowy klubu <strong>{{ r.access_code.club }}</strong> (kod {{ r.access_code.code }}).</p>{% endif %}
+  {% if r.client_pass %}<p>Opłacona kodem wejścia <strong>{{ r.client_pass.code }}</strong> ({{ r.client_pass.get_kind_display|lower }}) — <a href="{% url 'panel:user' r.user_id %}">karta klienta</a>.</p>{% endif %}
   <p>Zapłacono: <strong>{{ r.paid_amount|pln }}</strong> z {{ r.amount|pln }} · {% if WALLET_ENABLED %}saldo{% else %}nadpłata{% endif %} strzelca: <a href="{% url 'panel:wallet' r.user.pk %}">{{ wallet_balance|pln }}</a></p>
   <form method="post" class="actions" style="margin-top:0">{% csrf_token %}
   {% if r.payment_status == 'do_zaplaty' %}

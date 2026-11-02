@@ -1,8 +1,21 @@
+# Do obrazu trafia wyłącznie kod programu — nigdy dane, kopie ani ustawienia.
 .venv
 .git
 __pycache__
+.pytest_cache
 staticfiles
 private_media
-backups
 .env
-.pytest_cache
+.env.*
+data
+backups
+tmp
+*.dump
+*.zip
+*.xlsx
+# Foldery systemowe QNAP (kosz, migawki) i Synology
+@Recycle
+@Recently-Snapshot
+.@__thumb
+@eaDir
+#recycle

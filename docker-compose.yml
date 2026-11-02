@@ -66,6 +66,17 @@ services:
         sleep 300;
       done'
 
+  # Tunel Cloudflare jako kontener (opcjonalnie — uruchamiany z profilem „tunel”):
+  #   docker compose --profile tunel up -d
+  # Token tunelu wpisz w .env jako TUNNEL_TOKEN (Cloudflare → Zero Trust → Networks → Tunnels → Configure).
+  tunnel:
+    image: cloudflare/cloudflared:2024.12.2
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    profiles: ["tunel"]
+
   # Codzienna kopia bazy danych (format pg_dump -Fc), 7 ostatnich plików.
   backup:
     image: postgres:16

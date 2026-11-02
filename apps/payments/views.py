@@ -146,7 +146,18 @@ def tpay_notify(request):
         payment = Payment.objects.select_for_update().get(pk=payment.pk)
         payment.raw = {**payment.raw, "powiadomienie": {k: v for k, v in fields.items() if k != "md5sum"}}
         payment.save(update_fields=["raw"])
-        if status == "true":
+        expected_title = (payment.raw or {}).get("tpay_title")
+        mismatch = None
+        if expected_title and fields.get("tr_id") != expected_title:
+            mismatch = f"Numer transakcji z Tpay ({fields.get('tr_id', '')[:40]}) różni się od zapisanego ({expected_title})"
+        elif not settings.TPAY_SANDBOX and fields.get("test_mode") == "1":
+            mismatch = "Powiadomienie testowe Tpay na koncie produkcyjnym — nie zaksięgowano"
+        if mismatch and status == "true":
+            if payment.status != Payment.Status.COMPLETED:
+                payment.note, payment.status = mismatch[:255], Payment.Status.UNMATCHED
+                payment.save(update_fields=["note", "status"])
+            logger.warning("Powiadomienie Tpay do sprawdzenia: %s", mismatch)
+        elif status == "true":
             paid = services_amount(fields.get("tr_paid") or fields.get("tr_amount"))
             if paid != payment.amount:
                 payment.note = f"Kwota z Tpay ({paid / 100:.2f} zł) różni się od oczekiwanej"

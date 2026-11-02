@@ -471,3 +471,27 @@ def test_direct_mode_bank_transfer_with_reservation_number(ps, owner):
     services.import_bank_csv(raw, "pko.csv", owner)
     r.refresh_from_db()
     assert r.payment_status == Reservation.Payment.PAID
+
+
+def test_tpay_notification_with_foreign_transaction_id_goes_to_review(client, ps, tpay_keys):
+    payment = Payment.objects.create(user=ps, amount=5000, method=Payment.Method.TPAY, raw={"tpay_title": "TR-INNY-9"})
+    assert _post(client, tpay_keys, _notification(payment)).content == b"TRUE"
+    payment.refresh_from_db()
+    assert payment.status == Payment.Status.UNMATCHED and "Numer transakcji" in payment.note and services.balance_of(ps) == 0
+    ok = Payment.objects.create(user=ps, amount=5000, method=Payment.Method.TPAY, raw={"tpay_title": "TR-TEST-1"})
+    _post(client, tpay_keys, _notification(ok))
+    ok.refresh_from_db()
+    assert ok.status == Payment.Status.COMPLETED
+
+
+def test_tpay_test_notification_not_booked_in_production(client, ps, tpay_keys, settings, monkeypatch):
+    settings.TPAY_SANDBOX = False
+    monkeypatch.setattr(tpay, "verify_jws", lambda header, body, cert_loader=None: True)  # podpis poprawny — sprawdzamy test_mode
+    payment = Payment.objects.create(user=ps, amount=5000, method=Payment.Method.TPAY)
+    assert _post(client, tpay_keys, _notification(payment)).content == b"TRUE"  # test_mode=1
+    payment.refresh_from_db()
+    assert payment.status == Payment.Status.UNMATCHED and "testowe" in payment.note and services.balance_of(ps) == 0
+    live = Payment.objects.create(user=ps, amount=5000, method=Payment.Method.TPAY)
+    _post(client, tpay_keys, _notification(live).replace(b"test_mode=1", b"test_mode=0"))
+    live.refresh_from_db()
+    assert live.status == Payment.Status.COMPLETED

@@ -18,6 +18,7 @@ urlpatterns = [
     path("platnosci/", include("apps.payments.urls")),
     path("stowarzyszenie/", include("apps.association.urls")),
     path("panel/", include("apps.core.panel_urls")),
+    path("kiosk/", include("apps.kiosk.urls")),
     path("techniczny/", admin.site.urls),
     path("manifest.webmanifest", core_views.manifest, name="manifest"),
     path("sw.js", core_views.service_worker, name="service_worker"),

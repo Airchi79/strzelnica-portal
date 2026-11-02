@@ -40,7 +40,7 @@ h1 { font-size: 1.5rem; margin: 0 0 var(--gap); } h2 { font-size: 1.2rem; margin
 form p, .field { margin: 0 0 14px; }
 label { display: block; font-weight: 600; margin-bottom: 4px; }
 input[type=text], input[type=email], input[type=password], input[type=date], input[type=time], input[type=datetime-local],
-input[type=number], input[type=search], input[type=tel], select, textarea {
+input[type=number], input[type=search], input[type=tel], input[type=month], input:not([type]), select, textarea {
   width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
 textarea { min-height: 120px; }
 input[type=checkbox] { width: 20px; height: 20px; vertical-align: middle; margin-right: 6px; }
@@ -153,4 +153,30 @@ tr.cancelled td { text-decoration: line-through; color: var(--muted); }
   table.days td[data-label]::before { content: attr(data-label); display: block; font-size: .75rem; color: var(--muted); }
   table.days td.hide-sm { display: none; }
   .day-head strong { flex-basis: 100%; }
+}
+
+/* Kiosk (tablet / Raspberry Pi przy wejściu) */
+body.kiosk { font-size: 18px; }
+.kiosk-buttons { display: grid; gap: 12px; margin-bottom: 16px; }
+.kiosk-big { min-height: 64px; font-size: 1.15rem; width: 100%; }
+.kiosk-choices { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.kiosk-choices label { display: flex; gap: 8px; align-items: center; padding: 8px 0; }
+.kiosk-list { list-style: none; padding: 0; margin: 0; }
+.kiosk-list li { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.kiosk-list li:last-child { border-bottom: 0; }
+.kiosk-list button { width: 100%; text-align: left; }
+.kiosk-status { font-size: .9rem; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.15); }
+.kiosk-status.offline { background: var(--bad-bg); color: var(--bad); }
+.kiosk-done { text-align: center; padding: 32px 16px; }
+@media (min-width: 720px) { .kiosk-buttons { grid-template-columns: 1fr 1fr; } }
+
+/* Panel: menu boczne na szerokich ekranach (na telefonie i tablecie pionowo — przyciski u góry) */
+.panel-main { min-width: 0; }
+@media (min-width: 1100px) {
+  .wrap:has(> .panel-layout), main.wrap:has(.panel-layout) { max-width: 1280px; }
+  .panel-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; align-items: start; }
+  .panel-nav { flex-direction: column; flex-wrap: nowrap; gap: 2px; position: sticky; top: 12px; margin: 0;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; }
+  .panel-nav a { border: 0; border-radius: 8px; padding: 9px 12px; }
+  .panel-nav a:not(.active):hover { background: var(--bg); }
 }

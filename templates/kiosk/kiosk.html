@@ -1,0 +1,68 @@
+{% load static %}<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Kiosk · {{ SITE_NAME }}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#2f5d3a">
+<link rel="stylesheet" href="{% static 'css/app.css' %}"></head>
+<body class="kiosk" data-kiosk data-api="{% url 'kiosk:home' %}api/">
+<header class="topbar"><div class="wrap"><span class="brand">{{ SITE_NAME }} · książka pobytu</span>
+  <span class="kiosk-status" data-status>…</span></div></header>
+<main class="wrap">
+
+<section data-view="home">
+  <h1>Witamy na strzelnicy</h1>
+  <div class="kiosk-buttons">
+    <button class="btn kiosk-big" type="button" data-go="form">Wpis do książki pobytu</button>
+    <button class="btn secondary kiosk-big" type="button" data-go="exit">Wyjście ze strzelnicy</button>
+    <button class="btn secondary kiosk-big" type="button" data-scan hidden>Zeskanuj kod QR (rezerwacja lub „Mój kod”)</button>
+  </div>
+  <p class="muted">Masz kod QR rezerwacji albo osobisty kod z konta? Przyłóż go do czytnika{% comment %} (Raspberry Pi){% endcomment %} lub zeskanuj kamerą.</p>
+  <div class="card"><h2 style="margin-top:0">Dzisiejsze rezerwacje</h2><ul class="kiosk-list" data-reservations><li class="muted">Wczytywanie…</li></ul></div>
+  <p class="small muted" data-queue hidden></p>
+</section>
+
+<section data-view="scan" hidden>
+  <h1>Skanowanie kodu QR</h1>
+  <video data-video playsinline muted style="width:100%;max-height:60vh;background:#000;border-radius:10px"></video>
+  <div class="actions"><button class="btn secondary" type="button" data-go="home">Anuluj</button></div>
+</section>
+
+<section data-view="form" hidden>
+  <h1>Wpis do książki pobytu</h1>
+  <div class="msg" data-form-info hidden></div>
+  <form class="card" data-kiosk-form novalidate autocomplete="off">
+    <div class="msg error" data-form-error hidden></div>
+    <div class="field"><label>Cel pobytu</label>
+      <div class="kiosk-choices">{% for v, l in purposes %}<label><input type="radio" name="purpose" value="{{ v }}"> {{ l }}</label>{% endfor %}</div></div>
+    <div class="field" data-field="reservation"><label for="k-res">Rezerwacja (oś i godziny)</label><select id="k-res" name="reservation"></select></div>
+    <div class="field" data-field="purpose_note"><label for="k-note">Krótki opis celu</label><input id="k-note" name="purpose_note" maxlength="160"></div>
+    <div class="field"><label for="k-fn">Imię</label><input id="k-fn" name="first_name" maxlength="80"></div>
+    <div class="field"><label for="k-ln">Nazwisko</label><input id="k-ln" name="last_name" maxlength="120"></div>
+    <div class="field"><label>Czy masz pozwolenie na broń?</label>
+      <div class="kiosk-choices"><label><input type="radio" name="has_permit" value="tak"> Tak</label><label><input type="radio" name="has_permit" value="nie"> Nie</label></div></div>
+    <div class="field" data-field="permit_number"><label for="k-pn">Numer pozwolenia na broń</label><input id="k-pn" name="permit_number" maxlength="64"></div>
+    <div class="field" data-field="permit_issuer"><label for="k-pi">Organ, który wydał pozwolenie</label><input id="k-pi" name="permit_issuer" maxlength="160" placeholder="np. Komendant Wojewódzki Policji we Wrocławiu"></div>
+    <div class="field" data-field="address"><label for="k-ad">Adres zamieszkania</label><input id="k-ad" name="address" maxlength="255"></div>
+    <div class="field"><label><input type="checkbox" name="statement"> {{ statement }}</label></div>
+    <div class="field"><label>Podpis</label>
+      <div class="sigbox"><canvas data-sig aria-label="Pole podpisu"></canvas><button type="button" class="btn secondary small-btn" data-sig-clear>Wyczyść</button></div></div>
+    <div class="actions"><button class="btn kiosk-big" type="submit">Zapisz wpis</button><button class="btn secondary" type="button" data-go="home">Anuluj</button></div>
+  </form>
+</section>
+
+<section data-view="exit" hidden>
+  <h1>Wyjście ze strzelnicy</h1>
+  <div class="card">
+    <label for="k-exit">Wpisz początek nazwiska</label>
+    <input id="k-exit" data-exit-q maxlength="40" autocomplete="off">
+    <ul class="kiosk-list" data-exit-list></ul>
+    <div class="actions"><button class="btn secondary" type="button" data-go="home">Wróć</button></div>
+  </div>
+</section>
+
+<section data-view="done" hidden>
+  <div class="card kiosk-done"><h1 data-done-title>Gotowe</h1><p data-done-text></p>
+    <button class="btn kiosk-big" type="button" data-go="home">OK</button></div>
+</section>
+
+</main>
+<script src="{% static 'js/kiosk.js' %}" defer></script>
+</body></html>

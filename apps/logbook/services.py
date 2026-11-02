@@ -183,20 +183,23 @@ def check_rate_limit(ip):
 
 
 STAFF_BACKDATE_HOURS = 24
+DEVICE_BACKDATE_HOURS = 72  # wpisy z kolejki offline kiosku
 
 
 @transaction.atomic
 def create_entry(
-    *, data, signature_png, source, reservation=None, user=None, created_by=None, ip=None, user_agent="", now=None, entered_at=None
+    *, data, signature_png, source, reservation=None, user=None, created_by=None, ip=None, user_agent="", now=None, entered_at=None,
+    device=None, client_ref=None,
 ):
     """Zapisuje wpis. `entered_at` (godzina wejścia wcześniejsza niż chwila zapisu) przyjmuje się tylko przy wpisie
-    przez obsługę — np. gdy osoba weszła, a obsługa uzupełnia książkę chwilę później; najwyżej 24 h wstecz."""
+    przez obsługę (najwyżej 24 h wstecz) i z kiosku, który zapisał wpis bez połączenia (najwyżej 72 h wstecz)."""
     now = now or timezone.now()
     if entered_at is not None:
-        if source != Entry.Source.STAFF:
+        limits = {Entry.Source.STAFF: STAFF_BACKDATE_HOURS, Entry.Source.DEVICE: DEVICE_BACKDATE_HOURS}
+        if source not in limits:
             raise ValidationError("Godzinę wejścia może podać tylko obsługa.")
-        if entered_at > now + timedelta(minutes=1) or entered_at < now - timedelta(hours=STAFF_BACKDATE_HOURS):
-            raise ValidationError(f"Godzina wejścia musi mieścić się w ostatnich {STAFF_BACKDATE_HOURS} godzinach.")
+        if entered_at > now + timedelta(minutes=2) or entered_at < now - timedelta(hours=limits[source]):
+            raise ValidationError(f"Godzina wejścia musi mieścić się w ostatnich {limits[source]} godzinach.")
         entered_at = min(entered_at, now)
     else:
         entered_at = now
@@ -232,6 +235,9 @@ def create_entry(
         source=source,
         ip=ip,
         user_agent=(user_agent or "")[:255],
+        device=device,
+        client_ref=client_ref,
+        received_at=now if device is not None else None,
     )
     entry.content_sha256 = entry.compute_content_hash()
     entry.save()

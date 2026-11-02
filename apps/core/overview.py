@@ -61,6 +61,7 @@ FEED_LABELS = {
     "ksiazka.eksport": "Eksport książki pobytu (XLSX)",
     "ksiazka.wypis_auto": "Automatyczne zamknięcie pobytów",
     "klient.kartoteka": "Zmiana w kartotece klienta",
+    "kiosk.wpis_odrzucony": "Odrzucony wpis z kiosku",
     "klient.zatwierdzenie": "Zatwierdzenie klienta",
     "klient.cofniecie_zatwierdzenia": "Cofnięcie zatwierdzenia klienta",
     "kod_wejscia.wydanie": "Wydanie kodu wejścia",

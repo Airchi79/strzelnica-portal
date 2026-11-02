@@ -1,0 +1,6 @@
+{% autoescape off %}{{ event }}
+
+{{ text }}
+{% if url_path %}
+Panel: {{ site_url }}{{ url_path }}{% endif %}
+{% endautoescape %}

@@ -2,7 +2,8 @@
 
 System dla Stowarzyszenia STRZELNICA SĄTOK: konta strzelców, weryfikacja uprawnień, regulaminy,
 osie i cennik, a w kolejnych etapach rezerwacje, elektroniczna książka pobytu, płatności i obsługa stowarzyszenia.
-Specyfikacja: [`docs/SPEC-etap-1-2.md`](docs/SPEC-etap-1-2.md).
+Specyfikacja: [`docs/SPEC-etap-1-2.md`](docs/SPEC-etap-1-2.md), kolejne etapy w `docs/SPEC-etap-*.md` (panel obsługi, kiosk: [`docs/SPEC-etap-6-panel.md`](docs/SPEC-etap-6-panel.md)).
+Kiosk na Raspberry Pi: [`deploy/raspberry-pi/README.md`](deploy/raspberry-pi/README.md).
 
 **Stos:** Python 3.12+, Django 5.2 LTS, PostgreSQL 16, strony renderowane na serwerze + PWA.
 

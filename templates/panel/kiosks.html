@@ -1,0 +1,25 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Kioski{% endblock %}
+{% block panel %}
+<h1>Kioski przy wejściu</h1>
+<p class="muted">Kiosk to tablet albo Raspberry Pi z czytnikiem kodów, na którym osoby wpisują się do książki pobytu. Otwórz na urządzeniu adres <strong class="code">{{ kiosk_url }}</strong> i wpisz kod parowania.</p>
+{% if code %}<div class="card"><h2 style="margin-top:0">Kod parowania: {{ code.0.name }}</h2>
+  <p style="font-size:2rem;letter-spacing:.2em" class="code"><strong>{{ code.1|slice:":4" }} {{ code.1|slice:"4:" }}</strong></p>
+  <p class="small muted">Ważny {{ minutes }} minut, jednorazowy. Kod nie zostanie pokazany ponownie — w razie potrzeby wygeneruj nowy (dotychczasowe sparowanie urządzenia przestanie wtedy działać).</p></div>{% endif %}
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Urządzenie</th><th>Stan</th><th>Ostatni kontakt</th><th>Wpisy</th><th></th></tr>
+  {% for d in devices %}<tr>
+    <td><strong>{{ d.name }}</strong><div class="small muted">dodane {{ d.created_at|date:"j.m.Y" }}</div></td>
+    <td data-label="Stan">{% if not d.is_active %}<span class="badge bad">wyłączone</span>{% elif d.paired_at %}<span class="badge ok">sparowane {{ d.paired_at|date:"j.m.Y" }}</span>{% else %}<span class="badge warn">czeka na parowanie</span>{% endif %}</td>
+    <td data-label="Ostatni kontakt">{{ d.last_seen_at|date:"j.m.Y H:i"|default:"—" }}</td>
+    <td data-label="Wpisy">{{ d.entries.count }}</td>
+    <td><form method="post" class="actions" style="margin:0">{% csrf_token %}<input type="hidden" name="device" value="{{ d.pk }}">
+      <button class="btn secondary small-btn" name="action" value="code" data-confirm-click="Wygenerować nowy kod parowania? Obecne sparowanie przestanie działać.">Nowy kod</button>
+      {% if d.is_active %}<button class="btn secondary small-btn" name="action" value="revoke" data-confirm-click="Wyłączyć urządzenie {{ d.name }}?">Wyłącz</button>{% endif %}</form></td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Brak urządzeń.</td></tr>{% endfor %}
+</table></div></section>
+<h2>Dodaj urządzenie</h2>
+<div class="card"><form method="post" class="actions" style="margin:0">{% csrf_token %}<input type="hidden" name="action" value="add">
+  <input name="name" maxlength="80" required placeholder="np. Tablet przy wejściu" aria-label="Nazwa urządzenia"><button class="btn" type="submit">Dodaj i pokaż kod</button></form></div>
+<p><a href="{% url 'panel:logbook' %}">← Książka pobytu</a></p>
+{% endblock %}

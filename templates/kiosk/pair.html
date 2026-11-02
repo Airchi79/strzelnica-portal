@@ -1,0 +1,18 @@
+{% load static %}<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kiosk — parowanie · {{ SITE_NAME }}</title>
+<link rel="stylesheet" href="{% static 'css/app.css' %}"><meta name="robots" content="noindex"></head>
+<body class="kiosk">
+<main class="wrap" style="max-width:520px">
+  <h1>Parowanie kiosku</h1>
+  <div class="card">
+    <p>To urządzenie nie jest jeszcze kioskiem strzelnicy. Wpisz 8-cyfrowy kod parowania z panelu zarządu (Książka pobytu → Kioski).</p>
+    {% if error %}<div class="msg error">{{ error }}</div>{% endif %}
+    <form method="post" action="{% url 'kiosk:pair' %}">{% csrf_token %}
+      <label for="code">Kod parowania</label>
+      <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" required autofocus style="font-size:1.6rem;letter-spacing:.2em">
+      <div class="actions"><button class="btn" type="submit">Sparuj urządzenie</button></div>
+    </form>
+  </div>
+</main>
+</body></html>

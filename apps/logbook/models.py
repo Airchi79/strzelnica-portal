@@ -110,6 +110,10 @@ class Entry(models.Model):
     source = models.CharField("sposób wpisu", max_length=16, choices=Source.choices)
     ip = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=255, blank=True)
+    device = models.ForeignKey("kiosk.KioskDevice", verbose_name="urządzenie kiosku", null=True, blank=True, on_delete=models.PROTECT, related_name="entries")
+    client_ref = models.UUIDField("identyfikator wpisu z urządzenia", null=True, blank=True, unique=True,
+                                  help_text="Chroni przed podwójnym zapisem przy ponownym wysłaniu z kolejki offline.")
+    received_at = models.DateTimeField("odebrano z urządzenia", null=True, blank=True)
 
     class Meta:
         ordering = ["-entered_at", "-id"]

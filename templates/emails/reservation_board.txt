@@ -1,7 +1,7 @@
 {% autoescape off %}{{ event }}
 
 {% include "emails/_reservation_summary.txt" %}Rezerwujący: {{ reservation.user.full_name }} ({{ reservation.user.email }}{% if reservation.user.phone %}, {{ reservation.user.phone }}{% endif %})
-{% if reservation.status == 'anulowana' %}Status: anulowana{% if reservation.late_cancellation %} po terminie bezpłatnego anulowania{% endif %}{% if reservation.cancel_reason %} — {{ reservation.cancel_reason }}{% endif %}
+{% if reservation.status == 'anulowana' %}Status: anulowana{% if reservation.late_cancellation %} z zachowaniem należności{% endif %}{% if reservation.cancel_reason %} — {{ reservation.cancel_reason }}{% endif %}
 {% endif %}
 Panel: {{ site_url }}{% url 'panel:reservation' reservation.pk %}
 {% endautoescape %}

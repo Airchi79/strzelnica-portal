@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-<nav class="tabs" aria-label="Panel zarządu">
+<div class="panel-layout">
+<nav class="tabs panel-nav" aria-label="Panel zarządu">
   {% with u=request.resolver_match.url_name %}
   <a href="{% url 'panel:home' %}" class="{% if u == 'home' %}active{% endif %}">Start</a>
   <a href="{% url 'panel:notifications' %}" class="{% if 'notification' in u %}active{% endif %}">Powiadomienia{% if unread_notifications %} <span class="badge warn">{{ unread_notifications }}</span>{% endif %}</a>
   {% if perms.bookings.manage_reservations %}<a href="{% url 'panel:bookings' %}" class="{% if 'booking' in u or 'reservation' in u or 'block' in u %}active{% endif %}">Rezerwacje</a>{% endif %}
   {% if perms.payments.manage_payments or perms.reports.view_salesreport %}<a href="{% if perms.payments.manage_payments %}{% url 'panel:payments' %}{% else %}{% url 'panel:sales_reports' %}{% endif %}" class="{% if 'payment' in u or 'wallet' in u or 'sales_report' in u %}active{% endif %}">Płatności</a>{% endif %}
   {% if perms.association.manage_members or perms.association.manage_resolutions or perms.association.manage_clubs or perms.association.view_reports %}<a href="{% if perms.association.manage_members %}{% url 'panel:members' %}{% elif perms.association.manage_resolutions %}{% url 'panel:resolutions' %}{% elif perms.association.manage_clubs %}{% url 'panel:clubs' %}{% else %}{% url 'panel:reports' %}{% endif %}" class="{% if 'member' in u or 'resolution' in u or 'meeting' in u or 'club' in u or u == 'fees' or u == 'applications' or u == 'reports' %}active{% endif %}">Stowarzyszenie</a>{% endif %}
-  {% if perms.logbook.view_logbook %}<a href="{% url 'panel:logbook' %}" class="{% if 'logbook' in u %}active{% endif %}">Książka pobytu</a>{% endif %}
+  {% if perms.logbook.view_logbook %}<a href="{% url 'panel:logbook' %}" class="{% if 'logbook' in u or 'kiosk' in u %}active{% endif %}">Książka pobytu</a>{% endif %}
   {% if perms.credentials.review_credential %}<a href="{% url 'panel:credentials' %}" class="{% if 'credential' in u %}active{% endif %}">Weryfikacja</a>{% endif %}
   {% if perms.accounts.view_users %}<a href="{% url 'panel:users' %}" class="{% if 'user' in u or 'client' in u %}active{% endif %}">Klienci</a>{% endif %}
   {% if perms.facilities.manage_facilities %}<a href="{% url 'panel:lanes' %}" class="{% if 'lane' in u or 'price' in u %}active{% endif %}">Osie i cennik</a>{% endif %}
@@ -16,5 +17,6 @@
   {% if perms.audit.view_auditlog %}<a href="{% url 'panel:audit' %}" class="{% if u == 'audit' %}active{% endif %}">Dziennik</a>{% endif %}
   {% endwith %}
 </nav>
-{% block panel %}{% endblock %}
+<div class="panel-main">{% block panel %}{% endblock %}</div>
+</div>
 {% endblock %}

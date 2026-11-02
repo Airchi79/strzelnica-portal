@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "apps.association",
     "apps.clients",
     "apps.reports",
+    "apps.kiosk",
 ]
 
 MIDDLEWARE = [

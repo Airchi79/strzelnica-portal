@@ -79,3 +79,11 @@ def add_credential(user, kind=Credential.Kind.RANGE_OFFICER, status=Credential.S
         valid_until=valid_until,
         status=status,
     )
+
+
+def approve(user):
+    """Klient zatwierdzony w kartotece (grupa „powracający”) — rezerwuje bez zatwierdzania każdej rezerwacji."""
+    from apps.clients.services import set_approved
+
+    set_approved(user, True, None)
+    return user

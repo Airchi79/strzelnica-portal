@@ -19,6 +19,7 @@ FEED_GROUPS = {
 FEED_LABELS = {
     "rezerwacja.utworzenie": "Nowa rezerwacja",
     "rezerwacja.anulowanie": "Anulowanie rezerwacji",
+    "rezerwacja.zatwierdzenie": "Zatwierdzenie rezerwacji",
     "rezerwacja.oplacona": "Rezerwacja opłacona",
     "rezerwacja.zmiana_osob": "Zmiana liczby osób",
     "rezerwacja.rozliczenie_ksiazka": "Rozliczenie wg książki pobytu",
@@ -117,7 +118,7 @@ def attention(user, now=None):
     now = now or timezone.now()
     tiles = []
     if user.has_perm("bookings.manage_reservations"):
-        pending = Reservation.objects.filter(status=Reservation.Status.PENDING_APPROVAL).count() if hasattr(Reservation.Status, "PENDING_APPROVAL") else 0
+        pending = Reservation.objects.filter(status=Reservation.Status.PENDING_APPROVAL).count()
         tiles.append(("Czekają na zatwierdzenie", "Rezerwacje nowych klientów", pending, reverse("panel:reservations_days") + "?filtr=do_zatwierdzenia"))
         due = Reservation.objects.filter(payment_status=Reservation.Payment.DUE).exclude(status=Reservation.Status.CANCELLED, late_cancellation=False).count()
         tiles.append(("Płatności", "Rezerwacje do zapłaty", due, reverse("panel:reservations_days") + "?filtr=do_zaplaty"))

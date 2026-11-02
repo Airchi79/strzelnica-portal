@@ -13,7 +13,7 @@ from apps.clients import services
 from apps.clients.models import ClientPass
 from apps.facilities.models import Lane
 
-from .conftest import add_credential, grant, login_with_otp, make_user
+from .conftest import approve, add_credential, grant, login_with_otp, make_user
 
 pytestmark = pytest.mark.django_db
 
@@ -22,7 +22,15 @@ pytestmark = pytest.mark.django_db
 def ps(db):
     user = make_user("ps@example.com", first_name="Piotr", last_name="Strzelec")
     add_credential(user)
+    approve(user)
     return user
+
+
+@pytest.fixture(autouse=True)
+def passes_for_returning(db):
+    from apps.bookings.models import GroupRule
+
+    GroupRule.objects.filter(group="powracajacy").update(pay_pass=True)
 
 
 def day(offset=5):
@@ -180,3 +188,12 @@ def test_dashboard_shows_own_passes(client, ps):
     client.force_login(ps)
     body = client.get("/pulpit/").content.decode()
     assert p.code in body and "zostało 2 z 2" in body
+
+
+def test_pass_not_allowed_for_group(ps):
+    from apps.bookings.models import GroupRule
+
+    GroupRule.objects.filter(group="powracajacy").update(pay_pass=False)
+    p = issue(ps)
+    with pytest.raises(ValidationError, match="grupy"):
+        book(ps, p.code)

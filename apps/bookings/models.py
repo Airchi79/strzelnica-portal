@@ -19,7 +19,23 @@ class TsTzRange(Func):
 class BookingSettings(models.Model):
     """Ustawienia rezerwacji (jeden rekord)."""
 
-    free_cancel_hours = models.PositiveIntegerField("bezpłatne anulowanie do [h] przed terminem", default=48)
+    free_cancel_hours = models.PositiveIntegerField(
+        "klient może sam anulować do [h] przed terminem", default=24,
+        help_text="Później anulować może tylko obsługa.",
+    )
+    online_payment_minutes = models.PositiveIntegerField(
+        "czas na płatność online [min]", default=15,
+        help_text="Dla grup, które mogą płacić tylko online: nieopłacona rezerwacja zwalnia się po tym czasie. 0 — bez limitu.",
+    )
+    approval_payment_hours = models.PositiveIntegerField(
+        "czas na płatność po zatwierdzeniu [h]", default=24,
+        help_text="Gdy rezerwację zatwierdziła obsługa — liczony od zatwierdzenia (klient dostaje e-mail).",
+    )
+    offline_instructions = models.TextField(
+        "instrukcja płatności offline", blank=True, max_length=2000,
+        default="Zapłać przelewem na konto Stowarzyszenia, w tytule wpisz numer rezerwacji, albo gotówką na miejscu przed strzelaniem.",
+        help_text="Pokazywana klientom, którzy mogą płacić offline (przelew, gotówka na miejscu).",
+    )
     max_advance_days = models.PositiveIntegerField("rezerwacja najwyżej [dni] naprzód", default=180)
     max_persons = models.PositiveIntegerField("maksymalna liczba osób w rezerwacji", default=50)
 
@@ -37,6 +53,47 @@ class BookingSettings(models.Model):
         return obj
 
 
+class GroupRule(models.Model):
+    """Zasady rezerwowania dla grupy klientów (członek, powracający, nowy)."""
+
+    class Group(models.TextChoices):
+        MEMBER = "czlonek", "Członkowie stowarzyszenia"
+        RETURNING = "powracajacy", "Klienci powracający"
+        NEW = "nowy", "Nowi klienci"
+
+    group = models.CharField("grupa", max_length=12, choices=Group.choices, unique=True)
+    requires_approval = models.BooleanField("rezerwacja wymaga zatwierdzenia przez obsługę", default=False)
+    pay_online = models.BooleanField("płatność online (Tpay)", default=True)
+    pay_offline = models.BooleanField("płatność offline (przelew, gotówka na miejscu)", default=True)
+    pay_pass = models.BooleanField("kody wejścia (karnety, abonamenty)", default=False)
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "zasady grupy klientów"
+        verbose_name_plural = "zasady grup klientów"
+        constraints = [models.CheckConstraint(condition=Q(pay_online=True) | Q(pay_offline=True) | Q(pay_pass=True), name="group_some_payment")]
+
+    def __str__(self):
+        return self.get_group_display()
+
+    @property
+    def online_only(self):
+        return self.pay_online and not self.pay_offline
+
+    @classmethod
+    def for_group(cls, group):
+        defaults = DEFAULT_GROUP_RULES.get(group, DEFAULT_GROUP_RULES[cls.Group.NEW])
+        obj, _ = cls.objects.get_or_create(group=group, defaults=defaults)
+        return obj
+
+
+DEFAULT_GROUP_RULES = {
+    "czlonek": {"requires_approval": False, "pay_online": True, "pay_offline": True, "pay_pass": True},
+    "powracajacy": {"requires_approval": False, "pay_online": True, "pay_offline": True, "pay_pass": False},
+    "nowy": {"requires_approval": True, "pay_online": True, "pay_offline": False, "pay_pass": False},
+}
+
+
 class NumberSequence(models.Model):
     """Licznik numerów rezerwacji w danym roku (blokowany wierszowo przy nadawaniu)."""
 
@@ -46,6 +103,7 @@ class NumberSequence(models.Model):
 
 class Reservation(models.Model):
     class Status(models.TextChoices):
+        PENDING_APPROVAL = "do_zatwierdzenia", "Czeka na zatwierdzenie"
         CONFIRMED = "potwierdzona", "Potwierdzona"
         CANCELLED = "anulowana", "Anulowana"
         NO_SHOW = "nieodbyta", "Nieodbyta"
@@ -94,6 +152,10 @@ class Reservation(models.Model):
     )
     payment_marked_at = models.DateTimeField(null=True, blank=True)
     reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    client_group = models.CharField("grupa klienta przy rezerwacji", max_length=12, blank=True)
+    approved_at = models.DateTimeField("zatwierdzono", null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    pay_by = models.DateTimeField("opłać do (inaczej rezerwacja się zwalnia)", null=True, blank=True)
     # Rozliczenie po zakończeniu: dopłata, gdy w książce pobytu było więcej strzelających niż zadeklarowano.
     settled_at = models.DateTimeField("rozliczono po terminie", null=True, blank=True)
     declared_persons = models.PositiveIntegerField("zadeklarowana liczba osób", null=True, blank=True)
@@ -147,7 +209,12 @@ class Reservation(models.Model):
         return self.starts_at - timedelta(hours=BookingSettings.load().free_cancel_hours)
 
     def can_user_cancel(self, now=None):
-        return self.status == self.Status.CONFIRMED and self.starts_at > (now or timezone.now())
+        """Klient anuluje sam do terminu z ustawień (domyślnie 24 h przed); później tylko obsługa.
+        Rezerwację czekającą na zatwierdzenie można wycofać do jej początku."""
+        now = now or timezone.now()
+        if self.status == self.Status.PENDING_APPROVAL:
+            return self.starts_at > now
+        return self.status == self.Status.CONFIRMED and now <= self.free_cancel_deadline
 
 
 class Block(models.Model):

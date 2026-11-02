@@ -3,6 +3,24 @@
 {% block panel %}
 <h1>Ustawienia rezerwacji</h1>
 {% include "panel/_bookings_tabs.html" %}
-<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Zapisz</button></form>
+<form method="post" novalidate>{% csrf_token %}
+<h2>Zasady według grup klientów</h2>
+<div class="card">
+  <p class="small muted">Grupa jest ustalana przy rezerwacji: <strong>członek</strong> — aktywny członek stowarzyszenia; <strong>powracający</strong> — klient z co najmniej jedną wizytą albo zatwierdzony w kartotece; <strong>nowy</strong> — pozostali. Rezerwacje tworzone przez obsługę w panelu nie podlegają tym zasadom.</p>
+  <section class="day"><div class="table-wrap"><table class="days">
+    <tr class="head"><th>Grupa</th><th>Zatwierdzanie</th><th>Online</th><th>Offline</th><th>Kody wejścia</th></tr>
+    {% for rule, f in rule_forms %}<tr>
+      <td><strong>{{ rule }}</strong>{% if f.non_field_errors %}<div class="msg error">{{ f.non_field_errors.0 }}</div>{% endif %}</td>
+      <td data-label="Zatwierdzanie"><label>{{ f.requires_approval }} wymagane</label></td>
+      <td data-label="Online"><label>{{ f.pay_online }} tak</label></td>
+      <td data-label="Offline"><label>{{ f.pay_offline }} tak</label></td>
+      <td data-label="Kody wejścia"><label>{{ f.pay_pass }} tak</label></td>
+    </tr>{% endfor %}
+  </table></div></section>
+  <p class="small muted">Grupa „tylko online” (online bez offline): nieopłacona rezerwacja zwalnia się po czasie podanym niżej.{% if not tpay_enabled %} <strong>Płatności Tpay nie są skonfigurowane — dopóki ich nie włączysz, rezerwacje nie będą zwalniane automatycznie.</strong>{% endif %}</p>
+</div>
+<h2>Terminy i płatności</h2>
+<div class="card">{% include "partials/form.html" %}<button class="btn" type="submit">Zapisz</button>
 <p class="small muted">Godziny otwarcia i cennik ustawiasz osobno dla każdej osi w zakładce „Osie i cennik”.</p></div>
+</form>
 {% endblock %}

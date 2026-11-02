@@ -83,7 +83,13 @@ def pass_new(request, pk):
         else:
             messages.success(request, f"Wydano kod wejścia {p.code}. Przekaż go klientowi — zobaczy go też na swoim pulpicie.")
             return _back(pk, "#kody")
-    return render(request, "panel/client_pass_new.html", {"subject": subject, "form": form})
+    from apps.bookings.models import GroupRule
+
+    group = services.client_type(subject)
+    rule = GroupRule.for_group(group)
+    return render(request, "panel/client_pass_new.html", {
+        "subject": subject, "form": form, "group_label": services.TYPE_LABELS[group], "pass_allowed": rule.pay_pass,
+    })
 
 
 @panel_required("clients.manage_clients")

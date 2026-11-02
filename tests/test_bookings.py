@@ -16,7 +16,7 @@ from apps.core.models import Notification
 from apps.facilities.models import Lane
 from apps.regulations.models import RegulationDocument, RegulationVersion
 
-from .conftest import add_credential, grant, login_with_otp, make_user
+from .conftest import approve, add_credential, grant, login_with_otp, make_user
 
 pytestmark = pytest.mark.django_db
 
@@ -29,6 +29,7 @@ def next_weekday(offset_days=7):
 def ps(db):
     user = make_user("ps@example.com")
     add_credential(user)
+    approve(user)
     return user
 
 
@@ -156,25 +157,29 @@ def test_price_rule_frozen_at_booking(ps, lane):
 # --- anulowanie -----------------------------------------------------------
 
 
-def test_free_cancellation_before_48h(ps, lane):
+def test_free_cancellation_before_24h(ps, lane):
     day = next_weekday(10)
     r = book(ps, lane, day=day)
-    now = r.starts_at - timedelta(hours=48, minutes=1)
+    now = r.starts_at - timedelta(hours=24, minutes=1)
     r = services.cancel_reservation(r, ps, "zmiana planów", now=now)
     assert r.status == Reservation.Status.CANCELLED and not r.late_cancellation
     assert r.payment_status == Reservation.Payment.NONE
 
 
-def test_late_cancellation_keeps_amount_due(ps, lane):
+def test_late_cancellation_only_by_staff_optionally_keeping_fee(ps, lane, owner):
+    """G5: klient anuluje sam do 24 h przed terminem; później tylko obsługa (bez opłaty albo z zachowaniem należności)."""
     r = book(ps, lane)
-    now = r.starts_at - timedelta(hours=47)
-    r = services.cancel_reservation(r, ps, now=now)
+    now = r.starts_at - timedelta(hours=23)
+    with pytest.raises(ValidationError, match="tylko obsługa"):
+        services.cancel_reservation(r, ps, now=now)
+    assert not r.can_user_cancel(now) and r.can_user_cancel(r.starts_at - timedelta(hours=25))
+    r = services.cancel_reservation(r, owner, "późne odwołanie", as_board=True, now=now, keep_fee=True)
     assert r.late_cancellation and r.payment_status == Reservation.Payment.DUE
 
 
 def test_user_cannot_cancel_started_or_foreign(ps, lane):
     r = book(ps, lane)
-    with pytest.raises(ValidationError, match="rozpoczęła"):
+    with pytest.raises(ValidationError, match="tylko obsługa"):
         services.cancel_reservation(r, ps, now=r.starts_at + timedelta(minutes=1))
     other = make_user("x@example.com")
     with pytest.raises(ValidationError, match="Twoja"):
@@ -405,9 +410,23 @@ def test_notifications_panel(owner_client, owner, ps, lane, django_capture_on_co
 
 
 def test_booking_settings_panel(owner_client):
-    owner_client.post("/panel/rezerwacje/ustawienia/", {"free_cancel_hours": 24, "max_advance_days": 60, "max_persons": 20})
+    owner_client.post("/panel/rezerwacje/ustawienia/", {
+        "free_cancel_hours": 12, "max_advance_days": 60, "max_persons": 20, "online_payment_minutes": 20, "approval_payment_hours": 12,
+        "offline_instructions": "Przelew na konto.",
+        **{f"{g}-{k}": "on" for g in ("czlonek", "powracajacy", "nowy") for k in ("pay_online",)},
+        "czlonek-pay_pass": "on", "nowy-requires_approval": "on",
+    })
     cfg = BookingSettings.load()
-    assert (cfg.free_cancel_hours, cfg.max_advance_days, cfg.max_persons) == (24, 60, 20)
+    assert (cfg.free_cancel_hours, cfg.max_advance_days, cfg.max_persons, cfg.online_payment_minutes) == (12, 60, 20, 20)
+    from apps.bookings.models import GroupRule
+
+    assert not GroupRule.for_group("powracajacy").pay_offline and GroupRule.for_group("czlonek").pay_pass
+    # Grupa bez żadnego sposobu płatności jest odrzucana.
+    response = owner_client.post("/panel/rezerwacje/ustawienia/", {
+        "free_cancel_hours": 12, "max_advance_days": 60, "max_persons": 20, "online_payment_minutes": 20, "approval_payment_hours": 12,
+        "czlonek-pay_online": "on", "powracajacy-pay_online": "on",
+    })
+    assert response.status_code == 200 and "co najmniej jeden sposób" in response.content.decode()
 
 
 def test_slot_states_respect_dst_day(ps, lane):
@@ -436,3 +455,105 @@ def test_panel_overview_and_days_view(owner_client, ps, lane, owner):
     )
     assert past.number in owner_client.get("/panel/rezerwacje/dniami/?filtr=braki_ksiega").content.decode()
     assert Entry.objects.count() == 0
+
+
+# --- punkt 4: zasady grup klientów (G2–G5) ------------------------------------------------
+
+
+@pytest.fixture
+def newbie(db):
+    user = make_user("nowy@example.com", first_name="Nowy", last_name="Klient")
+    add_credential(user)
+    return user
+
+
+def test_new_client_reservation_waits_for_approval(newbie, lane, owner, client, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    with django_capture_on_commit_callbacks(execute=True):
+        r = book(newbie, lane)
+    assert r.status == Reservation.Status.PENDING_APPROVAL and r.client_group == "nowy" and r.pay_by is None
+    assert any("czeka na zatwierdzenie" in m.subject for m in mail.outbox)
+    # Termin jest zablokowany dla innych.
+    with pytest.raises(ValidationError):
+        book(owner_ps(), lane)
+    # Klient może wycofać rezerwację czekającą na zatwierdzenie.
+    assert r.can_user_cancel()
+    client.force_login(newbie)
+    body = client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    assert "czeka na zatwierdzenie" in body and "Zapłać online" not in body
+
+
+def owner_ps():
+    user = make_user("drugi@example.com")
+    add_credential(user)
+    return approve(user)
+
+
+def test_panel_approve_sets_payment_deadline_for_online_only(newbie, lane, owner_client, settings):
+    settings.TPAY_ENABLED = True
+    r = book(newbie, lane)
+    assert "Czekają na zatwierdzenie" in owner_client.get("/panel/").content.decode()
+    assert r.number in owner_client.get("/panel/rezerwacje/dniami/?filtr=do_zatwierdzenia").content.decode()
+    owner_client.post(f"/panel/rezerwacje/{r.pk}/", {"action": "approve"})
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CONFIRMED and r.approved_at and r.approved_by.is_superuser
+    hours = BookingSettings.load().approval_payment_hours
+    assert r.pay_by is not None and abs((r.pay_by - r.approved_at) - timedelta(hours=hours)) < timedelta(seconds=5)
+    assert services.payment_options(r) == {"online": True, "offline": False, "instructions": BookingSettings.load().offline_instructions}
+
+
+def test_panel_reject(newbie, lane, owner_client):
+    r = book(newbie, lane)
+    owner_client.post(f"/panel/rezerwacje/{r.pk}/", {"action": "reject", "c-reason": "brak miejsc"})
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CANCELLED and r.cancel_reason == "brak miejsc" and r.payment_status == Reservation.Payment.NONE
+
+
+def test_online_only_group_expires_unpaid(newbie, lane, settings):
+    from apps.bookings.models import GroupRule
+
+    settings.TPAY_ENABLED = True
+    GroupRule.objects.filter(group="nowy").update(requires_approval=False)
+    r = book(newbie, lane)
+    minutes = BookingSettings.load().online_payment_minutes
+    assert r.status == Reservation.Status.CONFIRMED and r.pay_by is not None
+    assert services.expire_unpaid(now=r.created_at + timedelta(minutes=minutes - 1)) == 0
+    # Trwająca płatność Tpay wstrzymuje zwolnienie.
+    from apps.payments.models import Payment
+
+    pay = Payment.objects.create(user=newbie, amount=r.amount, method=Payment.Method.TPAY, reservation=r, title=r.number)
+    assert services.expire_unpaid(now=r.pay_by + timedelta(minutes=1)) == 0
+    Payment.objects.filter(pk=pay.pk).update(status=Payment.Status.FAILED)
+    assert services.expire_unpaid(now=r.pay_by + timedelta(minutes=1)) == 1
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CANCELLED and "terminie" in r.cancel_reason
+
+
+def test_no_expiry_without_tpay_or_for_offline_groups(ps, newbie, lane, settings):
+    from apps.bookings.models import GroupRule
+
+    settings.TPAY_ENABLED = False
+    GroupRule.objects.filter(group="nowy").update(requires_approval=False)
+    assert book(newbie, lane).pay_by is None  # bez Tpay nie zwalniamy
+    settings.TPAY_ENABLED = True
+    assert book(ps, lane, start=14, end=15).pay_by is None  # powracający: także offline
+
+
+def test_staff_booking_ignores_group_rules(newbie, lane, owner):
+    r = book(newbie, lane, created_by=owner)
+    assert r.status == Reservation.Status.CONFIRMED and r.client_group == "" and r.pay_by is None
+    assert services.payment_options(r)["offline"]
+
+
+def test_tpay_refused_when_online_not_allowed(ps, lane, client, settings):
+    from apps.bookings.models import GroupRule
+
+    settings.TPAY_ENABLED = True
+    GroupRule.objects.filter(group="powracajacy").update(pay_online=False)
+    r = book(ps, lane)
+    client.force_login(ps)
+    body = client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    assert "Zapłać online" not in body and r.number in body
+    response = client.post("/platnosci/tpay/start/", {"reservation": r.pk})
+    assert response.status_code == 302 and response.url == f"/rezerwacje/{r.pk}/"

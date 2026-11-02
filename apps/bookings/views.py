@@ -28,12 +28,13 @@ from .forms import (
     BoardCancelForm,
     BoardReservationForm,
     BookingSettingsForm,
+    GroupRuleForm,
     CancelForm,
     PersonsForm,
     ReservationForm,
     active_lanes,
 )
-from .models import Block, BookingSettings, Reservation
+from .models import Block, BookingSettings, GroupRule, Reservation
 
 PERM = services.PERM
 
@@ -132,10 +133,7 @@ def detail(request, pk):
         except ValidationError as e:
             messages.error(request, _messages_from(e)[0])
         else:
-            if reservation.late_cancellation:
-                messages.warning(request, f"Rezerwacja anulowana po terminie bezpłatnego anulowania — należność {format_pln(reservation.amount)} pozostaje do zapłaty.")
-            else:
-                messages.success(request, "Rezerwacja anulowana bez opłat.")
+            messages.success(request, "Rezerwacja anulowana bez opłat.")
         return redirect("bookings:detail", pk=reservation.pk)
     return render(
         request,
@@ -143,8 +141,9 @@ def detail(request, pk):
         {
             "r": reservation,
             "form": form,
-            "late": timezone.now() > reservation.free_cancel_deadline,
             "association": AssociationSettings.load(),
+            "pay_options": services.payment_options(reservation),
+            "cancel_hours": BookingSettings.load().free_cancel_hours,
             "log_entries": reservation.log_entries.order_by("entered_at"),
             "tpay_enabled": settings.TPAY_ENABLED,
             **reservation_qr_context(request, reservation),
@@ -232,8 +231,19 @@ def panel_detail(request, pk):
             if action == "cancel":
                 cancel_form = BoardCancelForm(request.POST, prefix="c")
                 if cancel_form.is_valid():
-                    services.cancel_reservation(r, request.user, cancel_form.cleaned_data["reason"], as_board=True)
-                    messages.success(request, "Rezerwacja anulowana. Strzelec otrzyma e-mail.")
+                    keep = cancel_form.cleaned_data["keep_fee"]
+                    services.cancel_reservation(r, request.user, cancel_form.cleaned_data["reason"], as_board=True, keep_fee=keep)
+                    messages.success(request, "Rezerwacja anulowana" + (" z zachowaniem należności" if keep else "") + ". Klient otrzyma e-mail.")
+                    return redirect("panel:reservation", pk=r.pk)
+            elif action == "approve":
+                services.approve_reservation(r, request.user)
+                messages.success(request, "Rezerwacja zatwierdzona. Klient otrzyma e-mail z informacją o płatności.")
+                return redirect("panel:reservation", pk=r.pk)
+            elif action == "reject":
+                cancel_form = BoardCancelForm(request.POST, prefix="c")
+                if cancel_form.is_valid():
+                    services.reject_reservation(r, request.user, cancel_form.cleaned_data["reason"])
+                    messages.success(request, "Rezerwacja odrzucona. Klient otrzyma e-mail.")
                     return redirect("panel:reservation", pk=r.pk)
             elif action == "persons":
                 persons_form = PersonsForm(request.POST, prefix="p")
@@ -336,13 +346,21 @@ def panel_block_delete(request, pk):
 def panel_settings(request):
     obj = BookingSettings.load()
     before = {f: getattr(obj, f) for f in BookingSettingsForm.Meta.fields}
-    form = BookingSettingsForm(request.POST or None, instance=obj)
-    if request.method == "POST" and form.is_valid():
+    post = request.POST if request.method == "POST" else None
+    form = BookingSettingsForm(post, instance=obj)
+    rules = [GroupRule.for_group(g) for g in GroupRule.Group.values]
+    rule_forms = [(r, GroupRuleForm(post, instance=r, prefix=r.group)) for r in rules]
+    if post is not None and form.is_valid() and all(f.is_valid() for _, f in rule_forms):
         obj = form.save()
-        log_event("rezerwacje.ustawienia", obj, changes={f: [before[f], getattr(obj, f)] for f in before if before[f] != getattr(obj, f)})
+        changes = {f: [before[f], getattr(obj, f)] for f in before if before[f] != getattr(obj, f)}
+        for rule, f in rule_forms:
+            if f.has_changed():
+                f.save()
+                changes[f"grupa:{rule.group}"] = {k: f.cleaned_data[k] for k in f.changed_data}
+        log_event("rezerwacje.ustawienia", obj, changes=changes)
         messages.success(request, "Zapisano ustawienia rezerwacji.")
         return redirect("panel:booking_settings")
-    return render(request, "panel/booking_settings.html", {"form": form})
+    return render(request, "panel/booking_settings.html", {"form": form, "rule_forms": rule_forms, "tpay_enabled": settings.TPAY_ENABLED})
 
 
 @panel_required()
@@ -404,7 +422,7 @@ def panel_days(request):
         now = timezone.now()
         qs, ranged = qs.filter(status=Reservation.Status.CONFIRMED, starts_at__lte=now, starts_at__gte=now - timedelta(days=30), shooters=0), False
     elif f["filtr"] == "do_zatwierdzenia":
-        qs, ranged = qs.filter(status=getattr(Reservation.Status, "PENDING_APPROVAL", "__brak__")), False
+        qs, ranged = qs.filter(status=Reservation.Status.PENDING_APPROVAL), False
     elif f["q"]:
         ranged = False
     if ranged:

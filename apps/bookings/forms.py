@@ -7,7 +7,7 @@ from apps.credentials.forms import DateInput
 from apps.credentials.models import Credential
 from apps.facilities.models import Lane
 
-from .models import BookingSettings
+from .models import BookingSettings, GroupRule
 
 HOUR_START = [(h, f"{h:02d}:00") for h in range(0, 24)]
 HOUR_END = [(h, f"{h:02d}:00") for h in range(1, 25)]
@@ -70,7 +70,8 @@ class CancelForm(forms.Form):
 
 
 class BoardCancelForm(forms.Form):
-    reason = forms.CharField(label="Powód anulowania (strzelec zobaczy go w e-mailu)", max_length=255)
+    reason = forms.CharField(label="Powód (klient zobaczy go w e-mailu)", max_length=255)
+    keep_fee = forms.BooleanField(label="Zachowaj należność (późne odwołanie)", required=False)
 
 
 class PersonsForm(forms.Form):
@@ -114,10 +115,23 @@ class BlockForm(forms.Form):
 class BookingSettingsForm(forms.ModelForm):
     class Meta:
         model = BookingSettings
-        fields = ["free_cancel_hours", "max_advance_days", "max_persons"]
+        fields = ["free_cancel_hours", "online_payment_minutes", "approval_payment_hours", "offline_instructions", "max_advance_days", "max_persons"]
+        widgets = {"offline_instructions": forms.Textarea(attrs={"rows": 3})}
 
     def clean_max_persons(self):
         value = self.cleaned_data["max_persons"]
         if value < 1:
             raise forms.ValidationError("Co najmniej 1.")
         return value
+
+
+class GroupRuleForm(forms.ModelForm):
+    class Meta:
+        model = GroupRule
+        fields = ["requires_approval", "pay_online", "pay_offline", "pay_pass"]
+
+    def clean(self):
+        d = super().clean()
+        if not (d.get("pay_online") or d.get("pay_offline") or d.get("pay_pass")):
+            raise forms.ValidationError("Każda grupa musi mieć co najmniej jeden sposób płatności.")
+        return d

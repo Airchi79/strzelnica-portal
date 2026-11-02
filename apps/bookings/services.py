@@ -16,7 +16,7 @@ from apps.regulations.models import pending_acceptances
 
 from apps.payments.services import apply_wallet, reconcile_reservation, refund_reservation
 
-from .models import Block, BookingSettings, NumberSequence, Reservation
+from .models import Block, BookingSettings, GroupRule, NumberSequence, Reservation
 
 PERM = "bookings.manage_reservations"
 
@@ -155,6 +155,18 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
         raise ValidationError(reasons)
     q = quote(lane, day, start_hour, end_hour, persons, now, access_code=access_code, user=user)
     code, client_pass = q["code"], q["client_pass"]
+    now = now or timezone.now()
+    by_staff = created_by is not None and created_by != user
+    group = rule = None
+    if not by_staff:
+        # Zasady grupy klienta (decyzje G2–G4) obowiązują przy rezerwacji przez klienta; obsługa rezerwuje bez ograniczeń.
+        from apps.clients.services import client_type
+
+        group = client_type(user, now)
+        rule = GroupRule.for_group(group)
+        if client_pass is not None and not rule.pay_pass:
+            raise ValidationError("Kody wejścia nie są dostępne dla Twojej grupy klientów. Zarezerwuj bez kodu.")
+    pending = bool(rule and rule.requires_approval and code is None and client_pass is None)
     try:
         with transaction.atomic():
             if client_pass is not None:
@@ -179,7 +191,13 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
                 payment_status=(
                     Reservation.Payment.CONTRACT if code else Reservation.Payment.PASS if client_pass else Reservation.Payment.DUE
                 ),
+                status=Reservation.Status.PENDING_APPROVAL if pending else Reservation.Status.CONFIRMED,
+                client_group=group or "",
             )
+            if not pending:
+                reservation.pay_by = payment_deadline(reservation, now)
+                if reservation.pay_by:
+                    reservation.save(update_fields=["pay_by"])
     except IntegrityError as e:
         if "reservation_no_overlap" in str(e):
             raise ValidationError("Ten termin został właśnie zajęty. Wybierz inną godzinę.") from e
@@ -194,33 +212,116 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     # Opłata pobierana od razu z salda, jeśli wystarcza środków (w przeciwnym razie należność „do zapłaty”).
     apply_wallet(user, by=created_by)
     reservation.refresh_from_db()
-    notify_user(user, f"Rezerwacja {reservation.number} potwierdzona", "emails/reservation_created.txt", reservation=reservation)
+    if pending:
+        notify_user(user, f"Rezerwacja {reservation.number} czeka na zatwierdzenie", "emails/reservation_pending.txt", reservation=reservation)
+    else:
+        notify_user(user, f"Rezerwacja {reservation.number} potwierdzona", "emails/reservation_created.txt", reservation=reservation,
+                    options=payment_options(reservation))
     notify_board(
-        f"Nowa rezerwacja: {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m %H:%M}",
+        ("Do zatwierdzenia: " if pending else "Nowa rezerwacja: ") + f"{reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m %H:%M}",
         "emails/reservation_board.txt",
         PERM,
         url=reverse("panel:reservation", args=[reservation.pk]),
-        body=f"{user.full_name}, {persons} os.",
+        body=f"{user.full_name}, {persons} os." + (" Nowy klient — rezerwacja czeka na zatwierdzenie." if pending else ""),
         reservation=reservation,
-        event="Nowa rezerwacja",
+        event="Rezerwacja do zatwierdzenia" if pending else "Nowa rezerwacja",
     )
     return reservation
 
 
+# --- zasady grup klientów: płatności, zatwierdzanie, wygasanie ------------------------------
+
+
+def group_rule(reservation):
+    """Zasady grupy zapisane przy rezerwacji; rezerwacja utworzona przez obsługę — wszystkie metody dozwolone."""
+    if not reservation.client_group:
+        return None
+    return GroupRule.for_group(reservation.client_group)
+
+
+def payment_options(reservation):
+    rule = group_rule(reservation)
+    return {
+        "online": rule is None or rule.pay_online,
+        "offline": rule is None or rule.pay_offline,
+        "instructions": BookingSettings.load().offline_instructions,
+    }
+
+
+def payment_deadline(reservation, start, after_approval=False):
+    """Termin opłacenia dla grup „tylko online”: krótki po rezerwacji, dłuższy po zatwierdzeniu przez obsługę."""
+    from django.conf import settings as dj_settings
+
+    rule = group_rule(reservation)
+    if rule is None or not rule.online_only or reservation.payment_status != Reservation.Payment.DUE:
+        return None
+    if not dj_settings.TPAY_ENABLED:
+        return None  # bez działających płatności online nie zwalniamy rezerwacji automatycznie
+    cfg = BookingSettings.load()
+    delta = timedelta(hours=cfg.approval_payment_hours) if after_approval else timedelta(minutes=cfg.online_payment_minutes)
+    if not delta:
+        return None
+    return min(start + delta, reservation.starts_at)
+
+
 @transaction.atomic
-def cancel_reservation(reservation, by, reason="", as_board=False, now=None):
-    """Anulowanie. Strzelec: bezpłatnie do terminu z ustawień (48 h), później należność pozostaje do zapłaty.
-    Zarząd: anulowanie zawsze bez opłaty."""
+def approve_reservation(reservation, by, now=None):
+    now = now or timezone.now()
+    r = Reservation.objects.select_for_update().get(pk=reservation.pk)
+    if r.status != Reservation.Status.PENDING_APPROVAL:
+        raise ValidationError("Ta rezerwacja nie czeka na zatwierdzenie.")
+    if r.starts_at <= now:
+        raise ValidationError("Termin rezerwacji już minął — nie można jej zatwierdzić.")
+    r.status = Reservation.Status.CONFIRMED
+    r.approved_at, r.approved_by = now, by
+    r.pay_by = payment_deadline(r, now, after_approval=True)
+    r.save()
+    log_event("rezerwacja.zatwierdzenie", r, str(r), actor=by)
+    notify_user(r.user, f"Rezerwacja {r.number} zatwierdzona", "emails/reservation_created.txt", reservation=r, options=payment_options(r))
+    return r
+
+
+def reject_reservation(reservation, by, reason=""):
+    r = Reservation.objects.get(pk=reservation.pk)
+    if r.status != Reservation.Status.PENDING_APPROVAL:
+        raise ValidationError("Ta rezerwacja nie czeka na zatwierdzenie.")
+    return cancel_reservation(r, by, reason or "Rezerwacja nie została zatwierdzona", as_board=True)
+
+
+def expire_unpaid(now=None):
+    """Zwalnia rezerwacje nieopłacone w terminie (grupy „tylko online”). Pomija trwające płatności Tpay."""
+    from apps.payments.models import Payment
+
+    now = now or timezone.now()
+    count = 0
+    qs = Reservation.objects.filter(
+        status=Reservation.Status.CONFIRMED, payment_status=Reservation.Payment.DUE, pay_by__isnull=False, pay_by__lt=now
+    )
+    for r in qs:
+        if Payment.objects.filter(reservation=r, status=Payment.Status.PENDING, created_at__gte=now - timedelta(minutes=30)).exists():
+            continue
+        if r.paid_amount:
+            continue  # częściowo opłacona — decyzja obsługi
+        cancel_reservation(r, None, "Nieopłacona w wyznaczonym terminie", as_board=True, now=now, expired=True)
+        count += 1
+    return count
+
+
+@transaction.atomic
+def cancel_reservation(reservation, by, reason="", as_board=False, now=None, keep_fee=False, expired=False):
+    """Anulowanie. Klient: sam do terminu z ustawień (domyślnie 24 h przed), bez opłaty; później tylko obsługa.
+    Obsługa: bez opłaty albo — przy późnym odwołaniu — z zachowaniem należności (`keep_fee`)."""
     now = now or timezone.now()
     reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
-    if reservation.status != Reservation.Status.CONFIRMED:
+    if reservation.status not in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL):
         raise ValidationError("Tej rezerwacji nie można już anulować.")
     if not as_board:
         if reservation.user_id != by.pk:
             raise ValidationError("To nie jest Twoja rezerwacja.")
         if not reservation.can_user_cancel(now):
-            raise ValidationError("Rezerwacja już się rozpoczęła — anulować może tylko zarząd.")
-    late = not as_board and now > reservation.free_cancel_deadline
+            hours = BookingSettings.load().free_cancel_hours
+            raise ValidationError(f"Na mniej niż {hours} h przed terminem anulować może tylko obsługa strzelnicy — skontaktuj się z nami.")
+    late = bool(as_board and keep_fee and reservation.status == Reservation.Status.CONFIRMED)
     reservation.status = Reservation.Status.CANCELLED
     reservation.cancelled_at = now
     reservation.cancelled_by = by
@@ -235,7 +336,7 @@ def cancel_reservation(reservation, by, reason="", as_board=False, now=None):
         "rezerwacja.anulowanie",
         reservation,
         str(reservation),
-        changes={"po_terminie": late, "przez_zarzad": as_board, "powod": reservation.cancel_reason},
+        changes={"z_oplata": late, "przez_obsluge": as_board, "wygasla": expired, "powod": reservation.cancel_reason},
         actor=by,
     )
     notify_user(reservation.user, f"Rezerwacja {reservation.number} anulowana", "emails/reservation_cancelled.txt", reservation=reservation)
@@ -244,7 +345,7 @@ def cancel_reservation(reservation, by, reason="", as_board=False, now=None):
         "emails/reservation_board.txt",
         PERM,
         url=reverse("panel:reservation", args=[reservation.pk]),
-        body=f"{reservation.user.full_name}" + (" — po terminie bezpłatnego anulowania" if late else ""),
+        body=f"{reservation.user.full_name}" + (" — z zachowaniem należności" if late else "") + (" — nieopłacona w terminie" if expired else ""),
         reservation=reservation,
         event="Anulowanie rezerwacji",
     )

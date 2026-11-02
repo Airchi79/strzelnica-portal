@@ -28,24 +28,29 @@
   <table>{% for e in log_entries %}<tr><td>{{ e.entered_at|time:"H:i" }}</td><td>{{ e.full_name }}</td><td class="small">{{ e.get_purpose_display }}</td></tr>{% endfor %}</table>
 </div>
 {% endif %}
-{% if r.payment_status == 'do_zaplaty' %}
+{% if r.status == 'do_zatwierdzenia' %}
+<div class="card"><div class="msg">Rezerwacja czeka na zatwierdzenie przez obsługę strzelnicy. Termin jest zablokowany dla Ciebie — po zatwierdzeniu dostaniesz e-mail z informacją o płatności.</div></div>
+{% elif r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' %}
 <div class="card">
   <h2 style="margin-top:0">Do zapłaty: {{ r.amount|sub:r.paid_amount|pln }}</h2>
+  {% if r.pay_by %}<div class="msg warning">Opłać rezerwację online do <strong>{{ r.pay_by|date:"j.m.Y H:i" }}</strong> — inaczej termin zostanie zwolniony.</div>{% endif %}
   {% if WALLET_ENABLED %}<p class="small">Opłata zostanie pobrana automatycznie z Twojego salda, gdy będzie na nim wystarczająco środków.</p>{% endif %}
   <div class="actions">
-    {% if tpay_enabled %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}"><button class="btn" type="submit">Zapłać online</button></form>{% endif %}
+    {% if tpay_enabled and pay_options.online %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}"><button class="btn" type="submit">Zapłać online</button></form>{% endif %}
     <a class="btn secondary" href="{% url 'payments:wallet' %}">Moje płatności</a>
   </div>
-  <p class="small muted">Przelew: w tytule wpisz <strong>{{ r.number }}</strong>{% if association.bank_account %}, rachunek {{ association.bank_account }}{% endif %}. Na miejscu: gotówka lub BLIK na telefon.</p>
+  {% if pay_options.offline %}<p class="small muted">{{ pay_options.instructions }} Tytuł przelewu: <strong>{{ r.number }}</strong>{% if association.bank_account %}, rachunek {{ association.bank_account }}{% endif %}.</p>
+  {% elif not tpay_enabled %}<p class="small muted">Płatności online są chwilowo niedostępne — skontaktuj się z obsługą strzelnicy.</p>{% endif %}
 </div>
 {% endif %}
 {% if r.can_user_cancel %}
 <div class="card">
-  <h2 style="margin-top:0">Anulowanie</h2>
-  {% if late %}<div class="msg warning">Minął termin bezpłatnego anulowania ({{ r.free_cancel_deadline|date:"j.m.Y H:i" }}). Po anulowaniu należność {{ r.amount|pln }} pozostanie do zapłaty.</div>
-  {% else %}<p>Bezpłatnie do {{ r.free_cancel_deadline|date:"j.m.Y H:i" }}.</p>{% endif %}
+  <h2 style="margin-top:0">{% if r.status == 'do_zatwierdzenia' %}Wycofanie rezerwacji{% else %}Anulowanie{% endif %}</h2>
+  {% if r.status == 'potwierdzona' %}<p>Bez opłat, samodzielnie do {{ r.free_cancel_deadline|date:"j.m.Y H:i" }}. Później anulować może tylko obsługa strzelnicy.</p>{% endif %}
   <form method="post" data-confirm="Anulować rezerwację {{ r.number }}?">{% csrf_token %}{% include "partials/form.html" %}<button class="btn danger" type="submit">Anuluj rezerwację</button></form>
 </div>
+{% elif r.status == 'potwierdzona' and not r.is_finished %}
+<p class="small muted">Do terminu zostało mniej niż {{ cancel_hours }} h — anulować może już tylko obsługa strzelnicy.</p>
 {% endif %}
 <p><a href="{% url 'bookings:my_list' %}">← Moje rezerwacje</a></p>
 {% endblock %}

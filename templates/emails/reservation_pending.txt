@@ -1,0 +1,10 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+dziękujemy za rezerwację. Jako nowy klient czekasz na zatwierdzenie przez obsługę strzelnicy — termin jest już dla Ciebie zablokowany.
+Po zatwierdzeniu dostaniesz e-mail z informacją o płatności.
+
+{% include "emails/_reservation_summary.txt" %}
+Szczegóły i wycofanie rezerwacji: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

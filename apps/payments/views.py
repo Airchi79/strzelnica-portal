@@ -71,7 +71,14 @@ def tpay_start(request):
         fee = get_object_or_404(Fee, pk=request.POST["fee"], member__user=request.user, status=Fee.Status.DUE)
         amount = fee.amount
     elif request.POST.get("reservation"):
-        reservation = get_object_or_404(Reservation, pk=request.POST["reservation"], user=request.user, payment_status=Reservation.Payment.DUE)
+        reservation = get_object_or_404(
+            Reservation, pk=request.POST["reservation"], user=request.user, payment_status=Reservation.Payment.DUE, status=Reservation.Status.CONFIRMED
+        )
+        from apps.bookings.services import payment_options
+
+        if not payment_options(reservation)["online"]:
+            messages.error(request, "Dla tej rezerwacji płatność online nie jest dostępna — skorzystaj z instrukcji płatności.")
+            return redirect("bookings:detail", pk=reservation.pk)
         amount = max(reservation.amount - reservation.paid_amount - max(services.balance_of(request.user), 0), 0)
         if amount == 0:
             services.apply_wallet(request.user, targets=[reservation])

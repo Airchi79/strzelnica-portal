@@ -15,7 +15,7 @@ from apps.facilities.models import Lane
 from apps.logbook import services
 from apps.logbook.models import Entry, LogbookSettings
 
-from .conftest import add_credential, grant, login_with_otp, make_user
+from .conftest import approve, add_credential, grant, login_with_otp, make_user
 
 pytestmark = pytest.mark.django_db
 
@@ -40,6 +40,7 @@ def sig():
 def ps(db):
     user = make_user("ps@example.com", first_name="Piotr", last_name="Prowadzący")
     add_credential(user)
+    approve(user)
     return user
 
 

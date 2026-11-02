@@ -9,12 +9,24 @@
   <tr><th>Rezerwujący (PS)</th><td>{{ r.user.full_name }} · {{ r.user.email }}{% if r.user.phone %} · {{ r.user.phone }}{% endif %}</td></tr>
   <tr><th>Liczba osób</th><td>{{ r.persons }}</td></tr>
   <tr><th>Należność</th><td><strong>{{ r.amount|pln }}</strong> ({{ r.hourly_amount|pln }} / h, cennik od {{ r.price_rule.valid_from|date:"j.m.Y" }})</td></tr>
-  <tr><th>Status</th><td>{{ r.display_status }}{% if r.late_cancellation %} <span class="badge warn">anulowana po terminie bezpłatnego anulowania</span>{% endif %}
+  <tr><th>Status</th><td>{{ r.display_status }}{% if r.late_cancellation %} <span class="badge warn">anulowana z zachowaniem należności</span>{% endif %}
     {% if r.cancelled_at %}<div class="small muted">{{ r.cancelled_at|date:"j.m.Y H:i" }}, {{ r.cancelled_by.full_name }}{% if r.cancel_reason %} — {{ r.cancel_reason }}{% endif %}</div>{% endif %}</td></tr>
   <tr><th>Płatność</th><td>{{ r.get_payment_status_display }}{% if r.payment_marked_by %}<div class="small muted">{{ r.payment_marked_by.full_name }}, {{ r.payment_marked_at|date:"j.m.Y H:i" }}</div>{% endif %}</td></tr>
   {% if r.notes %}<tr><th>Uwagi</th><td>{{ r.notes }}</td></tr>{% endif %}
-  <tr><th>Utworzono</th><td>{{ r.created_at|date:"j.m.Y H:i" }}</td></tr>
+  <tr><th>Utworzono</th><td>{{ r.created_at|date:"j.m.Y H:i" }}{% if r.client_group %} · grupa: {{ r.client_group }}{% endif %}{% if r.approved_at %}<div class="small muted">zatwierdzona {{ r.approved_at|date:"j.m.Y H:i" }}{% if r.approved_by %}, {{ r.approved_by.full_name }}{% endif %}</div>{% endif %}</td></tr>
+  {% if r.pay_by and r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' %}<tr><th>Opłać do</th><td><span class="badge warn">{{ r.pay_by|date:"j.m.Y H:i" }}</span> <span class="small muted">— potem rezerwacja zwolni się automatycznie</span></td></tr>{% endif %}
 </table></div>
+
+{% if r.status == 'do_zatwierdzenia' %}
+<h2>Zatwierdzenie</h2>
+<div class="card">
+  <p>Nowy klient — <a href="{% url 'panel:user' r.user_id %}">karta klienta</a>. Po zatwierdzeniu klient dostanie e-mail z informacją o płatności.</p>
+  <form method="post" class="actions" style="margin-top:0">{% csrf_token %}<button class="btn" name="action" value="approve">Zatwierdź rezerwację</button></form>
+  <form method="post" data-confirm="Odrzucić rezerwację {{ r.number }}? Klient otrzyma e-mail z powodem.">{% csrf_token %}<input type="hidden" name="action" value="reject">
+    {% include "partials/form.html" with form=cancel_form %}
+    <button class="btn danger" type="submit">Odrzuć</button></form>
+</div>
+{% endif %}
 
 {% if log_entries is not None %}<h2>Książka pobytu ({{ log_entries|length }})</h2>
 <div class="card">{% if log_entries %}<table>{% for e in log_entries %}<tr><td><a href="{% url 'panel:logbook_entry' e.pk %}">{{ e.entered_at|time:"H:i" }}</a></td><td>{{ e.full_name }}</td><td>{{ e.get_purpose_display }}</td><td>{% if e.exited_at %}wyjście {{ e.exited_at|time:"H:i" }}{% else %}<span class="badge ok">na strzelnicy</span>{% endif %}</td></tr>{% endfor %}</table>{% else %}<p class="muted">Brak wpisów.</p>{% endif %}
@@ -48,7 +60,8 @@
 <div class="card">
   <form method="post" data-confirm="Anulować rezerwację {{ r.number }}? Strzelec otrzyma e-mail.">{% csrf_token %}<input type="hidden" name="action" value="cancel">
     {% include "partials/form.html" with form=cancel_form %}
-    <button class="btn danger" type="submit">Anuluj rezerwację (bez opłat)</button></form>
+    <button class="btn danger" type="submit">Anuluj rezerwację</button></form>
+  <p class="small muted">Bez zaznaczenia „Zachowaj należność” anulowanie jest bez opłat, a wpłaty wracają do klienta.</p>
 </div>
 {% endif %}
 {% endblock %}

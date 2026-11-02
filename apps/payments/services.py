@@ -14,10 +14,11 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.audit.services import log_event
-from apps.core.notifications import notify_user
+from apps.core.notifications import notify_board, notify_user
 
 from .models import BankImport, LedgerEntry, Payment, PaymentSettings, Wallet
 
@@ -221,7 +222,15 @@ def complete_payment(payment, user=None, by=None, note=""):
         by=by,
     )
     log_event("platnosc.zaksiegowana", payment, str(payment), changes={"dla": payment.user.email}, actor=by)
-    if payment.reservation_id or payment.fee_id:
+    if payment.reservation_id and payment.reservation.status == payment.reservation.Status.CANCELLED:
+        # Wpłata dotarła po zwolnieniu/anulowaniu rezerwacji — środki zostają na koncie klienta, decyzję podejmuje obsługa.
+        notify_board(
+            f"Wpłata za anulowaną rezerwację {payment.reservation.number}", "emails/reservation_board.txt", "payments.manage_payments",
+            url=reverse("panel:payment", args=[payment.pk]), reservation=payment.reservation,
+            body=f"{payment.user.full_name}: {payment.amount / 100:.2f} zł. Zwróć wpłatę albo utwórz rezerwację ponownie.",
+            event="Wpłata za anulowaną rezerwację",
+        )
+    elif payment.reservation_id or payment.fee_id:
         apply_wallet(payment.user, by=by, targets=[payment.reservation or payment.fee])
     elif wallet_enabled():
         apply_wallet(payment.user, by=by)

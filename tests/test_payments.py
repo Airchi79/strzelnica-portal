@@ -19,7 +19,7 @@ from apps.facilities.models import Lane
 from apps.payments import services, tpay
 from apps.payments.models import LedgerEntry, Payment
 
-from .conftest import add_credential, grant, login_with_otp, make_user
+from .conftest import approve, add_credential, grant, login_with_otp, make_user
 
 pytestmark = pytest.mark.django_db
 
@@ -38,6 +38,7 @@ def wallet_on(db):
 def ps(db):
     user = make_user("ps@example.com", first_name="Piotr", last_name="Prowadzący")
     add_credential(user)
+    approve(user)
     return user
 
 
@@ -91,7 +92,7 @@ def test_free_cancellation_refunds_to_balance(ps, owner):
 def test_late_cancellation_keeps_fee(ps, owner):
     services.register_manual_payment(ps, 24000, Payment.Method.CASH, owner)
     r = book(ps, days=1)
-    booking_services.cancel_reservation(r, ps, now=r.starts_at - timedelta(hours=10))
+    booking_services.cancel_reservation(r, owner, "późne odwołanie", as_board=True, keep_fee=True, now=r.starts_at - timedelta(hours=10))
     r.refresh_from_db()
     assert r.late_cancellation and r.payment_status == Reservation.Payment.PAID and services.balance_of(ps) == 0
 

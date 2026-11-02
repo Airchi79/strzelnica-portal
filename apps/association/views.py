@@ -515,17 +515,17 @@ IMPORT_PERMS = {
 @panel_required(PERM_M)
 def panel_import(request):
     """Import pakietu danych stowarzyszenia (ZIP: dane.json, regulamin, skany PDF) — z podglądem bez zapisu."""
-    from .importer import ZipPackage, run
+    from .importer import open_upload, run
 
     report = preview = None
     if request.method == "POST":
         uploaded = request.FILES.get("pakiet")
         preview = request.POST.get("tryb") != "importuj"
         if not uploaded:
-            messages.error(request, "Wybierz plik ZIP z pakietem danych.")
+            messages.error(request, "Wybierz plik ZIP albo XLSX.")
         else:
             try:
-                report = run(ZipPackage(uploaded), by=request.user, preview=preview,
+                report = run(open_upload(uploaded), by=request.user, preview=preview,
                              can=lambda section: request.user.has_perm(IMPORT_PERMS[section]))
             except ValidationError as e:
                 messages.error(request, " ".join(e.messages))
@@ -534,3 +534,12 @@ def panel_import(request):
                     log_event("stowarzyszenie.import", summary=f"{uploaded.name}: {sum(1 for s, _ in report if s == 'ok')} pozycji wprowadzonych")
                     messages.success(request, "Import zakończony.")
     return render(request, "panel/association_import.html", {"report": report, "preview": preview})
+
+
+@panel_required(PERM_M)
+def panel_import_template(request):
+    from .importer import template_xlsx
+
+    response = HttpResponse(template_xlsx(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="wzor-importu-stowarzyszenie.xlsx"'
+    return response

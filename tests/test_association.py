@@ -391,3 +391,60 @@ def test_panel_import_respects_section_permissions(client):
     c = Client()
     login_with_otp(c, other)
     assert c.get("/panel/czlonkowie/import/").status_code == 403
+
+
+def _xlsx(members=(), resolutions=(), sheets=None):
+    import io
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from openpyxl import load_workbook
+
+    from apps.association.importer import template_xlsx
+
+    wb = load_workbook(io.BytesIO(template_xlsx()))
+    for row in members:
+        wb["Członkowie"].append(list(row))
+    for row in resolutions:
+        wb["Uchwały"].append(list(row))
+    if sheets is not None:
+        for name in list(wb.sheetnames):
+            if name not in sheets:
+                del wb[name]
+    buf = io.BytesIO()
+    wb.save(buf)
+    return SimpleUploadedFile("dane.xlsx", buf.getvalue())
+
+
+def test_panel_import_xlsx(owner_client):
+    from datetime import datetime
+
+    response = owner_client.get("/panel/czlonkowie/import/wzor.xlsx")
+    assert response.status_code == 200 and response.content[:2] == b"PK"
+    members = [(1, "Remigiusz", "Raczyński", "", "Sątok 4", "Członek nadzwyczajny", datetime(2025, 7, 10), "tak", "prezes"),
+               (2, "Sylwia", "Raczyńska", "", "", "nadzwyczajny", "10.07.2025", "tak", ""),
+               (None, None, None, None, None, None, None, None, None)]
+    resolutions = [("zalozycielskie", 2025, 1, "2025-07-10", "W sprawie założenia", "Treść", 3, 0, 0)]
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": _xlsx(members, resolutions), "tryb": "podglad"}).content.decode()
+    assert "nic nie zapisano" in body and not Member.objects.exists()
+    owner_client.post("/panel/czlonkowie/import/", {"pakiet": _xlsx(members, resolutions), "tryb": "importuj"})
+    m1 = Member.objects.get(number=1)
+    assert m1.kind == "nadzwyczajny" and m1.board_role == "prezes" and m1.founder and m1.joined_on.isoformat() == "2025-07-10"
+    assert Member.objects.get(number=2).board_role == ""
+    r = Resolution.objects.get()
+    assert r.historical and (r.votes_for, r.votes_against) == (3, 0)
+
+
+def test_panel_import_xlsx_errors(owner_client):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    bad_kind = [(1, "A", "B", "", "", "honorowy", "10.07.2025", "nie", "")]
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": _xlsx(bad_kind), "tryb": "podglad"}).content.decode()
+    assert "wiersz 2" in body and "honorowy" in body
+    bad_date = [(1, "A", "B", "", "", "zwyczajny", "jutro", "nie", "")]
+    assert "nieprawidłowa data" in owner_client.post("/panel/czlonkowie/import/", {"pakiet": _xlsx(bad_date), "tryb": "podglad"}).content.decode()
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": _xlsx(sheets=["Instrukcja"]), "tryb": "podglad"}).content.decode()
+    assert "nie ma karty" in body
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": SimpleUploadedFile("x.xlsx", b"nie excel"), "tryb": "podglad"}).content.decode()
+    assert "poprawny plik Excel" in body
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": SimpleUploadedFile("x.csv", b"a;b"), "tryb": "podglad"}).content.decode()
+    assert "ZIP" in body and "XLSX" in body and not Member.objects.exists()

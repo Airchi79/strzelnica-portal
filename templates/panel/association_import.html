@@ -4,11 +4,12 @@
 <h1>Import danych stowarzyszenia</h1>
 {% include "panel/_assoc_tabs.html" %}
 <div class="card">
-  <p>Wgraj plik ZIP z pakietem danych (<span class="code">dane.json</span>, regulamin w pliku tekstowym, skany uchwał w PDF).
-  Istniejące wpisy są pomijane, więc ten sam pakiet można wgrać ponownie bez dublowania danych.</p>
+  <p>Wgraj <strong>arkusz Excel (XLSX)</strong> z listą członków i/lub uchwał — według wzoru — albo <strong>pakiet ZIP</strong>
+  (<span class="code">dane.json</span>, regulamin, skany uchwał w PDF). Istniejące wpisy są pomijane, więc ten sam plik można wgrać ponownie bez dublowania danych.</p>
+  <p><a class="btn secondary small-btn" href="{% url 'panel:association_import_template' %}">Pobierz wzór arkusza XLSX</a></p>
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
-    <label for="pakiet">Plik ZIP (do 50 MB)</label>
-    <input type="file" id="pakiet" name="pakiet" accept=".zip,application/zip" required>
+    <label for="pakiet">Plik XLSX lub ZIP (do 50 MB)</label>
+    <input type="file" id="pakiet" name="pakiet" accept=".xlsx,.zip,application/zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
     <div class="actions">
       <button class="btn secondary" type="submit" name="tryb" value="podglad">Podgląd (bez zapisu)</button>
       <button class="btn" type="submit" name="tryb" value="importuj" data-confirm-click="Zaimportować dane z pakietu?">Importuj</button>

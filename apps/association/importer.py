@@ -22,7 +22,21 @@ MAX_FILE_BYTES = 20 * 1024 * 1024
 MAX_FILES = 200
 
 
-class DirectoryPackage:
+class JsonPackageMixin:
+    def data(self):
+        raw = self.read("dane.json")
+        if raw is None:
+            raise ValidationError("W pakiecie nie ma pliku dane.json.")
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
+            raise ValidationError(f"Plik dane.json jest uszkodzony: {e}") from e
+        if not isinstance(data, dict):
+            raise ValidationError("Plik dane.json ma nieprawidłową budowę.")
+        return data
+
+
+class DirectoryPackage(JsonPackageMixin):
     def __init__(self, root):
         self.root = Path(root).resolve()
 
@@ -39,7 +53,7 @@ class DirectoryPackage:
         return path.read_bytes()
 
 
-class ZipPackage:
+class ZipPackage(JsonPackageMixin):
     """Pakiet ZIP; katalog z plikiem dane.json może być zagnieżdżony (np. pakiet-stowarzyszenie/dane.json)."""
 
     def __init__(self, uploaded):
@@ -73,18 +87,174 @@ class ZipPackage:
         return self.zip.read(info)
 
 
+# --- arkusz XLSX (członkowie i uchwały bez skanów) -------------------------------------------------
+
+MEMBER_COLUMNS = ["Nr", "Imię", "Nazwisko", "E-mail", "Adres", "Rodzaj", "Data przyjęcia", "Założyciel", "Funkcja w Zarządzie"]
+RESOLUTION_COLUMNS = ["Organ", "Rok", "Numer", "Data podjęcia", "Tytuł", "Treść", "Głosy za", "Głosy przeciw", "Wstrzymujące się"]
+SHEET_MEMBERS, SHEET_RESOLUTIONS = "Członkowie", "Uchwały"
+
+
+def _norm(value):
+    return str(value or "").strip().lower()
+
+
+def _choice(value, choices, field, row):
+    """Przyjmuje kod (np. „nadzwyczajny”) albo etykietę (np. „Członek nadzwyczajny”), bez względu na wielkość liter."""
+    v = _norm(value)
+    for code, label in choices:
+        if v in (code.lower(), str(label).lower()) or (code and v == f"członek {code}"):
+            return code
+    allowed = ", ".join(c for c, _ in choices if c)
+    raise ValidationError(f"Arkusz, wiersz {row}: „{value}” w kolumnie {field} — dozwolone: {allowed}.")
+
+
+def _date(value, field, row):
+    from datetime import datetime
+
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    text = str(value or "").strip()
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d-%m-%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    raise ValidationError(f"Arkusz, wiersz {row}: nieprawidłowa data „{value}” w kolumnie {field} (np. 10.07.2025).")
+
+
+def _int(value, field, row, required=True):
+    if value in (None, "") and not required:
+        return None
+    try:
+        number = int(float(str(value).replace(",", ".")))
+    except (TypeError, ValueError):
+        raise ValidationError(f"Arkusz, wiersz {row}: w kolumnie {field} wpisz liczbę.") from None
+    if number < 0:
+        raise ValidationError(f"Arkusz, wiersz {row}: w kolumnie {field} liczba nie może być ujemna.")
+    return number
+
+
+def _rows(ws, columns):
+    header = [str(c.value or "").strip() for c in next(ws.iter_rows(min_row=1, max_row=1))]
+    index = {}
+    for col in columns:
+        if col not in header:
+            raise ValidationError(f"Arkusz „{ws.title}”: brak kolumny „{col}”. Użyj wzoru pobranego z panelu.")
+        index[col] = header.index(col)
+    for row_no, values in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not any(v not in (None, "") for v in values):
+            continue
+        yield row_no, {col: values[i] if i < len(values) else None for col, i in index.items()}
+
+
+class XlsxPackage:
+    """Arkusz Excela z kartami „Członkowie” i/lub „Uchwały” (wzór do pobrania w panelu). Bez plików — skany uchwał
+    dodaje się w panelu albo pakietem ZIP."""
+
+    def __init__(self, uploaded):
+        from openpyxl import load_workbook
+
+        if uploaded.size > MAX_ZIP_BYTES:
+            raise ValidationError("Plik jest za duży (najwyżej 50 MB).")
+        try:
+            self.wb = load_workbook(io.BytesIO(uploaded.read()), read_only=True, data_only=True)
+        except Exception as e:  # uszkodzony lub nie-XLSX plik — openpyxl zgłasza różne wyjątki
+            raise ValidationError("To nie jest poprawny plik Excel (XLSX).") from e
+        if SHEET_MEMBERS not in self.wb.sheetnames and SHEET_RESOLUTIONS not in self.wb.sheetnames:
+            raise ValidationError(f"W arkuszu nie ma karty „{SHEET_MEMBERS}” ani „{SHEET_RESOLUTIONS}”. Użyj wzoru pobranego z panelu.")
+
+    def read(self, name):
+        return None
+
+    def data(self):
+        data = {"czlonkowie": [], "uchwaly": []}
+        if SHEET_MEMBERS in self.wb.sheetnames:
+            for row, r in _rows(self.wb[SHEET_MEMBERS], MEMBER_COLUMNS):
+                if not str(r["Imię"] or "").strip() or not str(r["Nazwisko"] or "").strip():
+                    raise ValidationError(f"Arkusz „{SHEET_MEMBERS}”, wiersz {row}: podaj imię i nazwisko.")
+                data["czlonkowie"].append({
+                    "numer": _int(r["Nr"], "Nr", row), "imie": str(r["Imię"]).strip()[:80], "nazwisko": str(r["Nazwisko"]).strip()[:120],
+                    "email": str(r["E-mail"] or "").strip()[:254], "adres": str(r["Adres"] or "").strip()[:255],
+                    "rodzaj": _choice(r["Rodzaj"], Member.Kind.choices, "Rodzaj", row),
+                    "data_przyjecia": _date(r["Data przyjęcia"], "Data przyjęcia", row).isoformat(),
+                    "zalozyciel": _norm(r["Założyciel"]) in ("tak", "t", "1", "true", "x"),
+                    "funkcja": _choice(r["Funkcja w Zarządzie"], Member.BoardRole.choices, "Funkcja w Zarządzie", row)
+                    if _norm(r["Funkcja w Zarządzie"]) not in ("", "—", "-", "brak", "nie") else "",
+                })
+        if SHEET_RESOLUTIONS in self.wb.sheetnames:
+            for row, r in _rows(self.wb[SHEET_RESOLUTIONS], RESOLUTION_COLUMNS):
+                if not str(r["Tytuł"] or "").strip():
+                    raise ValidationError(f"Arkusz „{SHEET_RESOLUTIONS}”, wiersz {row}: podaj tytuł uchwały.")
+                votes = [_int(r[c], c, row, required=False) for c in ("Głosy za", "Głosy przeciw", "Wstrzymujące się")]
+                item = {
+                    "organ": _choice(r["Organ"], Resolution.Organ.choices, "Organ", row), "rok": _int(r["Rok"], "Rok", row),
+                    "numer": _int(r["Numer"], "Numer", row), "data": _date(r["Data podjęcia"], "Data podjęcia", row).isoformat(),
+                    "tytul": str(r["Tytuł"]).strip()[:255], "tresc": str(r["Treść"] or "").strip(),
+                }
+                if any(v is not None for v in votes):
+                    item["glosy"] = [v or 0 for v in votes]
+                data["uchwaly"].append(item)
+        return data
+
+
+def template_xlsx():
+    """Wzór arkusza do importu: karty z nagłówkami, listy wyboru i instrukcja."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = SHEET_MEMBERS
+    ws.append(MEMBER_COLUMNS)
+    for col, choices in (("F", "zwyczajny,nadzwyczajny"), ("H", "tak,nie"), ("I", "prezes,wiceprezes,brak")):
+        dv = DataValidation(type="list", formula1=f'"{choices}"', allow_blank=True)
+        ws.add_data_validation(dv)
+        dv.add(f"{col}2:{col}1000")
+    ws2 = wb.create_sheet(SHEET_RESOLUTIONS)
+    ws2.append(RESOLUTION_COLUMNS)
+    dv = DataValidation(type="list", formula1='"zarzad,wzc,nadzwyczajni,zalozycielskie"', allow_blank=True)
+    ws2.add_data_validation(dv)
+    dv.add("A2:A1000")
+    for sheet, widths in ((ws, [6, 16, 20, 28, 34, 16, 16, 12, 20]), (ws2, [16, 8, 8, 16, 40, 60, 10, 12, 16])):
+        for cell in sheet[1]:
+            cell.font = Font(bold=True)
+        for i, w in enumerate(widths):
+            sheet.column_dimensions[chr(65 + i)].width = w
+        sheet.freeze_panes = "A2"
+    info = wb.create_sheet("Instrukcja")
+    for line in [
+        "Import do rejestru Stowarzyszenia — wypełnij karty „Członkowie” i/lub „Uchwały” od 2. wiersza.",
+        "Członkowie: Nr — numer w rejestrze; Rodzaj — zwyczajny lub nadzwyczajny; Data przyjęcia — np. 10.07.2025;",
+        "  Założyciel — tak/nie; Funkcja w Zarządzie — prezes, wiceprezes albo puste.",
+        "Uchwały (historyczne, z dokumentów papierowych): Organ — zarzad, wzc, nadzwyczajni, zalozycielskie;",
+        "  Rok i Numer — jak w numerze uchwały (np. 1/2025); głosy — opcjonalnie.",
+        "Wpisy, które już są w rejestrze (ten sam numer członka / ta sama uchwała), są pomijane.",
+        "Skany uchwał (PDF) dodaje się pakietem ZIP albo w panelu przy uchwale.",
+        "Przed zapisem użyj przycisku „Podgląd” — pokaże, co zostanie wprowadzone.",
+    ]:
+        info.append([line])
+    info.column_dimensions["A"].width = 120
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def open_upload(uploaded):
+    name = (uploaded.name or "").lower()
+    if name.endswith(".xlsx"):
+        return XlsxPackage(uploaded)
+    if name.endswith(".zip"):
+        return ZipPackage(uploaded)
+    raise ValidationError("Wybierz plik ZIP (pakiet ze skanami) albo XLSX (arkusz według wzoru).")
+
+
 def run(package, *, by=None, preview=False, can=lambda section: True):
     """Wykonuje import. Zwraca listę wierszy raportu. `can(section)` — czy użytkownik może importować daną część
     (sekcje: stowarzyszenie, regulamin, czlonkowie, uchwaly)."""
-    raw = package.read("dane.json")
-    if raw is None:
-        raise ValidationError("W pakiecie nie ma pliku dane.json.")
-    try:
-        data = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as e:
-        raise ValidationError(f"Plik dane.json jest uszkodzony: {e}") from e
-    if not isinstance(data, dict):
-        raise ValidationError("Plik dane.json ma nieprawidłową budowę.")
+    data = package.data()
     report = []
     with transaction.atomic():
         try:

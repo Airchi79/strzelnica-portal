@@ -67,6 +67,7 @@ urlpatterns = [
     path("czlonkowie/", association_views.panel_members, name="members"),
     path("czlonkowie/nowy/", association_views.panel_member_new, name="member_new"),
     path("czlonkowie/import/", association_views.panel_import, name="association_import"),
+    path("czlonkowie/import/wzor.xlsx", association_views.panel_import_template, name="association_import_template"),
     path("czlonkowie/<int:pk>/", association_views.panel_member, name="member"),
     path("deklaracje/", association_views.panel_applications, name="applications"),
     path("skladki/", association_views.panel_fees, name="fees"),

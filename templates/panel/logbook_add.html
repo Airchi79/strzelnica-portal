@@ -1,0 +1,30 @@
+{% extends "panel/base_panel.html" %}{% load static %}
+{% block title %}Wpis przez obsługę{% endblock %}
+{% block panel %}
+<h1>Wpis do książki pobytu przez obsługę</h1>
+<p class="muted">Dla osoby bez telefonu albo gdy wpis przy wejściu się nie udał. Osoba sama sprawdza dane, potwierdza oświadczenie i podpisuje się palcem na tym urządzeniu. Wpis zostanie oznaczony jako dodany przez Ciebie.</p>
+<form method="post" novalidate data-entry-form class="card">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="msg error">{% for e in form.non_field_errors %}{{ e }}<br>{% endfor %}</div>{% endif %}
+  {% with f=form.entered_at %}{% include "logbook/_field.html" with field=f %}{% endwith %}
+  {% with f=form.purpose %}{% include "logbook/_field.html" with field=f %}{% endwith %}
+  {% with f=form.reservation %}{% include "logbook/_field.html" with field=f %}{% endwith %}
+  {% with f=form.purpose_note %}{% include "logbook/_field.html" with field=f %}{% endwith %}
+  {% with f=form.first_name %}{% include "logbook/_field.html" with field=f %}{% endwith %}
+  {% with f=form.last_name %}{% include "logbook/_field.html" with field=f %}{% endwith %}
+  {% with f=form.has_permit %}{% include "logbook/_field.html" with field=f %}{% endwith %}
+  {% with f=form.permit_number %}{% include "logbook/_field.html" with field=f %}{% endwith %}
+  {% with f=form.permit_issuer %}{% include "logbook/_field.html" with field=f %}{% endwith %}
+  {% with f=form.address %}{% include "logbook/_field.html" with field=f %}{% endwith %}
+  {% with f=form.statement %}{% include "logbook/_field.html" with field=f %}{% endwith %}
+  {{ form.signature }}
+  <div class="field">
+    <label>Podpis osoby</label>
+    <div class="sigbox" data-signature="{{ form.signature.id_for_label }}">
+      <canvas aria-label="Pole podpisu — osoba podpisuje się palcem"></canvas>
+      <button type="button" class="btn secondary small-btn" data-signature-clear>Wyczyść</button>
+    </div>
+  </div>
+  <div class="actions"><button class="btn" type="submit">Zapisz wpis</button><button class="btn secondary" type="submit" name="kolejny" value="1">Zapisz i dodaj kolejną osobę</button></div>
+</form>
+<script src="{% static 'js/signature.js' %}" defer></script>
+{% endblock %}

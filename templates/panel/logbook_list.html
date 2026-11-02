@@ -2,23 +2,47 @@
 {% block title %}Książka pobytu{% endblock %}
 {% block panel %}
 <h1>Książka pobytu</h1>
+<div class="actions" style="margin-top:0;margin-bottom:12px">
+  {% if perms.logbook.staff_entry %}<a class="btn" href="{% url 'panel:logbook_add' %}">+ Wpis przez obsługę</a>{% endif %}
+  <a class="btn secondary" href="?otwarte=1&amp;od={% now 'Y-m-d' %}&amp;do={% now 'Y-m-d' %}">Na strzelnicy teraz ({{ open_count }})</a>
+  {% if perms.logbook.manage_logbook %}<a class="btn secondary" href="{% url 'panel:logbook_settings' %}">Ustawienia i kod QR</a>{% endif %}
+</div>
 <form method="get" class="card filters">
   <div><label for="f-od">Od</label><input type="date" id="f-od" name="od" value="{{ f.od|date:'Y-m-d' }}"></div>
   <div><label for="f-do">Do</label><input type="date" id="f-do" name="do" value="{{ f.do|date:'Y-m-d' }}"></div>
   <div><label for="f-cel">Cel</label><select id="f-cel" name="cel"><option value="">wszystkie</option>{% for v, l in purposes %}<option value="{{ v }}"{% if f.cel == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
-  <div><label for="f-q">Szukaj</label><input type="search" id="f-q" name="q" value="{{ f.q }}" placeholder="nazwisko, nr wpisu, nr pozwolenia"></div>
+  <div><label for="f-q">Szukaj</label><input type="search" id="f-q" name="q" value="{{ f.q }}" placeholder="nazwisko, nr wpisu, pozwolenia, rezerwacji"></div>
+  <div class="checkbox"><label><input type="checkbox" name="otwarte" value="1"{% if f.otwarte %} checked{% endif %}> tylko otwarte (bez wyjścia)</label></div>
+  <div class="checkbox"><label><input type="hidden" name="grupuj" value="0"><input type="checkbox" name="grupuj" value="1"{% if f.grupuj %} checked{% endif %}> grupuj wg rezerwacji</label></div>
   <div class="actions"><button class="btn" type="submit">Filtruj</button>
-    <a class="btn secondary" href="{% url 'panel:logbook_print' %}?{{ request.GET.urlencode }}" target="_blank" rel="noopener">Wydruk / PDF</a>
-    {% if perms.logbook.manage_logbook %}<a class="btn secondary" href="{% url 'panel:logbook_settings' %}">Ustawienia i kod QR</a>{% endif %}</div>
+    <a class="btn secondary" href="{% url 'panel:logbook_export' %}?{{ query }}">Eksport XLSX</a>
+    <a class="btn secondary" href="{% url 'panel:logbook_print' %}?{{ query }}" target="_blank" rel="noopener">Wydruk / PDF</a></div>
 </form>
-<div class="card table-wrap"><table>
-  <tr><th>Wejście</th><th>Osoba</th><th>Cel</th><th class="hide-sm">Prowadzący / oś</th><th class="hide-sm">Wyjście</th></tr>
-  {% for e in page %}
-  <tr><td><a href="{% url 'panel:logbook_entry' e.pk %}">{{ e.entered_at|date:"j.m.Y H:i" }}</a><div class="small muted">{{ e.number }}</div></td>
-    <td>{{ e.full_name }}</td><td>{{ e.get_purpose_display }}</td>
-    <td class="hide-sm">{% if e.range_officer %}{{ e.range_officer.full_name }}<div class="small muted">{{ e.reservation.lane }}</div>{% else %}—{% endif %}</td>
-    <td class="hide-sm">{{ e.exited_at|time:"H:i"|default:"—" }}</td></tr>
-  {% empty %}<tr><td colspan="5" class="muted">Brak wpisów w wybranym okresie.</td></tr>{% endfor %}
-</table></div>
+
+<div class="actions" style="margin-top:0;margin-bottom:12px;align-items:center">
+  <span class="muted small">{{ page.paginator.count }} wpisów{% if not reveal %} · numery pozwoleń i adresy są ukryte{% endif %}</span>
+  {% if entries and not reveal %}<form method="post">{% csrf_token %}
+    {% for k, v in request.GET.items %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <input type="hidden" name="pokaz" value="1"><button class="btn secondary small-btn" type="submit">Pokaż dane na tej stronie</button></form>
+  {% elif reveal %}<span class="badge warn">dane odkryte — dostęp zapisano w dzienniku</span>{% endif %}
+</div>
+
+{% if groups is not None %}
+  {% for g in groups %}
+  <section class="day">
+    <header class="day-head">
+      {% if g.reservation %}<strong><a href="{% url 'panel:reservation' g.reservation.pk %}">{{ g.reservation.number }}</a> · {{ g.reservation.lane }} · {{ g.reservation.starts_at|date:"j.m" }} {{ g.reservation.starts_at|time:"H:i" }}–{{ g.reservation.ends_at|time:"H:i" }}</strong>
+        <span class="muted small">prowadzący: {{ g.reservation.user.full_name }}</span>
+        {% if perms.logbook.staff_entry %}<a class="btn secondary small-btn" href="{% url 'panel:logbook_add' %}?rezerwacja={{ g.reservation.pk }}">+ Dopisz</a>{% endif %}
+      {% else %}<strong>{{ g.day|date:"l, j E Y" }} · bez rezerwacji</strong>{% endif %}
+      <span class="muted small">{{ g.entries|length }} os.</span>
+    </header>
+    {% include "panel/_logbook_rows.html" with rows=g.entries %}
+  </section>
+  {% empty %}<div class="card muted">Brak wpisów w wybranym okresie.</div>{% endfor %}
+{% else %}
+  <section class="day">{% include "panel/_logbook_rows.html" with rows=entries %}</section>
+  {% if not entries %}<div class="card muted">Brak wpisów w wybranym okresie.</div>{% endif %}
+{% endif %}
 {% include "partials/pagination.html" %}
 {% endblock %}

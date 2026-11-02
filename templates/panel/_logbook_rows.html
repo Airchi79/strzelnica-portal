@@ -1,0 +1,10 @@
+{% if rows %}<div class="table-wrap"><table class="days">
+  <tr class="head"><th>Wejście</th><th>Osoba</th><th>Pozwolenie / adres</th><th>Cel</th><th>Wyjście</th></tr>
+  {% for e in rows %}
+  <tr><td><a href="{% url 'panel:logbook_entry' e.pk %}">{{ e.entered_at|date:"j.m H:i" }}</a><div class="small muted code">{{ e.number }}</div></td>
+    <td data-label="Osoba">{{ e.full_name }}{% if e.source == 'obsluga' %}<div class="small muted">wpis obsługi</div>{% endif %}</td>
+    <td data-label="Pozwolenie / adres">{% if reveal %}{% if e.has_permit %}{{ e.permit_number }}<div class="small muted">{{ e.permit_issuer }}</div>{% else %}{{ e.address }}{% endif %}{% else %}<span class="muted">{{ e.identity_masked }}</span>{% endif %}</td>
+    <td data-label="Cel">{{ e.get_purpose_display }}{% if e.purpose_note %}<div class="small muted">{{ e.purpose_note }}</div>{% endif %}</td>
+    <td data-label="Wyjście">{% if e.exited_at %}{{ e.exited_at|time:"H:i" }}{% if e.exit_auto %} <span class="badge">auto</span>{% endif %}{% else %}<span class="badge ok">na strzelnicy</span>{% endif %}</td></tr>
+  {% endfor %}
+</table></div>{% endif %}

@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -22,7 +22,7 @@ from apps.core.permissions import panel_required
 from apps.core.qr import qr_svg_data_uri
 
 from . import services
-from .forms import EntryForm, LogbookSettingsForm
+from .forms import EntryForm, LogbookSettingsForm, StaffEntryForm
 from .models import Entry, LogbookSettings
 
 SESSION_RECENT = "logbook_recent_entries"
@@ -176,51 +176,137 @@ def _parse_day(value, default):
         return default
 
 
-def _filtered(request):
+def _filtered(params):
     today = timezone.localdate()
     f = {
-        "od": _parse_day(request.GET.get("od"), today - timedelta(days=30)),
-        "do": _parse_day(request.GET.get("do"), today),
-        "cel": request.GET.get("cel", ""),
-        "q": request.GET.get("q", "").strip(),
+        "od": _parse_day(params.get("od"), today - timedelta(days=30)),
+        "do": _parse_day(params.get("do"), today),
+        "cel": params.get("cel", ""),
+        "q": params.get("q", "").strip(),
+        "otwarte": params.get("otwarte") == "1",
+        "grupuj": params.get("grupuj", "1") != "0",
     }
     start = timezone.make_aware(datetime.combine(f["od"], time.min))
     end = timezone.make_aware(datetime.combine(f["do"] + timedelta(days=1), time.min))
-    qs = Entry.objects.filter(entered_at__gte=start, entered_at__lt=end).select_related("reservation__lane", "range_officer")
+    qs = Entry.objects.filter(entered_at__gte=start, entered_at__lt=end).select_related("reservation__lane", "range_officer", "created_by")
     if f["cel"] in Entry.Purpose.values:
         qs = qs.filter(purpose=f["cel"])
+    if f["otwarte"]:
+        qs = qs.filter(exited_at__isnull=True)
     if f["q"]:
         qs = qs.filter(Q(last_name__icontains=f["q"]) | Q(first_name__icontains=f["q"]) | Q(number__icontains=f["q"]) | Q(permit_number__icontains=f["q"]) | Q(reservation__number__iexact=f["q"]))
     return qs, f
 
 
+def _group(entries):
+    """Grupuje wpisy strony wg rezerwacji (kolejność pierwszego wystąpienia); wpisy bez rezerwacji — wg dnia."""
+    groups, index = [], {}
+    for e in entries:
+        key = ("r", e.reservation_id) if e.reservation_id else ("d", timezone.localdate(e.entered_at))
+        if key not in index:
+            index[key] = {"reservation": e.reservation, "day": key[1] if key[0] == "d" else None, "entries": []}
+            groups.append(index[key])
+        index[key]["entries"].append(e)
+    return groups
+
+
 @panel_required("logbook.view_logbook")
 def panel_list(request):
-    qs, f = _filtered(request)
-    page = Paginator(qs, 50).get_page(request.GET.get("page"))
-    log_sensitive_access(None, f"ksiazka:lista:{f['od']}..{f['do']}", "przegląd książki pobytu")
-    return render(request, "panel/logbook_list.html", {"page": page, "f": f, "purposes": Entry.Purpose.choices})
+    params = request.POST if request.method == "POST" else request.GET
+    qs, f = _filtered(params)
+    page = Paginator(qs, 50).get_page(params.get("page"))
+    reveal = request.method == "POST" and request.POST.get("pokaz") == "1"
+    entries = list(page)
+    for e in entries:
+        e.identity_masked = services.masked_identity(e)
+    if reveal:
+        for e in entries:
+            log_sensitive_access(e.user, f"ksiazka:wpis:{e.number}", "odkrycie danych na liście książki pobytu")
+    else:
+        log_sensitive_access(None, f"ksiazka:lista:{f['od']}..{f['do']}", "przegląd książki pobytu (dane ukryte)")
+    query = params.copy()
+    for k in ("csrfmiddlewaretoken", "pokaz", "page"):
+        query.pop(k, None)
+    ctx = {
+        "page": page, "entries": entries, "groups": _group(entries) if f["grupuj"] else None, "f": f, "reveal": reveal,
+        "purposes": Entry.Purpose.choices, "query": query.urlencode(),
+        "open_count": Entry.objects.filter(exited_at__isnull=True).count(),
+    }
+    return render(request, "panel/logbook_list.html", ctx)
 
 
 @panel_required("logbook.view_logbook")
 def panel_detail(request, pk):
     entry = get_object_or_404(Entry.objects.select_related("reservation__lane", "range_officer", "user", "created_by", "regulation_version"), pk=pk)
-    log_sensitive_access(entry.user, f"ksiazka:wpis:{entry.number}", "podgląd wpisu w książce pobytu")
-    return render(
-        request,
-        "panel/logbook_detail.html",
-        {"e": entry, "signature": "data:image/png;base64," + base64.b64encode(bytes(entry.signature)).decode()},
-    )
+    reveal = request.method == "POST" and request.POST.get("pokaz") == "1"
+    ctx = {"e": entry, "reveal": reveal, "identity_masked": services.masked_identity(entry)}
+    if reveal:
+        log_sensitive_access(entry.user, f"ksiazka:wpis:{entry.number}", "podgląd danych wpisu w książce pobytu")
+        ctx["signature"] = "data:image/png;base64," + base64.b64encode(bytes(entry.signature)).decode()
+    return render(request, "panel/logbook_detail.html", ctx)
 
 
 @panel_required("logbook.view_logbook")
 def panel_print(request):
-    qs, f = _filtered(request)
+    qs, f = _filtered(request.GET)
     entries = list(qs.order_by("entered_at", "id")[:2000])
     rows = [(e, "data:image/png;base64," + base64.b64encode(bytes(e.signature)).decode()) for e in entries]
     log_sensitive_access(None, f"ksiazka:wydruk:{f['od']}..{f['do']}", "wydruk książki pobytu")
     log_event("ksiazka.wydruk", summary=f"{f['od']}–{f['do']}, wpisów: {len(rows)}")
     return render(request, "logbook/print.html", {"rows": rows, "f": f, "association": AssociationSettings.load(), "truncated": len(entries) == 2000})
+
+
+EXPORT_LIMIT = 20000
+
+
+@panel_required("logbook.view_logbook")
+def panel_export(request):
+    from .export import entries_xlsx
+
+    qs, f = _filtered(request.GET)
+    entries = list(qs.select_related("regulation_version").order_by("entered_at", "id")[:EXPORT_LIMIT])
+    log_sensitive_access(None, f"ksiazka:eksport:{f['od']}..{f['do']}", "eksport książki pobytu do XLSX")
+    log_event("ksiazka.eksport", summary=f"{f['od']}–{f['do']}, wpisów: {len(entries)}")
+    response = HttpResponse(entries_xlsx(entries), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="ksiazka-pobytu-{f["od"]}-{f["do"]}.xlsx"'
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+def _staff_reservations(now):
+    """Rezerwacje, do których obsługa może dopisać osobę: potwierdzone, trwające w ostatnich 24 h."""
+    return (
+        Reservation.objects.filter(
+            status=Reservation.Status.CONFIRMED, ends_at__gte=now - timedelta(hours=services.STAFF_BACKDATE_HOURS), starts_at__lte=now + timedelta(hours=1)
+        ).select_related("lane", "user").order_by("starts_at", "lane__order")
+    )
+
+
+@panel_required("logbook.staff_entry")
+def panel_add(request):
+    now = timezone.now()
+    initial = {"entered_at": timezone.localtime(now).replace(second=0, microsecond=0)}
+    if request.GET.get("rezerwacja", "").isdigit():
+        initial.update(purpose=Entry.Purpose.SHOOTING, reservation=int(request.GET["rezerwacja"]))
+    form = StaffEntryForm(request.POST or None, initial=initial, reservations=_staff_reservations(now))
+    if request.method == "POST" and form.is_valid():
+        d = form.cleaned_data
+        try:
+            entry = services.create_entry(
+                data=d, signature_png=services.decode_signature(d.get("signature")), source=Entry.Source.STAFF,
+                reservation=d.get("reservation"), created_by=request.user, ip=client_ip(request),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""), entered_at=d["entered_at"], now=now,
+            )
+        except ValidationError as e:
+            for m in e.messages:
+                form.add_error(None, m)
+        else:
+            messages.success(request, f"Dodano wpis {entry.number}: {entry.full_name}.")
+            if "kolejny" in request.POST:
+                url = reverse("panel:logbook_add")
+                return redirect(f"{url}?rezerwacja={entry.reservation_id}" if entry.reservation_id else url)
+            return redirect("panel:logbook_entry", pk=entry.pk)
+    return render(request, "panel/logbook_add.html", {"form": form})
 
 
 @panel_required("logbook.manage_logbook")

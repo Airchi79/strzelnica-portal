@@ -16,6 +16,9 @@
   <tr><th>Utworzono</th><td>{{ r.created_at|date:"j.m.Y H:i" }}</td></tr>
 </table></div>
 
+{% if log_entries is not None %}<h2>Książka pobytu ({{ log_entries|length }})</h2>
+<div class="card">{% if log_entries %}<table>{% for e in log_entries %}<tr><td><a href="{% url 'panel:logbook_entry' e.pk %}">{{ e.entered_at|time:"H:i" }}</a></td><td>{{ e.full_name }}</td><td>{{ e.get_purpose_display }}</td><td>{% if e.exited_at %}wyjście {{ e.exited_at|time:"H:i" }}{% else %}<span class="badge ok">na strzelnicy</span>{% endif %}</td></tr>{% endfor %}</table>{% else %}<p class="muted">Brak wpisów.</p>{% endif %}
+  {% if perms.logbook.staff_entry and r.status == 'potwierdzona' %}<div class="actions"><a class="btn secondary" href="{% url 'panel:logbook_add' %}?rezerwacja={{ r.pk }}">+ Dopisz osobę (wpis przez obsługę)</a></div>{% endif %}</div>{% endif %}
 <h2>Rozliczenie</h2>
 <div class="card">
   {% if r.access_code %}<p>Rozliczenie wg umowy klubu <strong>{{ r.access_code.club }}</strong> (kod {{ r.access_code.code }}).</p>{% endif %}

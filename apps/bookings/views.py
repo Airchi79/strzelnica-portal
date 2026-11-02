@@ -262,6 +262,7 @@ def panel_detail(request, pk):
             "started": r.starts_at <= timezone.now(),
             "wallet_balance": balance_of(r.user),
             "remaining_pln": f"{(r.amount - r.paid_amount) / 100:.2f}".replace(".", ","),
+            "log_entries": list(r.log_entries.order_by("entered_at")) if request.user.has_perm("logbook.view_logbook") else None,
         },
     )
 

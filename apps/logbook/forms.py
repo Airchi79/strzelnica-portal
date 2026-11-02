@@ -62,10 +62,29 @@ class EntryForm(forms.Form):
         return data
 
 
+class StaffEntryForm(EntryForm):
+    """Wpis przez obsługę: osoba podpisuje się na urządzeniu obsługi; godzina wejścia może być wcześniejsza."""
+
+    entered_at = forms.DateTimeField(
+        label="Godzina wejścia", widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+        input_formats=["%Y-%m-%dT%H:%M"],
+    )
+    field_order = ["entered_at", "purpose", "reservation"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["statement"].label = "Osoba potwierdza: " + STATEMENT_TEXT[0].lower() + STATEMENT_TEXT[1:]
+        self.fields["has_permit"].label = "Czy osoba ma pozwolenie na broń?"
+        if "reservation" in self.fields:
+            self.fields["reservation"].label_from_instance = lambda r: (
+                f"{r.number} · {r.lane} · {timezone.localtime(r.starts_at):%H:%M}–{timezone.localtime(r.ends_at):%H:%M} · {r.user.full_name}"
+            )
+
+
 class LogbookSettingsForm(forms.ModelForm):
     class Meta:
         model = LogbookSettings
-        fields = ["retention_years", "window_before_minutes", "max_entries_per_hour"]
+        fields = ["retention_years", "window_before_minutes", "max_entries_per_hour", "auto_exit_hours"]
 
     def clean_retention_years(self):
         value = self.cleaned_data["retention_years"]

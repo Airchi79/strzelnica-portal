@@ -318,7 +318,9 @@ def test_panel_logbook_permissions_and_access_log(client, owner_client, running,
     body = owner_client.get("/panel/ksiazka/").content.decode()
     assert entry.number in body
     detail = owner_client.get(f"/panel/ksiazka/{entry.pk}/").content.decode()
-    assert "dane i podpis bez zmian" in detail and "data:image/png;base64," in detail
+    assert "dane i podpis bez zmian" in detail and "data:image/png;base64," not in detail and "AB 123" not in detail
+    detail = owner_client.post(f"/panel/ksiazka/{entry.pk}/", {"pokaz": "1"}).content.decode()
+    assert "data:image/png;base64," in detail and "AB 123" in detail
     printed = owner_client.get("/panel/ksiazka/druk/").content.decode()
     assert "Książka rejestru pobytu" in printed and "AB 123" in printed
     assert SensitiveAccessLog.objects.filter(resource__startswith="ksiazka:").count() >= 3
@@ -333,7 +335,7 @@ def test_panel_logbook_permissions_and_access_log(client, owner_client, running,
 
 
 def test_panel_settings_and_poster(owner_client):
-    response = owner_client.post("/panel/ksiazka/ustawienia/", {"retention_years": 7, "window_before_minutes": 45, "max_entries_per_hour": 40})
+    response = owner_client.post("/panel/ksiazka/ustawienia/", {"retention_years": 7, "window_before_minutes": 45, "max_entries_per_hour": 40, "auto_exit_hours": 10})
     assert response.status_code == 302
     assert LogbookSettings.load().retention_years == 7
     old = LogbookSettings.load().gate_token
@@ -346,3 +348,112 @@ def test_reservation_detail_shows_qr_to_owner(client, running):
     client.force_login(running.user)
     body = client.get(f"/rezerwacje/{running.pk}/").content.decode()
     assert "Kod QR do książki pobytu" in body
+
+
+# --- punkt 2: lista z grupowaniem i maskowaniem, eksport, wpis obsługi, auto-wyjście ----------
+
+
+def _entry(running, sig, **kw):
+    data = {**permit_data(**kw), "purpose": kw.pop("purpose", "strzelanie"), "has_permit": True}
+    return services.create_entry(data=data, signature_png=services.decode_signature(sig), source="qr_rezerwacji", reservation=running)
+
+
+def test_panel_list_masks_groups_and_reveals_with_log(owner_client, running, sig):
+    e = _entry(running, sig, permit_number="XY 987654")
+    body = owner_client.get("/panel/ksiazka/").content.decode()
+    assert running.number in body and e.full_name in body
+    assert "XY 987654" not in body and "XY•••••54" in body
+    before = SensitiveAccessLog.objects.count()
+    body = owner_client.post("/panel/ksiazka/", {"pokaz": "1", "od": "", "do": ""}).content.decode()
+    assert "XY 987654" in body
+    assert SensitiveAccessLog.objects.filter(resource=f"ksiazka:wpis:{e.number}").count() == 1
+    assert SensitiveAccessLog.objects.count() == before + 1  # odkrycie: wpis za każdą osobę na stronie
+    flat = owner_client.get("/panel/ksiazka/?grupuj=0").content.decode()
+    assert "prowadzący:" not in flat and e.number in flat
+
+
+def test_panel_list_only_open(owner_client, running, sig):
+    a = _entry(running, sig, last_name="Otwarty")
+    b = _entry(running, sig, last_name="Zamknięty")
+    services.register_exit(b)
+    body = owner_client.get("/panel/ksiazka/?otwarte=1").content.decode()
+    assert a.number in body and b.number not in body
+
+
+def test_export_xlsx(owner_client, running, sig):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    _entry(running, sig, last_name="=HYPERLINK(1)")
+    response = owner_client.get("/panel/ksiazka/eksport.xlsx")
+    assert response.status_code == 200 and response["Content-Type"].startswith("application/vnd.openxml")
+    ws = load_workbook(BytesIO(response.content)).active
+    rows = list(ws.values)
+    assert rows[0][0] == "Nr wpisu" and len(rows) == 2
+    assert rows[1][5] == "'=HYPERLINK(1)"  # zabezpieczenie przed formułą
+    assert rows[1][6] == "AB 123" and rows[1][18] == "zgodna"
+    assert SensitiveAccessLog.objects.filter(resource__startswith="ksiazka:eksport:").exists()
+
+
+def test_export_requires_permission(client):
+    staff = grant(make_user("z2@example.com"), "credentials.review_credential")
+    login_with_otp(client, staff)
+    assert client.get("/panel/ksiazka/eksport.xlsx").status_code == 403
+    assert client.get("/panel/ksiazka/nowy-wpis/").status_code == 403
+
+
+def test_staff_entry_with_earlier_time(owner_client, owner, running, sig):
+    start = timezone.localtime(running.starts_at)
+    data = {**permit_data(), "purpose": "strzelanie", "reservation": running.pk, "signature": sig,
+            "entered_at": start.strftime("%Y-%m-%dT%H:%M")}
+    response = owner_client.post("/panel/ksiazka/nowy-wpis/", data)
+    assert response.status_code == 302, response.content.decode()[:2000]
+    e = Entry.objects.get()
+    assert e.source == Entry.Source.STAFF and e.created_by == owner and e.user is None
+    assert e.entered_at == running.starts_at and e.range_officer == running.user and e.integrity_ok
+
+
+def test_staff_entry_rejects_time_outside_window_and_without_signature(owner_client, running, sig):
+    too_old = timezone.localtime(timezone.now() - timedelta(hours=30))
+    data = {**permit_data(), "purpose": "obserwator", "signature": sig, "entered_at": too_old.strftime("%Y-%m-%dT%H:%M")}
+    body = owner_client.post("/panel/ksiazka/nowy-wpis/", data).content.decode()
+    assert "ostatnich 24 godzinach" in body
+    data["entered_at"] = timezone.localtime().strftime("%Y-%m-%dT%H:%M")
+    data["signature"] = ""
+    assert owner_client.post("/panel/ksiazka/nowy-wpis/", data).status_code == 200
+    assert not Entry.objects.exists()
+
+
+def test_entered_at_only_for_staff(running, sig):
+    with pytest.raises(ValidationError):
+        services.create_entry(data={**permit_data(), "purpose": "obserwator", "has_permit": True}, signature_png=services.decode_signature(sig),
+                              source="qr_wejscia", entered_at=timezone.now() - timedelta(hours=1))
+
+
+def test_auto_exit_closes_stale_entries(running, sig):
+    raw = services.decode_signature(sig)
+    data = {**permit_data(), "purpose": "obserwator", "has_permit": True}
+    now = timezone.now()
+    old = services.create_entry(data=data, signature_png=raw, source="qr_wejscia", now=now - timedelta(hours=13))
+    fresh = services.create_entry(data=data, signature_png=raw, source="qr_wejscia", now=now - timedelta(hours=1))
+    shooter = _entry(running, sig)
+    assert services.close_stale_entries(now=now) == 1
+    old.refresh_from_db(); fresh.refresh_from_db(); shooter.refresh_from_db()
+    assert old.exit_auto and old.exited_at == old.entered_at + timedelta(hours=12)
+    assert fresh.exited_at is None and shooter.exited_at is None
+    # Po końcu rezerwacji pobyt strzelca zamyka się o jej końcu.
+    assert services.close_stale_entries(now=running.ends_at + timedelta(minutes=5)) == 1
+    shooter.refresh_from_db()
+    assert shooter.exited_at == running.ends_at and shooter.exit_auto and shooter.integrity_ok
+    # Zamkniętego automatycznie wpisu nie da się już zmienić.
+    with pytest.raises(DatabaseError), transaction.atomic():
+        Entry.objects.filter(pk=old.pk).update(exited_at=now, exit_auto=False)
+    LogbookSettings.objects.filter(pk=1).update(auto_exit_hours=0)
+    assert services.close_stale_entries(now=now + timedelta(days=2)) == 0
+
+
+def test_mask_helpers():
+    assert services.mask("AB 123456") == "AB•••••56"
+    assert services.mask("Sątok 5, 56-420 Bierutów", 3, 0) == "Sąt••••••"
+    assert services.mask("ab") == "a•" and services.mask("") == ""

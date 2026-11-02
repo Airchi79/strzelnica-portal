@@ -10,6 +10,7 @@ from django.core import signing
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 from PIL import Image, UnidentifiedImageError
@@ -181,21 +182,37 @@ def check_rate_limit(ip):
         cache.set(key, 1, 3600)
 
 
+STAFF_BACKDATE_HOURS = 24
+
+
 @transaction.atomic
-def create_entry(*, data, signature_png, source, reservation=None, user=None, created_by=None, ip=None, user_agent="", now=None):
+def create_entry(
+    *, data, signature_png, source, reservation=None, user=None, created_by=None, ip=None, user_agent="", now=None, entered_at=None
+):
+    """Zapisuje wpis. `entered_at` (godzina wejścia wcześniejsza niż chwila zapisu) przyjmuje się tylko przy wpisie
+    przez obsługę — np. gdy osoba weszła, a obsługa uzupełnia książkę chwilę później; najwyżej 24 h wstecz."""
     now = now or timezone.now()
+    if entered_at is not None:
+        if source != Entry.Source.STAFF:
+            raise ValidationError("Godzinę wejścia może podać tylko obsługa.")
+        if entered_at > now + timedelta(minutes=1) or entered_at < now - timedelta(hours=STAFF_BACKDATE_HOURS):
+            raise ValidationError(f"Godzina wejścia musi mieścić się w ostatnich {STAFF_BACKDATE_HOURS} godzinach.")
+        entered_at = min(entered_at, now)
+    else:
+        entered_at = now
     purpose = data["purpose"]
     if purpose == Entry.Purpose.SHOOTING:
         if reservation is None:
             raise ValidationError("Przy strzelaniu wybierz rezerwację, w ramach której strzelasz.")
     if reservation is not None:
         reservation = Reservation.objects.select_related("user").get(pk=reservation.pk)
-        if not reservation_open_for_entry(reservation, now):
-            raise ValidationError("Ta rezerwacja nie trwa — wpis do niej nie jest możliwy.")
+        if not reservation_open_for_entry(reservation, entered_at):
+            raise ValidationError("Ta rezerwacja nie trwa — wpis do niej nie jest możliwy." if entered_at == now
+                                  else "Godzina wejścia nie mieści się w czasie wybranej rezerwacji.")
     has_permit = data["has_permit"]
     entry = Entry(
-        number=_next_number(timezone.localdate(now).year),
-        entered_at=now,
+        number=_next_number(timezone.localdate(entered_at).year),
+        entered_at=entered_at,
         purpose=purpose,
         purpose_note=data.get("purpose_note", "").strip()[:160],
         reservation=reservation,
@@ -235,6 +252,48 @@ def register_exit(entry, now=None):
     entry.exited_at = now
     log_event("ksiazka.wypis", entry, entry.number)
     return entry
+
+
+def close_stale_entries(now=None):
+    """Zamyka pobyty bez zapisanego wyjścia: o końcu rezerwacji (strzelanie) albo po N godzinach od wejścia."""
+    now = now or timezone.now()
+    hours = LogbookSettings.load().auto_exit_hours
+    if not hours:
+        return 0
+    limit = timedelta(hours=hours)
+    closed = 0
+    stale = Entry.objects.filter(exited_at__isnull=True).filter(
+        Q(entered_at__lte=now - limit) | Q(reservation__isnull=False, reservation__ends_at__lte=now)
+    ).select_related("reservation")
+    for e in stale:
+        exit_at = e.entered_at + limit
+        if e.reservation and e.entered_at <= e.reservation.ends_at < exit_at:
+            exit_at = e.reservation.ends_at
+        if exit_at > now:
+            continue
+        closed += Entry.objects.filter(pk=e.pk, exited_at__isnull=True).update(exited_at=exit_at, exit_auto=True)
+    if closed:
+        log_event("ksiazka.wypis_auto", summary=f"Automatycznie zamknięto pobytów: {closed}")
+    return closed
+
+
+# --- maskowanie danych na listach ---------------------------------------------------
+
+
+def mask(value, keep_start=2, keep_end=2):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if len(value) <= keep_start + keep_end:
+        return value[:1] + "•" * (len(value) - 1)
+    tail = value[len(value) - keep_end:] if keep_end else ""
+    return value[:keep_start] + "•" * min(6, len(value) - keep_start - keep_end) + tail
+
+
+def masked_identity(entry):
+    if entry.has_permit:
+        return f"pozwolenie {mask(entry.permit_number)}"
+    return f"adres {mask(entry.address, 3, 0)}"
 
 
 # --- rozliczenie rezerwacji wg książki pobytu -------------------------------------

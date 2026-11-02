@@ -15,6 +15,7 @@ PANEL_PERMISSIONS = [
     ("association.view_reports", "Raporty"),
     ("payments.manage_payments", "Płatności: wpłaty, import wyciągu, salda i korekty"),
     ("logbook.view_logbook", "Książka pobytu: przegląd i wydruk"),
+    ("logbook.staff_entry", "Książka pobytu: wpis w imieniu osoby (obsługa)"),
     ("logbook.manage_logbook", "Książka pobytu: ustawienia i kod QR wejścia"),
     ("bookings.manage_reservations", "Rezerwacje, blokady osi i rozliczenia rezerwacji"),
     ("credentials.review_credential", "Weryfikacja dokumentów i uprawnień"),

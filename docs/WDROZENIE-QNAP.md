@@ -164,7 +164,7 @@ cd /share/strzelnica && docker compose --profile tunel up -d && sleep 15 && dock
 **Powrót na Unraid:** trasy z tunelu `qnap` z powrotem do `unraid` (URL `192.168.1.9:8000`),
 a na Unraid `docker compose start db app cron`.
 
-## 8. Sprzątanie na Unraid (po tygodniu bez problemów)
+## 7. Sprzątanie na Unraid (po tygodniu bez problemów)
 
 Kontenerów `cloudflared` i innych usług na Unraid **nie wyłączaj**. Usuń tylko kontenery i obraz strzelnicy
 (obraz zawiera kopię danych z czasu budowy):
@@ -176,7 +176,7 @@ cd /mnt/user/appdata/strzelnica-portal && docker compose down && docker image rm
 Dane na Unraid zostają (folder `appdata/strzelnica-portal`) — **nie usuwaj ich przez co najmniej tydzień**.
 Po tym czasie Unraid można wyłączyć.
 
-## 9. Po przeprowadzce
+## 8. Po przeprowadzce
 
 - **Wyłącz SSH** na QNAP.
 - **Kopia poza QNAP**: kopie bazy są w `/share/strzelnica/backups` (codziennie, 7 ostatnich). Ustaw w **Hybrid Backup Sync**

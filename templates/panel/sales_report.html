@@ -1,0 +1,28 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}{{ r.number }}{% endblock %}
+{% block panel %}
+<h1>Raport {{ r.number }}</h1>
+{% include "panel/_payments_tabs.html" %}
+<div class="card"><table>
+  <tr><th>Rodzaj</th><td>{{ r.get_kind_display }}</td></tr>
+  <tr><th>Okres</th><td>{{ r.period_start|date:"j.m.Y" }}{% if r.period_end != r.period_start %} – {{ r.period_end|date:"j.m.Y" }}{% endif %}</td></tr>
+  <tr><th>Wygenerowano</th><td>{{ r.generated_at|date:"j.m.Y H:i" }}{% if r.generated_by %}, {{ r.generated_by.full_name }}{% else %}, automatycznie{% endif %}</td></tr>
+  <tr><th>Integralność</th><td>{% if r.integrity_ok %}<span class="badge ok">dane bez zmian</span>{% else %}<span class="badge bad">NIEZGODNOŚĆ sumy kontrolnej</span>{% endif %}<div class="small muted code">{{ r.sha256 }}</div></td></tr>
+</table>
+<div class="actions"><a class="btn" href="{% url 'panel:sales_report_pdf' r.pk %}">Pobierz PDF</a><a class="btn secondary" href="{% url 'panel:sales_report_csv' r.pk %}">Pobierz CSV</a></div></div>
+<h2>Podsumowanie</h2>
+<div class="card"><table>
+  {% for label, v in categories %}<tr><td>{{ label }}</td><td style="text-align:right">{{ v|pln }}</td></tr>{% endfor %}
+  <tr><th>Razem netto</th><th style="text-align:right">{{ s.net|pln }}</th></tr>
+</table>
+{% if methods %}<h3>Wpływy według sposobu zapłaty</h3><table>{% for label, v in methods %}<tr><td>{{ label }}</td><td style="text-align:right">{{ v|pln }}</td></tr>{% endfor %}</table>{% endif %}
+{% if r.data.daily %}<h3>Raporty dzienne w miesiącu</h3><table>{% for d in r.data.daily %}<tr><td class="code">{{ d.number }}</td><td>{{ d.day }}</td><td style="text-align:right">{{ d.net|pln }}</td></tr>{% endfor %}</table>{% endif %}
+</div>
+<h2>Operacje ({{ s.count }})</h2>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Data</th><th>Kategoria</th><th>Sposób</th><th>Dokument</th><th>Klient</th><th>Kwota</th></tr>
+  {% for x in rows %}<tr><td>{{ x.at|slice:":10" }} {{ x.at|slice:"11:16" }}</td><td data-label="Kategoria">{{ x.category_label }}</td><td data-label="Sposób">{{ x.method_label }}</td>
+    <td data-label="Dokument">{{ x.doc }}</td><td data-label="Klient">{{ x.client }}</td><td data-label="Kwota">{{ x.amount|pln }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Brak operacji w okresie.</td></tr>{% endfor %}
+</table></div></section>
+{% endblock %}

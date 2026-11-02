@@ -60,6 +60,7 @@ services:
           python manage.py expire_credentials;
           python manage.py purge_logbook;
           python manage.py association_tasks;
+          python manage.py sales_reports;
         fi;
         n=$$((n + 1));
         sleep 300;

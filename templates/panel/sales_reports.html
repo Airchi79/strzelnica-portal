@@ -1,0 +1,33 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Raporty sprzedaży{% endblock %}
+{% block panel %}
+<h1>Raporty sprzedaży</h1>
+{% include "panel/_payments_tabs.html" %}
+<div class="card">
+  <p class="small muted">Raporty są numerowane i niezmienne. Dzienne powstają automatycznie po zakończeniu dnia, w którym były operacje; miesięczne — po zakończeniu miesiąca. Obejmują zaksięgowane wpłaty (rezerwacje, składki, inne), sprzedaż kodów wejścia i zwroty do wpłacających.</p>
+  <div class="actions">
+    <form method="post" action="{% url 'panel:sales_report_generate' %}" class="actions" style="margin:0">{% csrf_token %}
+      <input type="hidden" name="rodzaj" value="D"><input type="date" name="dzien" value="{{ yesterday|date:'Y-m-d' }}" max="{{ yesterday|date:'Y-m-d' }}" aria-label="Dzień">
+      <button class="btn secondary" type="submit">Raport dzienny</button></form>
+    <form method="post" action="{% url 'panel:sales_report_generate' %}" class="actions" style="margin:0">{% csrf_token %}
+      <input type="hidden" name="rodzaj" value="M"><input type="month" name="miesiac" value="{{ last_month }}" max="{{ last_month }}" aria-label="Miesiąc">
+      <button class="btn secondary" type="submit">Raport miesięczny</button></form>
+  </div>
+</div>
+<div class="tabs">
+  <a href="?" class="{% if not kind %}active{% endif %}">Wszystkie</a>
+  <a href="?rodzaj=D" class="{% if kind == 'D' %}active{% endif %}">Dzienne</a>
+  <a href="?rodzaj=M" class="{% if kind == 'M' %}active{% endif %}">Miesięczne</a>
+</div>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Numer</th><th>Okres</th><th>Operacje</th><th>Netto</th><th>Pobierz</th></tr>
+  {% for r in page %}<tr>
+    <td><a href="{% url 'panel:sales_report' r.pk %}"><strong class="code">{{ r.number }}</strong></a><div class="small muted">{{ r.get_kind_display }}</div></td>
+    <td data-label="Okres">{% if r.kind == 'D' %}{{ r.period_start|date:"j.m.Y" }}{% else %}{{ r.period_start|date:"F Y" }}{% endif %}</td>
+    <td data-label="Operacje">{{ r.data.summary.count }}</td>
+    <td data-label="Netto"><strong>{{ r.data.summary.net|pln }}</strong></td>
+    <td data-label="Pobierz"><a href="{% url 'panel:sales_report_pdf' r.pk %}">PDF</a> · <a href="{% url 'panel:sales_report_csv' r.pk %}">CSV</a></td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Brak raportów.</td></tr>{% endfor %}
+</table></div></section>
+{% include "partials/pagination.html" %}
+{% endblock %}

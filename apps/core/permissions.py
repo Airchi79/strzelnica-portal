@@ -13,6 +13,7 @@ PANEL_PERMISSIONS = [
     ("association.manage_resolutions", "Stowarzyszenie: uchwały i zebrania"),
     ("association.manage_clubs", "Kluby i kody dostępu"),
     ("association.view_reports", "Raporty"),
+    ("reports.view_salesreport", "Raporty sprzedaży: przegląd, generowanie, PDF i CSV"),
     ("payments.manage_payments", "Płatności: wpłaty, import wyciągu, salda i korekty"),
     ("logbook.view_logbook", "Książka pobytu: przegląd i wydruk"),
     ("logbook.staff_entry", "Książka pobytu: wpis w imieniu osoby (obsługa)"),

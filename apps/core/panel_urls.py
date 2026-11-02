@@ -6,6 +6,7 @@ from apps.credentials import views as credentials_views
 from apps.facilities import views as facilities_views
 from apps.clients import views as clients_views
 from apps.logbook import views as logbook_views
+from apps.reports import views as reports_views
 from apps.payments import views as payments_views
 from apps.regulations import views as regulations_views
 
@@ -42,6 +43,11 @@ urlpatterns = [
     path("blokady/", bookings_views.panel_blocks, name="blocks"),
     path("blokady/nowa/", bookings_views.panel_block_new, name="block_new"),
     path("blokady/<int:pk>/usun/", bookings_views.panel_block_delete, name="block_delete"),
+    path("raporty-sprzedazy/", reports_views.panel_list, name="sales_reports"),
+    path("raporty-sprzedazy/generuj/", reports_views.panel_generate, name="sales_report_generate"),
+    path("raporty-sprzedazy/<int:pk>/", reports_views.panel_detail, name="sales_report"),
+    path("raporty-sprzedazy/<int:pk>/csv/", reports_views.panel_csv, name="sales_report_csv"),
+    path("raporty-sprzedazy/<int:pk>/pdf/", reports_views.panel_pdf, name="sales_report_pdf"),
     path("ksiazka/", logbook_views.panel_list, name="logbook"),
     path("ksiazka/druk/", logbook_views.panel_print, name="logbook_print"),
     path("ksiazka/eksport.xlsx", logbook_views.panel_export, name="logbook_export"),

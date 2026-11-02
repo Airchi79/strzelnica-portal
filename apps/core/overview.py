@@ -11,7 +11,7 @@ from apps.audit.models import AuditLog
 # Grupy zdarzeń w strumieniu (prefiks akcji z dziennika → filtr).
 FEED_GROUPS = {
     "rezerwacje": ("rezerwacja.", "blokada."),
-    "platnosci": ("platnosc.", "platnosci.", "skladka.", "saldo."),
+    "platnosci": ("platnosc.", "platnosci.", "skladka.", "saldo.", "raport."),
     "ksiega": ("ksiazka.",),
     "klienci": ("konto.rejestracja", "dokument.", "deklaracja.", "czlonek.", "klient.", "kod_wejscia."),
 }
@@ -30,6 +30,7 @@ FEED_LABELS = {
     "platnosc.tpay_start": "Płatność online rozpoczęta",
     "platnosc.zwrot_tpay": "Zwrot płatności",
     "platnosci.import_wyciagu": "Import wyciągu",
+    "raport.sprzedaz": "Raport sprzedaży",
     "skladka.oplacona": "Składka opłacona",
     "ksiazka.wpis": "Wpis do książki pobytu",
     "ksiazka.wypis": "Wyjście ze strzelnicy",
@@ -83,6 +84,7 @@ _URLS = {
     "association.member": ("panel:member", True),
     "association.fee": ("panel:fees", False),
     "accounts.user": ("panel:user", True),
+    "reports.salesreport": ("panel:sales_report", True),
 }
 
 

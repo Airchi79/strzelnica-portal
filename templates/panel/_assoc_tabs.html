@@ -1,7 +1,7 @@
 <div class="tabs">
   {% with u=request.resolver_match.url_name %}
   {% if perms.association.manage_members %}
-  <a href="{% url 'panel:members' %}" class="{% if u == 'members' or u == 'member' or u == 'member_new' %}active{% endif %}">Członkowie</a>
+  <a href="{% url 'panel:members' %}" class="{% if u == 'members' or u == 'member' or u == 'member_new' or u == 'association_import' %}active{% endif %}">Członkowie</a>
   <a href="{% url 'panel:applications' %}" class="{% if u == 'applications' %}active{% endif %}">Deklaracje</a>
   <a href="{% url 'panel:fees' %}" class="{% if u == 'fees' %}active{% endif %}">Składki</a>
   {% endif %}

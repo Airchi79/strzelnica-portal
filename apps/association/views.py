@@ -502,3 +502,35 @@ def panel_reports(request):
         "fees": services.fees_summary(year), "stats": services.membership_stats(), "club_rows": club_rows,
         "inc_total": sum(t for _, _, t in inc_rows), "occ_total": sum(t for _, _, t in occ_rows),
     })
+
+
+IMPORT_PERMS = {
+    "stowarzyszenie": "core.manage_settings",
+    "regulamin": "regulations.publish_regulation",
+    "czlonkowie": "association.manage_members",
+    "uchwaly": "association.manage_resolutions",
+}
+
+
+@panel_required(PERM_M)
+def panel_import(request):
+    """Import pakietu danych stowarzyszenia (ZIP: dane.json, regulamin, skany PDF) — z podglądem bez zapisu."""
+    from .importer import ZipPackage, run
+
+    report = preview = None
+    if request.method == "POST":
+        uploaded = request.FILES.get("pakiet")
+        preview = request.POST.get("tryb") != "importuj"
+        if not uploaded:
+            messages.error(request, "Wybierz plik ZIP z pakietem danych.")
+        else:
+            try:
+                report = run(ZipPackage(uploaded), by=request.user, preview=preview,
+                             can=lambda section: request.user.has_perm(IMPORT_PERMS[section]))
+            except ValidationError as e:
+                messages.error(request, " ".join(e.messages))
+            else:
+                if not preview:
+                    log_event("stowarzyszenie.import", summary=f"{uploaded.name}: {sum(1 for s, _ in report if s == 'ok')} pozycji wprowadzonych")
+                    messages.success(request, "Import zakończony.")
+    return render(request, "panel/association_import.html", {"report": report, "preview": preview})

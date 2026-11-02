@@ -1,0 +1,27 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Import danych stowarzyszenia{% endblock %}
+{% block panel %}
+<h1>Import danych stowarzyszenia</h1>
+{% include "panel/_assoc_tabs.html" %}
+<div class="card">
+  <p>Wgraj plik ZIP z pakietem danych (<span class="code">dane.json</span>, regulamin w pliku tekstowym, skany uchwał w PDF).
+  Istniejące wpisy są pomijane, więc ten sam pakiet można wgrać ponownie bez dublowania danych.</p>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    <label for="pakiet">Plik ZIP (do 50 MB)</label>
+    <input type="file" id="pakiet" name="pakiet" accept=".zip,application/zip" required>
+    <div class="actions">
+      <button class="btn secondary" type="submit" name="tryb" value="podglad">Podgląd (bez zapisu)</button>
+      <button class="btn" type="submit" name="tryb" value="importuj" data-confirm-click="Zaimportować dane z pakietu?">Importuj</button>
+    </div>
+  </form>
+  <p class="small muted">Każda część wymaga uprawnienia: członkowie, uchwały, dane stowarzyszenia, regulaminy — części bez uprawnienia są pomijane.</p>
+</div>
+{% if report is not None %}
+<h2>{% if preview %}Podgląd — nic nie zapisano{% else %}Wynik importu{% endif %}</h2>
+<div class="card"><table>
+  {% for status, line in report %}<tr><td><span class="badge {% if status == 'ok' %}ok{% elif status == 'blad' %}bad{% endif %}">{% if status == 'ok' %}{% if preview %}zostanie wprowadzone{% else %}wprowadzono{% endif %}{% elif status == 'blad' %}uwaga{% else %}pominięto{% endif %}</span></td><td>{{ line }}</td></tr>
+  {% empty %}<tr><td class="muted">Pakiet nie zawiera danych do importu.</td></tr>{% endfor %}
+</table>
+{% if preview and report %}<p class="small muted">Wszystko się zgadza? Wybierz plik ponownie i kliknij „Importuj”.</p>{% endif %}</div>
+{% endif %}
+{% endblock %}

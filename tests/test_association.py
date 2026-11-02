@@ -325,3 +325,69 @@ def test_import_seed_command(tmp_path, owner):
     assert Member.objects.count() == 1 and Member.objects.get().board_role == "prezes"
     assert Resolution.objects.filter(historical=True).count() == 1
     assert services.association_rules().content.startswith("§ 1.")
+
+
+def _zip(files):
+    import io
+    import zipfile
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for name, content in files.items():
+            z.writestr(name, content)
+    return SimpleUploadedFile("pakiet.zip", buf.getvalue(), content_type="application/zip")
+
+
+IMPORT_DATA = {
+    "czlonkowie": [{"numer": 7, "imie": "Jan", "nazwisko": "Założyciel", "rodzaj": "nadzwyczajny", "data_przyjecia": "2025-07-10"}],
+    "uchwaly": [{"organ": "zalozycielskie", "rok": 2025, "numer": 1, "data": "2025-07-10", "tytul": "t", "tresc": "x",
+                 "skan": "skany/u1.pdf"},
+                {"organ": "zalozycielskie", "rok": 2025, "numer": 2, "data": "2025-07-10", "tytul": "t2", "tresc": "y",
+                 "skan": "skany/u2.pdf"}],
+}
+
+
+def _package():
+    return {"pakiet/dane.json": json.dumps(IMPORT_DATA), "pakiet/skany/u1.pdf": b"%PDF-1.4 test", "pakiet/skany/u2.pdf": b"MZ to nie pdf"}
+
+
+def test_panel_import_preview_then_import(owner_client):
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": _zip(_package()), "tryb": "podglad"}).content.decode()
+    assert "nic nie zapisano" in body and "zostanie wprowadzone" in body
+    assert not Member.objects.exists() and not Resolution.objects.exists()
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": _zip(_package()), "tryb": "importuj"}).content.decode()
+    assert "Wynik importu" in body and "to nie jest PDF" in body
+    assert Member.objects.get().number == 7
+    r1, r2 = Resolution.objects.order_by("number")
+    assert r1.attachment and not r2.attachment
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": _zip(_package()), "tryb": "importuj"}).content.decode()
+    assert "już w rejestrze" in body and Member.objects.count() == 1 and Resolution.objects.count() == 2
+    assert "Import danych" in owner_client.get("/panel/czlonkowie/").content.decode()
+
+
+def test_panel_import_rejects_bad_packages(owner_client):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": SimpleUploadedFile("x.zip", b"nie zip"), "tryb": "podglad"}, follow=True)
+    assert "poprawny plik ZIP" in body.content.decode()
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": _zip({"inne.txt": "x"}), "tryb": "podglad"}).content.decode()
+    assert "nie ma pliku dane.json" in body
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": _zip({"../dane.json": "{}"}), "tryb": "podglad"}).content.decode()
+    assert "Nieprawidłowa ścieżka" in body
+    body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": _zip({"dane.json": "{zly"}), "tryb": "importuj"}).content.decode()
+    assert "uszkodzony" in body and not Member.objects.exists()
+
+
+def test_panel_import_respects_section_permissions(client):
+    staff = grant(make_user("m@example.com"), "association.manage_members")
+    login_with_otp(client, staff)
+    body = client.post("/panel/czlonkowie/import/", {"pakiet": _zip(_package()), "tryb": "importuj"}).content.decode()
+    assert Member.objects.count() == 1 and not Resolution.objects.exists() and "brak uprawnienia" in body
+    other = grant(make_user("o@example.com"), "association.manage_resolutions")
+    from django.test import Client
+
+    c = Client()
+    login_with_otp(c, other)
+    assert c.get("/panel/czlonkowie/import/").status_code == 403

@@ -13,6 +13,7 @@
   <div><label for="f-k">Rodzaj</label><select id="f-k" name="kind"><option value="">wszystkie</option>{% for v, l in kinds %}<option value="{{ v }}"{% if f.kind == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
   <div><label for="f-q">Szukaj</label><input type="search" id="f-q" name="q" value="{{ f.q }}"></div>
   <div class="actions"><button class="btn" type="submit">Filtruj</button><button class="btn secondary" name="format" value="csv">Eksport CSV</button>
+    <a class="btn secondary" href="{% url 'panel:association_import' %}">Import danych</a>
     <a class="btn secondary" href="{% url 'panel:member_new' %}">Wpisz członka</a></div>
 </form>
 <div class="card table-wrap"><table>

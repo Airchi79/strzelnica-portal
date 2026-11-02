@@ -416,3 +416,23 @@ def test_slot_states_respect_dst_day(ps, lane):
     slots = services.day_slots(lane, day, now=services.local_dt(day, 0) - timedelta(days=1))
     assert [s.hour for s in slots] == list(range(9, 18))
     assert all((s.end - s.start) == timedelta(hours=1) for s in slots)
+
+
+def test_panel_overview_and_days_view(owner_client, ps, lane, owner):
+    from apps.logbook.models import Entry
+
+    day = next_weekday()
+    r = book(ps, lane, day=day)
+    home = owner_client.get("/panel/").content.decode()
+    assert "Płatności" in home and "Nowa rezerwacja" in home and "Braki w książce pobytu" in home
+    body = owner_client.get(f"/panel/rezerwacje/dniami/?od={day:%Y-%m-%d}").content.decode()
+    assert r.number in body and "do zapłaty" in body
+    assert r.number in owner_client.get("/panel/rezerwacje/dniami/?filtr=do_zaplaty").content.decode()
+    assert r.number in owner_client.get(f"/panel/rezerwacje/dniami/?q={ps.last_name}").content.decode()
+    assert r.number not in owner_client.get("/panel/rezerwacje/dniami/?filtr=braki_ksiega").content.decode()
+    past = Reservation.objects.create(
+        number="SATOK-R-TEST-9", lane=lane, user=ps, starts_at=timezone.now() - timedelta(days=1, hours=2),
+        ends_at=timezone.now() - timedelta(days=1, hours=1), persons=1, price_rule=r.price_rule, hourly_amount=6000, amount=6000,
+    )
+    assert past.number in owner_client.get("/panel/rezerwacje/dniami/?filtr=braki_ksiega").content.decode()
+    assert Entry.objects.count() == 0

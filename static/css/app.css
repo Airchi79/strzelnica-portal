@@ -119,3 +119,38 @@ td.neg, .neg { color: var(--bad); } td.pos { color: var(--ok); }
 
 .badge { white-space: nowrap; }
 table.report th, table.report td { font-size: .8rem; padding: 6px 4px; white-space: nowrap; }
+
+/* Przegląd */
+.attention { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom: 16px; }
+.attention .att { display: flex; gap: 12px; align-items: center; margin: 0; }
+.attention .att .stat { min-width: 2ch; }
+.attention .att strong { display: block; font-size: 1rem; }
+.attention .att.hot { border-color: var(--warn); }
+.feed-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.feed-row:last-child { border-bottom: 0; }
+.feed-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-top: 8px; flex: none; }
+.feed-main { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.feed-time { white-space: nowrap; }
+
+/* Wszystkie rezerwacje — dniami */
+.day { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
+.day.today { border-color: var(--brand); }
+.day.past { opacity: .85; }
+.day-head { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.day-head strong { margin-right: auto; text-transform: none; }
+.day-head .small-btn { min-height: 32px; padding: 4px 10px; font-size: .85rem; }
+table.days td, table.days th { padding: 8px 10px; }
+tr.cancelled td { text-decoration: line-through; color: var(--muted); }
+
+/* Lista rezerwacji dniami na telefonie: wiersz jako karta zamiast ściśniętej tabeli. */
+@media (max-width: 640px) {
+  .day .table-wrap { overflow: visible; }
+  table.days, table.days tbody { display: block; width: 100%; }
+  table.days tr.head { display: none; }
+  table.days tr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  table.days tr:last-child { border-bottom: 0; }
+  table.days td { display: block; padding: 0; border: 0; min-width: 0; overflow-wrap: anywhere; }
+  table.days td[data-label]::before { content: attr(data-label); display: block; font-size: .75rem; color: var(--muted); }
+  table.days td.hide-sm { display: none; }
+  .day-head strong { flex-basis: 100%; }
+}

@@ -30,6 +30,7 @@ urlpatterns = [
     path("ustawienia/", views.panel_settings, name="settings"),
     path("rezerwacje/", bookings_views.panel_calendar, name="bookings"),
     path("rezerwacje/lista/", bookings_views.panel_list, name="reservations"),
+    path("rezerwacje/dniami/", bookings_views.panel_days, name="reservations_days"),
     path("rezerwacje/nowa/", bookings_views.panel_new, name="reservation_new"),
     path("rezerwacje/ustawienia/", bookings_views.panel_settings, name="booking_settings"),
     path("rezerwacje/<int:pk>/", bookings_views.panel_detail, name="reservation"),

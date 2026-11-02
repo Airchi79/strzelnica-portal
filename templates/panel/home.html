@@ -1,16 +1,27 @@
-{% extends "panel/base_panel.html" %}
-{% block title %}Panel zarządu{% endblock %}
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Przegląd{% endblock %}
 {% block panel %}
-<h1>Panel zarządu</h1>
-<div class="grid">
-  {% if perms.credentials.review_credential %}
-  <a class="card tile" href="{% url 'panel:credentials' %}"><span class="stat">{{ stats.pending_credentials }}</span><strong>dokumentów do weryfikacji</strong></a>
-  {% endif %}
-  {% if perms.bookings.manage_reservations %}
-  <a class="card tile" href="{% url 'panel:bookings' %}"><span class="stat">{{ stats.upcoming_reservations }}</span><strong>nadchodzących rezerwacji</strong></a>
-  <a class="card tile" href="{% url 'panel:reservations' %}?platnosc=do_zaplaty"><span class="stat">{{ stats.due_reservations }}</span><strong>rezerwacji do rozliczenia</strong></a>
-  {% endif %}
-  <div class="card tile"><span class="stat">{{ stats.users }}</span><strong>aktywnych kont</strong></div>
-  <div class="card tile"><span class="stat">{{ stats.ps }}</span><strong>zweryfikowanych prowadzących strzelanie</strong></div>
+<h1>Przegląd</h1>
+<p class="muted" style="margin-top:-8px">Co wymaga uwagi i co się dzieje na strzelnicy.</p>
+<div class="attention">
+  {% for title, sub, n, url in tiles %}
+  <a class="card tile att{% if n %} hot{% endif %}" href="{{ url }}"><span class="stat">{{ n }}</span><span><strong>{{ title }}</strong><span class="muted small">{{ sub }}</span></span></a>
+  {% endfor %}
+</div>
+{% if perms.bookings.manage_reservations %}<div class="actions" style="margin-top:0;margin-bottom:12px">
+  <a class="btn" href="{% url 'panel:reservation_new' %}">+ Rezerwacja</a>
+  <a class="btn secondary" href="{% url 'panel:reservations_days' %}">Wszystkie rezerwacje</a>
+  {% if perms.logbook.view_logbook %}<a class="btn secondary" href="{% url 'panel:logbook' %}">Książka pobytu</a>{% endif %}</div>{% endif %}
+<h2>Co się dzieje</h2>
+<div class="tabs">{% for v, l in groups %}<a href="?grupa={{ v }}" class="{% if group == v %}active{% endif %}">{{ l }}</a>{% endfor %}</div>
+<div class="card feed">
+  {% for row in feed %}
+  <div class="feed-row">
+    <span class="dot"></span>
+    <div class="feed-main">{% if row.url %}<a href="{{ row.url }}">{{ row.label }}</a>{% else %}<strong>{{ row.label }}</strong>{% endif %}
+      <div class="small muted">{{ row.entry.summary|truncatechars:110 }}{% if row.entry.actor %} · {{ row.entry.actor.full_name }}{% endif %}</div></div>
+    <div class="small muted feed-time">{{ row.entry.at|date:"j.m H:i" }}</div>
+  </div>
+  {% empty %}<p class="muted">Brak zdarzeń.</p>{% endfor %}
 </div>
 {% endblock %}

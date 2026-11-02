@@ -359,3 +359,70 @@ def panel_notification_open(request, pk):
         n.read_at = timezone.now()
         n.save(update_fields=["read_at"])
     return redirect(n.url if n.url.startswith("/") and not n.url.startswith("//") else reverse("panel:notifications"))
+
+
+# --- panel: wszystkie rezerwacje (widok dniami) ---------------------------------------------------
+
+PAYMENT_LABELS = {"tpay": "Online", "gotowka": "Na miejscu", "blik": "BLIK", "przelew": "Przelew"}
+
+
+@panel_required(PERM)
+def panel_days(request):
+    """Rezerwacje pogrupowane dniami: godziny, klient, oś, prowadzący, stan książki pobytu, płatność."""
+    from django.db.models import Count, Prefetch
+
+    from apps.logbook.models import Entry
+    from apps.payments.models import Payment
+
+    today = timezone.localdate()
+    f = {
+        "q": request.GET.get("q", "").strip(),
+        "os": request.GET.get("os", ""),
+        "filtr": request.GET.get("filtr", ""),
+        "anulowane": request.GET.get("anulowane") == "1",
+    }
+    start = _parse_day(request.GET.get("od"), today - timedelta(days=2))
+    span = 14
+    qs = Reservation.objects.select_related("lane", "user", "access_code__club").annotate(
+        shooters=Count("log_entries", filter=Q(log_entries__purpose=Entry.Purpose.SHOOTING), distinct=True),
+        entries=Count("log_entries", distinct=True),
+    ).prefetch_related(Prefetch("payments", queryset=Payment.objects.filter(status=Payment.Status.COMPLETED).order_by("-completed_at"), to_attr="done_payments"))
+    if not f["anulowane"]:
+        qs = qs.exclude(status=Reservation.Status.CANCELLED, late_cancellation=False)
+    if f["os"].isdigit():
+        qs = qs.filter(lane_id=int(f["os"]))
+    if f["q"]:
+        qs = qs.filter(Q(number__icontains=f["q"]) | Q(user__last_name__icontains=f["q"]) | Q(user__first_name__icontains=f["q"])
+                       | Q(user__email__icontains=f["q"]) | Q(user__phone__icontains=f["q"]))
+    ranged = True
+    if f["filtr"] == "do_zaplaty":
+        qs, ranged = qs.filter(payment_status=Reservation.Payment.DUE), False
+    elif f["filtr"] == "braki_ksiega":
+        now = timezone.now()
+        qs, ranged = qs.filter(status=Reservation.Status.CONFIRMED, starts_at__lte=now, starts_at__gte=now - timedelta(days=30), shooters=0), False
+    elif f["filtr"] == "do_zatwierdzenia":
+        qs, ranged = qs.filter(status=getattr(Reservation.Status, "PENDING_APPROVAL", "__brak__")), False
+    elif f["q"]:
+        ranged = False
+    if ranged:
+        qs = qs.filter(starts_at__gte=services.local_dt(start, 0), starts_at__lt=services.local_dt(start + timedelta(days=span), 0))
+    days = {}
+    for r in qs.order_by("starts_at", "lane__order"):
+        pay = r.done_payments[0] if r.done_payments else None
+        if r.access_code_id:
+            r.pay_label = f"Kod klubu {r.access_code.club}"
+        elif pay:
+            r.pay_label = PAYMENT_LABELS.get(pay.method, pay.get_method_display())
+        else:
+            r.pay_label = ""
+        r.missing_entries = r.status == Reservation.Status.CONFIRMED and r.starts_at <= timezone.now() and r.shooters == 0
+        days.setdefault(timezone.localtime(r.starts_at).date(), []).append(r)
+    if ranged:
+        groups = [(start + timedelta(days=i), days.get(start + timedelta(days=i), [])) for i in range(span)]
+    else:
+        groups = sorted(days.items())
+    return render(request, "panel/bookings_days.html", {
+        "groups": groups, "f": f, "today": today, "start": start, "ranged": ranged,
+        "earlier": start - timedelta(days=7), "later": start + timedelta(days=7), "lanes": Lane.objects.all(),
+        "total": sum(len(rows) for _, rows in groups),
+    })

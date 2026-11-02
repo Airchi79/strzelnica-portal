@@ -68,14 +68,15 @@ def offline(request):
 
 @panel_required()
 def panel_home(request):
-    stats = {
-        "upcoming_reservations": Reservation.objects.filter(status="potwierdzona", starts_at__gte=timezone.now()).count(),
-        "due_reservations": Reservation.objects.filter(payment_status="do_zaplaty").exclude(status="anulowana", late_cancellation=False).count(),
-        "pending_credentials": Credential.objects.filter(status=Credential.Status.PENDING).count(),
-        "users": User.objects.filter(is_active=True).count(),
-        "ps": Credential.objects.filter(kind=Credential.Kind.RANGE_OFFICER, status=Credential.Status.VERIFIED).values("user").distinct().count(),
-    }
-    return render(request, "panel/home.html", {"stats": stats})
+    from .overview import FEED_GROUPS, attention, feed
+
+    group = request.GET.get("grupa", "")
+    return render(request, "panel/home.html", {
+        "tiles": attention(request.user),
+        "feed": feed(group if group in FEED_GROUPS else ""),
+        "group": group,
+        "groups": [("", "Wszystko"), ("rezerwacje", "Rezerwacje"), ("platnosci", "Płatności"), ("ksiega", "Księga"), ("klienci", "Klienci")],
+    })
 
 
 @panel_required("core.manage_settings")

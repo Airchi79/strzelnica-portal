@@ -190,7 +190,7 @@ def _filtered(request):
     if f["cel"] in Entry.Purpose.values:
         qs = qs.filter(purpose=f["cel"])
     if f["q"]:
-        qs = qs.filter(Q(last_name__icontains=f["q"]) | Q(first_name__icontains=f["q"]) | Q(number__icontains=f["q"]) | Q(permit_number__icontains=f["q"]))
+        qs = qs.filter(Q(last_name__icontains=f["q"]) | Q(first_name__icontains=f["q"]) | Q(number__icontains=f["q"]) | Q(permit_number__icontains=f["q"]) | Q(reservation__number__iexact=f["q"]))
     return qs, f
 
 

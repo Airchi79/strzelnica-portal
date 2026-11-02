@@ -1,0 +1,49 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Wszystkie rezerwacje{% endblock %}
+{% block panel %}
+<h1>Wszystkie rezerwacje</h1>
+{% include "panel/_bookings_tabs.html" %}
+<form method="get" class="card filters">
+  <div><label for="f-q">Szukaj</label><input type="search" id="f-q" name="q" value="{{ f.q }}" placeholder="klient, telefon, numer rezerwacji"></div>
+  <div><label for="f-os">Oś</label><select id="f-os" name="os"><option value="">wszystkie osie</option>{% for l in lanes %}<option value="{{ l.pk }}"{% if f.os == l.pk|stringformat:'d' %} selected{% endif %}>{{ l.name }}</option>{% endfor %}</select></div>
+  <div><label for="f-f">Pokaż</label><select id="f-f" name="filtr">
+    <option value="">dni od {{ start|date:"j.m" }}</option>
+    <option value="do_zatwierdzenia"{% if f.filtr == 'do_zatwierdzenia' %} selected{% endif %}>czekające na zatwierdzenie</option>
+    <option value="do_zaplaty"{% if f.filtr == 'do_zaplaty' %} selected{% endif %}>do zapłaty</option>
+    <option value="braki_ksiega"{% if f.filtr == 'braki_ksiega' %} selected{% endif %}>braki w książce pobytu</option></select></div>
+  <div class="checkbox"><label><input type="checkbox" name="anulowane" value="1"{% if f.anulowane %} checked{% endif %}> anulowane</label></div>
+  <input type="hidden" name="od" value="{{ start|date:'Y-m-d' }}">
+  <div class="actions"><button class="btn" type="submit">Pokaż</button><a class="btn secondary" href="{% url 'panel:reservations_days' %}">Wyczyść</a></div>
+</form>
+{% if ranged %}<div class="actions" style="margin-top:0;margin-bottom:12px">
+  <a class="btn secondary" href="?od={{ earlier|date:'Y-m-d' }}&amp;q={{ f.q|urlencode }}&amp;os={{ f.os }}">← wcześniejsze dni</a>
+  <a class="btn secondary" href="?od={{ later|date:'Y-m-d' }}&amp;q={{ f.q|urlencode }}&amp;os={{ f.os }}">późniejsze dni →</a>
+  <span class="muted small" style="align-self:center">{{ total }} rezerwacji</span></div>{% endif %}
+
+{% for day, rows in groups %}
+<section class="day{% if day == today %} today{% elif day < today %} past{% endif %}">
+  <header class="day-head">
+    <strong>{% if day == today %}<span class="badge ok">Dziś</span> {% endif %}{{ day|date:"l, j E Y" }}</strong>
+    <span class="muted small">{{ rows|length }} rez.</span>
+    {% if day >= today %}<a class="btn secondary small-btn" href="{% url 'panel:reservation_new' %}?dzien={{ day|date:'Y-m-d' }}">+ Dodaj</a>{% endif %}
+  </header>
+  {% if rows %}
+  <div class="table-wrap"><table class="days">
+    <tr class="head"><th>Godzina</th><th>Klient</th><th>Miejsce</th><th class="hide-sm">Prowadzący</th><th>Księga</th><th>Płatność</th></tr>
+    {% for r in rows %}
+    <tr class="{% if r.status == 'anulowana' %}cancelled{% endif %}">
+      <td><a href="{% url 'panel:reservation' r.pk %}">{{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</a><div class="small muted">{{ r.display_status|lower }}</div></td>
+      <td data-label="Klient">{{ r.user.full_name }}<div class="small muted code">{{ r.number }}</div></td>
+      <td data-label="Miejsce">{{ r.lane }}<div class="small muted">{{ r.persons }} os.</div></td>
+      <td class="hide-sm">{{ r.user.full_name }}<div class="small muted">PS</div></td>
+      <td data-label="Księga">{% if r.entries %}<a class="badge {% if r.missing_entries %}bad{% else %}ok{% endif %}" href="{% url 'panel:logbook' %}?q={{ r.number }}&amp;od={{ r.starts_at|date:'Y-m-d' }}&amp;do={{ r.starts_at|date:'Y-m-d' }}">wpisy: {{ r.entries }}</a>
+          {% elif r.missing_entries %}<span class="badge bad">brak wpisu</span>
+          {% else %}<span class="muted small">—</span>{% endif %}</td>
+      <td data-label="Płatność">{% if r.payment_status == 'oplacona' %}<span class="badge ok">opłacona</span>{% elif r.payment_status == 'do_zaplaty' %}<span class="badge warn">do zapłaty {{ r.amount|sub:r.paid_amount|pln }}</span>{% elif r.payment_status == 'umowa' %}<span class="badge">wg umowy</span>{% elif r.payment_status == 'zwolniona' %}<span class="badge">zwolniona</span>{% else %}<span class="muted small">—</span>{% endif %}
+        {% if r.pay_label %}<div class="small muted">{{ r.pay_label }}</div>{% endif %}</td>
+    </tr>{% endfor %}
+  </table></div>
+  {% endif %}
+</section>
+{% empty %}<div class="card muted">Brak rezerwacji spełniających kryteria.</div>{% endfor %}
+{% endblock %}

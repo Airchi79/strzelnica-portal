@@ -177,3 +177,40 @@ class Entry(models.Model):
             hashlib.sha256(bytes(self.signature)).hexdigest() == self.signature_sha256
             and self.compute_content_hash() == self.content_sha256
         )
+
+
+class ArchivedEntry(models.Model):
+    """Wpis z poprzedniego systemu książki pobytu (GunTracker) — archiwum tylko do odczytu.
+    Przechowywany osobno od bieżącej książki: nie ma podpisu w tym systemie (potwierdzenie było w GunTrackerze).
+    Wpisu nie można zmienić ani usunąć (trigger w bazie), poza czyszczeniem po okresie przechowywania."""
+
+    source = models.CharField("system źródłowy", max_length=20, default="guntracker")
+    row_hash = models.CharField("suma kontrolna wiersza", max_length=64, unique=True)
+    started_at = models.DateTimeField("rozpoczęcie", db_index=True)
+    ended_at = models.DateTimeField("zakończenie", null=True, blank=True)
+    duration_minutes = models.PositiveIntegerField("czas [min]", null=True, blank=True)
+    first_name = models.CharField("imię", max_length=80)
+    last_name = models.CharField("nazwisko", max_length=120, db_index=True)
+    permit_number = models.CharField("numer pozwolenia", max_length=64, blank=True)
+    permit_issuer = models.CharField("organ wydający", max_length=160, blank=True)
+    address = models.CharField("adres", max_length=255, blank=True)
+    lane = models.CharField("oś", max_length=80, blank=True)
+    position = models.CharField("stanowisko", max_length=40, blank=True)
+    entry_type = models.CharField("typ wpisu", max_length=60, blank=True)
+    confirmation = models.CharField("potwierdzenie", max_length=120, blank=True)
+    added_by = models.CharField("dodał administrator", max_length=120, blank=True)
+    imported_at = models.DateTimeField("zaimportowano", auto_now_add=True)
+    imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    import_file = models.CharField("plik importu", max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["-started_at", "-id"]
+        verbose_name = "wpis archiwalny (GunTracker)"
+        verbose_name_plural = "archiwum książki pobytu"
+
+    def __str__(self):
+        return f"{self.started_at:%Y-%m-%d %H:%M} {self.first_name} {self.last_name}"
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"

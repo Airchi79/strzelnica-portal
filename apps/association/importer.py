@@ -137,6 +137,9 @@ def _int(value, field, row, required=True):
 
 
 def _rows(ws, columns):
+    # Niektóre programy (np. GunTracker) zapisują błędny rozmiar arkusza — w trybie odczytu strumieniowego trzeba go zignorować.
+    if hasattr(ws, "reset_dimensions"):
+        ws.reset_dimensions()
     header = [str(c.value or "").strip() for c in next(ws.iter_rows(min_row=1, max_row=1))]
     index = {}
     for col in columns:

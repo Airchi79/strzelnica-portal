@@ -1,0 +1,25 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Archiwum rezerwacji{% endblock %}
+{% block panel %}
+<h1>Archiwum rezerwacji (GunTracker)</h1>
+{% include "panel/_bookings_tabs.html" %}
+<p class="muted">Rezerwacje z poprzedniego systemu — do wglądu. Przyszłe terminy mają blokadę osi (w kalendarzu publicznym „niedostępne”).</p>
+<form method="get" class="card filters">
+  <div><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ q }}" placeholder="klient, numer, prowadzący, telefon"></div>
+  <div class="checkbox"><label><input type="checkbox" name="przyszle" value="1"{% if przyszle %} checked{% endif %}> tylko przyszłe</label></div>
+  <div class="actions"><button class="btn" type="submit">Pokaż</button><a class="btn secondary" href="{% url 'panel:reservations_archive_import' %}">Import z GunTrackera</a></div>
+</form>
+<p class="muted small">{{ page.paginator.count }} z {{ total }} rezerwacji</p>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Termin</th><th>Klient</th><th>Oś</th><th>Prowadzący</th><th>Księga</th><th>Płatność</th></tr>
+  {% for r in page %}<tr>
+    <td>{{ r.starts_at|date:"j.m.Y" }} {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}<div class="small muted code">{{ r.number }}</div></td>
+    <td data-label="Klient">{{ r.client }}{% if r.contact %}<div class="small muted">{{ r.contact }}</div>{% endif %}</td>
+    <td data-label="Oś">{{ r.lane|default:r.lane_label }}{% if r.positions %}<div class="small muted">stanowiska: {{ r.positions }}</div>{% endif %}{% if r.block %}<div><span class="badge warn">blokada osi</span></div>{% endif %}</td>
+    <td data-label="Prowadzący">{{ r.range_officer }}</td>
+    <td data-label="Księga">{{ r.logbook_info }}</td>
+    <td data-label="Płatność">{{ r.payment }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Brak rezerwacji archiwalnych.</td></tr>{% endfor %}
+</table></div></section>
+{% include "partials/pagination.html" %}
+{% endblock %}

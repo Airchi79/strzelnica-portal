@@ -349,3 +349,70 @@ def panel_rotate_gate(request):
 def panel_gate_poster(request):
     url = _absolute(request, reverse("logbook:by_gate", args=[LogbookSettings.load().gate_token]))
     return render(request, "logbook/gate_poster.html", {"qr": qr_svg_data_uri(url, box_size=14), "url": url})
+
+
+# --- archiwum z GunTrackera -----------------------------------------------------------------
+
+
+def _archive_filtered(params):
+    from .models import ArchivedEntry
+
+    today = timezone.localdate()
+    f = {"od": _parse_day(params.get("od"), date(2000, 1, 1)), "do": _parse_day(params.get("do"), today), "q": params.get("q", "").strip()}
+    start = timezone.make_aware(datetime.combine(f["od"], time.min))
+    end = timezone.make_aware(datetime.combine(f["do"] + timedelta(days=1), time.min))
+    qs = ArchivedEntry.objects.filter(started_at__gte=start, started_at__lt=end)
+    if f["q"]:
+        qs = qs.filter(Q(last_name__icontains=f["q"]) | Q(first_name__icontains=f["q"]) | Q(permit_number__icontains=f["q"].replace(" ", "").upper()))
+    return qs, f
+
+
+@panel_required("logbook.view_logbook")
+def panel_archive(request):
+    from .models import ArchivedEntry
+
+    params = request.POST if request.method == "POST" else request.GET
+    qs, f = _archive_filtered(params)
+    page = Paginator(qs, 50).get_page(params.get("page"))
+    reveal = request.method == "POST" and request.POST.get("pokaz") == "1"
+    rows = list(page)
+    for e in rows:
+        e.masked = f"pozwolenie {services.mask(e.permit_number)}" if e.permit_number else f"adres {services.mask(e.address, 3, 0)}"
+    log_sensitive_access(None, f"ksiazka:archiwum:{'odkrycie' if reveal else 'lista'}:{f['od']}..{f['do']}",
+                         "archiwum książki pobytu (GunTracker)" + (" — dane odkryte" if reveal else ""))
+    query = params.copy()
+    for k in ("csrfmiddlewaretoken", "pokaz", "page"):
+        query.pop(k, None)
+    return render(request, "panel/logbook_archive.html", {
+        "page": page, "rows": rows, "f": f, "reveal": reveal, "query": query.urlencode(), "total": ArchivedEntry.objects.count(),
+    })
+
+
+@panel_required("logbook.view_logbook")
+def panel_archive_print(request):
+    qs, f = _archive_filtered(request.GET)
+    rows = list(qs.order_by("started_at", "id")[:5000])
+    log_sensitive_access(None, f"ksiazka:archiwum:wydruk:{f['od']}..{f['do']}", "wydruk archiwum książki pobytu")
+    log_event("ksiazka.wydruk_archiwum", summary=f"{f['od']}–{f['do']}, wpisów: {len(rows)}")
+    return render(request, "logbook/archive_print.html", {"rows": rows, "f": f, "association": AssociationSettings.load(), "truncated": len(rows) == 5000})
+
+
+@panel_required("logbook.manage_logbook")
+def panel_archive_import(request):
+    from . import archive
+
+    result = preview = None
+    if request.method == "POST":
+        uploaded = request.FILES.get("plik")
+        preview = request.POST.get("tryb") != "importuj"
+        if not uploaded:
+            messages.error(request, "Wybierz plik XLSX.")
+        else:
+            try:
+                result = archive.run(uploaded, by=request.user, preview=preview, add_persons=request.POST.get("osoby") == "1")
+            except ValidationError as e:
+                messages.error(request, " ".join(e.messages))
+            else:
+                if not preview:
+                    messages.success(request, "Import archiwum zakończony.")
+    return render(request, "panel/logbook_archive_import.html", {"result": result, "preview": preview})

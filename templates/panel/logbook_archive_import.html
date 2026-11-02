@@ -1,0 +1,27 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Import archiwum książki{% endblock %}
+{% block panel %}
+<h1>Import książki pobytu z GunTrackera</h1>
+<div class="card">
+  <p>Wgraj eksport <strong>„Księga pobytu”</strong> z GunTrackera (XLSX, bez zmian w nagłówkach). Wpisy trafią do archiwum tylko do odczytu.
+  Ten sam plik można wgrać ponownie — wpisy już zaimportowane są pomijane.</p>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    <label for="plik">Plik XLSX</label>
+    <input type="file" id="plik" name="plik" accept=".xlsx" required>
+    <div class="field"><label><input type="checkbox" name="osoby" value="1" checked> dodaj nowe osoby do kartoteki „Osoby bez konta”</label></div>
+    <div class="actions"><button class="btn secondary" type="submit" name="tryb" value="podglad">Podgląd (bez zapisu)</button>
+      <button class="btn" type="submit" name="tryb" value="importuj" data-confirm-click="Zaimportować wpisy do archiwum?">Importuj</button></div>
+  </form>
+</div>
+{% if result %}
+<h2>{% if preview %}Podgląd — nic nie zapisano{% else %}Wynik importu{% endif %}</h2>
+<div class="card"><table>
+  <tr><th>{% if preview %}Wpisy do dodania{% else %}Dodane wpisy{% endif %}</th><td>{{ result.dodane }}</td></tr>
+  <tr><th>Pominięte (już w archiwum)</th><td>{{ result.pominiete }}</td></tr>
+  <tr><th>{% if preview %}Nowe osoby do kartoteki{% else %}Dodane osoby do kartoteki{% endif %}</th><td>{{ result.osoby }}</td></tr>
+  {% if result.zakres %}<tr><th>Zakres dat w pliku</th><td>{{ result.zakres.0|date:"j.m.Y" }} – {{ result.zakres.1|date:"j.m.Y" }}</td></tr>{% endif %}
+</table>
+{% if not preview %}<div class="actions"><a class="btn" href="{% url 'panel:logbook_archive' %}">Przejdź do archiwum</a></div>{% endif %}</div>
+{% endif %}
+<p><a href="{% url 'panel:logbook_archive' %}">← Archiwum książki pobytu</a></p>
+{% endblock %}

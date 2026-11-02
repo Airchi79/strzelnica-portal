@@ -366,6 +366,10 @@ def purge_expired(now=None):
         with connection.cursor() as cur:
             cur.execute("SELECT set_config('satok.logbook_purge', 'on', true)")
         deleted, _ = Entry.objects.filter(entered_at__lt=cutoff).delete()
+        from .models import ArchivedEntry
+
+        archived, _ = ArchivedEntry.objects.filter(started_at__lt=cutoff).delete()
+        deleted += archived
     if deleted:
         log_event("ksiazka.czyszczenie", summary=f"Usunięto {deleted} wpisów starszych niż {years} lat")
     return deleted

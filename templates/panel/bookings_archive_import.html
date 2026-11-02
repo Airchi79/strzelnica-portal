@@ -1,0 +1,32 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Import rezerwacji{% endblock %}
+{% block panel %}
+<h1>Import rezerwacji z GunTrackera</h1>
+{% include "panel/_bookings_tabs.html" %}
+<div class="card">
+  <p>Wgraj eksport <strong>„Rezerwacje”</strong> z GunTrackera (XLSX). W eksporcie daty nie mają roku — podaj rok, którego dotyczą.
+  Rezerwacje trafią do archiwum; <strong>przyszłe</strong> dostaną blokadę osi, żeby nikt nie zarezerwował tego terminu ponownie.
+  Ten sam plik można wgrać ponownie — zaimportowane wiersze są pomijane.</p>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    <label for="plik">Plik XLSX</label><input type="file" id="plik" name="plik" accept=".xlsx" required>
+    <label for="rok">Rok rezerwacji</label><input type="number" id="rok" name="rok" value="{{ year }}" min="2000" max="2100" style="max-width:160px">
+    <div class="field"><label><input type="checkbox" name="kontakty" value="1" checked> uzupełnij telefony w kartotece „Osoby bez konta” (dopasowanie po imieniu i nazwisku, bez nadpisywania)</label></div>
+    <div class="actions"><button class="btn secondary" type="submit" name="tryb" value="podglad">Podgląd (bez zapisu)</button>
+      <button class="btn" type="submit" name="tryb" value="importuj" data-confirm-click="Zaimportować rezerwacje?">Importuj</button></div>
+  </form>
+</div>
+{% if result %}
+<h2>{% if preview %}Podgląd — nic nie zapisano{% else %}Wynik importu{% endif %}</h2>
+<div class="card"><table>
+  <tr><th>{% if preview %}Rezerwacje do dodania{% else %}Dodane rezerwacje{% endif %}</th><td>{{ result.dodane }}</td></tr>
+  <tr><th>Pominięte (już w archiwum)</th><td>{{ result.pominiete }}</td></tr>
+  {% if result.zakres %}<tr><th>Zakres dat</th><td>{{ result.zakres.0|date:"j.m.Y" }} – {{ result.zakres.1|date:"j.m.Y" }}</td></tr>{% endif %}
+  <tr><th>{% if preview %}Blokady osi do utworzenia{% else %}Utworzone blokady osi{% endif %}</th><td>{{ result.blokady }}</td></tr>
+  <tr><th>{% if preview %}Telefony do uzupełnienia w kartotece{% else %}Uzupełnione telefony w kartotece{% endif %}</th><td>{{ result.telefony }}{% if result.bez_kartoteki %} <span class="small muted">(klientów bez jednoznacznej osoby w kartotece: {{ result.bez_kartoteki }})</span>{% endif %}</td></tr>
+</table>
+{% if result.przyszle %}<h3>Przyszłe terminy</h3><ul>{% for x in result.przyszle %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+{% if result.konflikty %}<div class="msg warning"><strong>Kolizje z rezerwacjami w nowym systemie (bez blokady — sprawdź ręcznie):</strong><ul>{% for x in result.konflikty %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+{% if result.bez_osi %}<div class="msg warning"><strong>Nie rozpoznano osi (zapisane tylko w archiwum):</strong><ul>{% for x in result.bez_osi %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+{% if not preview %}<div class="actions"><a class="btn" href="{% url 'panel:reservations_archive' %}">Przejdź do archiwum</a></div>{% endif %}</div>
+{% endif %}
+{% endblock %}

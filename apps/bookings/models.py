@@ -237,3 +237,32 @@ class Block(models.Model):
 
     def __str__(self):
         return f"{self.title} · {timezone.localtime(self.starts_at):%d.%m.%Y %H:%M}–{timezone.localtime(self.ends_at):%H:%M}"
+
+
+class ArchivedReservation(models.Model):
+    """Rezerwacja z poprzedniego systemu (GunTracker) — archiwum do wglądu. Przyszłe terminy dostają blokadę osi."""
+
+    source = models.CharField("system źródłowy", max_length=20, default="guntracker")
+    row_hash = models.CharField(max_length=64, unique=True)
+    number = models.CharField("numer w GunTrackerze", max_length=40, db_index=True)
+    starts_at = models.DateTimeField("początek", db_index=True)
+    ends_at = models.DateTimeField("koniec")
+    client = models.CharField("klient", max_length=160)
+    lane_label = models.CharField("oś / instruktor (GunTracker)", max_length=80)
+    lane = models.ForeignKey(Lane, verbose_name="oś", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    positions = models.CharField("stanowiska", max_length=40, blank=True)
+    range_officer = models.CharField("prowadzący strzelanie", max_length=160, blank=True)
+    logbook_info = models.CharField("księga pobytu", max_length=80, blank=True)
+    payment = models.CharField("płatność", max_length=80, blank=True)
+    contact = models.CharField("kontakt", max_length=40, blank=True)
+    block = models.ForeignKey(Block, verbose_name="blokada osi", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-starts_at"]
+        verbose_name = "rezerwacja archiwalna (GunTracker)"
+        verbose_name_plural = "archiwum rezerwacji"
+
+    def __str__(self):
+        return f"{self.number} {self.starts_at:%Y-%m-%d %H:%M}"

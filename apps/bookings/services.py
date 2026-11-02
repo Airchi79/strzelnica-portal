@@ -437,7 +437,7 @@ def block_conflicts(lanes, occurrences):
     for start, end in occurrences:
         q |= Q(starts_at__lt=end, ends_at__gt=start)
     return (
-        Reservation.objects.filter(lane__in=lanes, status=Reservation.Status.CONFIRMED)
+        Reservation.objects.filter(lane__in=lanes, status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL])
         .filter(q)
         .select_related("lane", "user")
         .order_by("starts_at")

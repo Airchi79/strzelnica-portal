@@ -7,6 +7,7 @@
   <a class="btn secondary" href="?otwarte=1&amp;od={% now 'Y-m-d' %}&amp;do={% now 'Y-m-d' %}">Na strzelnicy teraz ({{ open_count }})</a>
   {% if perms.logbook.manage_logbook %}<a class="btn secondary" href="{% url 'panel:logbook_settings' %}">Ustawienia i kod QR</a>
   <a class="btn secondary" href="{% url 'panel:kiosks' %}">Kioski</a>{% endif %}
+  <a class="btn secondary" href="{% url 'panel:logbook_archive' %}">Archiwum (GunTracker)</a>
 </div>
 <form method="get" class="card filters">
   <div><label for="f-od">Od</label><input type="date" id="f-od" name="od" value="{{ f.od|date:'Y-m-d' }}"></div>

@@ -287,3 +287,29 @@ def test_staff_entry_prefill_from_person(owner_client):
     assert "Ewa Kartotekowa" in body and "CD7654321" not in body
     body = owner_client.get(f"/panel/ksiazka/nowy-wpis/?osoba={p.pk}").content.decode()
     assert 'value="Kartotekowa"' in body and 'value="CD7654321"' in body and "Dane z kartoteki" in body
+
+
+def _broken_dimension(uploaded):
+    """Odtwarza eksport GunTrackera: w pliku zapisany rozmiar arkusza „A1:A1” mimo wielu wierszy."""
+    import io
+    import re
+    import zipfile
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    src = zipfile.ZipFile(io.BytesIO(uploaded.read()))
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as z:
+        for item in src.infolist():
+            data = src.read(item)
+            if item.filename.startswith("xl/worksheets/sheet"):
+                data = re.sub(rb'<dimension ref="[^"]+"', b'<dimension ref="A1:A1"', data)
+            z.writestr(item, data)
+    return SimpleUploadedFile(uploaded.name, out.getvalue())
+
+
+def test_persons_import_ignores_wrong_sheet_dimension(owner_client):
+    from apps.clients.models import Person
+
+    owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": _broken_dimension(_gt_xlsx(GT_ROWS)), "tryb": "importuj"})
+    assert Person.objects.count() == 3

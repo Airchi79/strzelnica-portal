@@ -33,6 +33,7 @@ def read_rows(uploaded):
     except Exception as e:  # uszkodzony lub nie-XLSX plik
         raise ValidationError("To nie jest poprawny plik Excel (XLSX).") from e
     ws = wb.worksheets[0]
+    ws.reset_dimensions()  # GunTracker zapisuje w pliku błędny rozmiar arkusza („A1:A1”)
     rows = ws.iter_rows(values_only=True)
     header = [str(v or "").strip().lower() for v in next(rows, [])]
     index = {}

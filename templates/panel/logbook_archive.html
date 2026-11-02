@@ -1,0 +1,34 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Archiwum książki pobytu{% endblock %}
+{% block panel %}
+<h1>Archiwum książki pobytu (GunTracker)</h1>
+<p class="muted">Wpisy z poprzedniego systemu — tylko do odczytu, przechowywane osobno od bieżącej książki. Potwierdzenia i podpisy tych wpisów były składane w GunTrackerze.</p>
+<div class="actions" style="margin-top:0;margin-bottom:12px">
+  <a class="btn secondary" href="{% url 'panel:logbook' %}">← Bieżąca książka pobytu</a>
+  {% if perms.logbook.manage_logbook %}<a class="btn secondary" href="{% url 'panel:logbook_archive_import' %}">Import z GunTrackera</a>{% endif %}
+</div>
+<form method="get" class="card filters">
+  <div><label for="f-od">Od</label><input type="date" id="f-od" name="od" value="{{ f.od|date:'Y-m-d' }}"></div>
+  <div><label for="f-do">Do</label><input type="date" id="f-do" name="do" value="{{ f.do|date:'Y-m-d' }}"></div>
+  <div><label for="f-q">Szukaj</label><input type="search" id="f-q" name="q" value="{{ f.q }}" placeholder="nazwisko, nr pozwolenia"></div>
+  <div class="actions"><button class="btn" type="submit">Filtruj</button>
+    <a class="btn secondary" href="{% url 'panel:logbook_archive_print' %}?{{ query }}" target="_blank" rel="noopener">Wydruk / PDF</a></div>
+</form>
+<div class="actions" style="margin-top:0;margin-bottom:12px;align-items:center">
+  <span class="muted small">{{ page.paginator.count }} z {{ total }} wpisów{% if not reveal %} · numery pozwoleń i adresy ukryte{% endif %}</span>
+  {% if rows and not reveal %}<form method="post">{% csrf_token %}{% for k, v in request.GET.items %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <input type="hidden" name="pokaz" value="1"><button class="btn secondary small-btn" type="submit">Pokaż dane na tej stronie</button></form>
+  {% elif reveal %}<span class="badge warn">dane odkryte — dostęp zapisano w dzienniku</span>{% endif %}
+</div>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Wejście</th><th>Osoba</th><th>Pozwolenie / adres</th><th>Oś</th><th>Wyjście</th></tr>
+  {% for e in rows %}<tr>
+    <td>{{ e.started_at|date:"j.m.Y H:i" }}{% if e.entry_type %}<div class="small muted">{{ e.entry_type }}</div>{% endif %}</td>
+    <td data-label="Osoba">{{ e.full_name }}{% if e.confirmation %}<div class="small muted">{{ e.confirmation }}</div>{% endif %}</td>
+    <td data-label="Pozwolenie / adres">{% if reveal %}{% if e.permit_number %}{{ e.permit_number }}<div class="small muted">{{ e.permit_issuer }}</div>{% endif %}{% if e.address %}<div class="small">{{ e.address }}</div>{% endif %}{% else %}<span class="muted">{{ e.masked }}</span>{% endif %}</td>
+    <td data-label="Oś">{{ e.lane }}{% if e.position %}<div class="small muted">stanowisko {{ e.position }}</div>{% endif %}</td>
+    <td data-label="Wyjście">{{ e.ended_at|time:"H:i"|default:"—" }}{% if e.duration_minutes is not None %}<div class="small muted">{{ e.duration_minutes }} min</div>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Brak wpisów archiwalnych.</td></tr>{% endfor %}
+</table></div></section>
+{% include "partials/pagination.html" %}
+{% endblock %}

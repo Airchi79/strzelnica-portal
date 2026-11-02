@@ -449,3 +449,51 @@ def panel_days(request):
         "earlier": start - timedelta(days=7), "later": start + timedelta(days=7), "lanes": Lane.objects.all(),
         "total": sum(len(rows) for _, rows in groups),
     })
+
+
+# --- archiwum rezerwacji z GunTrackera ---------------------------------------------------------
+
+
+@panel_required(PERM)
+def panel_archive(request):
+    from .models import ArchivedReservation
+
+    q = request.GET.get("q", "").strip()
+    qs = ArchivedReservation.objects.select_related("lane", "block")
+    if q:
+        qs = qs.filter(Q(client__icontains=q) | Q(number__icontains=q) | Q(range_officer__icontains=q) | Q(contact__icontains=q))
+    if request.GET.get("przyszle") == "1":
+        qs = qs.filter(ends_at__gt=timezone.now()).order_by("starts_at")
+    page = Paginator(qs, 50).get_page(request.GET.get("page"))
+    return render(request, "panel/bookings_archive.html", {"page": page, "q": q, "przyszle": request.GET.get("przyszle") == "1",
+                                                            "total": ArchivedReservation.objects.count()})
+
+
+@panel_required(PERM)
+def panel_archive_import(request):
+    from . import archive
+
+    result = preview = None
+    year = timezone.localdate().year
+    if request.method == "POST":
+        uploaded = request.FILES.get("plik")
+        preview = request.POST.get("tryb") != "importuj"
+        try:
+            year = int(request.POST.get("rok", year))
+            if not 2000 <= year <= 2100:
+                raise ValueError
+        except (TypeError, ValueError):
+            messages.error(request, "Podaj poprawny rok.")
+        else:
+            if uploaded is None:
+                messages.error(request, "Wybierz plik XLSX.")
+            else:
+                try:
+                    result = archive.run(uploaded, year=year, by=request.user, preview=preview,
+                                         update_contacts=request.POST.get("kontakty") == "1")
+                except ValidationError as e:
+                    messages.error(request, " ".join(e.messages))
+                else:
+                    if not preview:
+                        messages.success(request, "Import rezerwacji zakończony.")
+    return render(request, "panel/bookings_archive_import.html", {"result": result, "preview": preview, "year": year})

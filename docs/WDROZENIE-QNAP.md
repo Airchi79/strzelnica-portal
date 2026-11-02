@@ -1,8 +1,13 @@
 # Przeniesienie systemu z Unraid na QNAP (TS-351, QTS 5.2, Container Station 3)
 
-Cel: strzelnica działa na QNAP, Unraid można wyłączyć. Adres strony się nie zmienia — tunel Cloudflare zostaje ten sam,
-zmienia się tylko adres serwera, na który wskazuje (z `192.168.1.9` na `192.168.1.87`).
-**Do ostatniego kroku Unraid zostaje nietknięty** — powrót to jedna zmiana w Cloudflare.
+Cel: strzelnica działa na QNAP. Adres strony się nie zmienia. Strzelnica ma **własny tunel Cloudflare „qnap”**
+(kontener `tunnel` w tym projekcie) — tunel „unraid” obsługuje inne usługi (kamery, Home Assistant itd.)
+i **nie wolno dodawać QNAP jako jego repliki** (ruch innych usług trafiałby losowo na QNAP).
+**Do ostatniego kroku Unraid zostaje nietknięty** — powrót to przeniesienie dwóch tras z powrotem.
+
+> Stan na 02.11.2026: przeprowadzka wykonana — aplikacja, baza, kopie i tunel „qnap” działają na QNAP,
+> folder `/share/strzelnica` (wolumin `DataVol1`, fizycznie `/share/CACHEDEV3_DATA/strzelnica`), `PUID=1000`, `PGID=100`.
+> Na Unraid kontenery strzelnicy są zatrzymane (zapas na tydzień); `cloudflared` na Unraid działa dalej dla innych usług.
 
 Przerwa w działaniu strony: ok. 15–30 minut (od zatrzymania aplikacji na Unraid do uruchomienia na QNAP).
 
@@ -134,46 +139,42 @@ docker compose ps
 
 > Jeśli port 8000 jest zajęty na QNAP, ustaw w `.env` `APP_PORT=8010` i w kroku 6 użyj portu 8010.
 
-## 6. Przełączenie tunelu Cloudflare
+## 6. Tunel „qnap” i przeniesienie adresów
 
-1. Cloudflare → **Zero Trust → Networks → Tunnels** → Twój tunel → **Configure → Public Hostname**.
-2. Przy `rezerwacje.strzelnicasatok.pl` (i `rezerwacje.airchi.pl`, jeśli jest) → **Edit** → **URL** zmień
-   z `192.168.1.9:8000` na **`192.168.1.87:8000`** → **Save**.
-3. Otwórz stronę w telefonie (na danych komórkowych): logowanie, panel, rezerwacje, Klienci, Książka pobytu.
-
-Tunel działa jeszcze przez kontener `cloudflared` na Unraid — to w porządku: Unraid tylko przekazuje ruch do QNAP.
-
-## 7. Tunel na QNAP (żeby wyłączyć Unraid)
-
-1. W Cloudflare w tym samym tunelu: **Configure → Overview** — w poleceniu instalacji jest token (długi ciąg po `--token`).
-   Skopiuj go. **Nie wklejaj go do czatu.**
-2. Na QNAP dopisz do `.env` linię `TUNNEL_TOKEN=…` (wklej token):
+1. Cloudflare → **Networks → Tunnels → Create a tunnel** → **Cloudflared** → nazwa `qnap` → **Create Tunnel**.
+   Na ekranie instalacji (zakładka **Docker**) skopiuj **tylko** długi ciąg po `--token` — **nie wklejaj go do czatu**,
+   polecenia `docker run` nie uruchamiaj.
+2. Na QNAP dopisz token do `.env` (zamiast `WKLEJ_TOKEN`, zachowaj apostrofy) i uruchom tunel:
 
 ```bash
-cd /share/strzelnica && vi .env
+echo 'TUNNEL_TOKEN=WKLEJ_TOKEN' >> /share/strzelnica/.env
 ```
 
-3. Uruchom tunel na QNAP:
-
 ```bash
-docker compose --profile tunel up -d
+cd /share/strzelnica && docker compose --profile tunel up -d && sleep 15 && docker compose --profile tunel ps tunnel
 ```
 
-4. W Cloudflare (Tunnels) przy tunelu pojawią się **2 połączenia** (Unraid i QNAP).
+3. W Cloudflare tunel `qnap` ma status **Healthy**.
+4. Tunel **unraid → Routes**: usuń tylko trasy `rezerwacje.strzelnicasatok.pl` i `rezerwacje.airchi.pl`.
+5. Tunel **qnap → Routes → Add route → Published application**: `rezerwacje` / `strzelnicasatok.pl`, typ **HTTP**,
+   URL **`app:8000`** (potwierdź nadpisanie rekordu DNS); to samo dla `rezerwacje` / `airchi.pl`.
+6. Sprawdź stronę w telefonie (na danych komórkowych). Jeśli przeglądarka pokazuje „Brak połączenia z internetem” —
+   to zapamiętana strona z chwili przełączenia: **Ctrl+F5**.
 
-## 8. Wyłączenie systemu na Unraid
+**Powrót na Unraid:** trasy z tunelu `qnap` z powrotem do `unraid` (URL `192.168.1.9:8000`),
+a na Unraid `docker compose start db app cron`.
 
-Gdy wszystko działa (najlepiej po dniu–dwóch), na Unraid:
+## 8. Sprzątanie na Unraid (po tygodniu bez problemów)
+
+Kontenerów `cloudflared` i innych usług na Unraid **nie wyłączaj**. Usuń tylko kontenery i obraz strzelnicy
+(obraz zawiera kopię danych z czasu budowy):
 
 ```bash
-cd /mnt/user/appdata/strzelnica-portal && docker compose down && docker stop cloudflared
+cd /mnt/user/appdata/strzelnica-portal && docker compose down && docker image rm strzelnica-portal:latest
 ```
 
 Dane na Unraid zostają (folder `appdata/strzelnica-portal`) — **nie usuwaj ich przez co najmniej tydzień**.
 Po tym czasie Unraid można wyłączyć.
-
-**Powrót na Unraid** (gdyby coś poszło nie tak przed krokiem 8): w Cloudflare zmień URL z powrotem na
-`192.168.1.9:8000`, a na Unraid `docker compose start app cron`.
 
 ## 9. Po przeprowadzce
 

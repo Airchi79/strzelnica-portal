@@ -9,7 +9,7 @@ Kiosk na Raspberry Pi: [`deploy/raspberry-pi/README.md`](deploy/raspberry-pi/REA
 
 ## Uruchomienie produkcyjne (Docker)
 
-Instrukcja krok po kroku dla serwera Unraid: [`docs/WDROZENIE-UNRAID.md`](docs/WDROZENIE-UNRAID.md).
+Instrukcja dla serwera QNAP (obecny serwer): [`docs/WDROZENIE-QNAP.md`](docs/WDROZENIE-QNAP.md); wcześniejsza dla Unraid: [`docs/WDROZENIE-UNRAID.md`](docs/WDROZENIE-UNRAID.md).
 
 ```bash
 cp .env.example .env          # uzupełnij sekrety i adres

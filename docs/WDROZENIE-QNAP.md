@@ -179,11 +179,51 @@ Po tym czasie Unraid można wyłączyć.
 ## 8. Po przeprowadzce
 
 - **Wyłącz SSH** na QNAP.
-- **Kopia poza QNAP**: kopie bazy są w `/share/strzelnica/backups` (codziennie, 7 ostatnich). Ustaw w **Hybrid Backup Sync**
-  zadanie kopiujące ten folder (i `data/private`) na dysk USB albo do chmury — dyski w QNAP są stare.
+- **Kopia poza QNAP** — rozdział 9 poniżej.
 - Migawki woluminu `DataVol1` (codziennie 3:00) dodatkowo chronią przed przypadkowym usunięciem i ransomware.
 - Aktualizacja programu na QNAP (zamiast poleceń z instrukcji Unraid):
 
 ```bash
 cd /share/strzelnica && wget -O tmp/strzelnica.tar.gz https://github.com/Airchi79/strzelnica-portal/archive/refs/heads/main.tar.gz && tar -xzf tmp/strzelnica.tar.gz -C tmp && cp -a tmp/strzelnica-portal-main/. /share/strzelnica/ && docker compose up -d --build
 ```
+
+## 9. Kopia zapasowa poza QNAP (Hybrid Backup Sync)
+
+**Co kopiujemy:** `/share/strzelnica/backups` (codzienne kopie bazy, 7 ostatnich — kilka MB) i
+`/share/strzelnica/data/private` (skany dokumentów). **Nie** kopiujemy `data/postgres` (pliki działającej bazy — kopia byłaby
+niespójna; od tego są pliki z `backups`). Razem kilkanaście MB — kopia trwa sekundy.
+
+**Plik `.env`** (hasło bazy, klucz aplikacji, hasło poczty) jest potrzebny do odtworzenia systemu. Zapisz jego treść raz
+w menedżerze haseł (np. Bitwarden, KeePass) i aktualizuj po każdej zmianie. Nie wysyłaj go e-mailem ani czatem.
+
+**Gdzie:** najlepiej **oba** miejsca — dysk USB (szybkie odtworzenie) i chmura (pożar, kradzież, przepięcie zabiera też USB).
+Kopie zawierają dane osobowe — **zawsze z szyfrowaniem** (hasło szyfrowania zapisz w menedżerze haseł; bez niego kopii nie odczytasz).
+
+### A. Dysk USB
+1. Podłącz dysk (pendrive 32 GB+ albo dysk zewnętrzny) do portu USB z tyłu QNAP.
+2. *Pamięć masowa i migawki → Zewnętrzna pamięć masowa* → dysk → **Formatuj** → system plików **NTFS** lub **exFAT**
+   (czytelny także w Windows) → etykieta np. `KOPIA-STRZELNICA`. Formatowanie usuwa zawartość dysku.
+3. *App Center* → zainstaluj **Hybrid Backup Sync 3** (jeśli go nie ma) → otwórz.
+4. **Kopia zapasowa i przywracanie → Utwórz → Nowe zadanie kopii zapasowej**.
+5. **Źródło:** zaznacz `strzelnica/backups` i `strzelnica/data/private`.
+6. **Miejsce docelowe:** **Lokalny NAS** → folder na dysku USB (np. `KOPIA-STRZELNICA/strzelnica`).
+7. **Harmonogram:** codziennie, **04:30** (po migawce o 3:00).
+8. **Zasady / opcje:** włącz **szyfrowanie po stronie klienta** (hasło!), **wersjonowanie** — „Inteligentne wersjonowanie”
+   albo 30 wersji.
+9. **Powiadomienia:** e-mail przy błędzie zadania (wymaga ustawionej poczty w *Panel sterowania → Centrum powiadomień*;
+   można użyć tego samego konta co aplikacja: serwer LH, port 465, SSL).
+10. **Utwórz** → **Uruchom teraz** → status „Ukończono”.
+
+### B. Chmura (zalecana druga kopia)
+Danych jest bardzo mało, więc koszt jest pomijalny. Do wyboru:
+- **Google Drive / OneDrive** — jeśli już masz konto (wystarczy darmowe miejsce);
+- **Backblaze B2** — płatność za GB, przy tej ilości danych grosze miesięcznie.
+
+W HBS 3: **Kopia zapasowa i przywracanie → Utwórz → Nowe zadanie kopii zapasowej** → to samo źródło → **Miejsce docelowe:**
+usługa w chmurze → **Dodaj konto** (logowanie do Google/Microsoft albo klucze B2) → folder `strzelnica-kopia` →
+harmonogram **05:00** → **szyfrowanie po stronie klienta: obowiązkowo** → wersjonowanie → powiadomienia jak wyżej.
+
+### C. Próba odtworzenia (raz, potem co kilka miesięcy)
+W HBS 3 → zadanie → **Przywróć** → wybierz najnowszą wersję → przywróć jeden plik `.dump` do **innego** folderu
+(np. `Public/test-przywracania`) → sprawdź, że plik ma rozmiar podobny jak w `backups`. Kopia, której nie dało się
+odtworzyć, nie jest kopią. Po teście usuń przywrócony plik.

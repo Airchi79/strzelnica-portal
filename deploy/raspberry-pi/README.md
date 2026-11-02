@@ -45,17 +45,22 @@ Zasilacz 27 W (2) przyda się do pierwszej instalacji i testów w domu; na strze
 Przetwornica 5 V bez negocjacji USB‑PD jest traktowana przez Pi 5 jak zasilacz 3 A (prąd portów USB ograniczony do 0,6 A —
 czytnikowi to wystarcza). Jeśli przetwornica ma pewne 5 A, można dopisać `usb_max_current_enable=1` w `/boot/firmware/config.txt`.
 
-**Bilans energii (szacunek do weryfikacji pomiarem):** Pi 5 z ekranem i czytnikiem ok. 6–8 W, router LTE ok. 2–4 W,
-straty przetwornic ok. 15%. Przy pracy tylko w godzinach otwarcia (np. 8:30–18:30, skrypt `harmonogram.sh`) to ok. **110–130 Wh na dobę**;
-przy pracy całą dobę — ok. 3 razy więcej. Akumulator 12 V 100 Ah (ok. 1280 Wh) daje wtedy kilka–kilkanaście dni pracy bez słońca.
-W grudniu i styczniu panele dają w Polsce bardzo mało energii — o tym, czy zimą wystarczą, zdecydują ich dane z tabliczki
-(moc Wp, napięcia Vmp i Voc); bez nich nie da się rzetelnie dobrać regulatora ani ocenić bilansu.
+**Bilans energii przy pracy całą dobę (szacunek do weryfikacji pomiarem):** Pi 5 z ekranem i czytnikiem ok. 6–8 W, router LTE
+ok. 2–4 W, straty przetwornic ok. 15% — razem ok. **280–330 Wh na dobę**. Z wygaszaniem ekranu przy bezczynności
+(`sh install.sh <adres> wygaszaj`) zużycie spada, ale realnie nadal ok. 200–250 Wh na dobę.
+Akumulator LiFePO4 12 V 100 Ah (ok. 1000 Wh do wykorzystania) to ok. **4–5 dni** pracy bez słońca; 2 × 100 Ah — ok. 8–10 dni.
+W grudniu i styczniu 1 Wp panelu daje w Polsce średnio poniżej 1 Wh na dobę, więc do pracy całą dobę zimą potrzeba rzędu
+**300–500 Wp paneli** skierowanych na południe, stromo (ok. 60°). Dwa panele z latarni mogą zimą nie wystarczyć — decyzja po danych z tabliczek.
+Jeśli zabraknie: większy akumulator, dodatkowy panel albo zimowy harmonogram nocnego wyłączania (`harmonogram.sh`) tylko w listopadzie–lutym.
+
+**Internet:** router LTE z kartą Play albo Orange — wybierz sieć, która przy ścianie kontenera ma lepszy sygnał (sprawdź telefonem z każdą kartą).
+Kiosk przesyła niewiele danych (kilkaset MB miesięcznie z zapasem); przy słabym sygnale — antena zewnętrzna LTE do routera.
 
 **Ograniczenia warunków zewnętrznych:** Raspberry Pi i ekran Touch Display 2 nie są urządzeniami przemysłowymi na mróz.
 W skrzynce jest tylko ekran (nagrzewa się podświetleniem), ale przy silnym mrozie ekran może reagować wolno, a w rękawiczkach dotyk
 nie działa. Ekran nie może stać w pełnym słońcu bez osłony (nagrzewanie). Na takie dni zostaje wpis telefonem z kodu QR przy wejściu.
 
-**Harmonogram pracy** (po instalacji kiosku, wymaga baterii RTC):
+**Harmonogram pracy** (opcjonalnie — gdy kiosk ma nie pracować całą dobę, np. zimą; wymaga baterii RTC):
 
 ```bash
 sh harmonogram.sh 08:30 18:30

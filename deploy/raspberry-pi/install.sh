@@ -1,9 +1,11 @@
 #!/bin/sh
 # Kiosk książki pobytu na Raspberry Pi (Raspberry Pi OS Bookworm z pulpitem, Wayland/labwc).
-# Uruchom jako zwykły użytkownik (nie root):  sh install.sh https://rezerwacje.strzelnicasatok.pl/kiosk/
+# Uruchom jako zwykły użytkownik (nie root):  sh install.sh https://rezerwacje.strzelnicasatok.pl/kiosk/ [wygaszaj]
+# Drugi argument „wygaszaj”: ekran gaśnie po bezczynności i budzi się dotykiem lub skanem (praca całą dobę z akumulatora).
 set -eu
 
 URL="${1:-https://rezerwacje.strzelnicasatok.pl/kiosk/}"
+BLANK="${2:-}"
 case "$URL" in https://*/kiosk/) ;; *) echo "Podaj adres kiosku, np. https://rezerwacje.strzelnicasatok.pl/kiosk/"; exit 1 ;; esac
 if [ "$(id -u)" = "0" ]; then echo "Uruchom jako zwykły użytkownik (skrypt sam użyje sudo tam, gdzie trzeba)."; exit 1; fi
 
@@ -12,8 +14,14 @@ sudo apt-get update
 sudo apt-get -y full-upgrade
 sudo apt-get -y install chromium-browser || sudo apt-get -y install chromium
 
-echo "== Ekran nie wygasa, automatyczne logowanie do pulpitu"
-sudo raspi-config nonint do_blanking 1 || true
+if [ "$BLANK" = "wygaszaj" ]; then
+  echo "== Wygaszanie ekranu po bezczynności włączone (oszczędzanie akumulatora)"
+  sudo raspi-config nonint do_blanking 0 || true
+else
+  echo "== Ekran nie wygasa"
+  sudo raspi-config nonint do_blanking 1 || true
+fi
+echo "== Automatyczne logowanie do pulpitu"
 sudo raspi-config nonint do_boot_behaviour B4 || true
 
 BROWSER=$(command -v chromium-browser || command -v chromium)

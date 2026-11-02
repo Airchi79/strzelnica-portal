@@ -288,6 +288,19 @@ def panel_add(request):
     initial = {"entered_at": timezone.localtime(now).replace(second=0, microsecond=0)}
     if request.GET.get("rezerwacja", "").isdigit():
         initial.update(purpose=Entry.Purpose.SHOOTING, reservation=int(request.GET["rezerwacja"]))
+    # Osoba z kartoteki (np. z GunTrackera): wyszukanie i uzupełnienie danych — dostęp zapisywany w dzienniku.
+    from apps.clients.models import Person
+
+    person_q = request.GET.get("osoba_q", "").strip()
+    matches = list(Person.objects.filter(last_name__istartswith=person_q)[:10]) if len(person_q) >= 2 else []
+    chosen = None
+    if request.GET.get("osoba", "").isdigit():
+        chosen = Person.objects.filter(pk=int(request.GET["osoba"])).first()
+        if chosen:
+            log_sensitive_access(chosen.user, f"kartoteka:osoba:{chosen.pk}", "uzupełnienie wpisu w książce pobytu")
+            initial.update(first_name=chosen.first_name, last_name=chosen.last_name, address=chosen.address,
+                           has_permit="tak" if chosen.permit_number else "nie", permit_number=chosen.permit_number,
+                           permit_issuer=chosen.permit_issuer)
     form = StaffEntryForm(request.POST or None, initial=initial, reservations=_staff_reservations(now))
     if request.method == "POST" and form.is_valid():
         d = form.cleaned_data
@@ -306,7 +319,9 @@ def panel_add(request):
                 url = reverse("panel:logbook_add")
                 return redirect(f"{url}?rezerwacja={entry.reservation_id}" if entry.reservation_id else url)
             return redirect("panel:logbook_entry", pk=entry.pk)
-    return render(request, "panel/logbook_add.html", {"form": form})
+    return render(request, "panel/logbook_add.html", {
+        "form": form, "person_q": person_q, "matches": matches, "chosen": chosen, "reservation_param": request.GET.get("rezerwacja", ""),
+    })
 
 
 @panel_required("logbook.manage_logbook")

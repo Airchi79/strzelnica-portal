@@ -1,0 +1,11 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{% if person %}{{ person.full_name }}{% else %}Nowa osoba{% endif %}{% endblock %}
+{% block panel %}
+<h1>{% if person %}{{ person.full_name }}{% else %}Nowa osoba w kartotece{% endif %}</h1>
+{% include "panel/_clients_tabs.html" %}
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
+  <p class="small muted">Do wpisu w książce pobytu potrzebny jest numer pozwolenia z organem albo adres.</p>
+  <div class="actions"><button class="btn" type="submit">Zapisz</button><a class="btn secondary" href="{% url 'panel:persons' %}">Anuluj</a></div></form>
+{% if person %}<form method="post" data-confirm="Usunąć {{ person.full_name }} z kartoteki? Wpisy w książce pobytu zostają bez zmian.">{% csrf_token %}<input type="hidden" name="action" value="delete"><button class="btn danger small-btn" type="submit">Usuń z kartoteki</button></form>
+<p class="small muted">Pochodzenie: {{ person.get_source_display }}, dodano {{ person.created_at|date:"j.m.Y" }}.</p>{% endif %}</div>
+{% endblock %}

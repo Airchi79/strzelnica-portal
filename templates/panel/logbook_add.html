@@ -3,6 +3,13 @@
 {% block panel %}
 <h1>Wpis do książki pobytu przez obsługę</h1>
 <p class="muted">Dla osoby bez telefonu albo gdy wpis przy wejściu się nie udał. Osoba sama sprawdza dane, potwierdza oświadczenie i podpisuje się palcem na tym urządzeniu. Wpis zostanie oznaczony jako dodany przez Ciebie.</p>
+<form method="get" class="card filters">
+  {% if reservation_param %}<input type="hidden" name="rezerwacja" value="{{ reservation_param }}">{% endif %}
+  <div><label for="osoba_q">Osoba z kartoteki (bez konta)</label><input type="search" id="osoba_q" name="osoba_q" value="{{ person_q }}" placeholder="początek nazwiska"></div>
+  <div class="actions"><button class="btn secondary" type="submit">Szukaj</button></div>
+  {% if person_q %}<ul class="kiosk-list" style="grid-column:1/-1">{% for p in matches %}<li><a href="?osoba={{ p.pk }}{% if reservation_param %}&amp;rezerwacja={{ reservation_param }}{% endif %}">{{ p.full_name }}</a>{% if not p.complete_for_logbook %} <span class="badge warn">braki</span>{% endif %}</li>{% empty %}<li class="muted">Nie znaleziono.</li>{% endfor %}</ul>{% endif %}
+</form>
+{% if chosen %}<div class="msg">Dane z kartoteki: <strong>{{ chosen.full_name }}</strong> — poproś osobę o sprawdzenie i podpis.</div>{% endif %}
 <form method="post" novalidate data-entry-form class="card">{% csrf_token %}
   {% if form.non_field_errors %}<div class="msg error">{% for e in form.non_field_errors %}{{ e }}<br>{% endfor %}</div>{% endif %}
   {% with f=form.entered_at %}{% include "logbook/_field.html" with field=f %}{% endwith %}

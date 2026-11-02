@@ -96,3 +96,41 @@ class ClientPass(models.Model):
     @property
     def is_paid(self):
         return bool(self.paid_with)
+
+
+class Person(models.Model):
+    """Osoba z kartoteki bez konta w systemie (np. klienci przeniesieni z GunTrackera). Służy obsłudze do szybkiego
+    uzupełnienia wpisu w książce pobytu; dane są widoczne tylko w panelu (z rejestrem wglądu)."""
+
+    class Source(models.TextChoices):
+        GUNTRACKER = "guntracker", "Import z GunTrackera"
+        PANEL = "panel", "Dodana w panelu"
+
+    first_name = models.CharField("imię", max_length=80)
+    last_name = models.CharField("nazwisko", max_length=120, db_index=True)
+    permit_number = models.CharField("numer pozwolenia na broń", max_length=64, blank=True)
+    permit_issuer = models.CharField("organ, który wydał pozwolenie", max_length=160, blank=True)
+    address = models.CharField("adres", max_length=255, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="konto", null=True, blank=True, on_delete=models.SET_NULL,
+                             related_name="kartoteka_persons")
+    source = models.CharField("pochodzenie", max_length=12, choices=Source.choices, default=Source.PANEL)
+    note = models.CharField("uwagi", max_length=255, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["last_name", "first_name"]
+        verbose_name = "osoba z kartoteki"
+        verbose_name_plural = "osoby z kartoteki"
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
+    @property
+    def complete_for_logbook(self):
+        """Wystarcza do wpisu w książce: pozwolenie z organem albo adres."""
+        return bool((self.permit_number and self.permit_issuer) or self.address)

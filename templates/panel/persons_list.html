@@ -1,0 +1,29 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Osoby bez konta{% endblock %}
+{% block panel %}
+<h1>Klienci</h1>
+{% include "panel/_clients_tabs.html" %}
+<p class="muted">Osoby z kartoteki, które nie mają konta w systemie (m.in. przeniesione z GunTrackera). Obsługa wybiera je przy „Wpisie przez obsługę” w książce pobytu — dane uzupełniają się same. Na kiosku i w formularzach publicznych nie są dostępne.</p>
+<form method="get" class="card filters">
+  <div><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ q }}" placeholder="nazwisko, imię, nr pozwolenia"></div>
+  <div class="checkbox"><label><input type="checkbox" name="niepelne" value="1"{% if niepelne %} checked{% endif %}> tylko z brakami</label></div>
+  <div class="actions"><button class="btn" type="submit">Pokaż</button>
+    {% if perms.clients.manage_clients %}<a class="btn secondary" href="{% url 'panel:person_new' %}">+ Dodaj osobę</a>{% endif %}</div>
+</form>
+<div class="actions" style="margin-top:0;margin-bottom:12px;align-items:center">
+  <span class="muted small">{{ page.paginator.count }} z {{ total }} osób{% if not reveal %} · numery pozwoleń i adresy ukryte{% endif %}</span>
+  {% if people and not reveal %}<form method="post">{% csrf_token %}{% for k, v in request.GET.items %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <input type="hidden" name="pokaz" value="1"><button class="btn secondary small-btn" type="submit">Pokaż dane na tej stronie</button></form>
+  {% elif reveal %}<span class="badge warn">dane odkryte — dostęp zapisano w dzienniku</span>{% endif %}
+</div>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Osoba</th><th>Pozwolenie / adres</th><th>Stan</th><th>Pochodzenie</th></tr>
+  {% for p in people %}<tr>
+    <td>{% if perms.clients.manage_clients %}<a href="{% url 'panel:person_edit' p.pk %}">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}{% if p.user %} <span class="badge">konto</span>{% endif %}</td>
+    <td data-label="Pozwolenie / adres">{% if reveal %}{% if p.permit_number %}{{ p.permit_number }}<div class="small muted">{{ p.permit_issuer|default:"brak organu" }}</div>{% endif %}{% if p.address %}<div class="small">{{ p.address }}</div>{% endif %}{% else %}<span class="muted">{{ p.masked }}</span>{% endif %}</td>
+    <td data-label="Stan">{% if p.complete_for_logbook %}<span class="badge ok">kompletne</span>{% else %}<span class="badge warn">braki</span>{% endif %}</td>
+    <td data-label="Pochodzenie" class="small">{{ p.get_source_display }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Brak osób.{% if perms.clients.manage_clients %} <a href="{% url 'panel:persons_import' %}">Zaimportuj z GunTrackera</a>.{% endif %}</td></tr>{% endfor %}
+</table></div></section>
+{% include "partials/pagination.html" %}
+{% endblock %}

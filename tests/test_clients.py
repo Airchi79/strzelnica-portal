@@ -197,3 +197,93 @@ def test_pass_not_allowed_for_group(ps):
     p = issue(ps)
     with pytest.raises(ValidationError, match="grupy"):
         book(ps, p.code)
+
+
+# --- osoby bez konta (import z GunTrackera) ------------------------------------------------------
+
+
+def _gt_xlsx(rows, header=("Imię", "Nazwisko", "Numer pozwolenia", "Organ wydający", "Adres"), name="Klienci.xlsx"):
+    import io
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(list(header))
+    for r in rows:
+        ws.append(list(r))
+    buf = io.BytesIO()
+    wb.save(buf)
+    return SimpleUploadedFile(name, buf.getvalue())
+
+
+GT_ROWS = [
+    ("Marek", "Testowy", "bb 0030709", "KWP Wrocław", "Główna 1, Wójcice"),
+    ("Tomasz", "Bezpozwolenia", "", "", "Mościckiego 3, Wrocław"),
+    ("Jan", "Bezorganu", "LB123", "", ""),
+    ("", "", "", "", ""),
+]
+
+
+def test_persons_import_preview_import_and_duplicates(owner_client):
+    from apps.clients.models import Person
+
+    body = owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": _gt_xlsx(GT_ROWS), "tryb": "podglad"}).content.decode()
+    assert "nic nie zapisano" in body and not Person.objects.exists()
+    body = owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": _gt_xlsx(GT_ROWS), "tryb": "importuj"}).content.decode()
+    assert Person.objects.count() == 3 and "brak organu" in body
+    p = Person.objects.get(last_name="Testowy")
+    assert p.permit_number == "BB0030709" and p.source == "guntracker" and p.complete_for_logbook
+    assert not Person.objects.get(last_name="Bezorganu").complete_for_logbook
+    body = owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": _gt_xlsx(GT_ROWS), "tryb": "importuj"}).content.decode()
+    assert Person.objects.count() == 3 and "już w kartotece" in body
+
+
+def test_persons_import_rejects_bad_files(owner_client):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    assert "kolumny" in owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": _gt_xlsx([("a",)], header=("X",)), "tryb": "podglad"}).content.decode()
+    assert "XLSX" in owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": SimpleUploadedFile("k.csv", b"a"), "tryb": "podglad"}).content.decode()
+    assert "poprawny plik Excel" in owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": SimpleUploadedFile("k.xlsx", b"zle"), "tryb": "podglad"}).content.decode()
+
+
+def test_persons_list_masked_reveal_logged_and_permissions(owner_client):
+    from django.test import Client
+
+    from apps.audit.models import SensitiveAccessLog
+    from apps.clients.models import Person
+
+    Person.objects.create(first_name="Ola", last_name="Ukryta", permit_number="AB1234567", permit_issuer="KWP Opole")
+    body = owner_client.get("/panel/uzytkownicy/osoby/").content.decode()
+    assert "Ola Ukryta" in body and "AB1234567" not in body
+    body = owner_client.post("/panel/uzytkownicy/osoby/", {"pokaz": "1"}).content.decode()
+    assert "AB1234567" in body and SensitiveAccessLog.objects.filter(resource__startswith="kartoteka:osoba:").exists()
+    viewer = grant(make_user("v2@example.com"), "accounts.view_users")
+    c = Client()
+    login_with_otp(c, viewer)
+    assert c.get("/panel/uzytkownicy/osoby/").status_code == 200
+    assert c.get("/panel/uzytkownicy/osoby/import/").status_code == 403
+    assert c.get("/panel/uzytkownicy/osoby/nowa/").status_code == 403
+
+
+def test_person_edit_validation_and_delete(owner_client):
+    from apps.clients.models import Person
+
+    response = owner_client.post("/panel/uzytkownicy/osoby/nowa/", {"first_name": "A", "last_name": "B", "permit_number": "x 1"})
+    assert response.status_code == 200 and "organ" in response.content.decode()
+    owner_client.post("/panel/uzytkownicy/osoby/nowa/", {"first_name": "A", "last_name": "B", "permit_number": "x 1", "permit_issuer": "KWP"})
+    p = Person.objects.get()
+    assert p.permit_number == "X1"
+    owner_client.post(f"/panel/uzytkownicy/osoby/{p.pk}/", {"action": "delete"})
+    assert not Person.objects.exists()
+
+
+def test_staff_entry_prefill_from_person(owner_client):
+    from apps.clients.models import Person
+
+    p = Person.objects.create(first_name="Ewa", last_name="Kartotekowa", permit_number="CD7654321", permit_issuer="KWP Wrocław")
+    body = owner_client.get("/panel/ksiazka/nowy-wpis/?osoba_q=kart").content.decode()
+    assert "Ewa Kartotekowa" in body and "CD7654321" not in body
+    body = owner_client.get(f"/panel/ksiazka/nowy-wpis/?osoba={p.pk}").content.decode()
+    assert 'value="Kartotekowa"' in body and 'value="CD7654321"' in body and "Dane z kartoteki" in body

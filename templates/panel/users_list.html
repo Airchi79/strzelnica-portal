@@ -2,6 +2,7 @@
 {% block title %}Klienci{% endblock %}
 {% block panel %}
 <h1>Klienci</h1>
+{% include "panel/_clients_tabs.html" %}
 <form method="get" class="card filters">
   <div><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ f.q }}" placeholder="nazwisko, e-mail, telefon"></div>
   <div><label for="f-typ">Typ</label><select id="f-typ" name="typ"><option value="">wszyscy</option>{% for v, l in types %}<option value="{{ v }}"{% if f.typ == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>

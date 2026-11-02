@@ -4,7 +4,7 @@ from django.utils import timezone
 from apps.core.dates import add_months
 from apps.facilities.models import Lane
 
-from .models import ClientPass
+from .models import ClientPass, Person
 
 
 class DateInput(forms.DateInput):
@@ -62,3 +62,20 @@ class PassForm(forms.Form):
 
 class PassPaidForm(forms.Form):
     paid_with = forms.ChoiceField(label="Zapłata", choices=[c for c in ClientPass.PaidWith.choices if c[0]])
+
+
+class PersonForm(forms.ModelForm):
+    class Meta:
+        model = Person
+        fields = ["first_name", "last_name", "permit_number", "permit_issuer", "address", "note"]
+
+    def clean_permit_number(self):
+        from .importer import normalize_permit
+
+        return normalize_permit(self.cleaned_data["permit_number"])
+
+    def clean(self):
+        d = super().clean()
+        if d.get("permit_number") and not d.get("permit_issuer", "").strip():
+            self.add_error("permit_issuer", "Podaj organ, który wydał pozwolenie.")
+        return d

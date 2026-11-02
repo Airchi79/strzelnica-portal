@@ -1,0 +1,7 @@
+<div class="tabs">
+  {% with u=request.resolver_match.url_name %}
+  <a href="{% url 'panel:users' %}" class="{% if u == 'users' %}active{% endif %}">Klienci z kontem</a>
+  <a href="{% url 'panel:persons' %}" class="{% if u == 'persons' or u == 'person_edit' or u == 'person_new' %}active{% endif %}">Osoby bez konta</a>
+  {% if perms.clients.manage_clients %}<a href="{% url 'panel:persons_import' %}" class="{% if u == 'persons_import' %}active{% endif %}">Import z GunTrackera</a>{% endif %}
+  {% endwith %}
+</div>

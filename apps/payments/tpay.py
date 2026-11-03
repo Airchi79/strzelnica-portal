@@ -25,6 +25,8 @@ from django.core.cache import cache
 logger = logging.getLogger(__name__)
 
 TIMEOUT = 20
+# Własny identyfikator klienta: Cloudflare przed API Tpay odrzuca domyślny „Python-urllib” (błąd 1010).
+USER_AGENT = "StrzelnicaSatok-Rezerwacje/1.0 (+https://github.com/Airchi79/strzelnica-portal)"
 
 
 class TpayError(Exception):
@@ -40,7 +42,7 @@ def secure_base():
 
 
 def _request(method, url, *, data=None, json_body=None, token=None):
-    headers = {"Accept": "application/json"}
+    headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
     body = None
     if json_body is not None:
         body = json.dumps(json_body).encode()
@@ -111,7 +113,8 @@ def _fetch_cert(url):
     key = "tpay-cert:" + hashlib.sha256(url.encode()).hexdigest()
     pem = cache.get(key)
     if pem is None:
-        with urllib.request.urlopen(url, timeout=TIMEOUT) as resp:
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
             pem = resp.read().decode()
         cache.set(key, pem, 24 * 3600)
     return x509.load_pem_x509_certificate(pem.encode())

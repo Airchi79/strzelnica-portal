@@ -34,6 +34,12 @@ printf "Zapisać %s? [t/n]: " "$NAME"
 IFS= read -r OK || OK=n
 case "$OK" in t|T|tak|TAK|y|Y) ;; *) echo "Nie zapisano."; exit 1 ;; esac
 
+# Docker Compose rozwija w .env odwołania „$NAZWA” — wartość ze znakami specjalnymi zapisujemy w apostrofach (dosłownie).
+case "$VALUE" in
+  *"'"*) echo "Wartość zawiera apostrof (') — wpisz ją ręcznie w .env, zamieniając każdy znak \$ na \$\$."; exit 1 ;;
+  *'$'*|*' '*|*'#'*|*'"'*|*'\'*) VALUE="'$VALUE'" ;;
+esac
+
 TMP="$FILE.tmp.$$"
 # Wartość przekazana przez zmienną środowiskową (ENVIRON), więc znaki specjalne nie są interpretowane.
 V="$VALUE" N="$NAME" awk 'BEGIN { n = ENVIRON["N"]; v = ENVIRON["V"]; done = 0 }

@@ -2,6 +2,7 @@
 {% block title %}Rezerwacja{% endblock %}
 {% block content %}
 <h1>Nie możesz jeszcze rezerwować</h1>
-<div class="card"><ul>{% for r in reasons %}<li>{{ r }}</li>{% endfor %}</ul>
-<div class="actions"><a class="btn" href="{% url 'credentials:my_list' %}">Moje dokumenty</a><a class="btn secondary" href="{% url 'bookings:calendar' %}">Zajętość osi</a></div></div>
+<p class="muted">Uzupełnij kroki oznaczone na czerwono. Kroki z kropkami czekają na obsługę strzelnicy.</p>
+{% include "partials/readiness.html" %}
+<p><a href="{% url 'bookings:calendar' %}">Zobacz zajętość osi</a></p>
 {% endblock %}

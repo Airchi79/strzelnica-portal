@@ -21,7 +21,10 @@ def my_list(request):
 @login_required
 def my_edit(request, pk=None):
     credential = get_object_or_404(Credential, pk=pk, user=request.user) if pk else Credential(user=request.user)
-    form = CredentialForm(request.POST or None, request.FILES or None, instance=credential, user=request.user)
+    initial = {}
+    if not pk and request.GET.get("rodzaj") in Credential.Kind.values:
+        initial["kind"] = request.GET["rodzaj"]  # np. z listy kontrolnej „Dodaj uprawnienia PS”
+    form = CredentialForm(request.POST or None, request.FILES or None, instance=credential, user=request.user, initial=initial)
     if request.method == "POST" and form.is_valid():
         if pk and "scan" in form.changed_data:
             old = Credential.objects.get(pk=pk)

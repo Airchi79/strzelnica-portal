@@ -91,6 +91,55 @@ def check_can_book(user):
     return reasons
 
 
+def booking_readiness(user):
+    """Lista kontrolna „co jeszcze, żeby zarezerwować” — te same warunki co check_can_book, z opisem i działaniem.
+    Stany: done (zrobione), missing (brakuje — blokuje), waiting (czeka na obsługę — blokuje), tip (zalecane, nie blokuje)."""
+    from apps.credentials.models import Credential
+
+    steps = []
+    steps.append({
+        "key": "email", "title": "Potwierdź adres e-mail",
+        "state": "done" if user.email_verified else "missing",
+        "detail": f"Potwierdzony: {user.email}" if user.email_verified else f"Kliknij link wysłany na {user.email} (sprawdź też SPAM).",
+        "url": "" if user.email_verified else reverse("accounts:resend_verification"), "action": "Wyślij link ponownie",
+    })
+    pending = pending_acceptances(user)
+    steps.append({
+        "key": "rules", "title": "Zaakceptuj regulaminy",
+        "state": "missing" if pending else "done",
+        "detail": ("Do przeczytania i akceptacji: " + ", ".join(str(v.document) for v in pending)) if pending else "Zaakceptowane.",
+        "url": reverse("regulations:accept") if pending else "", "action": "Przeczytaj i zaakceptuj",
+    })
+    ps = list(Credential.objects.filter(user=user, kind=Credential.Kind.RANGE_OFFICER))
+    statuses = {c.effective_status for c in ps}
+    if Credential.Status.VERIFIED in statuses:
+        state, detail, url, action = "done", "Zweryfikowane przez obsługę strzelnicy.", "", ""
+    elif Credential.Status.PENDING in statuses:
+        state, detail, url, action = ("waiting", "Dokument czeka na weryfikację przez obsługę — dostaniesz e-mail po sprawdzeniu.",
+                                      reverse("credentials:my_list"), "Moje dokumenty")
+    elif statuses:
+        state = "missing"
+        detail = "Uprawnienia wygasły lub zostały odrzucone — dodaj aktualny dokument." if Credential.Status.EXPIRED in statuses or Credential.Status.REJECTED in statuses else "Dodaj dokument."
+        url, action = reverse("credentials:my_add") + "?rodzaj=ps", "Dodaj uprawnienia PS"
+    else:
+        state, detail = "missing", ("Rezerwować oś może prowadzący strzelanie (PS). Dodaj numer i zdjęcie legitymacji — obsługa je sprawdzi. "
+                                    "Nie masz uprawnień PS? Możesz strzelać z prowadzącym, który ma rezerwację — wpiszesz się do książki pobytu kodem QR.")
+        url, action = reverse("credentials:my_add") + "?rodzaj=ps", "Dodaj uprawnienia PS"
+    steps.append({"key": "ps", "title": "Uprawnienia prowadzącego strzelanie (PS)", "state": state, "detail": detail, "url": url, "action": action})
+    missing_profile = [label for field, label in (("phone", "telefon"), ("street", "ulica"), ("postal_code", "kod pocztowy"), ("city", "miejscowość"))
+                       if not getattr(user, field)]
+    steps.append({
+        "key": "profile", "title": "Uzupełnij dane kontaktowe",
+        "state": "tip" if missing_profile else "done",
+        "detail": ("Brakuje: " + ", ".join(missing_profile) + ". Telefon pomaga w kontakcie, adres uzupełni się sam w książce pobytu.")
+        if missing_profile else "Kompletne.",
+        "url": reverse("accounts:profile") if missing_profile else "", "action": "Uzupełnij profil",
+    })
+    blocking = [s for s in steps if s["state"] in ("missing", "waiting")]
+    done = sum(1 for s in steps if s["state"] == "done")
+    return {"steps": steps, "ready": not blocking, "done": done, "total": len(steps)}
+
+
 def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: int, now=None):
     """Sprawdza termin i liczbę osób. Zwraca (starts_at, ends_at, price_rule)."""
     now = now or timezone.now()

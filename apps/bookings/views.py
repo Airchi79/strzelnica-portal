@@ -79,7 +79,7 @@ def _messages_from(error):
 def new(request):
     reasons = services.check_can_book(request.user)
     if reasons:
-        return render(request, "bookings/cannot_book.html", {"reasons": reasons})
+        return render(request, "bookings/cannot_book.html", {"reasons": reasons, "readiness": services.booking_readiness(request.user)})
     initial = {"day": _parse_day(request.GET.get("dzien"))}
     if request.GET.get("os"):
         initial["lane"] = request.GET["os"]

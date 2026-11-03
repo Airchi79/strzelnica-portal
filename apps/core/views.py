@@ -33,6 +33,7 @@ def home(request):
 @login_required
 def dashboard(request):
     credentials = list(request.user.credentials.all())
+    from apps.bookings.services import booking_readiness
     from apps.clients.services import pass_uses
 
     passes = list(request.user.client_passes.filter(is_active=True, valid_until__gte=timezone.localdate()))
@@ -44,6 +45,7 @@ def dashboard(request):
         {
             "credentials": credentials,
             "passes": passes,
+            "readiness": booking_readiness(request.user),
             "is_ps": is_range_officer(request.user),
             "missing_profile": not (request.user.phone and request.user.city),
             "balance": balance_of(request.user),

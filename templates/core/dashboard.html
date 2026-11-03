@@ -2,7 +2,7 @@
 {% block title %}Mój pulpit{% endblock %}
 {% block content %}
 <h1>Witaj, {{ user.first_name }}</h1>
-{% if missing_profile %}<div class="msg warning">Uzupełnij dane kontaktowe i adres w <a href="{% url 'accounts:profile' %}">profilu</a>.</div>{% endif %}
+{% include "partials/readiness.html" %}
 <div class="grid">
   <a class="card tile" href="{% url 'credentials:my_list' %}">
     <strong>Moje dokumenty i uprawnienia</strong>

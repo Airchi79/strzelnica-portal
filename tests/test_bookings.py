@@ -557,3 +557,41 @@ def test_tpay_refused_when_online_not_allowed(ps, lane, client, settings):
     assert "Zapłać online" not in body and r.number in body
     response = client.post("/platnosci/tpay/start/", {"reservation": r.pk})
     assert response.status_code == 302 and response.url == f"/rezerwacje/{r.pk}/"
+
+
+# --- lista kontrolna „co jeszcze, żeby zarezerwować” ------------------------------------------
+
+
+def test_booking_readiness_steps(db):
+    from apps.credentials.models import Credential
+
+    u = make_user("gotowosc@example.com", verified=False)
+    r = services.booking_readiness(u)
+    states = {s["key"]: s["state"] for s in r["steps"]}
+    assert not r["ready"] and states["email"] == "missing" and states["ps"] == "missing" and states["profile"] == "tip"
+    u.email_verified_at = timezone.now()
+    u.save()
+    c = add_credential(u, status=Credential.Status.PENDING)
+    states = {s["key"]: s["state"] for s in services.booking_readiness(u)["steps"]}
+    assert states["email"] == "done" and states["ps"] == "waiting"
+    Credential.objects.filter(pk=c.pk).update(status=Credential.Status.VERIFIED)
+    r = services.booking_readiness(u)
+    # Gotowość zgodna z check_can_book (dane kontaktowe są tylko zalecane).
+    assert r["ready"] == (not services.check_can_book(u))
+
+
+def test_dashboard_and_cannot_book_show_checklist(client):
+    u = make_user("nowy-klient@example.com")
+    client.force_login(u)
+    body = client.get("/pulpit/").content.decode()
+    assert "Co jeszcze, żeby zarezerwować" in body and "Dodaj uprawnienia PS" in body and "?rodzaj=ps" in body
+    body = client.get("/rezerwacje/nowa/").content.decode()
+    assert "Nie możesz jeszcze rezerwować" in body and "Uprawnienia prowadzącego strzelanie" in body
+    form = client.get("/dokumenty/dodaj/?rodzaj=ps").content.decode()
+    assert 'value="ps" selected' in form
+
+
+def test_dashboard_ready_state(client, ps):
+    client.force_login(ps)
+    body = client.get("/pulpit/").content.decode()
+    assert "Możesz rezerwować osie" in body

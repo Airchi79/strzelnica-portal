@@ -1,11 +1,12 @@
 {% if form.non_field_errors %}<div class="msg error">{% for e in form.non_field_errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+{% if form.errors and not form.non_field_errors %}<div class="msg error" role="alert">Popraw pola zaznaczone na czerwono.</div>{% endif %}
 {% for field in form.hidden_fields %}{{ field }}{% endfor %}
 {% for field in form.visible_fields %}
-  <div class="field{% if field.widget_type == 'checkbox' %} checkbox{% endif %}">
+  <div class="field{% if field.widget_type == 'checkbox' %} checkbox{% endif %}{% if field.errors %} has-error{% endif %}">
     {% if field.widget_type == 'checkbox' %}
-      <label>{{ field }} {{ field.label }}</label>
+      <label>{{ field }} {{ field.label }}{% if field.field.required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
     {% else %}
-      <label for="{{ field.id_for_label }}">{{ field.label }}{% if not field.field.required %} <span class="muted small">(opcjonalnie)</span>{% endif %}</label>
+      <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="req" title="pole wymagane" aria-hidden="true">*</span>{% else %} <span class="muted small">(opcjonalnie)</span>{% endif %}</label>
       {{ field }}
     {% endif %}
     {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}

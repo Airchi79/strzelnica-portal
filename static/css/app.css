@@ -276,3 +276,46 @@ body.panel-app { font-size: 14px; line-height: 1.45; }
 .theme-btn .when-light { display: inline-flex; }
 html.is-dark .theme-btn .when-dark { display: inline-flex; }
 html.is-dark .theme-btn .when-light { display: none; }
+
+/* Formularze: pola wymagane i błędy wyraźnie na czerwono */
+.req { color: var(--bad); font-weight: 700; }
+.field.has-error label { color: var(--bad); }
+.field.has-error input, .field.has-error select, .field.has-error textarea { border-color: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 18%, transparent); }
+.errorlist li::before { content: "✕ "; font-weight: 700; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Lista kontrolna „co jeszcze, żeby zarezerwować” */
+.readiness { border-left: 4px solid var(--bad); }
+.readiness.ready { border-left-color: var(--ok); }
+.readiness-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.readiness-bar { height: 6px; border-radius: 999px; background: var(--border); margin: 8px 0 4px; overflow: hidden; }
+.readiness-bar span { display: block; height: 100%; background: var(--ok); }
+.steps { list-style: none; padding: 0; margin: 8px 0 0; }
+.step { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.step:last-child { border-bottom: 0; }
+.step-ico { flex: none; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800; background: var(--border); color: var(--muted); }
+.step-body { flex: 1; min-width: 0; }
+.step.done .step-ico { background: var(--ok-bg); color: var(--ok); }
+.step.missing .step-ico { background: var(--bad-bg); color: var(--bad); }
+.step.missing strong { color: var(--bad); }
+.step.waiting .step-ico, .step.tip .step-ico { background: var(--warn-bg); color: var(--warn); }
+.step .btn { flex: none; align-self: center; }
+
+/* Podpowiedzi przy haśle */
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 84px; }
+.pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--brand); font: inherit; font-size: .85rem; cursor: pointer; padding: 6px 8px; }
+.pw-rules { list-style: none; padding: 0; margin: 8px 0 0; font-size: .86rem; }
+.pw-rules li { padding: 2px 0; color: var(--bad); }
+.pw-rules li::before { content: "✕ "; font-weight: 700; }
+.pw-rules li.ok { color: var(--ok); }
+.pw-rules li.ok::before { content: "✓ "; }
+.pw-meter { height: 6px; border-radius: 999px; background: var(--border); margin-top: 8px; overflow: hidden; }
+.pw-meter span { display: block; height: 100%; width: 0; background: var(--bad); transition: width .2s, background .2s; }
+.pw-meter-label { font-size: .8rem; color: var(--muted); }
+@media (max-width: 640px) {
+  .step { flex-wrap: wrap; }
+  .step-body { flex-basis: calc(100% - 40px); }
+  .step .btn { margin-left: 40px; align-self: flex-start; }
+}

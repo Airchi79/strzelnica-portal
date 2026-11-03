@@ -1,7 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Sprawdź skrzynkę{% endblock %}
 {% block content %}
-<h1>Sprawdź skrzynkę e-mail</h1>
+<h1>Konto założone — sprawdź skrzynkę e-mail</h1>
 <div class="card"><p>Wysłaliśmy link potwierdzający na adres <strong>{{ email }}</strong>. Kliknij go, aby aktywować konto.</p>
 <p class="small muted">Nie dotarł? Sprawdź folder SPAM lub <a href="{% url 'accounts:resend_verification' %}">wyślij link ponownie</a>.</p></div>
+<h2>Co dalej — droga do pierwszej rezerwacji</h2>
+<div class="card"><ol class="steps">
+  <li class="step missing"><span class="step-ico">1</span><div class="step-body"><strong>Potwierdź e-mail</strong><div class="small">Kliknij link z wiadomości, którą właśnie wysłaliśmy.</div></div></li>
+  <li class="step"><span class="step-ico">2</span><div class="step-body"><strong>Zaloguj się</strong><div class="small">Na pulpicie zobaczysz listę kontrolną z tym, czego jeszcze brakuje.</div></div></li>
+  <li class="step"><span class="step-ico">3</span><div class="step-body"><strong>Zaakceptuj regulaminy</strong><div class="small">Regulamin strzelnicy i zasady bezpieczeństwa.</div></div></li>
+  <li class="step"><span class="step-ico">4</span><div class="step-body"><strong>Dodaj uprawnienia prowadzącego strzelanie (PS)</strong><div class="small">Numer i zdjęcie legitymacji — obsługa je zweryfikuje. Bez PS możesz strzelać z prowadzącym, który ma rezerwację.</div></div></li>
+  <li class="step"><span class="step-ico">5</span><div class="step-body"><strong>Zarezerwuj oś</strong><div class="small">Po weryfikacji uprawnień wybierzesz oś, dzień i godziny.</div></div></li>
+</ol></div>
 {% endblock %}

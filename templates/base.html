@@ -9,8 +9,10 @@
   <link rel="icon" href="{% static 'icons/icon-192.png' %}">
   <link rel="apple-touch-icon" href="{% static 'icons/icon-192.png' %}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="{% static 'js/theme.js' %}"></script>
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
+{% block shell %}
 <header class="topbar">
   <div class="wrap">
     <a class="brand" href="{% url 'core:home' %}">{{ SITE_NAME }}</a>
@@ -38,6 +40,7 @@
   {% block content %}{% endblock %}
 </main>
 <footer>Stowarzyszenie STRZELNICA SĄTOK · strzelnica niekomercyjna</footer>
+{% endblock %}
 <script src="{% static 'js/app.js' %}" defer></script>
 </body>
 </html>

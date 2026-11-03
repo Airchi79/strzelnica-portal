@@ -270,3 +270,9 @@ body.panel-app { font-size: 14px; line-height: 1.45; }
 .panel-app .feed-main a { font-weight: 600; color: var(--text); }
 .panel-app .feed-time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .78rem; }
 .panel-app .card > table:only-child, .panel-app .card > .table-wrap:only-child { margin: -4px 0; }
+
+/* przycisk motywu: słońce w ciemnym (przełącza na jasny), księżyc w jasnym */
+.theme-btn .when-dark { display: none; }
+.theme-btn .when-light { display: inline-flex; }
+html.is-dark .theme-btn .when-dark { display: inline-flex; }
+html.is-dark .theme-btn .when-light { display: none; }

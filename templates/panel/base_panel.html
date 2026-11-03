@@ -24,7 +24,7 @@
       <button type="button" class="appbar-btn menu-btn" data-sidebar-toggle aria-controls="panel-sidebar" aria-label="Menu">{% icon "menu" 20 %}</button>
       <span class="appbar-title">{% block appbar_title %}Panel obsługi{% endblock %}</span>
       <div class="appbar-right">
-        <button type="button" class="appbar-btn" data-theme-toggle aria-label="Zmień motyw (jasny / ciemny / systemowy)" title="Motyw">{% icon "moon" 18 %}</button>
+        <button type="button" class="appbar-btn theme-btn" data-theme-toggle aria-label="Przełącz motyw jasny / ciemny" title="Przełącz motyw"><span class="when-dark">{% icon "sun" 18 %}</span><span class="when-light">{% icon "moon" 18 %}</span></button>
         <a class="appbar-btn" href="{% url 'panel:notifications' %}" aria-label="Powiadomienia" title="Powiadomienia">{% icon "bell" 18 %}{% if unread_notifications %}<span class="dot-count">{{ unread_notifications }}</span>{% endif %}</a>
         <a class="appbar-user" href="{% url 'core:dashboard' %}" title="Mój pulpit"><span class="avatar">{{ user.first_name|first|default:"?" }}{{ user.last_name|first }}</span><span class="hide-sm">{{ user.full_name|default:user.email }}</span></a>
         <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit" class="appbar-btn" aria-label="Wyloguj" title="Wyloguj">{% icon "logout" 18 %}</button></form>

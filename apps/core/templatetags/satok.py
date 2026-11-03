@@ -99,3 +99,24 @@ def panel_menu(context):
 
     request = context.get("request")
     return build(request) if request is not None and request.user.is_authenticated else []
+
+
+DAY_SHORT = ["pon", "wt", "śr", "czw", "pt", "sob", "ndz"]
+
+
+@register.filter
+def hours_summary(hours):
+    """Godziny otwarcia skrótowo: kolejne dni z tymi samymi godzinami łączone w zakres („pon–pt 09:00–18:00”)."""
+    rows = sorted(hours, key=lambda h: h.weekday)
+    groups = []
+    for h in rows:
+        span = f"{h.opens:%H:%M}–{h.closes:%H:%M}"
+        if groups and groups[-1][2] == span and groups[-1][1] == h.weekday - 1:
+            groups[-1][1] = h.weekday
+        else:
+            groups.append([h.weekday, h.weekday, span])
+    parts = []
+    for start, end, span in groups:
+        days = DAY_SHORT[start] if start == end else f"{DAY_SHORT[start]}–{DAY_SHORT[end]}"
+        parts.append(f"{days} {span}")
+    return ", ".join(parts)

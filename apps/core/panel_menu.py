@@ -23,7 +23,7 @@ SECTIONS = [
         ("Kioski", "panel:kiosks", "tablet", "logbook.manage_logbook", ["kiosks"]),
         ("Ustawienia książki", "panel:logbook_settings", "sliders", "logbook.manage_logbook",
          ["logbook_settings", "logbook_rotate", "logbook_poster"]),
-        ("Osie i cennik", "panel:lanes", "target", "facilities.manage_facilities", ["lanes", "lane", "price_add"]),
+        ("Osie i cennik", "panel:lanes", "target", "facilities.manage_facilities", ["lane*", "facility*", "price_add"]),
         ("Regulaminy", "panel:regulations", "file", "regulations.publish_regulation", ["regulation*"]),
     ]),
     ("Klienci", [

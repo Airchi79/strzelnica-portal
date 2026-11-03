@@ -1,7 +1,8 @@
 {% extends "panel/base_panel.html" %}{% load satok %}
 {% block title %}{{ lane.name }}{% endblock %}
 {% block panel %}
-<h1>{{ lane.name }}</h1>
+<h1>{{ lane.name }} <span class="muted small">· {{ lane.facility }}</span></h1>
+{% if future_count %}<div class="msg">Na tej osi jest {{ future_count }} przyszłych rezerwacji — zmiana godzin czy wyłączenie osi ich nie anuluje.</div>{% endif %}
 <form method="post" novalidate>{% csrf_token %}
   <div class="card">{% include "partials/form.html" with form=form %}</div>
   <h2>Godziny otwarcia</h2>
@@ -36,5 +37,11 @@
     {% empty %}<tr><td colspan="3" class="muted">Brak cennika.</td></tr>{% endfor %}
   </table></div>
   <div class="actions"><a class="btn secondary" href="{% url 'panel:price_add' lane.pk %}">Dodaj cennik od wybranej daty</a></div>
+</div>
+<h2>Usuwanie osi</h2>
+<div class="card">
+  {% if can_delete %}<form method="post" action="{% url 'panel:lane_delete' lane.pk %}" data-confirm="Usunąć oś {{ lane.name }} razem z jej godzinami i cennikiem?">{% csrf_token %}<button class="btn danger" type="submit">Usuń oś</button></form>
+  <p class="small muted">Oś nie ma rezerwacji ani blokad, więc można ją usunąć.</p>
+  {% else %}<p class="muted">Oś ma rezerwacje lub blokady w historii — nie można jej usunąć bez utraty rozliczeń. Odznacz pole <strong>„aktywna”</strong> u góry i zapisz: oś zniknie z rezerwacji, historia zostanie.</p>{% endif %}
 </div>
 {% endblock %}

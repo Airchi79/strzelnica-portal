@@ -5,14 +5,46 @@ from django.forms import BaseInlineFormSet, inlineformset_factory
 
 from apps.credentials.forms import DateInput
 
-from .models import Lane, OpeningHours, PriceRule
+from .models import Facility, Lane, OpeningHours, PriceRule
+
+
+class FacilityForm(forms.ModelForm):
+    class Meta:
+        model = Facility
+        fields = ["name", "kind", "is_active", "order"]
+        help_texts = {"is_active": "Wyłączony obiekt i jego osie znikają z rezerwacji (historia zostaje).",
+                      "order": "Kolejność na liście (mniejsza liczba — wyżej)."}
 
 
 class LaneForm(forms.ModelForm):
     class Meta:
         model = Lane
-        fields = ["name", "kind", "length_m", "description", "exclusive_only", "is_active", "order"]
+        fields = ["facility", "name", "kind", "length_m", "description", "exclusive_only", "is_active", "order"]
         widgets = {"description": forms.Textarea(attrs={"rows": 3})}
+        help_texts = {"is_active": "Wyłączona oś znika z rezerwacji; istniejące rezerwacje zostają.",
+                      "order": "Kolejność w kalendarzu (mniejsza liczba — wyżej)."}
+
+
+class NewLaneForm(LaneForm):
+    """Nowa oś: opcjonalnie godziny skopiowane z innej osi i pierwszy cennik."""
+
+    copy_hours_from = forms.ModelChoiceField(label="Godziny otwarcia skopiuj z osi", queryset=Lane.objects.none(), required=False,
+                                             empty_label="— bez godzin (ustawię później) —")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["copy_hours_from"].queryset = Lane.objects.select_related("facility").order_by("facility__order", "order")
+        self.fields["copy_hours_from"].label_from_instance = lambda lane: f"{lane.facility} · {lane}"
+        self.fields["price_per_person"] = PLNField(label="Cennik: stawka za osobę / h [zł]", required=False,
+                                                   help_text="Puste = oś tylko z ryczałtem.")
+        self.fields["price_flat"] = PLNField(label="Cennik: ryczałt / h [zł]", required=False,
+                                             help_text="Puste = bez cennika (dodasz później; bez cennika oś nie przyjmuje rezerwacji).")
+
+    def clean(self):
+        d = super().clean()
+        if d.get("price_per_person") is not None and d.get("price_flat") is None:
+            self.add_error("price_flat", "Podaj ryczałt (maksymalną cenę za godzinę).")
+        return d
 
 
 class TimeInput(forms.TimeInput):

@@ -1,0 +1,9 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Nowa oś{% endblock %}
+{% block panel %}
+<h1>Nowa oś</h1>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
+  <p class="small muted">Cennik podany tutaj obowiązuje od dziś. Godziny otwarcia i cennik możesz zmienić po zapisaniu osi.</p>
+  <div class="actions"><button class="btn" type="submit">Dodaj oś</button><a class="btn secondary" href="{% url 'panel:lanes' %}">Anuluj</a></div>
+</form></div>
+{% endblock %}

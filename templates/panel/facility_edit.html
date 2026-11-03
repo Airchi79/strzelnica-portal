@@ -1,0 +1,16 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{% if facility %}{{ facility.name }}{% else %}Nowy obiekt{% endif %}{% endblock %}
+{% block panel %}
+<h1>{% if facility %}Obiekt: {{ facility.name }}{% else %}Nowy obiekt (strzelnica){% endif %}</h1>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
+  <p class="small muted">Rodzaj „Strzelnica śrutowa” — na przyszłą oś/stanowiska śrutowe. Osie dodasz po zapisaniu obiektu.</p>
+  <div class="actions"><button class="btn" type="submit">Zapisz</button><a class="btn secondary" href="{% url 'panel:lanes' %}">Wróć</a></div>
+</form></div>
+{% if facility %}
+<h2>Usuwanie</h2>
+<div class="card">
+  {% if lane_count %}<p class="muted">Obiekt ma {{ lane_count }} os. — usunąć można tylko pusty obiekt. Możesz go <strong>wyłączyć</strong> (pole „aktywny”) albo przenieść osie do innego obiektu w ich edycji.</p>
+  {% else %}<form method="post" data-confirm="Usunąć obiekt {{ facility.name }}?">{% csrf_token %}<input type="hidden" name="action" value="delete"><button class="btn danger" type="submit">Usuń obiekt</button></form>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -63,7 +63,7 @@ def test_panel_lane_hours_edit(owner_client):
     lane = Lane.objects.get(name="Oś 35 m")
     hours = list(lane.opening_hours.order_by("weekday"))
     data = {
-        "lane-name": lane.name, "lane-kind": lane.kind, "lane-length_m": "35", "lane-description": "",
+        "lane-facility": lane.facility_id, "lane-name": lane.name, "lane-kind": lane.kind, "lane-length_m": "35", "lane-description": "",
         "lane-is_active": "on", "lane-order": "3",
         "hours-TOTAL_FORMS": "7", "hours-INITIAL_FORMS": "7", "hours-MIN_NUM_FORMS": "0", "hours-MAX_NUM_FORMS": "7",
     }
@@ -85,3 +85,78 @@ def test_format_pln():
     assert format_pln(10000) == "100 zł"
     assert format_pln(3750) == "37,50 zł"
     assert format_pln(123456) == "1 234,56 zł"
+
+
+
+# --- obiekty i osie: dodawanie, usuwanie ------------------------------------------------------
+
+
+def test_add_facility_and_lane_with_copied_hours_and_price(owner_client):
+    from apps.facilities.models import Facility
+
+    response = owner_client.post("/panel/osie/obiekt/nowy/", {"name": "Strzelnica śrutowa TEST", "kind": "srutowa", "is_active": "on", "order": "2"})
+    assert response.status_code == 302
+    f = Facility.objects.get(name="Strzelnica śrutowa TEST")
+    source = Lane.objects.get(name="Oś 35 m")
+    response = owner_client.post("/panel/osie/nowa/", {
+        "facility": f.pk, "name": "Oś śrutowa 1", "kind": "srutowa", "length_m": "", "description": "", "is_active": "on", "order": "1",
+        "copy_hours_from": source.pk, "price_per_person": "40,00", "price_flat": "150,00",
+    })
+    assert response.status_code == 302, response.content.decode()[:1500]
+    lane = Lane.objects.get(name="Oś śrutowa 1")
+    assert lane.facility == f and lane.opening_hours.count() == source.opening_hours.count()
+    rule = lane.price_rule_for(datetime.date.today())
+    assert (rule.per_person_hourly, rule.flat_hourly) == (4000, 15000)
+    assert "Oś śrutowa 1" in owner_client.get("/panel/osie/").content.decode()
+    from apps.audit.models import AuditLog
+
+    assert AuditLog.objects.filter(action__in=["obiekt.dodanie", "os.dodanie"]).count() == 2
+
+
+def test_new_lane_price_requires_flat(owner_client):
+    f = Lane.objects.first().facility
+    response = owner_client.post("/panel/osie/nowa/", {"facility": f.pk, "name": "X", "kind": "krotka", "order": "9", "is_active": "on",
+                                                      "price_per_person": "10"})
+    assert response.status_code == 200 and not Lane.objects.filter(name="X").exists()
+
+
+def test_delete_lane_only_without_history(owner_client, owner):
+    from apps.bookings.models import Reservation
+    from django.utils import timezone
+
+    f = Lane.objects.first().facility
+    owner_client.post("/panel/osie/nowa/", {"facility": f.pk, "name": "Pusta", "kind": "krotka", "order": "9", "is_active": "on"})
+    empty = Lane.objects.get(name="Pusta")
+    assert owner_client.post(f"/panel/osie/{empty.pk}/usun/").status_code == 302 and not Lane.objects.filter(pk=empty.pk).exists()
+    used = Lane.objects.get(name="Oś 35 m")
+    start = timezone.now() + datetime.timedelta(days=3)
+    rule = used.price_rule_for(start.date())
+    Reservation.objects.create(number="SATOK-R-F-1", lane=used, user=owner, starts_at=start, ends_at=start + datetime.timedelta(hours=1),
+                               persons=1, price_rule=rule, hourly_amount=100, amount=100)
+    body = owner_client.post(f"/panel/osie/{used.pk}/usun/", follow=True).content.decode()
+    assert Lane.objects.filter(pk=used.pk).exists() and "nie można usunąć" in body
+    assert "przyszłych rezerwacji" in owner_client.get(f"/panel/osie/{used.pk}/").content.decode()
+
+
+def test_delete_facility_only_when_empty(owner_client):
+    from apps.facilities.models import Facility
+
+    busy = Lane.objects.first().facility
+    owner_client.post(f"/panel/osie/obiekt/{busy.pk}/", {"action": "delete"})
+    assert Facility.objects.filter(pk=busy.pk).exists()
+    owner_client.post("/panel/osie/obiekt/nowy/", {"name": "Tymczasowy", "kind": "kulowa", "order": "5"})
+    empty = Facility.objects.get(name="Tymczasowy")
+    owner_client.post(f"/panel/osie/obiekt/{empty.pk}/", {"action": "delete"})
+    assert not Facility.objects.filter(pk=empty.pk).exists()
+
+
+def test_facility_management_requires_permission(client):
+    from django.test import Client
+
+    from .conftest import grant, login_with_otp, make_user
+
+    staff = grant(make_user("s@example.com"), "logbook.view_logbook")
+    c = Client()
+    login_with_otp(c, staff)
+    assert c.get("/panel/osie/obiekt/nowy/").status_code == 403
+    assert c.get("/panel/osie/nowa/").status_code == 403

@@ -1,7 +1,7 @@
 {% extends "panel/base_panel.html" %}{% load satok %}
 {% block title %}Wpłata{% endblock %}
 {% block panel %}
-<h1>Wpłata {{ p.amount|pln }}</h1>
+<h1>Wpłata {{ p.amount|pln }}{% if p.is_test %} <span class="badge warn">TEST — sandbox Tpay, bez prawdziwych pieniędzy</span>{% endif %}</h1>
 {% include "panel/_payments_tabs.html" %}
 <div class="card"><table>
   <tr><th>Sposób</th><td>{{ p.get_method_display }}</td></tr>

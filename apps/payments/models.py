@@ -89,6 +89,12 @@ class Payment(models.Model):
     def __str__(self):
         return f"{self.get_method_display()} {self.amount / 100:.2f} zł ({self.get_status_display()})"
 
+    @property
+    def is_test(self):
+        """Płatność w środowisku testowym Tpay (sandbox) — bez prawdziwych pieniędzy; nie wchodzi do raportów sprzedaży."""
+        raw = self.raw or {}
+        return self.method == self.Method.TPAY and (raw.get("sandbox") is True or (raw.get("powiadomienie") or {}).get("test_mode") == "1")
+
 
 class LedgerEntry(models.Model):
     """Operacja na saldzie (dodatnia = uznanie, ujemna = obciążenie). Wpisów nie można zmieniać ani usuwać."""

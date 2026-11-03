@@ -110,3 +110,13 @@ def test_panel_generate_and_permissions(owner_client, client_user, owner):
     c = Client()
     login_with_otp(c, viewer)
     assert c.get("/panel/raporty-sprzedazy/").status_code == 200
+
+
+def test_sandbox_tpay_payment_excluded_from_report(client_user, owner):
+    day = timezone.localdate() - timedelta(days=1)
+    real = _pay(client_user, owner, 7000, Payment.Method.CASH, day)
+    test = Payment.objects.create(user=client_user, amount=9900, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED,
+                                  completed_at=_at(day, 14), raw={"tpay_title": "TR-X", "powiadomienie": {"test_mode": "1"}})
+    assert test.is_test and not real.is_test
+    report, _ = services.generate(SalesReport.Kind.DAILY, day)
+    assert report.data["summary"]["net"] == 7000 and report.data["summary"]["count"] == 1

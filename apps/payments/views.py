@@ -114,7 +114,9 @@ def tpay_start(request):
         Payment.objects.filter(pk=payment.pk).update(status=Payment.Status.FAILED, note=str(e)[:255])
         messages.error(request, "Nie udało się połączyć z Tpay. Spróbuj ponownie później lub zapłać przelewem.")
         return redirect("payments:wallet")
-    Payment.objects.filter(pk=payment.pk).update(external_id=f"tpay:{tx['transaction_id']}", raw={"tpay_title": tx["title"]})
+    Payment.objects.filter(pk=payment.pk).update(
+        external_id=f"tpay:{tx['transaction_id']}", raw={"tpay_title": tx["title"], "sandbox": bool(settings.TPAY_SANDBOX)}
+    )
     log_event("platnosc.tpay_start", payment, f"{amount / 100:.2f} zł")
     return redirect(tx["payment_url"])
 

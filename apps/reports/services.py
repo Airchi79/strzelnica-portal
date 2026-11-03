@@ -47,6 +47,8 @@ def collect(start, end):
         "user", "reservation", "fee"
     )
     for p in payments.order_by("completed_at", "id"):
+        if p.is_test:
+            continue  # płatność testowa (sandbox Tpay) — bez prawdziwych pieniędzy
         category = "rezerwacja" if p.reservation_id else "skladka" if p.fee_id else "inne"
         doc = p.reservation.number if p.reservation_id else (p.fee.label if p.fee_id else (p.title or ""))
         rows.append({

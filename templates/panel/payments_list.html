@@ -11,7 +11,7 @@
 </form>
 <div class="card table-wrap"><table>
   <tr><th>Data</th><th>Kwota</th><th>Sposób</th><th>Strzelec / wpłacający</th><th>Status</th></tr>
-  {% for p in page %}<tr><td><a href="{% url 'panel:payment' p.pk %}">{{ p.booked_on|default:p.created_at|date:"j.m.Y" }}</a></td><td>{{ p.amount|pln }}</td><td>{{ p.get_method_display }}</td>
+  {% for p in page %}<tr><td><a href="{% url 'panel:payment' p.pk %}">{{ p.booked_on|default:p.created_at|date:"j.m.Y" }}</a></td><td>{{ p.amount|pln }}{% if p.is_test %} <span class="badge warn">TEST</span>{% endif %}</td><td>{{ p.get_method_display }}</td>
     <td>{{ p.user.full_name|default:p.payer_name }}<div class="small muted">{{ p.title|truncatechars:60 }}</div></td>
     <td><span class="badge {% if p.status == 'zaksiegowana' %}ok{% elif p.status == 'nieprzypisana' %}warn{% elif p.status == 'nieudana' %}bad{% endif %}">{{ p.get_status_display }}</span></td></tr>
   {% empty %}<tr><td colspan="5" class="muted">Brak wpłat.</td></tr>{% endfor %}

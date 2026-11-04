@@ -134,3 +134,54 @@ def test_expiry_by_date_and_nightly_command(user, django_capture_on_commit_callb
 def test_valid_until_today_is_still_valid(user):
     add_credential(user, valid_until=datetime.date.today())
     assert is_range_officer(user)
+
+
+def test_add_form_defaults_to_ps_with_hints(client, user):
+    client.force_login(user)
+    html = client.get("/dokumenty/dodaj/").content.decode()
+    assert 'value="ps"' in html and 'id="id_kind_0"' in html
+    assert "Numer legitymacji PS" in html and "PS/123/2019" in html and 'id="kind-hints"' in html
+    assert 'capture=' not in html  # aparat włącza dopiero przycisk „Zrób zdjęcie”
+    assert "credential.js" in html
+
+
+def test_hints_follow_submitted_kind_on_error(client, user):
+    client.force_login(user)
+    response = client.post("/dokumenty/dodaj/", form_data(kind="licencja", number=""))
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "Numer licencji" in html and "Polski Związek Strzelectwa Sportowego" in html
+
+
+def test_add_form_png_scan_accepted_and_renamed(client, user):
+    client.force_login(user)
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+    response = client.post("/dokumenty/dodaj/", {**form_data(), "scan": SimpleUploadedFile("IMG_0001.png", png, "image/png")})
+    assert response.status_code == 302
+    c = Credential.objects.get(user=user)
+    assert c.scan.name.endswith(".png") and "IMG_0001" not in c.scan.name
+    c.scan.delete(save=False)
+
+
+def test_heic_rejected_with_hint(client, user):
+    client.force_login(user)
+    heic = b"\x00\x00\x00\x18ftypheic" + b"0" * 32
+    response = client.post("/dokumenty/dodaj/", {**form_data(), "scan": SimpleUploadedFile("a.heic", heic, "image/heic")})
+    assert response.status_code == 200 and "HEIC" in str(response.context["form"].errors["scan"])
+
+
+def test_my_list_shows_ps_state(client, user):
+    client.force_login(user)
+    html = client.get("/dokumenty/").content.decode()
+    assert "potrzebujesz zweryfikowanych uprawnień PS" in html and "?rodzaj=ps" in html
+    add_credential(user)
+    html = client.get("/dokumenty/").content.decode()
+    assert "Uprawnienia PS zweryfikowane" in html
+
+
+def test_rejected_credential_shows_reason_on_edit(client, user):
+    client.force_login(user)
+    c = Credential.objects.create(user=user, kind="ps", number="PS/1", issuer="PZSS", issued_on=datetime.date(2020, 1, 1),
+                                  status=Credential.Status.REJECTED, review_note="Nieczytelny numer")
+    assert "Popraw i wyślij ponownie" in client.get("/dokumenty/").content.decode()
+    assert "Nieczytelny numer" in client.get(f"/dokumenty/{c.pk}/").content.decode()

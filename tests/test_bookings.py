@@ -588,7 +588,7 @@ def test_dashboard_and_cannot_book_show_checklist(client):
     body = client.get("/rezerwacje/nowa/").content.decode()
     assert "Nie możesz jeszcze rezerwować" in body and "Uprawnienia prowadzącego strzelanie" in body
     form = client.get("/dokumenty/dodaj/?rodzaj=ps").content.decode()
-    assert 'value="ps" selected' in form
+    assert 'value="ps"' in form and 'checked' in form.split('value="ps"')[1].split('>')[0]
 
 
 def test_dashboard_ready_state(client, ps):

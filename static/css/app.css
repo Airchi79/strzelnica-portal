@@ -401,3 +401,17 @@ html.is-dark .theme-btn .when-light { display: none; }
 .res-cancel summary { cursor: pointer; font-weight: 600; color: var(--bad); }
 .res-cancel[open] summary { margin-bottom: 10px; }
 .countdown { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* --- formularz dokumentów / uprawnień PS --- */
+.helptext:empty { display: none; }
+.step-title { margin: 0 0 10px; font-size: 1.05rem; }
+.field-row { display: flex; gap: 12px; flex-wrap: wrap; } .field-row > .field { flex: 1 1 180px; }
+.kind-cards.has-error .lane-card { border-color: var(--bad); }
+.scan-buttons { margin-top: 0; }
+.scan-field.js-scan input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.scan-preview { display: flex; gap: 12px; align-items: center; padding: 10px; border: 1px dashed var(--border); border-radius: 10px; margin-top: 8px; }
+.scan-preview img { width: 120px; max-height: 120px; object-fit: contain; border-radius: 6px; background: var(--border); }
+.scan-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; } .scan-info strong { overflow-wrap: anywhere; }
+.scan-tips { margin: 6px 0 0; padding-left: 18px; }
+.next-steps ol { margin: 0 0 4px; padding-left: 18px; }
+@media (max-width: 600px) { .kind-cards { grid-template-columns: 1fr; } }

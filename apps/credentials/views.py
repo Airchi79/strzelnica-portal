@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -15,7 +16,17 @@ from .models import Credential
 
 @login_required
 def my_list(request):
-    return render(request, "credentials/my_list.html", {"credentials": request.user.credentials.all()})
+    credentials = list(request.user.credentials.all())
+    ps = [c for c in credentials if c.kind == Credential.Kind.RANGE_OFFICER]
+    return render(
+        request,
+        "credentials/my_list.html",
+        {
+            "credentials": credentials,
+            "ps_valid": any(c.is_valid for c in ps),
+            "ps_pending": any(c.effective_status == Credential.Status.PENDING for c in ps),
+        },
+    )
 
 
 @login_required
@@ -24,6 +35,8 @@ def my_edit(request, pk=None):
     initial = {}
     if not pk and request.GET.get("rodzaj") in Credential.Kind.values:
         initial["kind"] = request.GET["rodzaj"]  # np. z listy kontrolnej „Dodaj uprawnienia PS”
+    elif not pk and not request.user.credentials.filter(kind=Credential.Kind.RANGE_OFFICER).exists():
+        initial["kind"] = Credential.Kind.RANGE_OFFICER
     form = CredentialForm(request.POST or None, request.FILES or None, instance=credential, user=request.user, initial=initial)
     if request.method == "POST" and form.is_valid():
         if pk and "scan" in form.changed_data:
@@ -33,7 +46,9 @@ def my_edit(request, pk=None):
         services.submit(form.save(commit=False), form.changed_data)
         messages.success(request, "Zapisano. Dokument czeka na weryfikację przez zarząd.")
         return redirect("credentials:my_list")
-    return render(request, "credentials/my_edit.html", {"form": form, "credential": credential})
+    return render(
+        request, "credentials/my_edit.html", {"form": form, "credential": credential, "kind_hints": form.hints_json(), "max_upload": settings.MAX_UPLOAD_BYTES}
+    )
 
 
 @login_required

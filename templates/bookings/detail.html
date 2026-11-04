@@ -1,56 +1,99 @@
-{% extends "base.html" %}{% load satok %}
+{% extends "base.html" %}{% load satok static %}
 {% block title %}Rezerwacja {{ r.number }}{% endblock %}
 {% block content %}
-<h1>Rezerwacja {{ r.number }}</h1>
-<div class="card"><table>
-  <tr><th>Oś</th><td>{{ r.lane }}</td></tr>
-  <tr><th>Termin</th><td>{{ r.starts_at|date:"l, j E Y" }}, {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</td></tr>
-  <tr><th>Liczba osób</th><td>{{ r.persons }}</td></tr>
-  {% if r.access_code %}<tr><th>Rozliczenie</th><td>wg umowy klubu {{ r.access_code.club }}</td></tr>
-  {% elif r.client_pass %}<tr><th>Rozliczenie</th><td>kod wejścia {{ r.client_pass.code }} ({{ r.client_pass.get_kind_display|lower }})</td></tr>
-  {% else %}<tr><th>Należność</th><td><strong>{{ r.amount|pln }}</strong> ({{ r.hourly_amount|pln }} / h)</td></tr>{% endif %}
-  <tr><th>Status</th><td>{{ r.display_status }}{% if r.cancel_reason %} — {{ r.cancel_reason }}{% endif %}</td></tr>
-  <tr><th>Płatność</th><td>{{ r.get_payment_status_display }}</td></tr>
-  {% if r.notes %}<tr><th>Uwagi</th><td>{{ r.notes }}</td></tr>{% endif %}
-</table></div>
-{% if entry_qr %}
-<div class="card" style="text-align:center">
-  <h2 style="margin-top:0">Kod QR do książki pobytu</h2>
-  <div class="qr"><img src="{{ entry_qr }}" alt="Kod QR wpisu do książki pobytu dla tej rezerwacji"></div>
-  <p class="small">Pokaż kod uczestnikom — każdy skanuje go swoim telefonem i wpisuje się do książki.
-  {% if not entry_open %}<br>Wpisy będą możliwe od {{ entry_opens_at|date:"j.m.Y H:i" }}.{% endif %}</p>
-  <p class="small muted">Masz osobę z kontem? Zeskanuj jej „Mój kod QR” aparatem telefonu, aby ją dopisać.</p>
+{# --- baner stanu --- #}
+{% if r.status == 'anulowana' %}
+  <div class="res-banner gray"><strong>Rezerwacja anulowana</strong>{% if r.cancel_reason %}<span>{{ r.cancel_reason }}</span>{% endif %}</div>
+{% elif r.status == 'nieodbyta' %}
+  <div class="res-banner gray"><strong>Rezerwacja nieodbyta</strong></div>
+{% elif r.status == 'do_zatwierdzenia' %}
+  <div class="res-banner warn"><strong>Czeka na zatwierdzenie przez obsługę</strong><span>Termin jest już zablokowany dla Ciebie. Po zatwierdzeniu dostaniesz e-mail z informacją o płatności.</span></div>
+{% elif r.is_finished %}
+  <div class="res-banner gray"><strong>Rezerwacja zakończona</strong><span>Dziękujemy za wizytę.</span></div>
+{% elif r.payment_status == 'do_zaplaty' %}
+  <div class="res-banner warn"><strong>Rezerwacja potwierdzona — do zapłaty {{ r.amount|sub:r.paid_amount|pln }}</strong>
+    {% if r.pay_by %}<span>Opłać do {{ r.pay_by|date:"j.m H:i" }} <span class="countdown" data-countdown="{{ r.pay_by|date:'c' }}"></span> — inaczej termin zostanie zwolniony.</span>{% endif %}</div>
+{% else %}
+  <div class="res-banner ok"><strong>Rezerwacja potwierdzona ✓</strong><span>{{ r.get_payment_status_display }}</span></div>
+{% endif %}
+
+{# --- karta terminu --- #}
+<div class="card res-main">
+  <div class="res-date">
+    <span class="res-dow">{{ r.starts_at|date:"l" }}</span>
+    <span class="res-day">{{ r.starts_at|date:"j E Y" }}</span>
+    <span class="res-time">{{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</span>
+  </div>
+  <dl class="res-facts">
+    <div><dt>Oś</dt><dd>{{ r.lane }}</dd></div>
+    <div><dt>Osoby</dt><dd>{{ r.persons }}</dd></div>
+    <div><dt>Numer</dt><dd class="code">{{ r.number }}</dd></div>
+    <div><dt>{% if r.access_code or r.client_pass %}Rozliczenie{% else %}Należność{% endif %}</dt>
+      <dd>{% if r.access_code %}wg umowy klubu {{ r.access_code.club }}{% elif r.client_pass %}kod {{ r.client_pass.code }}{% else %}<strong>{{ r.amount|pln }}</strong> <span class="small muted">({{ r.hourly_amount|pln }}/h)</span>{% endif %}</dd></div>
+  </dl>
+  {% if r.notes %}<p class="small muted">Uwagi: {{ r.notes }}</p>{% endif %}
+  {% if r.status == 'potwierdzona' and not r.is_finished %}
+  <div class="actions res-links">
+    <a class="btn secondary small-btn" href="{% url 'bookings:ics' r.pk %}">Dodaj do kalendarza</a>
+    <a class="btn secondary small-btn" href="{{ gcal_url }}" target="_blank" rel="noopener">Google Kalendarz</a>
+    {% if map_url %}<a class="btn secondary small-btn" href="{{ map_url }}" target="_blank" rel="noopener">Dojazd (mapa)</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{# --- płatność --- #}
+{% if r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' %}
+<div class="card res-pay">
+  <h2 style="margin-top:0">Płatność: {{ r.amount|sub:r.paid_amount|pln }}</h2>
+  {% if WALLET_ENABLED %}<p class="small">Opłata zostanie pobrana automatycznie z Twojego salda, gdy będzie na nim wystarczająco środków.</p>{% endif %}
+  {% if tpay_enabled and pay_options.online %}
+    <form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}">
+      <button class="btn res-pay-btn" type="submit">Zapłać online — BLIK, przelew, karta</button></form>
+  {% endif %}
+  {% if pay_options.offline %}
+    <div class="res-offline"><strong>{% if tpay_enabled and pay_options.online %}Albo offline{% else %}Jak zapłacić{% endif %}</strong>
+      <p class="small">{{ pay_options.instructions }}</p>
+      <p class="small">Tytuł przelewu: <strong class="code" data-copy-text>{{ r.number }}</strong> <button type="button" class="link-btn" data-copy="{{ r.number }}">kopiuj</button>
+      {% if association.bank_account %}<br>Rachunek: <strong class="code">{{ association.bank_account }}</strong> <button type="button" class="link-btn" data-copy="{{ association.bank_account }}">kopiuj</button>{% endif %}</p>
+    </div>
+  {% elif not tpay_enabled %}<p class="small muted">Płatności online są chwilowo niedostępne — skontaktuj się z obsługą strzelnicy.</p>{% endif %}
+  <p class="small"><a href="{% url 'payments:wallet' %}">Moje płatności</a></p>
 </div>
 {% endif %}
+
+{# --- kod QR dla uczestników --- #}
+{% if entry_qr %}
+<div class="card res-qr">
+  <h2 style="margin-top:0">Kod QR do książki pobytu</h2>
+  <p class="small">Na miejscu <strong>każdy uczestnik</strong> skanuje ten kod swoim telefonem i wpisuje się do książki pobytu — także Ty.
+  {% if not entry_open %}<br><span class="badge warn">Wpisy otworzą się {{ entry_opens_at|date:"j.m H:i" }}</span>{% else %}<br><span class="badge ok">Wpisy otwarte</span>{% endif %}</p>
+  <div class="qr res-qr-img"><img src="{{ entry_qr }}" alt="Kod QR wpisu do książki pobytu dla tej rezerwacji"></div>
+  <div class="actions" style="justify-content:center">
+    <button type="button" class="btn" data-share="{{ entry_url }}" data-share-title="Wpis do książki pobytu — {{ r.lane }}, {{ r.starts_at|date:'j.m' }} {{ r.starts_at|time:'H:i' }}">Udostępnij link uczestnikom</button>
+    <button type="button" class="btn secondary" data-copy="{{ entry_url }}">Kopiuj link</button>
+  </div>
+  <p class="small muted">Wyślij link wcześniej (SMS, komunikator) — uczestnicy wpiszą się bez skanowania. Osobę z kontem możesz też dopisać, skanując jej „Mój kod QR”.</p>
+</div>
+{% endif %}
+
+{# --- wpisy w książce --- #}
 {% if log_entries %}
 <div class="card">
-  <h2 style="margin-top:0">Książka pobytu ({{ log_entries|length }})</h2>
-  <table>{% for e in log_entries %}<tr><td>{{ e.entered_at|time:"H:i" }}</td><td>{{ e.full_name }}</td><td class="small">{{ e.get_purpose_display }}</td></tr>{% endfor %}</table>
+  <h2 style="margin-top:0">W książce pobytu ({{ log_entries|length }})</h2>
+  <table>{% for e in log_entries %}<tr><td>{{ e.entered_at|time:"H:i" }}</td><td>{{ e.full_name }}</td><td class="small muted">{{ e.get_purpose_display }}</td></tr>{% endfor %}</table>
 </div>
 {% endif %}
-{% if r.status == 'do_zatwierdzenia' %}
-<div class="card"><div class="msg">Rezerwacja czeka na zatwierdzenie przez obsługę strzelnicy. Termin jest zablokowany dla Ciebie — po zatwierdzeniu dostaniesz e-mail z informacją o płatności.</div></div>
-{% elif r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' %}
-<div class="card">
-  <h2 style="margin-top:0">Do zapłaty: {{ r.amount|sub:r.paid_amount|pln }}</h2>
-  {% if r.pay_by %}<div class="msg warning">Opłać rezerwację online do <strong>{{ r.pay_by|date:"j.m.Y H:i" }}</strong> — inaczej termin zostanie zwolniony.</div>{% endif %}
-  {% if WALLET_ENABLED %}<p class="small">Opłata zostanie pobrana automatycznie z Twojego salda, gdy będzie na nim wystarczająco środków.</p>{% endif %}
-  <div class="actions">
-    {% if tpay_enabled and pay_options.online %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}"><button class="btn" type="submit">Zapłać online</button></form>{% endif %}
-    <a class="btn secondary" href="{% url 'payments:wallet' %}">Moje płatności</a>
-  </div>
-  {% if pay_options.offline %}<p class="small muted">{{ pay_options.instructions }} Tytuł przelewu: <strong>{{ r.number }}</strong>{% if association.bank_account %}, rachunek {{ association.bank_account }}{% endif %}.</p>
-  {% elif not tpay_enabled %}<p class="small muted">Płatności online są chwilowo niedostępne — skontaktuj się z obsługą strzelnicy.</p>{% endif %}
-</div>
-{% endif %}
+
+{# --- anulowanie --- #}
 {% if r.can_user_cancel %}
-<div class="card">
-  <h2 style="margin-top:0">{% if r.status == 'do_zatwierdzenia' %}Wycofanie rezerwacji{% else %}Anulowanie{% endif %}</h2>
-  {% if r.status == 'potwierdzona' %}<p>Bez opłat, samodzielnie do {{ r.free_cancel_deadline|date:"j.m.Y H:i" }}. Później anulować może tylko obsługa strzelnicy.</p>{% endif %}
+<details class="card res-cancel"{% if form.errors %} open{% endif %}>
+  <summary>{% if r.status == 'do_zatwierdzenia' %}Wycofaj rezerwację{% else %}Anuluj rezerwację{% endif %}</summary>
+  {% if r.status == 'potwierdzona' %}<p class="small">Bez opłat, samodzielnie do <strong>{{ r.free_cancel_deadline|date:"j.m.Y H:i" }}</strong>. Później anulować może tylko obsługa strzelnicy.</p>{% endif %}
   <form method="post" data-confirm="Anulować rezerwację {{ r.number }}?">{% csrf_token %}{% include "partials/form.html" %}<button class="btn danger" type="submit">Anuluj rezerwację</button></form>
-</div>
+</details>
 {% elif r.status == 'potwierdzona' and not r.is_finished %}
-<p class="small muted">Do terminu zostało mniej niż {{ cancel_hours }} h — anulować może już tylko obsługa strzelnicy.</p>
+<p class="small muted">Do terminu zostało mniej niż {{ cancel_hours }} h — anulować może już tylko obsługa strzelnicy{% if association.contact_phone %} (tel. <a href="tel:{{ association.contact_phone }}">{{ association.contact_phone }}</a>){% endif %}.</p>
 {% endif %}
 <p><a href="{% url 'bookings:my_list' %}">← Moje rezerwacje</a></p>
+<script src="{% static 'js/reservation.js' %}" defer></script>
 {% endblock %}

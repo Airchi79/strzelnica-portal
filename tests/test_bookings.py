@@ -481,7 +481,7 @@ def test_new_client_reservation_waits_for_approval(newbie, lane, owner, client, 
     assert r.can_user_cancel()
     client.force_login(newbie)
     body = client.get(f"/rezerwacje/{r.pk}/").content.decode()
-    assert "czeka na zatwierdzenie" in body and "Zapłać online" not in body
+    assert "czeka na zatwierdzenie" in body.lower() and "Zapłać online" not in body
 
 
 def owner_ps():
@@ -610,3 +610,17 @@ def test_slots_json_and_new_form(client, ps, lane):
     client.force_login(ps)
     page = client.get(f"/rezerwacje/nowa/?os={lane.pk}&dzien={day.isoformat()}").content.decode()
     assert 'class="lane-card"' in page and "Wybierz godziny" in page and "data-slots-url" in page
+
+
+def test_reservation_page_calendar_and_share(client, ps, lane):
+    r = book(ps, lane)
+    client.force_login(ps)
+    body = client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    assert "Rezerwacja potwierdzona" in body and "Dodaj do kalendarza" in body and "calendar.google.com" in body
+    ics = client.get(f"/rezerwacje/{r.pk}/kalendarz.ics")
+    text = ics.content.decode()
+    assert ics["Content-Type"].startswith("text/calendar") and "BEGIN:VEVENT" in text and r.number in text
+    assert f"DTSTART:{r.starts_at.astimezone(datetime.timezone.utc):%Y%m%dT%H%M%SZ}" in text and "\r\n" in text
+    other = make_user("obcy@example.com")
+    client.force_login(other)
+    assert client.get(f"/rezerwacje/{r.pk}/kalendarz.ics").status_code == 404

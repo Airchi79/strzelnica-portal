@@ -10,4 +10,5 @@ urlpatterns = [
     path("sloty/", views.slots_json, name="slots"),
     path("moje/", views.my_list, name="my_list"),
     path("<int:pk>/", views.detail, name="detail"),
+    path("<int:pk>/kalendarz.ics", views.ics, name="ics"),
 ]

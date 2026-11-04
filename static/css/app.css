@@ -376,3 +376,28 @@ html.is-dark .theme-btn .when-light { display: none; }
   .day-other { grid-column: 1 / -1; }
   .book-summary .btn { padding: 8px 12px; font-size: .9rem; }
 }
+
+/* Strona rezerwacji */
+.res-banner { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: var(--radius); margin-bottom: 12px; border-left: 5px solid; }
+.res-banner strong { font-size: 1.05rem; }
+.res-banner span { font-size: .9rem; }
+.res-banner.ok { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
+.res-banner.warn { background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
+.res-banner.gray { background: var(--surface); border-color: var(--border); color: var(--muted); }
+.res-banner span, .res-banner strong { color: inherit; }
+.res-main .res-date { display: flex; flex-direction: column; margin-bottom: 10px; }
+.res-dow { text-transform: capitalize; color: var(--muted); font-size: .9rem; }
+.res-day { font-size: 1.35rem; font-weight: 800; }
+.res-time { font-size: 1.6rem; font-weight: 800; color: var(--brand); font-variant-numeric: tabular-nums; }
+.res-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px 16px; margin: 0; }
+.res-facts dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.res-facts dd { margin: 0; font-weight: 600; }
+.res-links { margin-top: 12px; }
+.res-pay-btn { width: 100%; min-height: 52px; font-size: 1.05rem; }
+.res-offline { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.link-btn { border: 0; background: none; color: var(--brand); font: inherit; font-size: .85rem; text-decoration: underline; cursor: pointer; padding: 0 4px; }
+.res-qr { text-align: center; }
+.res-qr-img img { width: min(300px, 80vw); height: auto; background: #fff; padding: 10px; border-radius: 12px; }
+.res-cancel summary { cursor: pointer; font-weight: 600; color: var(--bad); }
+.res-cancel[open] summary { margin-bottom: 10px; }
+.countdown { font-weight: 700; font-variant-numeric: tabular-nums; }

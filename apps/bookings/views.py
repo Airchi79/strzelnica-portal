@@ -1,5 +1,7 @@
 import csv
+from urllib.parse import quote, urlencode
 from datetime import date, timedelta
+from datetime import timezone as dt_timezone
 
 from django.conf import settings
 from django.contrib import messages
@@ -91,6 +93,15 @@ def slots_json(request):
     })
 
 
+def _google_calendar_url(r, request):
+    fmt = "%Y%m%dT%H%M%SZ"
+    dates = f"{r.starts_at.astimezone(dt_timezone.utc).strftime(fmt)}/{r.ends_at.astimezone(dt_timezone.utc).strftime(fmt)}"
+    link = settings.SITE_URL + reverse("bookings:detail", args=[r.pk])
+    params = {"action": "TEMPLATE", "text": f"Strzelnica — {r.lane}", "dates": dates,
+              "details": f"Rezerwacja {r.number}, {r.persons} os. {link}", "location": AssociationSettings.load().address}
+    return "https://calendar.google.com/calendar/render?" + urlencode(params)
+
+
 def _messages_from(error):
     return error.messages if isinstance(error, ValidationError) else [str(error)]
 
@@ -171,12 +182,44 @@ def detail(request, pk):
             "form": form,
             "association": AssociationSettings.load(),
             "pay_options": services.payment_options(reservation),
+            "gcal_url": _google_calendar_url(reservation, request),
+            "map_url": ("https://www.google.com/maps/search/?api=1&query=" + quote(AssociationSettings.load().address))
+            if AssociationSettings.load().address else "",
             "cancel_hours": BookingSettings.load().free_cancel_hours,
             "log_entries": reservation.log_entries.order_by("entered_at"),
             "tpay_enabled": settings.TPAY_ENABLED,
             **reservation_qr_context(request, reservation),
         },
     )
+
+
+def _ics_escape(text):
+    return str(text).replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+
+
+@login_required
+def ics(request, pk):
+    """Plik kalendarza (iCalendar) dla własnej rezerwacji — „Dodaj do kalendarza” w telefonie."""
+    r = get_object_or_404(Reservation.objects.select_related("lane"), pk=pk, user=request.user)
+    association = AssociationSettings.load()
+    fmt = "%Y%m%dT%H%M%SZ"
+    utc = lambda dt: dt.astimezone(dt_timezone.utc).strftime(fmt)
+    link = settings.SITE_URL + reverse("bookings:detail", args=[r.pk])
+    host = settings.SITE_URL.split("//")[-1].split("/")[0] or "strzelnica"
+    lines = [
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Strzelnica Satok//Rezerwacje//PL", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+        "BEGIN:VEVENT", f"UID:{r.number}@{host}", f"DTSTAMP:{utc(timezone.now())}", f"DTSTART:{utc(r.starts_at)}", f"DTEND:{utc(r.ends_at)}",
+        f"SUMMARY:{_ics_escape(f'Strzelnica — {r.lane}')}",
+        f"LOCATION:{_ics_escape(association.address or association.name)}",
+        f"DESCRIPTION:{_ics_escape(f'Rezerwacja {r.number}, {r.persons} os. Kod QR do książki pobytu: {link}')}",
+        f"URL:{link}",
+        "STATUS:CANCELLED" if r.status == Reservation.Status.CANCELLED else "STATUS:CONFIRMED",
+        "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Strzelanie za 2 godziny", "TRIGGER:-PT2H", "END:VALARM",
+        "END:VEVENT", "END:VCALENDAR",
+    ]
+    response = HttpResponse("\r\n".join(lines) + "\r\n", content_type="text/calendar; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{r.number}.ics"'
+    return response
 
 
 # --- panel zarządu ---------------------------------------------------------

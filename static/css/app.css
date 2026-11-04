@@ -124,7 +124,7 @@ input[type=radio] { width: 20px; height: 20px; margin-right: 6px; }
 td { overflow-wrap: anywhere; }
 
 /* Płatności */
-td.neg, .neg { color: var(--bad); } td.pos { color: var(--ok); }
+td.neg, .neg { color: var(--bad); } td.pos, .pos { color: var(--ok); }
 .code { font-family: ui-monospace, monospace; letter-spacing: .03em; }
 
 .badge { white-space: nowrap; }
@@ -441,3 +441,16 @@ html.is-dark .theme-btn .when-light { display: none; }
 @media (max-width: 900px) { .verify-grid { grid-template-columns: 1fr; } .verify-scan { position: static; } }
 .revoke-box summary { cursor: pointer; font-weight: 600; color: var(--bad); }
 .revoke-box[open] summary { margin-bottom: 8px; }
+
+/* --- widok tygodnia --- */
+.viewnav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tabs.seg { margin-bottom: 8px; }
+.weekgrid { min-width: 600px; }
+.weekgrid thead th a { color: inherit; text-decoration: none; font-weight: 700; }
+.weekgrid thead th.today { box-shadow: inset 0 -3px 0 var(--brand); }
+.weekgrid td.cell { font-size: .78rem; padding: 4px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.weekgrid td.cell a { min-height: 26px; line-height: 26px; }
+.daylabel.week-label { text-transform: none; }
+.weekgrid thead th, .panel-app .weekgrid thead th { text-transform: none; letter-spacing: 0; font-size: .85rem; }
+.weekgrid thead th .small { font-weight: 400; }
+.weekgrid thead th.past-day { opacity: .6; }

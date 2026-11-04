@@ -15,6 +15,7 @@
         {% if panel %}<a href="{% url 'panel:reservation' s.reservation.pk %}">{{ s.reservation.user.last_name }}<br><span class="small">{{ s.reservation.persons }} os.</span></a>
         {% else %}zajęte{% endif %}</td>
       {% elif s.state == 'blokada' %}<td class="cell blocked">{% if panel %}{{ s.block.title }}{% else %}niedostępne{% endif %}</td>
+      {% elif s.state == 'za_pozno' %}<td class="cell past" title="za krótko przed terminem na rezerwację online">za krótko</td>
       {% else %}<td class="cell past">minęło</td>{% endif %}
     {% endfor %}</tr>
   {% empty %}<tr><td class="muted" colspan="{{ lanes|length|add:1 }}">Tego dnia żadna oś nie jest czynna.</td></tr>

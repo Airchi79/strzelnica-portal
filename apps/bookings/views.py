@@ -48,12 +48,12 @@ def _parse_day(value, default=None):
         return default or timezone.localdate()
 
 
-def _day_grid(day, lanes, now=None):
+def _day_grid(day, lanes, now=None, lead_hours=0):
     """Siatka dnia: wiersze = godziny, kolumny = osie. Zwraca (godziny, {oś: {godzina: Slot}})."""
     columns = []
     hours = set()
     for lane in lanes:
-        slots = {s.hour: s for s in services.day_slots(lane, day, now)}
+        slots = {s.hour: s for s in services.day_slots(lane, day, now, lead_hours=lead_hours)}
         hours.update(slots)
         columns.append((lane, slots))
     ordered = sorted(hours)
@@ -61,16 +61,47 @@ def _day_grid(day, lanes, now=None):
     return [lane for lane, _ in columns], rows
 
 
-def calendar(request):
-    """Publiczny kalendarz zajętości osi — bez danych osobowych."""
+def _week_grid(lane, start, now=None, lead_hours=0):
+    """Siatka tygodnia jednej osi: kolumny = 7 dni od `start`, wiersze = godziny.
+    Zwraca (dni [(dzień, liczba wolnych godzin, czy czynna)], wiersze [(godzina, [(dzień, Slot|None)])])."""
+    days, columns, hours = [], [], set()
+    for i in range(7):
+        d = start + timedelta(days=i)
+        slots = {s.hour: s for s in services.day_slots(lane, d, now, lead_hours=lead_hours)}
+        hours.update(slots)
+        columns.append((d, slots))
+        days.append((d, sum(1 for s in slots.values() if s.state == "wolne"), bool(slots)))
+    rows = [(h, [(d, slots.get(h)) for d, slots in columns]) for h in sorted(hours)]
+    return days, rows
+
+
+def _calendar_context(request, lanes):
+    """Wspólny kontekst kalendarza dnia/tygodnia (publiczny i panel)."""
     day = _parse_day(request.GET.get("dzien"))
-    lanes, rows = _day_grid(day, active_lanes())
-    can_book = request.user.is_authenticated and not services.check_can_book(request.user)
-    return render(
-        request,
-        "bookings/calendar.html",
-        {"day": day, "prev": day - timedelta(days=1), "next": day + timedelta(days=1), "lanes": lanes, "rows": rows, "can_book": can_book},
-    )
+    week = request.GET.get("widok") == "tydzien"
+    ctx = {"day": day, "week_view": week, "all_lanes": lanes, "today": timezone.localdate()}
+    if not week:
+        return ctx, day
+    lane_id = request.GET.get("os", "")
+    lane = next((l for l in lanes if str(l.pk) == lane_id), None) or (lanes[0] if lanes else None)
+    start = day - timedelta(days=day.weekday())  # od poniedziałku
+    ctx.update({"lane": lane, "week_start": start, "week_end": start + timedelta(days=6),
+                "prev": start - timedelta(days=7), "next": start + timedelta(days=7)})
+    return ctx, start
+
+
+def calendar(request):
+    """Publiczny kalendarz zajętości osi (dzień albo tydzień jednej osi) — bez danych osobowych."""
+    lanes = list(active_lanes().select_related("facility").order_by("facility__order", "order"))
+    ctx, start = _calendar_context(request, lanes)
+    lead = BookingSettings.load().min_lead_hours
+    ctx["can_book"] = request.user.is_authenticated and not services.check_can_book(request.user)
+    if ctx["week_view"]:
+        ctx["week_days"], ctx["rows"] = _week_grid(ctx["lane"], start, lead_hours=lead) if ctx["lane"] else ([], [])
+    else:
+        ctx["lanes"], ctx["rows"] = _day_grid(start, lanes, lead_hours=lead)
+        ctx.update({"prev": start - timedelta(days=1), "next": start + timedelta(days=1)})
+    return render(request, "bookings/calendar.html", ctx)
 
 
 def slots_json(request):
@@ -230,13 +261,14 @@ def ics(request, pk):
 
 @panel_required(PERM)
 def panel_calendar(request):
-    day = _parse_day(request.GET.get("dzien"))
-    lanes, rows = _day_grid(day, Lane.objects.filter(is_active=True).select_related("facility"))
-    return render(
-        request,
-        "panel/bookings_calendar.html",
-        {"day": day, "prev": day - timedelta(days=1), "next": day + timedelta(days=1), "lanes": lanes, "rows": rows},
-    )
+    lanes = list(Lane.objects.filter(is_active=True).select_related("facility").order_by("facility__order", "order"))
+    ctx, start = _calendar_context(request, lanes)
+    if ctx["week_view"]:
+        ctx["week_days"], ctx["rows"] = _week_grid(ctx["lane"], start) if ctx["lane"] else ([], [])
+    else:
+        ctx["lanes"], ctx["rows"] = _day_grid(start, lanes)
+        ctx.update({"prev": start - timedelta(days=1), "next": start + timedelta(days=1)})
+    return render(request, "panel/bookings_calendar.html", ctx)
 
 
 def _csv_safe(value):

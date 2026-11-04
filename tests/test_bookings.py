@@ -650,3 +650,19 @@ def test_min_lead_zero_keeps_on_site_booking(ps, lane):
     day = next_weekday()
     now = services.local_dt(day, 10) + timedelta(minutes=50)
     assert services.create_reservation(ps, lane, day, 10, 11, 1, now=now).pk
+
+
+def test_week_view_public_and_panel(client, owner_client, ps, lane):
+    day = next_weekday()
+    book(ps, lane, day=day, start=10, end=12)
+    response = client.get(f"/rezerwacje/?widok=tydzien&os={lane.pk}&dzien={day.isoformat()}")
+    assert response.status_code == 200
+    ctx = response.context
+    assert ctx["week_start"].weekday() == 0 and ctx["week_start"] <= day <= ctx["week_end"]
+    assert len(ctx["week_days"]) == 7 and ctx["lane"] == lane
+    html = response.content.decode()
+    assert "zajęte" in html and ps.last_name not in html  # publicznie bez danych osobowych
+    page = owner_client.get(f"/panel/rezerwacje/?widok=tydzien&os={lane.pk}&dzien={day.isoformat()}")
+    assert page.status_code == 200 and ps.last_name in page.content.decode()
+    # widok dnia działa jak wcześniej
+    assert client.get(f"/rezerwacje/?dzien={day.isoformat()}").context["week_view"] is False

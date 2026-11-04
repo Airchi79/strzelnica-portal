@@ -1,0 +1,20 @@
+{# Przełącznik Dzień/Tydzień, wybór osi i nawigacja tygodnia. #}
+<div class="viewnav">
+  <div class="tabs seg" role="tablist" aria-label="Widok">
+    <a href="?dzien={{ day|date:'Y-m-d' }}" class="{% if not week_view %}active{% endif %}">Dzień</a>
+    <a href="?widok=tydzien&amp;dzien={{ day|date:'Y-m-d' }}{% if lane %}&amp;os={{ lane.pk }}{% endif %}" class="{% if week_view %}active{% endif %}">Tydzień</a>
+  </div>
+</div>
+{% if week_view %}
+  <div class="tabs lane-tabs" aria-label="Oś">{% for l in all_lanes %}<a href="?widok=tydzien&amp;dzien={{ week_start|date:'Y-m-d' }}&amp;os={{ l.pk }}" class="{% if l.pk == lane.pk %}active{% endif %}">{{ l.name }}</a>{% endfor %}</div>
+  <form method="get" class="daynav">
+    <input type="hidden" name="widok" value="tydzien">{% if lane %}<input type="hidden" name="os" value="{{ lane.pk }}">{% endif %}
+    <a class="btn secondary" href="?widok=tydzien&amp;os={{ lane.pk }}&amp;dzien={{ prev|date:'Y-m-d' }}" aria-label="Poprzedni tydzień">←</a>
+    <input type="date" name="dzien" value="{{ week_start|date:'Y-m-d' }}" aria-label="Tydzień zawierający dzień" onchange="this.form.submit()">
+    <a class="btn secondary" href="?widok=tydzien&amp;os={{ lane.pk }}&amp;dzien={{ next|date:'Y-m-d' }}" aria-label="Następny tydzień">→</a>
+    <noscript><button class="btn secondary" type="submit">Pokaż</button></noscript>
+  </form>
+  <p class="daylabel week-label">{{ lane.name }} · {{ week_start|date:"j E" }} – {{ week_end|date:"j E Y" }}</p>
+{% else %}
+  {% include "bookings/_daynav.html" %}
+{% endif %}

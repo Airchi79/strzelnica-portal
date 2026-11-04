@@ -1,0 +1,97 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Dziś na strzelnicy — {{ day|date:"j.m.Y" }}{% endblock %}
+{% block panel %}
+<div class="today-head">
+  <div>
+    <h1 style="margin-bottom:2px">{% if is_today %}Dziś na strzelnicy{% else %}Raport dnia{% endif %}</h1>
+    <p class="daylabel" style="margin:0">{{ day|date:"l, j E Y" }}</p>
+  </div>
+  <div class="actions no-print" style="margin:0">
+    <a class="btn secondary small-btn" href="?dzien={{ prev|date:'Y-m-d' }}" aria-label="Poprzedni dzień">←</a>
+    {% if not is_today %}<a class="btn secondary small-btn" href="?">Dziś</a>{% endif %}
+    <a class="btn secondary small-btn" href="?dzien={{ next|date:'Y-m-d' }}" aria-label="Następny dzień">→</a>
+    <button type="button" class="btn small-btn" onclick="window.print()">Drukuj</button>
+  </div>
+</div>
+
+<div class="today-tiles">
+  <div class="card tile"><span class="tile-n">{{ reservations|length }}</span><span class="tile-l">rezerwacji · {{ persons }} os.</span></div>
+  <div class="card tile{% if attention.unpaid %} warn{% endif %}"><span class="tile-n">{{ due_total|pln }}</span><span class="tile-l">do zapłaty ({{ attention.unpaid|length }})</span></div>
+  {% if entries is not None %}<div class="card tile"><span class="tile-n">{{ entries|length }}</span><span class="tile-l">wpisów w książce{% if present %} · {{ present|length }} na terenie{% endif %}</span></div>{% endif %}
+  {% if payments is not None %}<div class="card tile"><span class="tile-n">{{ cash_total|pln }}</span><span class="tile-l">gotówka do rozliczenia</span></div>{% endif %}
+</div>
+
+{% if attention.unpaid or attention.pending or attention.no_log or attention.conflicts or present and not is_today %}
+<div class="card attention-box">
+  <h2 class="step-title">Wymaga uwagi</h2>
+  <ul class="small">
+    {% for r in attention.unpaid %}<li><strong>Nie zapłacono {{ r.due|pln }}</strong> — {{ r.starts_at|time:"H:i" }} {{ r.lane }}, {{ r.user.full_name }}{% if r.user.phone %} (<a href="tel:{{ r.user.phone }}">{{ r.user.phone }}</a>){% endif %} <span class="no-print">· <a href="{% url 'panel:reservation' r.pk %}">rozlicz</a></span></li>{% endfor %}
+    {% for r in attention.pending %}<li><strong>Czeka na zatwierdzenie</strong> — {{ r.starts_at|time:"H:i" }} {{ r.lane }}, {{ r.user.full_name }} <span class="no-print">· <a href="{% url 'panel:reservation' r.pk %}">otwórz</a></span></li>{% endfor %}
+    {% for r in attention.no_log %}<li><strong>Brak strzelców w książce pobytu</strong> — {{ r.starts_at|time:"H:i" }} {{ r.lane }}, {{ r.user.full_name }} (rezerwacja już trwa{% if r.entries %}, {{ r.entries }} wpis(y) innych osób{% endif %})</li>{% endfor %}
+    {% for r, b in attention.conflicts %}<li><strong>Kolizja z blokadą „{{ b.title }}”</strong> — {{ r.starts_at|time:"H:i" }} {{ r.lane }}, {{ r.user.full_name }} <span class="no-print">· <a href="{% url 'panel:reservation' r.pk %}">otwórz</a></span></li>{% endfor %}
+    {% if present and not is_today %}<li><strong>{{ present|length }} os. bez odnotowanego wyjścia</strong></li>{% endif %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="card table-wrap">
+  <h2 class="step-title">Rezerwacje</h2>
+  <table class="today-table">
+    <tr><th>Godz.</th><th>Oś</th><th>Prowadzący (PS)</th><th>Os.</th><th>Książka</th><th>Płatność</th></tr>
+    {% for r in reservations %}
+    <tr class="{% if r.status == 'nieodbyta' or r.status == 'anulowana' %}muted{% endif %}">
+      <td class="nowrap"><a href="{% url 'panel:reservation' r.pk %}">{{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</a></td>
+      <td class="nowrap">{{ r.lane }}</td>
+      <td><strong>{{ r.user.full_name }}</strong>{% if r.user.phone %}<div class="small"><a href="tel:{{ r.user.phone }}">{{ r.user.phone }}</a></div>{% endif %}
+        {% if r.notes %}<div class="small muted">{{ r.notes }}</div>{% endif %}
+        {% if r.status != 'potwierdzona' %}<span class="badge {% if r.status == 'do_zatwierdzenia' %}warn{% endif %}">{{ r.get_status_display }}</span>{% endif %}</td>
+      <td>{{ r.persons }}</td>
+      <td class="nowrap">{% if r.no_log %}<span class="badge bad">brak</span>{% elif r.shooters %}<span class="badge ok">{{ r.shooters }}/{{ r.persons }}</span>{% elif r.started %}—{% else %}<span class="muted small">później</span>{% endif %}</td>
+      <td class="nowrap">{% if r.due %}<span class="badge warn">do zapłaty {{ r.due|pln }}</span>
+        {% elif r.access_code %}<span class="small">klub {{ r.access_code.club }}</span>
+        {% elif r.client_pass %}<span class="small">kod {{ r.client_pass.code }}</span>
+        {% else %}<span class="badge {% if r.payment_status == 'oplacona' %}ok{% endif %}">{{ r.get_payment_status_display }}</span>{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="6" class="muted">Brak rezerwacji tego dnia.</td></tr>{% endfor %}
+  </table>
+</div>
+
+{% if blocks %}
+<div class="card">
+  <h2 class="step-title">Blokady osi</h2>
+  <ul class="small" style="margin:0;padding-left:18px">{% for b in blocks %}<li>{{ b.starts_at|date:"j.m H:i" }}–{{ b.ends_at|date:"j.m H:i" }} · {{ b.title }} · {% for l in b.lanes.all %}{{ l.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+{% if entries is not None %}
+<div class="card table-wrap">
+  <h2 class="step-title">Książka pobytu ({{ entries|length }})</h2>
+  <table>
+    <tr><th>Wejście</th><th>Wyjście</th><th>Osoba</th><th>Cel</th><th>Rezerwacja</th></tr>
+    {% for e in entries %}<tr>
+      <td>{{ e.entered_at|time:"H:i" }}</td>
+      <td>{% if e.exited_at %}{{ e.exited_at|time:"H:i" }}{% if e.exit_auto %} <span class="small muted">auto</span>{% endif %}{% else %}<span class="badge warn">na terenie</span>{% endif %}</td>
+      <td><a href="{% url 'panel:logbook_entry' e.pk %}">{{ e.full_name }}</a></td>
+      <td class="small">{{ e.get_purpose_display }}</td>
+      <td class="small">{% if e.reservation %}{{ e.reservation.starts_at|time:"H:i" }} {{ e.reservation.lane }}{% else %}—{% endif %}</td>
+    </tr>{% empty %}<tr><td colspan="5" class="muted">Brak wpisów.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if payments is not None %}
+<div class="card table-wrap">
+  <h2 class="step-title">Wpłaty zaksięgowane tego dnia</h2>
+  {% if pay_totals %}<p class="small" style="margin-top:0">{% for label, amount, m in pay_totals %}<span class="pay-sum{% if m == 'gotowka' %} cash{% endif %}">{{ label }}: <strong>{{ amount|pln }}</strong></span>{% endfor %} · razem <strong>{{ pay_sum|pln }}</strong></p>{% endif %}
+  <table>
+    <tr><th>Godz.</th><th>Sposób</th><th>Kwota</th><th>Wpłacający</th><th>Dotyczy</th></tr>
+    {% for p in payments %}<tr>
+      <td>{{ p.completed_at|time:"H:i" }}</td><td class="small">{{ p.get_method_display }}</td><td class="nowrap"><strong>{{ p.amount|pln }}</strong></td>
+      <td>{{ p.user.full_name|default:p.payer_name|default:"—" }}</td>
+      <td class="small">{% if p.reservation %}<a href="{% url 'panel:reservation' p.reservation.pk %}">{{ p.reservation.number }}</a>{% else %}{{ p.title|default:"—"|truncatechars:40 }}{% endif %}</td>
+    </tr>{% empty %}<tr><td colspan="5" class="muted">Brak wpłat.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endif %}
+<p class="small muted print-only">Wydrukowano {% now "j.m.Y H:i" %} · {{ user.full_name }}</p>
+{% endblock %}

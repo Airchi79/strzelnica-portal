@@ -454,3 +454,28 @@ html.is-dark .theme-btn .when-light { display: none; }
 .weekgrid thead th, .panel-app .weekgrid thead th { text-transform: none; letter-spacing: 0; font-size: .85rem; }
 .weekgrid thead th .small { font-weight: 400; }
 .weekgrid thead th.past-day { opacity: .6; }
+
+/* --- raport dnia (Dziś na strzelnicy) --- */
+.today-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.today-tiles { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 4px; }
+.tile { display: flex; flex-direction: column; gap: 2px; }
+.tile-n { font-size: 1.4rem; font-weight: 700; } .tile-l { color: var(--muted); font-size: .85rem; }
+.tile.warn { border-color: var(--warn); background: var(--warn-bg); } .tile.warn .tile-n { color: var(--warn); }
+.attention-box { border-left: 4px solid var(--warn); } .attention-box ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.nowrap { white-space: nowrap; }
+tr.muted td { color: var(--muted); }
+.pay-sum { margin-right: 12px; } .pay-sum.cash strong { color: var(--ok); }
+.print-only { display: none; }
+@media print {
+  .sidebar, .sidebar-backdrop, .appbar, .no-print, .msg { display: none !important; }
+  .panel-app .app, .app-body, .app-main, body { display: block !important; background: #fff !important; color: #000 !important; padding: 0 !important; margin: 0 !important; }
+  .card { break-inside: avoid; border-color: #999 !important; background: #fff !important; box-shadow: none !important; }
+  .badge { border: 1px solid #999; background: none !important; color: #000 !important; }
+  a { color: #000 !important; text-decoration: none; }
+  .print-only { display: block; }
+  .table-wrap { overflow: visible !important; }
+}
+@media print {
+  .today-tiles { display: grid !important; grid-template-columns: repeat(4, 1fr); }
+  .tile-l { color: #333 !important; }
+}

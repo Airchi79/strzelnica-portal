@@ -6,6 +6,7 @@ from django.urls import reverse
 SECTIONS = [
     (None, [
         ("Przegląd", "panel:home", "home", None, ["home"]),
+        ("Dziś na strzelnicy", "panel:today", "calendar", "bookings.manage_reservations", ["today"]),
         ("Powiadomienia", "panel:notifications", "bell", None, ["notification*"]),
     ]),
     ("Rezerwacje", [

@@ -603,3 +603,64 @@ def panel_archive_import(request):
                     if not preview:
                         messages.success(request, "Import rezerwacji zakończony.")
     return render(request, "panel/bookings_archive_import.html", {"result": result, "preview": preview, "year": year})
+
+
+@panel_required(PERM)
+def panel_today(request):
+    """Raport dnia dla dyżurnego: rezerwacje, kto nie zapłacił, książka pobytu, wpłaty (gotówka do rozliczenia)."""
+    from django.db.models import Count
+
+    from apps.logbook.models import Entry
+    from apps.payments.models import Payment
+
+    today = timezone.localdate()
+    day = _parse_day(request.GET.get("dzien"), today)
+    start, end = services.local_dt(day, 0), services.local_dt(day + timedelta(days=1), 0)
+    now = timezone.now()
+    reservations = list(
+        Reservation.objects.filter(starts_at__gte=start, starts_at__lt=end)
+        .exclude(status=Reservation.Status.CANCELLED, late_cancellation=False)
+        .select_related("lane", "user", "access_code__club", "client_pass")
+        .annotate(
+            shooters=Count("log_entries", filter=Q(log_entries__purpose=Entry.Purpose.SHOOTING), distinct=True),
+            entries=Count("log_entries", distinct=True),
+        )
+        .order_by("starts_at", "lane__order")
+    )
+    active = [r for r in reservations if r.status in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL)]
+    for r in reservations:
+        r.due = max(r.amount - r.paid_amount, 0) if r.payment_status == Reservation.Payment.DUE else 0
+        r.started = r.starts_at <= now
+        r.no_log = r.status == Reservation.Status.CONFIRMED and r.started and r.shooters == 0
+    attention = {
+        "unpaid": [r for r in active if r.payment_status == Reservation.Payment.DUE and r.status == Reservation.Status.CONFIRMED],
+        "pending": [r for r in active if r.status == Reservation.Status.PENDING_APPROVAL],
+        "no_log": [r for r in reservations if r.no_log],
+    }
+    blocks = list(Block.objects.filter(starts_at__lt=end, ends_at__gt=start).prefetch_related("lanes").order_by("starts_at"))
+    attention["conflicts"] = [
+        (r, b) for r in active for b in blocks
+        if b.starts_at < r.ends_at and b.ends_at > r.starts_at and any(l.pk == r.lane_id for l in b.lanes.all())
+    ]
+    ctx = {
+        "day": day, "is_today": day == today, "prev": day - timedelta(days=1), "next": day + timedelta(days=1),
+        "reservations": reservations, "attention": attention,
+        "persons": sum(r.persons for r in active),
+        "due_total": sum(r.due for r in attention["unpaid"]),
+        "blocks": blocks,
+    }
+    if request.user.has_perm("logbook.view_logbook"):
+        entries = list(Entry.objects.filter(entered_at__gte=start, entered_at__lt=end).select_related("reservation__lane").order_by("entered_at"))
+        ctx["entries"] = entries
+        ctx["present"] = [e for e in entries if e.exited_at is None]
+    if request.user.has_perm("payments.manage_payments"):
+        payments = list(Payment.objects.filter(status=Payment.Status.COMPLETED, completed_at__gte=start, completed_at__lt=end)
+                        .select_related("reservation", "user").order_by("completed_at"))
+        totals = {m: 0 for m in Payment.Method.values}
+        for p in payments:
+            totals[p.method] += p.amount
+        ctx["payments"] = payments
+        ctx["pay_totals"] = [(label, totals[value], value) for value, label in Payment.Method.choices if totals[value]]
+        ctx["cash_total"] = totals[Payment.Method.CASH]
+        ctx["pay_sum"] = sum(totals.values())
+    return render(request, "panel/today.html", ctx)

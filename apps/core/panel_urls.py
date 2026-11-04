@@ -44,6 +44,7 @@ urlpatterns = [
     path("osie/obiekt/<int:pk>/", facilities_views.panel_facility, name="facility"),
     path("osie/<int:pk>/cennik/", facilities_views.panel_price_add, name="price_add"),
     path("ustawienia/", views.panel_settings, name="settings"),
+    path("dzis/", bookings_views.panel_today, name="today"),
     path("rezerwacje/", bookings_views.panel_calendar, name="bookings"),
     path("rezerwacje/lista/", bookings_views.panel_list, name="reservations"),
     path("rezerwacje/dniami/", bookings_views.panel_days, name="reservations_days"),

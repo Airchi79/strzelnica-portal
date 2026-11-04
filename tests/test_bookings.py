@@ -666,3 +666,45 @@ def test_week_view_public_and_panel(client, owner_client, ps, lane):
     assert page.status_code == 200 and ps.last_name in page.content.decode()
     # widok dnia działa jak wcześniej
     assert client.get(f"/rezerwacje/?dzien={day.isoformat()}").context["week_view"] is False
+
+
+def test_panel_today_report(owner_client, ps, lane):
+    from apps.payments.models import Payment
+
+    day = timezone.localdate()
+    tomorrow = day + timedelta(days=1)
+    r = book(ps, lane, day=tomorrow, start=10, end=12, persons=2)
+    Payment.objects.create(user=ps, amount=5000, method=Payment.Method.CASH, status=Payment.Status.COMPLETED,
+                           completed_at=services.local_dt(tomorrow, 9), reservation=r)
+    response = owner_client.get(f"/panel/dzis/?dzien={tomorrow.isoformat()}")
+    assert response.status_code == 200
+    ctx = response.context
+    assert [x.pk for x in ctx["reservations"]] == [r.pk]
+    assert ctx["cash_total"] == 5000 and ctx["entries"] == []
+    html = response.content.decode()
+    assert ps.full_name in html and "gotówka do rozliczenia" in html and "Drukuj" in html
+    if r.payment_status == Reservation.Payment.DUE:
+        assert [x.pk for x in ctx["attention"]["unpaid"]] == [r.pk]
+    assert owner_client.get("/panel/dzis/").context["is_today"]
+
+
+def test_panel_today_hides_sections_without_permission(client, ps, lane):
+    from .conftest import grant, login_with_otp
+
+    staff = grant(make_user("dyzurny@example.com"), "bookings.manage_reservations")
+    login_with_otp(client, staff)
+    response = client.get("/panel/dzis/")
+    assert response.status_code == 200
+    assert "entries" not in response.context and "payments" not in response.context
+    assert "Książka pobytu (" not in response.content.decode()
+
+
+def test_panel_today_flags_block_conflict(owner_client, ps, lane, owner):
+    from apps.bookings.models import Block
+
+    day = next_weekday()
+    r = book(ps, lane, day=day, start=10, end=12)
+    b = Block.objects.create(title="Zawody", starts_at=services.local_dt(day, 11), ends_at=services.local_dt(day, 15), created_by=owner)
+    b.lanes.add(lane)
+    ctx = owner_client.get(f"/panel/dzis/?dzien={day.isoformat()}").context
+    assert [(x.pk, y.pk) for x, y in ctx["attention"]["conflicts"]] == [(r.pk, b.pk)]

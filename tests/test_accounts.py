@@ -126,3 +126,21 @@ def test_user_can_deactivate(client):
     client.post("/konto/profil/dezaktywuj/", {"password": PASSWORD})
     user.refresh_from_db()
     assert not user.is_active and user.deactivated_at
+
+
+def test_welcome_email_sent_once_after_verification(client, django_capture_on_commit_callbacks):
+    with django_capture_on_commit_callbacks(execute=True):
+        register(client)
+    link = re.search(r"http://testserver(/konto/potwierdz/\S+)", mail.outbox[0].body).group(1)
+    with django_capture_on_commit_callbacks(execute=True):
+        client.get(link)
+    welcome = [m for m in mail.outbox if "Witamy" in m.subject]
+    assert len(welcome) == 1 and welcome[0].to == ["nowy@example.com"]
+    body = welcome[0].body
+    assert "Uprawnienia prowadzącego strzelanie (PS)" in body and "/dokumenty/dodaj/?rodzaj=ps" in body
+    assert "Potwierdź adres e-mail" not in body  # ten krok jest już zrobiony
+    assert "http://testserver/rezerwacje/" in body
+    # ponowne kliknięcie linku nie wysyła drugiego powitania
+    with django_capture_on_commit_callbacks(execute=True):
+        client.get(link)
+    assert len([m for m in mail.outbox if "Witamy" in m.subject]) == 1

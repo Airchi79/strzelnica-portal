@@ -1,0 +1,26 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+witamy na Strzelnicy Sątok — Twój adres e-mail jest potwierdzony, konto jest aktywne.
+Zaloguj się: {{ site_url }}{% url 'accounts:login' %}
+{% if readiness.ready %}
+Wszystko gotowe — możesz od razu zarezerwować oś:
+{{ site_url }}{% url 'bookings:new' %}
+{% else %}
+Do pierwszej rezerwacji osi zostało:
+{% for s in readiness.steps %}{% if s.state != 'done' %}
+• {{ s.title }}{% if s.state == 'tip' %} (zalecane){% elif s.state == 'waiting' %} (czeka na obsługę){% endif %}
+  {{ s.detail }}{% if s.url %}
+  {{ s.action }}: {{ site_url }}{{ s.url }}{% endif %}
+{% endif %}{% endfor %}
+Postęp widzisz też na swoim pulpicie: {{ site_url }}{% url 'core:dashboard' %}
+{% endif %}
+Przydatne:
+• Zajętość osi (dzień / tydzień): {{ site_url }}{% url 'bookings:calendar' %}
+• Cennik: {{ site_url }}{% url 'core:lanes' %}{% if association.address %}
+• Dojazd: {{ association.address }}{% endif %}{% if association.contact_phone %}
+• Kontakt: tel. {{ association.contact_phone }}{% endif %}{% if association.contact_email %}{% if association.contact_phone %}, {% else %}
+• Kontakt: {% endif %}{{ association.contact_email }}{% endif %}
+
+Do zobaczenia na strzelnicy!
+{{ association.name }}
+{% endautoescape %}

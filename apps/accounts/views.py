@@ -54,6 +54,15 @@ def register(request):
     return render(request, "accounts/register.html", {"form": form})
 
 
+def send_welcome_email(user):
+    """E-mail powitalny: co zostało do pierwszej rezerwacji (ta sama lista kontrolna co na pulpicie) i dane strzelnicy."""
+    from apps.bookings.services import booking_readiness
+    from apps.core.models import AssociationSettings
+
+    notify_user(user, "Witamy — co dalej, żeby zarezerwować oś", "emails/welcome.txt",
+                readiness=booking_readiness(user), association=AssociationSettings.load())
+
+
 def verify_email(request, uidb64, token):
     try:
         user = User.objects.get(pk=force_str(urlsafe_base64_decode(uidb64)))
@@ -66,6 +75,7 @@ def verify_email(request, uidb64, token):
         user.email_verified_at = timezone.now()
         user.save(update_fields=["email_verified_at"])
         log_event("konto.potwierdzenie_email", user, actor=user)
+        send_welcome_email(user)  # tylko przy pierwszym potwierdzeniu — ponowne kliknięcie linku nie wysyła drugi raz
     messages.success(request, "Adres e-mail potwierdzony. Możesz się zalogować.")
     return redirect("accounts:login")
 

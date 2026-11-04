@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% load satok %}
+{% extends "base.html" %}{% load satok static %}
 {% block title %}Nowa rezerwacja{% endblock %}
 {% block content %}
 <h1>Nowa rezerwacja</h1>
@@ -18,7 +18,16 @@
     <tr><th>Należność</th><td><strong>{{ preview.amount|pln }}</strong></td></tr>
     {% endif %}
   </table>
-  <p class="small">Rezerwacja obejmuje całą oś.{% if not preview.code and not preview.client_pass %} Płatność online, przelewem z numerem rezerwacji w tytule albo na miejscu.{% endif %} Bezpłatne anulowanie do <strong>{{ preview.free_cancel_until|date:"j.m.Y H:i" }}</strong>; później należność pozostaje do zapłaty.</p>
+  {% if preview.rule.requires_approval and not preview.code and not preview.client_pass %}
+  <div class="msg warning">Jesteś nowym klientem — rezerwacja zablokuje termin i będzie czekać na zatwierdzenie przez obsługę strzelnicy. Dostaniesz e-mail.</div>{% endif %}
+  <ul class="small">
+    <li>Rezerwacja obejmuje <strong>całą oś</strong>.</li>
+    {% if not preview.code and not preview.client_pass %}<li>Płatność:
+      {% if preview.rule.pay_online %}online{% endif %}{% if preview.rule.pay_online and preview.rule.pay_offline %} albo {% endif %}{% if preview.rule.pay_offline %}przelewem z numerem rezerwacji w tytule lub na miejscu{% endif %}.
+      {% if preview.rule.pay_online and not preview.rule.pay_offline %}Nieopłacona rezerwacja może zostać zwolniona — termin płatności zobaczysz po zarezerwowaniu.{% endif %}</li>{% endif %}
+    <li>Samodzielnie anulujesz bez opłat do <strong>{{ preview.free_cancel_until|date:"j.m.Y H:i" }}</strong>; później anulować może tylko obsługa strzelnicy.</li>
+    <li>Na miejscu każdy uczestnik wpisuje się do książki pobytu kodem QR tej rezerwacji.</li>
+  </ul>
   <form method="post">{% csrf_token %}
     {% for field in form %}<input type="hidden" name="{{ field.html_name }}" value="{{ field.value|default_if_none:'' }}">{% endfor %}
     <div class="actions"><button class="btn" type="submit" name="action" value="confirm">Rezerwuję</button>
@@ -26,26 +35,65 @@
   </form>
 </div>
 {% else %}
-{% if lane %}
-<div class="card">
-  <strong>{{ lane.name }} — {{ day|date:"j E Y" }}</strong>
-  <div class="slots">{% for s in slots %}<span class="cell {% if s.state == 'wolne' %}free{% elif s.state == 'zajete' %}busy{% elif s.state == 'blokada' %}blocked{% else %}past{% endif %}">{{ s.label }}</span>{% empty %}<span class="muted">Oś jest tego dnia zamknięta.</span>{% endfor %}</div>
-</div>
-{% endif %}
-<div class="card">
-<form method="post" novalidate id="booking-form">{% csrf_token %}
-  {% include "partials/form.html" %}
-  <div class="actions"><button class="btn" type="submit" name="action" value="preview">Dalej — podsumowanie</button>
-    <a class="btn secondary" href="{% url 'bookings:calendar' %}?dzien={{ day|date:'Y-m-d' }}">Kalendarz</a></div>
+<form method="post" novalidate id="booking-form" class="booking" data-slots-url="{% url 'bookings:slots' %}">{% csrf_token %}
+  {% if form.errors %}<div class="msg error" role="alert">{% for e in form.non_field_errors %}{{ e }}<br>{% endfor %}{% for f in form %}{% for e in f.errors %}{{ f.label }}: {{ e }}<br>{% endfor %}{% endfor %}</div>{% endif %}
+
+  <section class="book-step">
+    <h2><span class="step-no">1</span> Wybierz oś</h2>
+    <div class="lane-cards" role="radiogroup" aria-label="Oś">
+      {% for l, rule in lane_cards %}
+      <label class="lane-card">
+        <input type="radio" name="lane" value="{{ l.pk }}"{% if form.lane.value|stringformat:"s" == l.pk|stringformat:"s" %} checked{% endif %}>
+        <span class="lane-name">{{ l.name }}</span>
+        <span class="lane-meta">{{ l.get_kind_display }}{% if l.length_m %} · {{ l.length_m }} m{% endif %}</span>
+        <span class="lane-price">{% if rule %}{% if rule.per_person_hourly %}{{ rule.per_person_hourly|pln }}/os. · maks. {{ rule.flat_hourly|pln }}/h{% else %}{{ rule.flat_hourly|pln }}/h ryczałt{% endif %}{% else %}brak cennika{% endif %}</span>
+        {% if l.exclusive_only %}<span class="badge">na wyłączność</span>{% endif %}
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="book-step">
+    <h2><span class="step-no">2</span> Wybierz dzień</h2>
+    <div class="day-chips">
+      {% for d in week %}<button type="button" class="day-chip" data-day="{{ d|date:'Y-m-d' }}">
+        <span>{% if forloop.first %}Dziś{% elif forloop.counter == 2 %}Jutro{% else %}{{ d|date:"D" }}{% endif %}</span><strong>{{ d|date:"j.m" }}</strong></button>{% endfor %}
+      <label class="day-other"><span>Inny dzień</span>{{ form.day }}</label>
+    </div>
+  </section>
+
+  <section class="book-step">
+    <h2><span class="step-no">3</span> Wybierz godziny</h2>
+    <p class="small muted" data-slot-hint>Kliknij godzinę rozpoczęcia, a potem ostatnią godzinę strzelania. Rezerwacja obejmuje całą oś.</p>
+    <div class="slot-grid" data-slot-grid>
+      {% for s in slots %}<button type="button" class="slot {{ s.state }}" data-hour="{{ s.hour }}"{% if s.state != 'wolne' %} disabled{% endif %}>{{ s.start|time:"H:i" }}</button>{% empty %}<span class="muted">Wybierz oś i dzień.</span>{% endfor %}
+    </div>
+    <p class="legend small"><span class="slot-demo free"></span> wolne <span class="slot-demo busy"></span> zajęte <span class="slot-demo sel"></span> Twój wybór</p>
+    <div class="hour-fallback">
+      <div class="field"><label for="{{ form.start_hour.id_for_label }}">Od</label>{{ form.start_hour }}</div>
+      <div class="field"><label for="{{ form.end_hour.id_for_label }}">Do</label>{{ form.end_hour }}</div>
+    </div>
+  </section>
+
+  <section class="book-step">
+    <h2><span class="step-no">4</span> Ile osób będzie strzelać?</h2>
+    <div class="stepper">
+      <button type="button" class="btn secondary" data-persons="-1" aria-label="Mniej osób">−</button>
+      {{ form.persons }}
+      <button type="button" class="btn secondary" data-persons="1" aria-label="Więcej osób">+</button>
+    </div>
+    <p class="small" data-price-info></p>
+    <details class="book-extra"{% if form.access_code.value %} open{% endif %}><summary>Mam kod klubu lub kod wejścia (karnet)</summary>
+      <div class="field">{{ form.access_code }}<span class="helptext">{{ form.access_code.help_text }}</span></div></details>
+    <details class="book-extra"{% if form.notes.value %} open{% endif %}><summary>Uwagi dla obsługi</summary>
+      <div class="field">{{ form.notes }}</div></details>
+  </section>
+
+  <div class="book-summary" data-summary>
+    <div class="book-summary-text"><strong data-sum-main>Wybierz oś, dzień i godziny</strong><span class="small" data-sum-price></span></div>
+    <button class="btn" type="submit" name="action" value="preview" data-sum-submit>Dalej — podsumowanie</button>
+  </div>
 </form>
-</div>
-<script>
-  // Po zmianie osi lub dnia odśwież dostępność (GET z wybranymi wartościami).
-  document.querySelectorAll('#id_lane, #id_day').forEach((el) => el.addEventListener('change', () => {
-    const f = document.getElementById('booking-form');
-    const p = new URLSearchParams({os: f.lane.value, dzien: f.day.value, od: f.start_hour.value});
-    window.location.search = p.toString();
-  }));
-</script>
+<script src="{% static 'js/booking.js' %}" defer></script>
 {% endif %}
 {% endblock %}

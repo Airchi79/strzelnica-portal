@@ -7,6 +7,7 @@ app_name = "bookings"
 urlpatterns = [
     path("", views.calendar, name="calendar"),
     path("nowa/", views.new, name="new"),
+    path("sloty/", views.slots_json, name="slots"),
     path("moje/", views.my_list, name="my_list"),
     path("<int:pk>/", views.detail, name="detail"),
 ]

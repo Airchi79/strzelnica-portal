@@ -595,3 +595,18 @@ def test_dashboard_ready_state(client, ps):
     client.force_login(ps)
     body = client.get("/pulpit/").content.decode()
     assert "Możesz rezerwować osie" in body
+
+
+def test_slots_json_and_new_form(client, ps, lane):
+    day = next_weekday()
+    book(ps, lane, day=day, start=10, end=12, persons=1)
+    data = client.get(f"/rezerwacje/sloty/?os={lane.pk}&dzien={day.isoformat()}").json()
+    states = {s["hour"]: s["state"] for s in data["slots"]}
+    assert states[10] == "zajete" and states[11] == "zajete" and states[12] == "wolne"
+    assert data["price"]["flat"] == 20000 and data["price"]["per_person"] == 6000
+    body = str(data)
+    assert "ps@example.com" not in body and "Kowalski" not in body  # bez danych osobowych
+    assert client.get("/rezerwacje/sloty/?os=99999").status_code == 404
+    client.force_login(ps)
+    page = client.get(f"/rezerwacje/nowa/?os={lane.pk}&dzien={day.isoformat()}").content.decode()
+    assert 'class="lane-card"' in page and "Wybierz godziny" in page and "data-slots-url" in page

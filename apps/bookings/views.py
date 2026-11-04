@@ -71,6 +71,26 @@ def calendar(request):
     )
 
 
+def slots_json(request):
+    """Zajętość jednej osi w danym dniu i cena — dla formularza rezerwacji (bez danych osobowych, jak publiczny kalendarz)."""
+    from django.http import JsonResponse
+
+    lane_id = request.GET.get("os", "")
+    lane = active_lanes().filter(pk=int(lane_id)).first() if lane_id.isdigit() else None
+    if lane is None:
+        return JsonResponse({"error": "Nieznana oś."}, status=404)
+    day = _parse_day(request.GET.get("dzien"))
+    slots = services.day_slots(lane, day)
+    rule = lane.price_rule_for(day)
+    return JsonResponse({
+        "lane": lane.pk, "day": day.isoformat(),
+        "slots": [{"hour": s.hour, "state": s.state} for s in slots],
+        "price": {"per_person": rule.per_person_hourly, "flat": rule.flat_hourly} if rule else None,
+        "exclusive_only": lane.exclusive_only,
+        "max_persons": BookingSettings.load().max_persons,
+    })
+
+
 def _messages_from(error):
     return error.messages if isinstance(error, ValidationError) else [str(error)]
 
@@ -103,6 +123,11 @@ def new(request):
             )
             preview["hours"] = d["end_hour"] - d["start_hour"]
             preview["free_cancel_until"] = preview["starts_at"] - timedelta(hours=BookingSettings.load().free_cancel_hours)
+            from apps.clients.services import TYPE_LABELS, client_type
+
+            group = client_type(request.user)
+            preview["rule"] = GroupRule.for_group(group)
+            preview["group_label"] = TYPE_LABELS[group]
         except ValidationError as e:
             for m in _messages_from(e):
                 form.add_error(None, m)
@@ -110,7 +135,10 @@ def new(request):
     lane = Lane.objects.filter(pk=lane_id).first() if str(lane_id).isdigit() else None
     day = _parse_day(form.data.get("day"), initial["day"])
     slots = services.day_slots(lane, day) if lane else []
-    return render(request, "bookings/new.html", {"form": form, "preview": preview, "slots": slots, "lane": lane, "day": day})
+    lane_cards = [(l, l.price_rule_for(day)) for l in active_lanes().order_by("facility__order", "order")]
+    week = [timezone.localdate() + timedelta(days=i) for i in range(7)]
+    return render(request, "bookings/new.html", {"form": form, "preview": preview, "slots": slots, "lane": lane, "day": day,
+                                                 "lane_cards": lane_cards, "week": week})
 
 
 @login_required

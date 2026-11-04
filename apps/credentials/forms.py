@@ -166,3 +166,10 @@ class ReviewForm(forms.Form):
         if data.get("decision") == "reject" and not data.get("note", "").strip():
             self.add_error("note", "Podaj powód odrzucenia.")
         return data
+
+
+class RevokeForm(forms.Form):
+    reason = forms.CharField(
+        label="Powód cofnięcia (strzelec dostanie go e-mailem)", max_length=200,
+        widget=forms.Textarea(attrs={"rows": 2, "maxlength": 200}),
+    )

@@ -19,6 +19,7 @@ urlpatterns = [
     path("", views.panel_home, name="home"),
     path("weryfikacja/", credentials_views.panel_list, name="credentials"),
     path("weryfikacja/<int:pk>/", credentials_views.panel_detail, name="credential"),
+    path("weryfikacja/<int:pk>/cofnij/", credentials_views.panel_revoke, name="credential_revoke"),
     path("weryfikacja/<int:pk>/skan/", credentials_views.panel_scan, name="credential_scan"),
     path("uzytkownicy/", clients_views.panel_list, name="users"),
     path("uzytkownicy/osoby/", clients_views.persons_list, name="persons"),

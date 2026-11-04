@@ -439,3 +439,5 @@ html.is-dark .theme-btn .when-light { display: none; }
 .chip { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 3px 10px; font-size: .8rem; cursor: pointer; }
 .chip:hover { border-color: var(--brand); }
 @media (max-width: 900px) { .verify-grid { grid-template-columns: 1fr; } .verify-scan { position: static; } }
+.revoke-box summary { cursor: pointer; font-weight: 600; color: var(--bad); }
+.revoke-box[open] summary { margin-bottom: 8px; }

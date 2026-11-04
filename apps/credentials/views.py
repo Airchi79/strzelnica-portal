@@ -16,7 +16,7 @@ from apps.audit.services import log_event, log_sensitive_access
 from apps.core.permissions import panel_required
 
 from . import services
-from .forms import CredentialForm, ReviewForm
+from .forms import CredentialForm, RevokeForm, ReviewForm
 from .models import Credential
 
 
@@ -138,6 +138,14 @@ def panel_detail(request, pk):
     queue = list(_pending_queue().values_list("pk", flat=True))
     others = credential.user.credentials.exclude(pk=pk).select_related("reviewed_by")
     history = AuditLog.objects.filter(object_type=Credential._meta.label_lower, object_id=str(pk)).select_related("actor")[:20]
+    upcoming = []
+    if credential.status == Credential.Status.VERIFIED:
+        from apps.bookings.models import Reservation
+
+        upcoming = Reservation.objects.filter(
+            user=credential.user, starts_at__gte=timezone.now(),
+            status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL],
+        ).select_related("lane").order_by("starts_at")[:10]
     scan_kind = ""
     if credential.scan:
         scan_kind = "pdf" if credential.scan.name.lower().endswith(".pdf") else "image"
@@ -154,8 +162,27 @@ def panel_detail(request, pk):
             "queue_pos": queue.index(pk) + 1 if pk in queue else None,
             "queue_len": len(queue),
             "has_next": any(x != pk for x in queue),
+            "revoke_form": RevokeForm(),
+            "upcoming": upcoming,
         },
     )
+
+
+@panel_required("credentials.review_credential")
+@require_POST
+def panel_revoke(request, pk):
+    credential = get_object_or_404(Credential, pk=pk)
+    form = RevokeForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Podaj powód cofnięcia weryfikacji.")
+        return redirect("panel:credential", pk)
+    try:
+        services.revoke(credential, request.user, form.cleaned_data["reason"])
+    except ValueError as e:
+        messages.error(request, str(e))
+    else:
+        messages.success(request, "Cofnięto weryfikację. Strzelec otrzyma e-mail z powodem.")
+    return redirect("panel:credential", pk)
 
 
 @panel_required("credentials.review_credential")

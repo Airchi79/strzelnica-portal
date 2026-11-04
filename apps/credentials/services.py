@@ -71,6 +71,34 @@ def review(credential, reviewer, approve, note=""):
     return credential
 
 
+@transaction.atomic
+def revoke(credential, actor, reason):
+    """Cofnięcie weryfikacji (np. utrata uprawnień, pomyłka przy weryfikacji). Dokument wraca jako odrzucony,
+    strzelec może go poprawić i wysłać ponownie. Istniejące rezerwacje nie są anulowane automatycznie."""
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValueError("Podaj powód cofnięcia weryfikacji.")
+    credential = Credential.objects.select_for_update().get(pk=credential.pk)
+    if credential.status != Credential.Status.VERIFIED:
+        raise ValueError("Cofnąć można tylko weryfikację dokumentu o statusie „Zweryfikowany”.")
+    previous = {"zweryfikowal": credential.reviewed_by.full_name if credential.reviewed_by else "",
+                "data": credential.reviewed_at.isoformat() if credential.reviewed_at else ""}
+    credential.status = Credential.Status.REJECTED
+    credential.review_note = f"Weryfikacja cofnięta: {reason}"[:255]
+    credential.reviewed_by = actor
+    credential.reviewed_at = timezone.now()
+    credential.save()
+    log_event(
+        "dokument.cofniecie_weryfikacji",
+        credential,
+        f"{credential} → weryfikacja cofnięta",
+        changes={"powod": reason, "poprzednia_weryfikacja": previous},
+        actor=actor,
+    )
+    notify_user(credential.user, "Cofnięto weryfikację dokumentu", "emails/credential_revoked.txt", credential=credential, reason=reason)
+    return credential
+
+
 def expire_outdated(today=None):
     """Oznacza jako wygasłe zweryfikowane dokumenty po terminie ważności. Zwraca liczbę zmienionych."""
     today = today or timezone.localdate()

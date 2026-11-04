@@ -224,3 +224,35 @@ def test_panel_scan_can_be_embedded_same_origin_only(owner_client, user):
     assert response["X-Frame-Options"] == "SAMEORIGIN" and response["Cache-Control"] == "no-store"
     b"".join(response.streaming_content)
     credential.scan.delete(save=False)
+
+
+def test_revoke_verification(owner_client, user, django_capture_on_commit_callbacks):
+    credential = add_credential(user)
+    assert is_range_officer(user)
+    page = owner_client.get(f"/panel/weryfikacja/{credential.pk}/").content.decode()
+    assert "Cofnij weryfikację" in page
+    # bez powodu — odmowa
+    owner_client.post(f"/panel/weryfikacja/{credential.pk}/cofnij/", {"reason": "  "})
+    credential.refresh_from_db()
+    assert credential.status == Credential.Status.VERIFIED
+    with django_capture_on_commit_callbacks(execute=True):
+        response = owner_client.post(f"/panel/weryfikacja/{credential.pk}/cofnij/", {"reason": "Uprawnienia odebrane przez PZSS"})
+    assert response.status_code == 302
+    credential.refresh_from_db()
+    assert credential.status == Credential.Status.REJECTED
+    assert credential.review_note == "Weryfikacja cofnięta: Uprawnienia odebrane przez PZSS"
+    assert not is_range_officer(user)
+    log = AuditLog.objects.get(action="dokument.cofniecie_weryfikacji")
+    assert log.changes["powod"] == "Uprawnienia odebrane przez PZSS"
+    assert any("Cofnięto weryfikację" in m.subject and m.to == [user.email] for m in mail.outbox)
+    # drugi raz — już nie zweryfikowany
+    owner_client.post(f"/panel/weryfikacja/{credential.pk}/cofnij/", {"reason": "x"})
+    assert AuditLog.objects.filter(action="dokument.cofniecie_weryfikacji").count() == 1
+
+
+def test_revoke_requires_permission_and_post(client, user):
+    credential = add_credential(user)
+    client.force_login(user)
+    assert client.post(f"/panel/weryfikacja/{credential.pk}/cofnij/", {"reason": "x"}).status_code in (302, 403)
+    credential.refresh_from_db()
+    assert credential.status == Credential.Status.VERIFIED

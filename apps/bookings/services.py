@@ -33,7 +33,7 @@ def hour_floor(dt: datetime) -> datetime:
 class Slot:
     start: datetime
     end: datetime
-    state: str  # wolne | zajete | blokada | minione
+    state: str  # wolne | zajete | blokada | minione | za_pozno (za krótko przed terminem na rezerwację online)
     reservation: Reservation | None = None
     block: Block | None = None
 
@@ -46,9 +46,11 @@ class Slot:
         return f"{timezone.localtime(self.start):%H:%M}–{timezone.localtime(self.end):%H:%M}"
 
 
-def day_slots(lane, day: date, now=None):
-    """Godzinowe sloty osi w danym dniu, zgodnie z godzinami otwarcia osi."""
+def day_slots(lane, day: date, now=None, lead_hours=0):
+    """Godzinowe sloty osi w danym dniu, zgodnie z godzinami otwarcia osi.
+    `lead_hours` > 0 (widok klienta): wolne godziny zaczynające się wcześniej niż za tyle godzin mają stan „za_pozno”."""
     now = now or timezone.now()
+    lead_limit = now + timedelta(hours=lead_hours) if lead_hours else None
     hours = lane.hours_for(day)
     if hours is None or not lane.is_active:
         return []
@@ -71,6 +73,8 @@ def day_slots(lane, day: date, now=None):
             state = "zajete"
         elif start < current_hour:
             state = "minione"
+        elif lead_limit and start < lead_limit:
+            state = "za_pozno"
         else:
             state = "wolne"
         slots.append(Slot(start, end, state, res, blk))
@@ -140,8 +144,9 @@ def booking_readiness(user):
     return {"steps": steps, "ready": not blocking, "done": done, "total": len(steps)}
 
 
-def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: int, now=None):
-    """Sprawdza termin i liczbę osób. Zwraca (starts_at, ends_at, price_rule)."""
+def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: int, now=None, enforce_lead=False):
+    """Sprawdza termin i liczbę osób. Zwraca (starts_at, ends_at, price_rule).
+    `enforce_lead` — rezerwacja przez klienta: obowiązuje minimalny czas przed terminem z ustawień."""
     now = now or timezone.now()
     cfg = BookingSettings.load()
     if not lane.is_active or not lane.facility.is_active:
@@ -159,6 +164,11 @@ def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: i
     # Rezerwować można do chwili rozpoczęcia — także bieżącą, już rozpoczętą godzinę (rezerwacja na miejscu).
     if starts_at < hour_floor(now):
         raise ValidationError("Nie można rezerwować terminu, który już minął.")
+    if enforce_lead and cfg.min_lead_hours and starts_at < now + timedelta(hours=cfg.min_lead_hours):
+        raise ValidationError(
+            f"Online można rezerwować najpóźniej {cfg.min_lead_hours} h przed rozpoczęciem. "
+            "Na wcześniejszą godzinę wybierz inny termin albo skontaktuj się z obsługą strzelnicy."
+        )
     if day > timezone.localdate(now) + timedelta(days=cfg.max_advance_days):
         raise ValidationError(f"Rezerwować można najwyżej {cfg.max_advance_days} dni naprzód.")
     if Block.objects.filter(lanes=lane, starts_at__lt=ends_at, ends_at__gt=starts_at).exists():
@@ -169,8 +179,8 @@ def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: i
     return starts_at, ends_at, rule
 
 
-def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", user=None):
-    starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, persons, now)
+def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", user=None, enforce_lead=False):
+    starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, persons, now, enforce_lead=enforce_lead)
     hours = end_hour - start_hour
     base = {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "code": None, "client_pass": None}
     if access_code:
@@ -202,10 +212,10 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     reasons = check_can_book(user)
     if reasons:
         raise ValidationError(reasons)
-    q = quote(lane, day, start_hour, end_hour, persons, now, access_code=access_code, user=user)
+    by_staff = created_by is not None and created_by != user
+    q = quote(lane, day, start_hour, end_hour, persons, now, access_code=access_code, user=user, enforce_lead=not by_staff)
     code, client_pass = q["code"], q["client_pass"]
     now = now or timezone.now()
-    by_staff = created_by is not None and created_by != user
     group = rule = None
     if not by_staff:
         # Zasady grupy klienta (decyzje G2–G4) obowiązują przy rezerwacji przez klienta; obsługa rezerwuje bez ograniczeń.

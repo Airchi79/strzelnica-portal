@@ -346,7 +346,7 @@ html.is-dark .theme-btn .when-light { display: none; }
 .slot { min-height: 44px; border-radius: 8px; border: 1px solid var(--border); font: inherit; font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums; }
 .slot.wolne { background: var(--ok-bg); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, var(--border)); }
 .slot.zajete, .slot.blokada { background: var(--bad-bg); color: var(--bad); opacity: .55; cursor: not-allowed; text-decoration: line-through; }
-.slot.minione { background: transparent; color: var(--muted); opacity: .5; cursor: not-allowed; }
+.slot.minione, .slot.za_pozno { background: transparent; color: var(--muted); opacity: .5; cursor: not-allowed; }
 .slot.sel { background: var(--brand); color: var(--brand-contrast); border-color: var(--brand); }
 .slot-demo { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: middle; margin: 0 2px 0 10px; }
 .slot-demo.free { background: var(--ok-bg); border: 1px solid var(--ok); } .slot-demo.busy { background: var(--bad-bg); border: 1px solid var(--bad); }

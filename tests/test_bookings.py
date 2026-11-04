@@ -411,7 +411,7 @@ def test_notifications_panel(owner_client, owner, ps, lane, django_capture_on_co
 
 def test_booking_settings_panel(owner_client):
     owner_client.post("/panel/rezerwacje/ustawienia/", {
-        "free_cancel_hours": 12, "max_advance_days": 60, "max_persons": 20, "online_payment_minutes": 20, "approval_payment_hours": 12,
+        "free_cancel_hours": 12, "min_lead_hours": 0, "max_advance_days": 60, "max_persons": 20, "online_payment_minutes": 20, "approval_payment_hours": 12,
         "offline_instructions": "Przelew na konto.",
         **{f"{g}-{k}": "on" for g in ("czlonek", "powracajacy", "nowy") for k in ("pay_online",)},
         "czlonek-pay_pass": "on", "nowy-requires_approval": "on",
@@ -624,3 +624,29 @@ def test_reservation_page_calendar_and_share(client, ps, lane):
     other = make_user("obcy@example.com")
     client.force_login(other)
     assert client.get(f"/rezerwacje/{r.pk}/kalendarz.ics").status_code == 404
+
+
+def test_min_lead_hours_for_clients_only(ps, lane, owner):
+    cfg = BookingSettings.load()
+    cfg.min_lead_hours = 2
+    cfg.save()
+    day = next_weekday()
+    now = services.local_dt(day, 9) + timedelta(minutes=30)
+    with pytest.raises(ValidationError, match="najpóźniej 2 h"):
+        services.create_reservation(ps, lane, day, 11, 12, 1, now=now)  # za 1,5 h
+    r = services.create_reservation(ps, lane, day, 12, 13, 1, now=now)  # za 2,5 h
+    assert r.pk
+    # obsługa rezerwuje dla klienta bez ograniczenia
+    r2 = services.create_reservation(ps, lane, day, 10, 11, 1, now=now, created_by=owner)
+    assert r2.pk
+    states = {s.hour: s.state for s in services.day_slots(lane, day, now=now, lead_hours=2)}
+    assert states[9] == "za_pozno" and states[11] == "za_pozno" and states[14] == "wolne"
+    # panel (bez lead_hours) widzi tę godzinę jako wolną
+    assert {s.hour: s.state for s in services.day_slots(lane, day, now=now)}[11] == "wolne"
+
+
+def test_min_lead_zero_keeps_on_site_booking(ps, lane):
+    assert BookingSettings.load().min_lead_hours == 0
+    day = next_weekday()
+    now = services.local_dt(day, 10) + timedelta(minutes=50)
+    assert services.create_reservation(ps, lane, day, 10, 11, 1, now=now).pk

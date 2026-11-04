@@ -36,6 +36,11 @@ class BookingSettings(models.Model):
         default="Zapłać przelewem na konto Stowarzyszenia, w tytule wpisz numer rezerwacji, albo gotówką na miejscu przed strzelaniem.",
         help_text="Pokazywana klientom, którzy mogą płacić offline (przelew, gotówka na miejscu).",
     )
+    min_lead_hours = models.PositiveIntegerField(
+        "rezerwacja online najpóźniej [h] przed terminem", default=0,
+        help_text="Np. 2 — klient nie zarezerwuje sam terminu zaczynającego się za mniej niż 2 h. "
+                  "0 — można rezerwować do rozpoczęcia godziny. Obsługa w panelu rezerwuje bez tego ograniczenia.",
+    )
     max_advance_days = models.PositiveIntegerField("rezerwacja najwyżej [dni] naprzód", default=180)
     max_persons = models.PositiveIntegerField("maksymalna liczba osób w rezerwacji", default=50)
 

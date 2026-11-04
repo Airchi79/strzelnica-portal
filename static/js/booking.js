@@ -50,7 +50,7 @@
       const b = document.createElement("button");
       b.type = "button"; b.className = "slot " + s.state; b.dataset.hour = s.hour; b.textContent = pad(s.hour);
       b.disabled = s.state !== "wolne";
-      b.title = { wolne: "wolne", zajete: "zajęte", blokada: "niedostępne", minione: "minęło" }[s.state] || "";
+      b.title = { wolne: "wolne", zajete: "zajęte", blokada: "niedostępne", minione: "minęło", za_pozno: "za krótko przed terminem — rezerwacja online niedostępna" }[s.state] || "";
       if (start !== null && s.hour >= start && s.hour < end) b.classList.add("sel");
       grid.appendChild(b);
     });

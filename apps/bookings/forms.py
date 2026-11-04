@@ -115,7 +115,7 @@ class BlockForm(forms.Form):
 class BookingSettingsForm(forms.ModelForm):
     class Meta:
         model = BookingSettings
-        fields = ["free_cancel_hours", "online_payment_minutes", "approval_payment_hours", "offline_instructions", "max_advance_days", "max_persons"]
+        fields = ["free_cancel_hours", "online_payment_minutes", "approval_payment_hours", "offline_instructions", "min_lead_hours", "max_advance_days", "max_persons"]
         widgets = {"offline_instructions": forms.Textarea(attrs={"rows": 3})}
 
     def clean_max_persons(self):

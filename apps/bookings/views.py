@@ -82,7 +82,7 @@ def slots_json(request):
     if lane is None:
         return JsonResponse({"error": "Nieznana oś."}, status=404)
     day = _parse_day(request.GET.get("dzien"))
-    slots = services.day_slots(lane, day)
+    slots = services.day_slots(lane, day, lead_hours=BookingSettings.load().min_lead_hours)
     rule = lane.price_rule_for(day)
     return JsonResponse({
         "lane": lane.pk, "day": day.isoformat(),
@@ -130,7 +130,8 @@ def new(request):
                 messages.success(request, f"Zarezerwowano: {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m.%Y %H:%M}. Potwierdzenie wysłaliśmy e-mailem.")
                 return redirect("bookings:detail", pk=reservation.pk)
             preview = services.quote(
-                d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"], access_code=d["access_code"], user=request.user
+                d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"], access_code=d["access_code"], user=request.user,
+                enforce_lead=True,
             )
             preview["hours"] = d["end_hour"] - d["start_hour"]
             preview["free_cancel_until"] = preview["starts_at"] - timedelta(hours=BookingSettings.load().free_cancel_hours)
@@ -145,11 +146,13 @@ def new(request):
     lane_id = form.data.get("lane") or initial.get("lane") or (active_lanes().values_list("pk", flat=True).first())
     lane = Lane.objects.filter(pk=lane_id).first() if str(lane_id).isdigit() else None
     day = _parse_day(form.data.get("day"), initial["day"])
-    slots = services.day_slots(lane, day) if lane else []
+    min_lead = BookingSettings.load().min_lead_hours
+    slots = services.day_slots(lane, day, lead_hours=min_lead) if lane else []
     lane_cards = [(l, l.price_rule_for(day)) for l in active_lanes().order_by("facility__order", "order")]
     week = [timezone.localdate() + timedelta(days=i) for i in range(7)]
     return render(request, "bookings/new.html", {"form": form, "preview": preview, "slots": slots, "lane": lane, "day": day,
-                                                 "lane_cards": lane_cards, "week": week})
+                                                 "lane_cards": lane_cards, "week": week, "min_lead": min_lead,
+                                                 "association": AssociationSettings.load()})
 
 
 @login_required

@@ -222,8 +222,9 @@ def panel_payment(request, pk):
     return render(request, "panel/payment_detail.html", {"p": payment, "form": form, "ledger": payment.ledger_entries.all()})
 
 
-@panel_required(PERM)
+@panel_required((PERM, "payments.accept_onsite"))
 def panel_manual(request):
+    full = request.user.has_perm(PERM)  # dyżurny (accept_onsite): tylko gotówka/BLIK i tylko za rezerwację
     initial = {}
     if request.GET.get("user", "").isdigit():
         initial["user"] = request.GET["user"]
@@ -231,19 +232,27 @@ def panel_manual(request):
         initial["amount"] = request.GET["kwota"]
     if request.GET.get("rezerwacja", "").isdigit():
         initial["reservation"] = request.GET["rezerwacja"]
-    form = ManualPaymentForm(request.POST or None, initial=initial)
+    form = ManualPaymentForm(request.POST or None, initial=initial, onsite_only=not full)
     reservation = None
     rid = form.data.get("reservation") or initial.get("reservation")
     if rid and str(rid).isdigit():
         reservation = Reservation.objects.filter(pk=int(rid)).first()
+    if not full and reservation is None:
+        messages.error(request, "Wpłatę na miejscu przyjmujesz z karty rezerwacji (przycisk „Przyjmij wpłatę”).")
+        return redirect("panel:today")
+    if not full:
+        form.fields["user"].queryset = form.fields["user"].queryset.filter(pk=reservation.user_id)
     if request.method == "POST" and form.is_valid():
         d = form.cleaned_data
         if reservation is not None and reservation.user_id != d["user"].pk:
             reservation = None
         payment = services.register_manual_payment(d["user"], d["amount"], d["method"], request.user, note=d["note"], reservation=reservation)
+        if not full:
+            messages.success(request, f"Przyjęto wpłatę {format_pln(d['amount'])} za rezerwację {reservation.number}.")
+            return redirect("panel:reservation", pk=reservation.pk)
         messages.success(request, f"Przyjęto wpłatę {format_pln(d['amount'])}. Saldo: {format_pln(services.balance_of(d['user']))}.")
         return redirect("panel:wallet", user_pk=payment.user_id)
-    return render(request, "panel/payment_manual.html", {"form": form, "reservation": reservation})
+    return render(request, "panel/payment_manual.html", {"form": form, "reservation": reservation, "full": full})
 
 
 @panel_required(PERM)

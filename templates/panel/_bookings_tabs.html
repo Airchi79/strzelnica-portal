@@ -6,6 +6,6 @@
   <a href="{% url 'panel:reservation_new' %}" class="{% if u == 'reservation_new' %}active{% endif %}">Nowa rezerwacja</a>
   <a href="{% url 'panel:blocks' %}" class="{% if 'block' in u %}active{% endif %}">Blokady</a>
   <a href="{% url 'panel:reservations_archive' %}" class="{% if 'archive' in u %}active{% endif %}">Archiwum GunTracker</a>
-  <a href="{% url 'panel:booking_settings' %}" class="{% if u == 'booking_settings' %}active{% endif %}">Ustawienia</a>
+  {% if perms.bookings.manage_booking_settings %}<a href="{% url 'panel:booking_settings' %}" class="{% if u == 'booking_settings' %}active{% endif %}">Ustawienia</a>{% endif %}
   {% endwith %}
 </div>

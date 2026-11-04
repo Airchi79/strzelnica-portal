@@ -448,7 +448,7 @@ def panel_block_delete(request, pk):
     return redirect("panel:blocks")
 
 
-@panel_required(PERM)
+@panel_required("bookings.manage_booking_settings")
 def panel_settings(request):
     obj = BookingSettings.load()
     before = {f: getattr(obj, f) for f in BookingSettingsForm.Meta.fields}
@@ -575,7 +575,7 @@ def panel_archive(request):
                                                             "total": ArchivedReservation.objects.count()})
 
 
-@panel_required(PERM)
+@panel_required("bookings.manage_booking_settings")
 def panel_archive_import(request):
     from . import archive
 
@@ -653,9 +653,12 @@ def panel_today(request):
         entries = list(Entry.objects.filter(entered_at__gte=start, entered_at__lt=end).select_related("reservation__lane").order_by("entered_at"))
         ctx["entries"] = entries
         ctx["present"] = [e for e in entries if e.exited_at is None]
-    if request.user.has_perm("payments.manage_payments"):
-        payments = list(Payment.objects.filter(status=Payment.Status.COMPLETED, completed_at__gte=start, completed_at__lt=end)
-                        .select_related("reservation", "user").order_by("completed_at"))
+    full_payments = request.user.has_perm("payments.manage_payments")
+    if full_payments or request.user.has_perm("payments.accept_onsite"):
+        payments_qs = Payment.objects.filter(status=Payment.Status.COMPLETED, completed_at__gte=start, completed_at__lt=end)
+        if not full_payments:  # dyżurny widzi tylko pieniądze przyjęte na miejscu
+            payments_qs = payments_qs.filter(method__in=[Payment.Method.CASH, Payment.Method.BLIK_PHONE])
+        payments = list(payments_qs.select_related("reservation", "user").order_by("completed_at"))
         totals = {m: 0 for m in Payment.Method.values}
         for p in payments:
             totals[p.method] += p.amount

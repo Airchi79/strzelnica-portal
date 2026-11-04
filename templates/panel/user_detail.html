@@ -69,6 +69,12 @@
 <div class="card">
 {% if subject.is_superuser %}<p>Właściciel systemu — pełne uprawnienia.</p>
 {% elif can_manage %}
+  {% for key, p, active in presets %}
+  <form method="post" class="preset-box" data-confirm="Nadać zestaw „{{ p.label }}”? Zastąpi on obecne uprawnienia tej osoby.">{% csrf_token %}
+    <div><strong>Gotowy zestaw: {{ p.label }}</strong>{% if active %} <span class="badge ok">nadany</span>{% endif %}<div class="small muted">{{ p.description }}</div></div>
+    {% if not active %}<button class="btn secondary small-btn" type="submit" name="preset" value="{{ key }}">Nadaj zestaw</button>{% endif %}
+  </form>
+  {% endfor %}
   <form method="post">{% csrf_token %}
     <ul class="checks">{% for cb in form.permissions %}<li><label>{{ cb.tag }} {{ cb.choice_label }}</label></li>{% endfor %}</ul>
     <p class="small muted">Nadanie dowolnego uprawnienia daje dostęp do panelu i wymaga od tej osoby logowania dwuskładnikowego.</p>

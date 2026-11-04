@@ -7,7 +7,7 @@
 <form method="get" class="card filters">
   <div><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ q }}" placeholder="klient, numer, prowadzący, telefon"></div>
   <div class="checkbox"><label><input type="checkbox" name="przyszle" value="1"{% if przyszle %} checked{% endif %}> tylko przyszłe</label></div>
-  <div class="actions"><button class="btn" type="submit">Pokaż</button><a class="btn secondary" href="{% url 'panel:reservations_archive_import' %}">Import z GunTrackera</a></div>
+  <div class="actions"><button class="btn" type="submit">Pokaż</button>{% if perms.bookings.manage_booking_settings %}<a class="btn secondary" href="{% url 'panel:reservations_archive_import' %}">Import z GunTrackera</a>{% endif %}</div>
 </form>
 <p class="muted small">{{ page.paginator.count }} z {{ total }} rezerwacji</p>
 <section class="day"><div class="table-wrap"><table class="days">

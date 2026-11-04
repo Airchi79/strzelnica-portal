@@ -20,7 +20,7 @@ from apps.facilities.models import Lane
 
 from .forms import AssociationSettingsForm, UserPermissionsForm
 from .models import AssociationSettings
-from .permissions import PANEL_PERMISSIONS, panel_required
+from .permissions import PANEL_PERMISSIONS, ROLE_PRESETS, panel_required
 
 User = get_user_model()
 
@@ -119,6 +119,10 @@ def panel_user(request, pk):
     if request.method == "POST":
         if not can_manage:
             raise PermissionDenied
+        preset = ROLE_PRESETS.get(request.POST.get("preset", ""))
+        if preset is not None:
+            # Gotowy zestaw zastępuje dotychczasowe uprawnienia (z wyjątkiem właściciela — tego nie da się tu zmienić).
+            form = UserPermissionsForm({"permissions": preset["permissions"]})
         if form.is_valid():
             chosen = form.cleaned_data["permissions"]
             codes = {code for code, _ in PANEL_PERMISSIONS}
@@ -126,7 +130,8 @@ def panel_user(request, pk):
             subject.user_permissions.add(*_perm_objects(chosen))
             subject.is_staff = bool(chosen)
             subject.save(update_fields=["is_staff"])
-            log_event("uprawnienia.zmiana", subject, subject.email, changes={"przed": current, "po": sorted(chosen)})
+            log_event("uprawnienia.zmiana", subject, subject.email,
+                      changes={"przed": current, "po": sorted(chosen), **({"zestaw": preset["label"]} if preset else {})})
             messages.success(request, "Zapisano uprawnienia." + (" Osoba skonfiguruje logowanie dwuskładnikowe przy wejściu do panelu." if chosen else ""))
             return redirect("panel:user", pk=subject.pk)
     log_sensitive_access(subject, f"konto:{subject.pk}", "podgląd konta w panelu")
@@ -149,6 +154,7 @@ def panel_user(request, pk):
         "panel/user_detail.html",
         {
             "subject": subject, "credentials": subject.credentials.all(), "form": form, "can_manage": can_manage,
+            "presets": [(k, v, sorted(v["permissions"]) == sorted(current)) for k, v in ROLE_PRESETS.items()],
             "profile": profile, "profile_form": profile_form, "passes": passes, "paid_form": PassPaidForm(),
             "member": Member.objects.filter(user=subject).first(),
             "reservations": subject.reservations.select_related("lane", "client_pass", "access_code__club").order_by("-starts_at")[:30],

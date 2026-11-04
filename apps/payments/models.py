@@ -84,7 +84,10 @@ class Payment(models.Model):
         ordering = ["-created_at"]
         verbose_name = "wpłata"
         verbose_name_plural = "wpłaty"
-        permissions = [("manage_payments", "Może przyjmować wpłaty, importować wyciągi i korygować salda")]
+        permissions = [
+            ("manage_payments", "Może przyjmować wpłaty, importować wyciągi i korygować salda"),
+            ("accept_onsite", "Może przyjmować wpłaty na miejscu (gotówka, BLIK) za rezerwacje"),
+        ]
 
     def __str__(self):
         return f"{self.get_method_display()} {self.amount / 100:.2f} zł ({self.get_status_display()})"

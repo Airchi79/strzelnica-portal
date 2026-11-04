@@ -35,10 +35,10 @@
 <div class="card">
   {% if r.access_code %}<p>Rozliczenie wg umowy klubu <strong>{{ r.access_code.club }}</strong> (kod {{ r.access_code.code }}).</p>{% endif %}
   {% if r.client_pass %}<p>Opłacona kodem wejścia <strong>{{ r.client_pass.code }}</strong> ({{ r.client_pass.get_kind_display|lower }}) — <a href="{% url 'panel:user' r.user_id %}">karta klienta</a>.</p>{% endif %}
-  <p>Zapłacono: <strong>{{ r.paid_amount|pln }}</strong> z {{ r.amount|pln }} · {% if WALLET_ENABLED %}saldo{% else %}nadpłata{% endif %} strzelca: <a href="{% url 'panel:wallet' r.user.pk %}">{{ wallet_balance|pln }}</a></p>
+  <p>Zapłacono: <strong>{{ r.paid_amount|pln }}</strong> z {{ r.amount|pln }} · {% if WALLET_ENABLED %}saldo{% else %}nadpłata{% endif %} strzelca: {% if perms.payments.manage_payments %}<a href="{% url 'panel:wallet' r.user.pk %}">{{ wallet_balance|pln }}</a>{% else %}{{ wallet_balance|pln }}{% endif %}</p>
   <form method="post" class="actions" style="margin-top:0">{% csrf_token %}
   {% if r.payment_status == 'do_zaplaty' %}
-    <a class="btn" href="{% url 'panel:payment_manual' %}?user={{ r.user.pk }}&amp;kwota={{ remaining_pln }}&amp;rezerwacja={{ r.pk }}">Przyjmij wpłatę (gotówka / BLIK)</a>
+    {% if perms.payments.manage_payments or perms.payments.accept_onsite %}<a class="btn" href="{% url 'panel:payment_manual' %}?user={{ r.user.pk }}&amp;kwota={{ remaining_pln }}&amp;rezerwacja={{ r.pk }}">Przyjmij wpłatę (gotówka / BLIK)</a>{% endif %}
     <button class="btn secondary" name="action" value="waive" data-confirm-click="Zwolnić z pozostałej opłaty?">Zwolnij z opłaty</button>
   {% elif r.payment_status == 'zwolniona' %}
     <button class="btn secondary" name="action" value="unwaive">Cofnij zwolnienie</button>

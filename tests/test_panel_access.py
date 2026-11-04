@@ -77,3 +77,72 @@ def test_technical_admin_requires_otp(client, owner):
     client.post("/konto/logowanie/", {"email": owner.email, "password": PASSWORD})
     response = client.get("/techniczny/")
     assert response.status_code == 302  # bez weryfikacji OTP — przekierowanie do logowania panelu technicznego
+
+
+def test_duty_preset_grants_limited_access(owner_client, client):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.bookings import services as booking_services
+    from apps.payments.models import Payment
+    from apps.facilities.models import Lane
+
+    from .conftest import add_credential, approve, login_with_otp
+
+    duty = make_user("dyzur@example.com")
+    response = owner_client.post(f"/panel/uzytkownicy/{duty.pk}/", {"preset": "dyzurny"})
+    assert response.status_code == 302
+    duty.refresh_from_db()
+    assert duty.is_staff
+    assert duty.has_perm("bookings.manage_reservations") and duty.has_perm("payments.accept_onsite")
+    assert not duty.has_perm("payments.manage_payments") and not duty.has_perm("bookings.manage_booking_settings")
+    assert AuditLog.objects.filter(action="uprawnienia.zmiana", changes__zestaw__isnull=False).exists()
+    owner_client.logout()
+
+    shooter = make_user("ps-dyzur@example.com")
+    add_credential(shooter)
+    approve(shooter)
+    lane = Lane.objects.filter(is_active=True).first()
+    day = timezone.localdate() + timedelta(days=1)
+    while lane.hours_for(day) is None:
+        day += timedelta(days=1)
+    hours = lane.hours_for(day)
+    r = booking_services.create_reservation(shooter, lane, day, hours.opens.hour, hours.opens.hour + 1, 2)
+
+    login_with_otp(client, duty)
+    assert client.get("/panel/dzis/").status_code == 200
+    assert client.get("/panel/rezerwacje/ustawienia/").status_code == 403
+    assert client.get("/panel/platnosci/import/").status_code == 403
+    assert client.get("/panel/platnosci/").status_code == 403
+    # bez rezerwacji — odesłanie na „Dziś”
+    assert client.get("/panel/platnosci/wplata/").url == "/panel/dzis/"
+    page = client.get(f"/panel/platnosci/wplata/?user={shooter.pk}&rezerwacja={r.pk}&kwota=10")
+    assert [c[0] for c in page.context["form"].fields["method"].choices] == ["gotowka", "blik"]
+    # przelew odrzucony, gotówka przyjęta
+    bad = client.post(f"/panel/platnosci/wplata/?rezerwacja={r.pk}", {"user": shooter.pk, "amount": "10", "method": "przelew", "reservation": r.pk})
+    assert bad.status_code == 200 and not Payment.objects.exists()
+    ok = client.post(f"/panel/platnosci/wplata/?rezerwacja={r.pk}", {"user": shooter.pk, "amount": "10", "method": "gotowka", "reservation": r.pk})
+    assert ok.status_code == 302 and ok.url == f"/panel/rezerwacje/{r.pk}/"
+    p = Payment.objects.get()
+    assert p.method == "gotowka" and p.created_by == duty and p.reservation_id == r.pk
+
+
+def test_existing_staff_keep_settings_after_permission_split():
+    import importlib
+
+    from django.apps import apps as django_apps
+    from django.contrib.auth.models import Permission
+
+    from apps.core.permissions import PANEL_PERMISSIONS, ROLE_PRESETS
+
+    assert set(ROLE_PRESETS["dyzurny"]["permissions"]) <= {c for c, _ in PANEL_PERMISSIONS}
+    staff = grant(make_user("stary@example.com"), "bookings.manage_reservations", "payments.manage_payments")
+    for codename in ("manage_booking_settings", "accept_onsite"):
+        staff.user_permissions.remove(Permission.objects.get(codename=codename))
+    staff = User.objects.get(pk=staff.pk)
+    assert not staff.has_perm("bookings.manage_booking_settings")
+    migration = importlib.import_module("apps.bookings.migrations.0010_split_permissions")
+    migration.forwards(django_apps, None)
+    staff = User.objects.get(pk=staff.pk)
+    assert staff.has_perm("bookings.manage_booking_settings") and staff.has_perm("payments.accept_onsite")

@@ -479,3 +479,4 @@ tr.muted td { color: var(--muted); }
   .today-tiles { display: grid !important; grid-template-columns: repeat(4, 1fr); }
   .tile-l { color: #333 !important; }
 }
+.preset-box { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 12px; border: 1px dashed var(--border); border-radius: 8px; }

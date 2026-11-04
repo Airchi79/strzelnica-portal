@@ -19,6 +19,8 @@ PANEL_PERMISSIONS = [
     ("logbook.staff_entry", "Książka pobytu: wpis w imieniu osoby (obsługa)"),
     ("logbook.manage_logbook", "Książka pobytu: ustawienia i kod QR wejścia"),
     ("bookings.manage_reservations", "Rezerwacje, blokady osi i rozliczenia rezerwacji"),
+    ("bookings.manage_booking_settings", "Rezerwacje: ustawienia (anulowanie, płatności, grupy klientów) i import archiwum"),
+    ("payments.accept_onsite", "Wpłaty na miejscu: gotówka i BLIK za rezerwację (bez importu wyciągów i korekt sald)"),
     ("credentials.review_credential", "Weryfikacja dokumentów i uprawnień"),
     ("accounts.view_users", "Klienci: przeglądanie kartoteki i kont"),
     ("clients.manage_clients", "Klienci: notatki, tagi, zatwierdzanie i kody wejścia"),
@@ -30,8 +32,25 @@ PANEL_PERMISSIONS = [
 ]
 
 
+# Gotowe zestawy uprawnień (role). Nadawane w karcie osoby jednym przyciskiem; potem można je dowolnie zmienić.
+ROLE_PRESETS = {
+    "dyzurny": {
+        "label": "Dyżurny / obsługa strzelnicy",
+        "description": "Dziś na strzelnicy, rezerwacje i rezerwacja na miejscu, książka pobytu (podgląd i wpis za osobę), "
+                       "wpłaty gotówką i BLIK za rezerwacje. Bez członków, raportów, ustawień i korekt sald.",
+        "permissions": [
+            "bookings.manage_reservations",
+            "logbook.view_logbook",
+            "logbook.staff_entry",
+            "payments.accept_onsite",
+        ],
+    },
+}
+
+
 def panel_required(perm=None):
-    """Dostęp do panelu zarządu: zalogowany, `is_staff`, po weryfikacji dwuskładnikowej i z danym uprawnieniem."""
+    """Dostęp do panelu zarządu: zalogowany, `is_staff`, po weryfikacji dwuskładnikowej i z danym uprawnieniem.
+    `perm` może być krotką — wystarczy jedno z wymienionych uprawnień."""
 
     def decorator(view):
         @wraps(view)
@@ -45,7 +64,8 @@ def panel_required(perm=None):
                 request.session[SESSION_2FA_NEXT] = request.get_full_path()
                 has_device = TOTPDevice.objects.filter(user=user, confirmed=True).exists()
                 return redirect("accounts:otp_verify" if has_device else "accounts:otp_setup")
-            if perm and not user.has_perm(perm):
+            perms = perm if isinstance(perm, (list, tuple)) else ([perm] if perm else [])
+            if perms and not any(user.has_perm(p) for p in perms):
                 raise PermissionDenied
             return view(request, *args, **kwargs)
 

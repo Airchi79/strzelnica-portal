@@ -40,9 +40,11 @@ class ManualPaymentForm(forms.Form):
     note = forms.CharField(label="Uwagi", max_length=255, required=False)
     reservation = forms.IntegerField(widget=forms.HiddenInput, required=False)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, onsite_only=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["user"].queryset = _users()
+        if onsite_only:  # dyżurny: tylko pieniądze przyjęte na miejscu
+            self.fields["method"].choices = [(Payment.Method.CASH, "Gotówka"), (Payment.Method.BLIK_PHONE, "BLIK na telefon")]
 
     def clean_amount(self):
         value = self.cleaned_data["amount"]

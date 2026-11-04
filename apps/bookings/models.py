@@ -172,7 +172,10 @@ class Reservation(models.Model):
         ordering = ["starts_at", "lane__order"]
         verbose_name = "rezerwacja"
         verbose_name_plural = "rezerwacje"
-        permissions = [("manage_reservations", "Może zarządzać rezerwacjami i blokadami osi")]
+        permissions = [
+            ("manage_reservations", "Może zarządzać rezerwacjami i blokadami osi"),
+            ("manage_booking_settings", "Może zmieniać ustawienia rezerwacji i importować archiwum"),
+        ]
         constraints = [
             models.CheckConstraint(condition=Q(ends_at__gt=models.F("starts_at")), name="reservation_positive_length"),
             models.CheckConstraint(condition=Q(persons__gte=1), name="reservation_persons_min"),

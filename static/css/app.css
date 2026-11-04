@@ -404,7 +404,7 @@ html.is-dark .theme-btn .when-light { display: none; }
 
 /* --- formularz dokumentów / uprawnień PS --- */
 .helptext:empty { display: none; }
-.step-title { margin: 0 0 10px; font-size: 1.05rem; }
+.step-title, .panel-app .step-title { margin: 0 0 10px; font-size: 1.05rem; }
 .field-row { display: flex; gap: 12px; flex-wrap: wrap; } .field-row > .field { flex: 1 1 180px; }
 .kind-cards.has-error .lane-card { border-color: var(--bad); }
 .scan-buttons { margin-top: 0; }
@@ -415,3 +415,27 @@ html.is-dark .theme-btn .when-light { display: none; }
 .scan-tips { margin: 6px 0 0; padding-left: 18px; }
 .next-steps ol { margin: 0 0 4px; padding-left: 18px; }
 @media (max-width: 600px) { .kind-cards { grid-template-columns: 1fr; } }
+
+/* --- weryfikacja dokumentów (panel) --- */
+.tab-count { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 2px; border-radius: 999px; background: var(--border); color: var(--text); font-size: .72rem; text-align: center; }
+.tabs a.active .tab-count { background: color-mix(in srgb, var(--brand-contrast) 25%, transparent); color: inherit; }
+.verify-grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; }
+.verify-scan { position: sticky; top: 70px; }
+.scan-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.scan-stage { display: flex; justify-content: center; align-items: center; min-height: 260px; max-height: 70vh; overflow: auto; background: color-mix(in srgb, var(--text) 6%, var(--surface)); border-radius: 8px; }
+.scan-stage img { max-width: 100%; max-height: 70vh; transition: transform .2s; cursor: zoom-in; }
+.scan-stage.sideways img { max-width: 70vh; max-height: 100%; }
+.scan-stage.zoom { align-items: flex-start; justify-content: flex-start; }
+.scan-stage.zoom img { max-width: none; max-height: none; cursor: zoom-out; }
+.scan-pdf { width: 100%; height: 70vh; border: 0; border-radius: 8px; background: #fff; }
+.scan-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 40px 16px; color: var(--muted); }
+.verify-facts { margin: 0; display: grid; gap: 8px; }
+.verify-facts > div { display: grid; grid-template-columns: 130px 1fr; gap: 8px; }
+.verify-facts dt { color: var(--muted); font-size: .85rem; } .verify-facts dd { margin: 0; overflow-wrap: anywhere; }
+.big-code, .panel-app .big-code { font-size: 1.15rem; font-weight: 700; letter-spacing: .02em; }
+.verify-check { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; }
+.verify-check label { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; margin: 0; }
+.reason-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 3px 10px; font-size: .8rem; cursor: pointer; }
+.chip:hover { border-color: var(--brand); }
+@media (max-width: 900px) { .verify-grid { grid-template-columns: 1fr; } .verify-scan { position: static; } }

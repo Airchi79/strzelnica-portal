@@ -1,11 +1,17 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db.models import Count, Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
+from apps.audit.models import AuditLog
 from apps.audit.services import log_event, log_sensitive_access
 from apps.core.permissions import panel_required
 
@@ -68,36 +74,92 @@ def my_delete(request, pk):
 # --- panel zarządu ---------------------------------------------------------
 
 
+# (krótka etykieta przycisku, tekst wstawiany do uwag dla strzelca)
+REJECT_REASONS = [
+    ("Nieczytelne zdjęcie", "Zdjęcie jest nieczytelne — dodaj wyraźniejsze zdjęcie dokumentu."),
+    ("Zły numer", "Numer nie zgadza się z dokumentem."),
+    ("Inne nazwisko", "Imię i nazwisko na dokumencie nie zgadza się z danymi konta."),
+    ("Dokument nieważny", "Dokument jest nieważny."),
+    ("Brak zdjęcia", "Brak zdjęcia — dodaj zdjęcie dokumentu albo okaż go na strzelnicy."),
+]
+
+
+def _pending_queue():
+    return Credential.objects.filter(status=Credential.Status.PENDING).order_by("created_at", "pk")
+
+
 @panel_required("credentials.review_credential")
 def panel_list(request):
     status = request.GET.get("status", Credential.Status.PENDING)
+    kind = request.GET.get("rodzaj", "")
+    q = request.GET.get("q", "").strip()
     qs = Credential.objects.select_related("user", "reviewed_by")
+    if q:
+        qs = qs.filter(
+            Q(user__first_name__icontains=q) | Q(user__last_name__icontains=q)
+            | Q(user__email__icontains=q) | Q(number__icontains=q)
+        )
+    if kind in Credential.Kind.values:
+        qs = qs.filter(kind=kind)
+    counts = {r["status"]: r["n"] for r in qs.order_by().values("status").annotate(n=Count("pk"))}
     if status in Credential.Status.values:
         qs = qs.filter(status=status)
-    page = Paginator(qs.order_by("created_at"), 30).get_page(request.GET.get("page"))
+    if status == Credential.Status.PENDING:
+        qs = qs.order_by("created_at", "pk")  # najdłużej czekające na górze
+    else:
+        qs = qs.order_by("-reviewed_at", "-updated_at")
+    page = Paginator(qs, 30).get_page(request.GET.get("page"))
+    tabs = [(value, label, counts.get(value, 0)) for value, label in Credential.Status.choices]
     return render(
-        request, "panel/credentials_list.html", {"page": page, "status": status, "statuses": Credential.Status.choices}
+        request,
+        "panel/credentials_list.html",
+        {"page": page, "status": status, "tabs": tabs, "kind": kind, "q": q, "kinds": Credential.Kind.choices,
+         "stale_before": timezone.now() - timedelta(days=2)},
     )
 
 
 @panel_required("credentials.review_credential")
 def panel_detail(request, pk):
-    credential = get_object_or_404(Credential.objects.select_related("user"), pk=pk)
+    credential = get_object_or_404(Credential.objects.select_related("user", "reviewed_by"), pk=pk)
     form = ReviewForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
             services.review(credential, request.user, form.cleaned_data["decision"] == "approve", form.cleaned_data["note"])
         except ValueError as e:
             messages.error(request, str(e))
-        else:
-            messages.success(request, "Zapisano decyzję. Strzelec otrzyma powiadomienie e-mail.")
+            return redirect("panel:credentials")
+        messages.success(request, f"Zapisano decyzję ({credential.user.full_name}). Strzelec otrzyma powiadomienie e-mail.")
+        nxt = _pending_queue().exclude(pk=pk).first()
+        if nxt and request.POST.get("then") == "next":
+            return redirect("panel:credential", nxt.pk)
         return redirect("panel:credentials")
     if request.method == "GET":
         log_sensitive_access(credential.user, f"dokument:{credential.pk}", "weryfikacja dokumentu")
-    return render(request, "panel/credential_detail.html", {"credential": credential, "form": form})
+    queue = list(_pending_queue().values_list("pk", flat=True))
+    others = credential.user.credentials.exclude(pk=pk).select_related("reviewed_by")
+    history = AuditLog.objects.filter(object_type=Credential._meta.label_lower, object_id=str(pk)).select_related("actor")[:20]
+    scan_kind = ""
+    if credential.scan:
+        scan_kind = "pdf" if credential.scan.name.lower().endswith(".pdf") else "image"
+    return render(
+        request,
+        "panel/credential_detail.html",
+        {
+            "credential": credential,
+            "form": form,
+            "others": others,
+            "history": history,
+            "scan_kind": scan_kind,
+            "reject_reasons": REJECT_REASONS,
+            "queue_pos": queue.index(pk) + 1 if pk in queue else None,
+            "queue_len": len(queue),
+            "has_next": any(x != pk for x in queue),
+        },
+    )
 
 
 @panel_required("credentials.review_credential")
+@xframe_options_sameorigin  # podgląd PDF osadzony na stronie weryfikacji
 def panel_scan(request, pk):
     credential = get_object_or_404(Credential, pk=pk)
     if not credential.scan:

@@ -185,3 +185,42 @@ def test_rejected_credential_shows_reason_on_edit(client, user):
                                   status=Credential.Status.REJECTED, review_note="Nieczytelny numer")
     assert "Popraw i wyślij ponownie" in client.get("/dokumenty/").content.decode()
     assert "Nieczytelny numer" in client.get(f"/dokumenty/{c.pk}/").content.decode()
+
+
+def test_panel_list_counts_search_and_menu_badge(owner_client, user):
+    other = make_user("druga@example.com")
+    add_credential(user, status=Credential.Status.PENDING, number="PS-A")
+    add_credential(other, status=Credential.Status.PENDING, number="PS-B")
+    add_credential(other, kind=Credential.Kind.LICENSE, status=Credential.Status.VERIFIED, number="L-1")
+    response = owner_client.get("/panel/weryfikacja/")
+    tabs = {v: n for v, _, n in response.context["tabs"]}
+    assert tabs["oczekuje"] == 2 and tabs["zweryfikowany"] == 1
+    assert 'title="czeka na decyzję">2<' in response.content.decode()
+    response = owner_client.get("/panel/weryfikacja/?q=PS-B")
+    assert [c.number for c in response.context["page"]] == ["PS-B"]
+    response = owner_client.get("/panel/weryfikacja/?status=zweryfikowany&rodzaj=licencja")
+    assert [c.number for c in response.context["page"]] == ["L-1"]
+
+
+def test_panel_review_goes_to_next_in_queue(owner_client, user):
+    first = add_credential(user, status=Credential.Status.PENDING, number="PS-1")
+    second = add_credential(make_user("b@example.com"), status=Credential.Status.PENDING, number="PS-2")
+    page = owner_client.get(f"/panel/weryfikacja/{first.pk}/")
+    assert page.context["queue_pos"] == 1 and page.context["has_next"]
+    response = owner_client.post(f"/panel/weryfikacja/{first.pk}/", {"decision": "approve", "note": "", "then": "next"})
+    assert response.status_code == 302 and response.url == f"/panel/weryfikacja/{second.pk}/"
+    response = owner_client.post(f"/panel/weryfikacja/{second.pk}/", {"decision": "approve", "note": "", "then": "next"})
+    assert response.url == "/panel/weryfikacja/"
+    history = owner_client.get(f"/panel/weryfikacja/{first.pk}/").context["history"]
+    assert any(h.action == "dokument.weryfikacja" for h in history)
+
+
+def test_panel_scan_can_be_embedded_same_origin_only(owner_client, user):
+    credential = add_credential(user, status=Credential.Status.PENDING)
+    credential.scan.save("skan.pdf", __import__("django.core.files.base", fromlist=["ContentFile"]).ContentFile(PDF))
+    page = owner_client.get(f"/panel/weryfikacja/{credential.pk}/").content.decode()
+    assert 'class="scan-pdf"' in page
+    response = owner_client.get(f"/panel/weryfikacja/{credential.pk}/skan/")
+    assert response["X-Frame-Options"] == "SAMEORIGIN" and response["Cache-Control"] == "no-store"
+    b"".join(response.streaming_content)
+    credential.scan.delete(save=False)

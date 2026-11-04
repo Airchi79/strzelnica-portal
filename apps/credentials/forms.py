@@ -156,7 +156,10 @@ class CredentialForm(forms.ModelForm):
 
 class ReviewForm(forms.Form):
     decision = forms.ChoiceField(choices=[("approve", "Zatwierdź"), ("reject", "Odrzuć")], widget=forms.HiddenInput)
-    note = forms.CharField(label="Uwagi (wymagane przy odrzuceniu)", max_length=255, required=False)
+    note = forms.CharField(
+        label="Uwagi (wymagane przy odrzuceniu)", max_length=255, required=False,
+        widget=forms.Textarea(attrs={"rows": 3, "maxlength": 255}),
+    )
 
     def clean(self):
         data = super().clean()

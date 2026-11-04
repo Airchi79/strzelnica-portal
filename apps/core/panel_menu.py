@@ -56,17 +56,28 @@ def _matches(current, patterns):
     return any(current.startswith(p[:-1]) if p.endswith("*") else current == p for p in patterns)
 
 
+def _counts(user):
+    """Liczniki spraw czekających na zarząd, pokazywane przy pozycjach menu."""
+    counts = {}
+    if user.has_perm("credentials.review_credential"):
+        from apps.credentials.models import Credential
+
+        counts["panel:credentials"] = Credential.objects.filter(status=Credential.Status.PENDING).count()
+    return counts
+
+
 def build(request):
     user = request.user
     current = getattr(request.resolver_match, "url_name", "") or ""
     sections = []
+    counts = _counts(user)
     for title, items in SECTIONS:
         visible = []
         for label, name, icon, perm, patterns in items:
             if perm and not user.has_perm(perm):
                 continue
             visible.append({"label": label, "url": reverse(name), "icon": icon, "active": _matches(current, patterns),
-                            "badge": "notifications" if name == "panel:notifications" else ""})
+                            "badge": "notifications" if name == "panel:notifications" else "", "count": counts.get(name, 0)})
         if visible:
             sections.append({"title": title, "items": visible})
     return sections

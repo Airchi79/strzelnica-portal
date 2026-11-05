@@ -46,6 +46,9 @@ def register(request):
     if request.user.is_authenticated:
         return redirect("core:dashboard")
     form = RegistrationForm(request.POST or None)
+    if request.method == "POST" and form.is_valid() and not ratelimit.allow(
+            "register-ip", client_ip(request), ratelimit.REGISTRATIONS_PER_IP_PER_HOUR):
+        form.add_error(None, "Zbyt wiele rejestracji z tego adresu. Spróbuj za godzinę.")
     if request.method == "POST" and form.is_valid():
         user = form.save()
         log_event("konto.rejestracja", user, f"Rejestracja {user.email}", actor=user)
@@ -84,7 +87,7 @@ def resend_verification(request):
     form = ResendVerificationForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         user = User.objects.filter(email__iexact=form.cleaned_data["email"], is_active=True, email_verified_at__isnull=True).first()
-        if user:
+        if user and _mail_allowed(request, "verify", user.email):
             send_verification_email(user)
         # Ta sama odpowiedź niezależnie od tego, czy konto istnieje (brak wycieku informacji o kontach).
         messages.info(request, "Jeśli konto istnieje i nie jest potwierdzone, wysłaliśmy nowy link.")
@@ -243,6 +246,14 @@ class PasswordChangeView(auth_views.PasswordChangeView):
         return response
 
 
+def _mail_allowed(request, kind, email):
+    """Limit e-maili z formularzy publicznych: na adres odbiorcy i na IP. Odpowiedź dla użytkownika jest taka sama
+    niezależnie od wyniku (bez ujawniania, czy konto istnieje i czy zadziałał limit)."""
+    ok_ip = ratelimit.allow(f"{kind}-ip", client_ip(request), ratelimit.MAIL_PER_IP_PER_HOUR)
+    ok_mail = ratelimit.allow(f"{kind}-mail", email, ratelimit.MAIL_PER_ADDRESS_PER_HOUR)
+    return ok_ip and ok_mail
+
+
 class PasswordResetView(auth_views.PasswordResetView):
     template_name = "accounts/password_reset.html"
     extra_context = {"heading": "Reset hasła"}
@@ -250,6 +261,11 @@ class PasswordResetView(auth_views.PasswordResetView):
     extra_email_context = {"site_url": settings.SITE_URL}
     subject_template_name = "emails/password_reset_subject.txt"
     success_url = reverse_lazy("accounts:password_reset_done")
+
+    def form_valid(self, form):
+        if not _mail_allowed(self.request, "reset", form.cleaned_data["email"]):
+            return redirect(self.success_url)  # ta sama strona „wysłaliśmy” — bez wysyłki
+        return super().form_valid(form)
 
 
 class PasswordResetConfirmView(auth_views.PasswordResetConfirmView):

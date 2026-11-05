@@ -30,3 +30,22 @@ def register_failure(email, ip):
 
 def reset(email, ip):
     cache.delete(_key("email", email))
+
+
+def allow(kind, value, limit, window=3600):
+    """Ogólny licznik: True, jeśli w oknie czasu wykonano mniej niż `limit` operacji (i zalicza tę operację)."""
+    key = _key(kind, value)
+    count = cache.get(key, 0)
+    if count >= limit:
+        return False
+    try:
+        cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, window)
+    return True
+
+
+# Limity wysyłki e-maili z formularzy publicznych (ochrona skrzynek przed zalewem i domeny przed oznaczeniem jako spam).
+MAIL_PER_ADDRESS_PER_HOUR = 3
+MAIL_PER_IP_PER_HOUR = 20
+REGISTRATIONS_PER_IP_PER_HOUR = 10

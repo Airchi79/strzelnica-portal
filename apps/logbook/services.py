@@ -143,12 +143,12 @@ def decode_signature(data_url):
         raise ValidationError("Podpis jest za duży.")
     try:
         img = Image.open(BytesIO(raw))
+        if img.format != "PNG" or img.width > 2000 or img.height > 1000:  # wymiary z nagłówka — przed rozpakowaniem
+            raise ValidationError("Nieprawidłowy podpis.")
         img.verify()
         img = Image.open(BytesIO(raw)).convert("LA")
-    except (UnidentifiedImageError, OSError, SyntaxError) as e:
+    except (UnidentifiedImageError, OSError, SyntaxError, Image.DecompressionBombError) as e:
         raise ValidationError("Nieprawidłowy podpis.") from e
-    if img.width > 2000 or img.height > 1000:
-        raise ValidationError("Nieprawidłowy podpis.")
     # Podpis musi zawierać ślad: odpowiednio dużo nieprzezroczystych, ciemnych pikseli.
     pixels = img.get_flattened_data() if hasattr(img, "get_flattened_data") else img.getdata()
     inked = sum(1 for lum, alpha in pixels if alpha > 64 and lum < 160)

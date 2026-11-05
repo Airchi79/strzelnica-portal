@@ -36,6 +36,11 @@ def _range_free(lane, starts_at, ends_at, now, for_user=None):
 def join(user, lane, day, start_hour, end_hour, persons=1, now=None):
     from .services import local_dt
 
+    from .services import check_can_book
+
+    reasons = check_can_book(user)  # oferta trzyma termin — tylko dla osób, które mogą go potem zarezerwować
+    if reasons:
+        raise ValidationError(reasons)
     now = now or timezone.now()
     starts_at, ends_at = local_dt(day, start_hour), local_dt(day, end_hour)
     hours = lane.hours_for(day)

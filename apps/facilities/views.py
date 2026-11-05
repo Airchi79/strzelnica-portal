@@ -181,9 +181,15 @@ def issue_new(request):
     form = IssueForm(request.POST or None, request.FILES or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         d = form.cleaned_data
-        issues.report(request.user, d["title"], d["description"], d["lane"], d["urgent"], d["photo"])
-        messages.success(request, "Dziękujemy — zgłoszenie trafiło do zarządu. O naprawie dostaniesz e-mail.")
-        return redirect("core:issues")
+        from django.core.exceptions import ValidationError
+
+        try:
+            issues.report(request.user, d["title"], d["description"], d["lane"], d["urgent"], d["photo"])
+        except ValidationError as e:
+            form.add_error(None, e.messages[0])
+        else:
+            messages.success(request, "Dziękujemy — zgłoszenie trafiło do zarządu. O naprawie dostaniesz e-mail.")
+            return redirect("core:issues")
     from apps.core.models import AssociationSettings
 
     return render(request, "facilities/issue_new.html", {"form": form, "association": AssociationSettings.load()})

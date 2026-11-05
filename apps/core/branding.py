@@ -83,12 +83,14 @@ def _open_raster(data: bytes):
     from PIL import Image
 
     try:
-        img = Image.open(io.BytesIO(data))
+        img = Image.open(io.BytesIO(data))  # czyta tylko nagłówek — wymiary sprawdzamy przed rozpakowaniem
+        if max(img.size) > 6000 or img.size[0] * img.size[1] > 36_000_000:
+            raise ValidationError("Obraz jest za duży (najwyżej 6000 px).")
         img.load()
+    except ValidationError:
+        raise
     except Exception as e:  # noqa: BLE001 — każdy błąd dekodowania to „zły plik”
         raise ValidationError("Nie udało się odczytać obrazu.") from e
-    if max(img.size) > 6000:
-        raise ValidationError("Obraz jest za duży (najwyżej 6000 px).")
     return img.convert("RGBA")
 
 

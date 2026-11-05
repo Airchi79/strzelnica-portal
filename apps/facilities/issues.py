@@ -1,6 +1,7 @@
 """Zgłoszenia usterek: przyjęcie zgłoszenia (ze zdjęciem), zmiany statusu, powiadomienia."""
 
 import io
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -22,8 +23,12 @@ def clean_photo(f):
     from PIL import Image, ImageOps
 
     try:
-        img = Image.open(f)
+        img = Image.open(f)  # najpierw tylko nagłówek: wymiary przed rozpakowaniem (ochrona przed „bombą” w pliku)
+        if img.size[0] * img.size[1] > 50_000_000:
+            raise ValidationError("Zdjęcie ma za dużą rozdzielczość.")
         img.load()
+    except ValidationError:
+        raise
     except Exception as e:  # noqa: BLE001
         raise ValidationError("To nie jest zdjęcie (dozwolone JPG i PNG).") from e
     if img.format not in ("JPEG", "PNG", "WEBP"):
@@ -35,8 +40,13 @@ def clean_photo(f):
     return ContentFile(out.getvalue(), name="zdjecie.jpg")
 
 
+MAX_REPORTS_PER_DAY = 10
+
+
 @transaction.atomic
 def report(user, title, description="", lane=None, urgent=False, photo=None):
+    if user and Issue.objects.filter(reported_by=user, created_at__gte=timezone.now() - timedelta(days=1)).count() >= MAX_REPORTS_PER_DAY:
+        raise ValidationError("Wysłano już wiele zgłoszeń w ciągu doby — jeśli sprawa jest pilna, zadzwoń do zarządu.")
     issue = Issue(reported_by=user, title=title.strip(), description=description.strip(), lane=lane, urgent=urgent)
     if photo:
         issue.photo.save("zdjecie.jpg", photo, save=False)

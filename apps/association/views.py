@@ -9,6 +9,7 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.http import FileResponse, Http404, HttpResponse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -216,7 +217,10 @@ def panel_fee_pay(request, pk):
             _err(request, e)
         else:
             messages.success(request, f"Zaksięgowano: {fee.label}.")
-    return redirect(request.POST.get("next") or "panel:fees")
+    nxt = request.POST.get("next", "")
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return redirect(nxt)
+    return redirect("panel:fees")
 
 
 @panel_required(PERM_M)

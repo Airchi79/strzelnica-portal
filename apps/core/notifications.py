@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def _send(subject, template, context, recipients):
+    subject = " ".join(str(subject).split())[:200]  # jedna linia: treści od użytkowników nie mogą zepsuć nagłówka
     recipients = sorted({r for r in recipients if r})
     if not recipients:
         return
@@ -59,6 +60,7 @@ def notify_board(subject, template, permission_codename=None, url="", body="", *
     from apps.core.models import Notification
 
     if url or body:
+        subject = " ".join(str(subject).split())
         Notification.objects.bulk_create(
             Notification(recipient=u, title=subject[:160], body=body[:500], url=url[:255])
             for u in board_users(permission_codename)

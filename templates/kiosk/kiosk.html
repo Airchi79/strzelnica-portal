@@ -3,12 +3,12 @@
 <title>Kiosk · {{ SITE_NAME }}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#2f5d3a">
 <link rel="stylesheet" href="{% static 'css/app.css' %}"></head>
 <body class="kiosk" data-kiosk data-api="{% url 'kiosk:home' %}api/">
-<header class="topbar"><div class="wrap"><span class="brand"><img class="brand-logo" src="{{ BRAND.logo }}" alt="" width="34" height="34" data-hide-broken>{{ SITE_NAME }} · książka pobytu</span>
+<header class="topbar"><div class="wrap"><span class="brand"><img class="brand-logo" src="{{ BRAND.logo_small }}" alt="" width="34" height="34" data-hide-broken>{{ SITE_NAME }} · książka pobytu</span>
   <span class="kiosk-status" data-status>…</span></div></header>
 <main class="wrap">
 
 <section data-view="home">
-  <img class="kiosk-logo" src="{{ BRAND.logo }}" alt="Logo {{ SITE_NAME }}" data-hide-broken>
+  <img class="kiosk-logo" src="{{ BRAND.icon_512 }}" alt="Logo {{ SITE_NAME }}" data-hide-broken>
   <h1>Witamy na strzelnicy</h1>
   <div class="kiosk-buttons">
     <button class="btn kiosk-big" type="button" data-go="form">Wpis do książki pobytu</button>

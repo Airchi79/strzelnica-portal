@@ -81,14 +81,14 @@
     <h2><span class="step-no">4</span> Ile osób będzie strzelać?</h2>
     <div class="stepper">
       <button type="button" class="btn secondary" data-persons="-1" aria-label="Mniej osób">−</button>
-      {{ form.persons }}
+      <label for="{{ form.persons.id_for_label }}" class="sr-only">Liczba osób</label>{{ form.persons }}
       <button type="button" class="btn secondary" data-persons="1" aria-label="Więcej osób">+</button>
     </div>
     <p class="small" data-price-info></p>
     <details class="book-extra"{% if form.access_code.value %} open{% endif %}><summary>Mam kod klubu lub kod wejścia (karnet)</summary>
-      <div class="field">{{ form.access_code }}<span class="helptext">{{ form.access_code.help_text }}</span></div></details>
+      <div class="field"><label for="{{ form.access_code.id_for_label }}" class="sr-only">{{ form.access_code.label }}</label>{{ form.access_code }}<span class="helptext">{{ form.access_code.help_text }}</span></div></details>
     <details class="book-extra"{% if form.notes.value %} open{% endif %}><summary>Uwagi dla obsługi</summary>
-      <div class="field">{{ form.notes }}</div></details>
+      <div class="field"><label for="{{ form.notes.id_for_label }}" class="sr-only">{{ form.notes.label }}</label>{{ form.notes }}</div></details>
   </section>
 
   <div class="book-summary" data-summary>

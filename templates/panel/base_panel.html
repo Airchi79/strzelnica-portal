@@ -5,7 +5,7 @@
 <div class="app" data-app>
   <aside class="sidebar" id="panel-sidebar" aria-label="Menu panelu">
     <div class="sidebar-brand">
-      <a href="{% url 'panel:home' %}"><img class="sidebar-logo" src="{{ BRAND.logo }}" alt="" width="36" height="36">{{ SITE_NAME }}</a>
+      <a href="{% url 'panel:home' %}"><img class="sidebar-logo" src="{{ BRAND.logo_small }}" alt="" width="36" height="36">{{ SITE_NAME }}</a>
       <span class="sidebar-sub">Panel obsługi</span>
     </div>
     <nav class="sidebar-nav">
@@ -31,7 +31,7 @@
         <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit" class="appbar-btn" aria-label="Wyloguj" title="Wyloguj">{% icon "logout" 18 %}</button></form>
       </div>
     </header>
-    <main class="app-main">
+    <main class="app-main" id="tresc" tabindex="-1">
       {% if pending_regulations and request.resolver_match.url_name != 'accept' %}
         <div class="msg warning">Obowiązują nowe dokumenty do akceptacji. <a href="{% url 'regulations:accept' %}?next={{ request.get_full_path|urlencode }}">Przeczytaj i zaakceptuj</a></div>
       {% endif %}

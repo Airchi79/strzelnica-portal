@@ -29,7 +29,7 @@ def data_url(b):
 
 def test_default_logo_and_icons_without_upload(client):
     html = client.get("/").content.decode()
-    assert "/static/img/logo.svg" in html and "/static/icons/icon-192.png" in html
+    assert "/static/icons/icon-192.png" in html and "/static/icons/icon-512.png" in html  # lekkie ikony zamiast SVG
     assert client.get("/logo/").status_code == 302
     manifest = client.get("/manifest.webmanifest").content.decode()
     assert "icon-512-maskable.png" in manifest
@@ -45,7 +45,7 @@ def test_upload_svg_with_browser_icons(owner_client, client):
     assert b.logo_type == "image/svg+xml" and bytes(b.logo) == SVG and b.icon_background == "#123456"
     assert AuditLog.objects.filter(action="ustawienia.logo").exists()
     html = client.get("/").content.decode()
-    assert "/logo/?v=" in html and "/ikona/192.png?v=" in html
+    assert "/ikona/192.png?v=" in html and "/ikona/512.png?v=" in html
     r = client.get("/logo/?v=1")
     assert r["Content-Type"] == "image/svg+xml" and "sandbox" in r["Content-Security-Policy"] and "immutable" in r["Cache-Control"]
     icon = client.get("/ikona/maskable.png")
@@ -63,8 +63,8 @@ def test_upload_png_server_generates_icons_and_crops_margin(owner_client):
     })
     assert response.status_code == 302
     b = Branding.objects.get()
-    icon = Image.open(io.BytesIO(bytes(b.icon_512)))
-    assert icon.size == (512, 512)
+    icon = Image.open(io.BytesIO(bytes(b.icon_512))).convert("RGBA")
+    assert icon.size == (512, 512) and len(bytes(b.icon_512)) < 60_000  # paleta — mały plik
     # pusty margines przycięty — logo wypełnia prawie całą ikonę
     assert icon.getchannel("A").getbbox()[0] < 20
     mask = Image.open(io.BytesIO(bytes(b.icon_maskable))).convert("RGBA")

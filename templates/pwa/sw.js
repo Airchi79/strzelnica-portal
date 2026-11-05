@@ -3,7 +3,7 @@ const CACHE = "satok-v3-{{ BRAND.version }}"; // nowa wersja przy zmianie logo �
 const KIOSK_URL = "{% url 'kiosk:home' %}";
 const KIOSK_CACHE = "satok-kiosk"; // osobna pamięć — nie jest czyszczona przy zmianie wersji zasobów
 const OFFLINE_URL = "{% url 'core:offline' %}";
-const ASSETS = [OFFLINE_URL, "{% static 'css/app.css' %}", "{% static 'js/app.js' %}", "{{ BRAND.icon_192 }}", "{{ BRAND.logo }}", "{% static 'js/kiosk.js' %}"];
+const ASSETS = [OFFLINE_URL, "{% static 'css/app.css' %}", "{% static 'js/app.js' %}", "{{ BRAND.icon_192 }}", "{{ BRAND.icon_512 }}", "{% static 'js/kiosk.js' %}"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));

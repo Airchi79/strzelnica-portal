@@ -1,9 +1,9 @@
 {# Przełącznik Dzień/Tydzień, wybór osi i nawigacja tygodnia. #}
 <div class="viewnav">
-  <div class="tabs seg" role="tablist" aria-label="Widok">
-    <a href="?dzien={{ day|date:'Y-m-d' }}" class="{% if not week_view %}active{% endif %}">Dzień</a>
-    <a href="?widok=tydzien&amp;dzien={{ day|date:'Y-m-d' }}{% if lane %}&amp;os={{ lane.pk }}{% endif %}" class="{% if week_view %}active{% endif %}">Tydzień</a>
-  </div>
+  <nav class="tabs seg" aria-label="Widok kalendarza">
+    <a href="?dzien={{ day|date:'Y-m-d' }}" class="{% if not week_view %}active{% endif %}"{% if not week_view %} aria-current="page"{% endif %}>Dzień</a>
+    <a href="?widok=tydzien&amp;dzien={{ day|date:'Y-m-d' }}{% if lane %}&amp;os={{ lane.pk }}{% endif %}" class="{% if week_view %}active{% endif %}"{% if week_view %} aria-current="page"{% endif %}>Tydzień</a>
+  </nav>
 </div>
 {% if week_view %}
   <div class="tabs lane-tabs" aria-label="Oś">{% for l in all_lanes %}<a href="?widok=tydzien&amp;dzien={{ week_start|date:'Y-m-d' }}&amp;os={{ l.pk }}" class="{% if l.pk == lane.pk %}active{% endif %}">{{ l.name }}</a>{% endfor %}</div>

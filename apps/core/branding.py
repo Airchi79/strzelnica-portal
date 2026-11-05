@@ -123,7 +123,8 @@ def make_icons(img, background="#ffffff"):
         logo = square.resize((inner, inner), Image.LANCZOS)
         canvas.alpha_composite(logo, ((size - inner) // 2, (size - inner) // 2))
         out = io.BytesIO()
-        canvas.save(out, "PNG", optimize=True)
+        # paleta 256 kolorów (z przezroczystością): plik kilka razy mniejszy, ważne przy słabym LTE na strzelnicy
+        canvas.quantize(colors=256, method=Image.Quantize.FASTOCTREE).save(out, "PNG", optimize=True)
         return out.getvalue()
 
     return {
@@ -158,6 +159,7 @@ def brand_urls(version=None):
     if version is None:
         return {
             "logo": static("img/logo.svg"),
+            "logo_small": static("icons/icon-192.png"),
             "icon_192": static("icons/icon-192.png"),
             "icon_512": static("icons/icon-512.png"),
             "icon_maskable": static("icons/icon-512-maskable.png"),
@@ -166,6 +168,7 @@ def brand_urls(version=None):
     v = f"?v={version}"
     return {
         "logo": reverse("brand_logo") + v,
+        "logo_small": reverse("brand_icon", args=["192"]) + v,
         "icon_192": reverse("brand_icon", args=["192"]) + v,
         "icon_512": reverse("brand_icon", args=["512"]) + v,
         "icon_maskable": reverse("brand_icon", args=["maskable"]) + v,

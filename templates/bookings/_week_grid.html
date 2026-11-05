@@ -1,5 +1,5 @@
 {# Siatka tygodnia jednej osi. rows = [(godzina, [(dzień, Slot|None)])]. panel=True: nazwiska i akcje zarządu. #}
-<div class="table-wrap">
+<div class="table-wrap" tabindex="0" role="region" aria-label="Zajętość osi w tygodniu (przewijana tabela)">
 <table class="daygrid weekgrid">
   <thead><tr><th class="hcol">Godz.</th>{% for d, free, open in week_days %}
     <th class="{% if d == today %}today{% elif d < today %}past-day{% endif %}"><a href="?dzien={{ d|date:'Y-m-d' }}">{{ d|date:"D" }}<br><span class="small">{{ d|date:"j.m" }}</span></a>

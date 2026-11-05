@@ -550,3 +550,13 @@ tr.neg td { color: var(--bad); }
 .help h2 { font-size: 1.05rem; margin: 0 0 8px; } .help ol, .help ul { margin: 0; padding-left: 20px; display: grid; gap: 5px; }
 .help p { margin: 0; } .help-toc ol { margin: 6px 0 0; padding-left: 20px; columns: 2; } .help:target { box-shadow: 0 0 0 2px var(--brand); }
 @media (max-width: 640px) { .help-toc ol { columns: 1; } }
+
+/* --- dostępność: wyraźny fokus przy obsłudze klawiaturą, link „Przejdź do treści” --- */
+:root { --focus: #1f5fd1; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --focus: #8fb8ff; } }
+:root[data-theme="dark"] { --focus: #8fb8ff; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+main:focus { outline: none; }
+.skip-link { position: absolute; left: 8px; top: -60px; z-index: 1000; padding: 8px 14px; border-radius: 8px; background: var(--surface); color: var(--text); border: 2px solid var(--focus); font-weight: 700; text-decoration: none; }
+.skip-link:focus { top: 8px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; scroll-behavior: auto !important; } }

@@ -1,0 +1,28 @@
+{% extends "panel/base_panel.html" %}{% load static %}
+{% block title %}Kalendarz w telefonie{% endblock %}
+{% block panel %}
+<h1>Kalendarz w telefonie</h1>
+{% include "panel/_bookings_tabs.html" %}
+<div class="card">
+  <p style="margin-top:0">Prywatny link do subskrypcji: rezerwacje, blokady osi i wydarzenia (30 dni wstecz, pół roku naprzód) odświeżają się same w Twoim kalendarzu. W treści nie ma nazwisk ani telefonów — tylko oś, liczba osób i numer rezerwacji; szczegóły po kliknięciu, w panelu (z logowaniem).</p>
+  {% if url %}
+    <div class="msg warning"><strong>Skopiuj link teraz</strong> — ze względów bezpieczeństwa nie pokażemy go ponownie. Nie udostępniaj go: kto ma link, widzi zajętość strzelnicy.</div>
+    <p><strong class="code" style="word-break:break-all" data-copy-text>{{ url }}</strong></p>
+    <div class="actions"><button type="button" class="btn" data-copy="{{ url }}">Kopiuj link</button></div>
+  {% elif existing %}
+    <p>Link jest aktywny (utworzony {{ existing.created_at|date:"j.m.Y H:i" }}{% if existing.last_used_at %}, ostatnio pobrany {{ existing.last_used_at|date:"j.m.Y H:i" }}{% endif %}).</p>
+  {% else %}<p class="muted">Nie masz jeszcze linku.</p>{% endif %}
+  <form method="post" class="actions" {% if existing %}data-confirm="Utworzyć nowy link? Stary przestanie działać."{% endif %}>{% csrf_token %}
+    <button class="btn{% if url %} secondary{% endif %}" type="submit">{% if existing %}Utwórz nowy link{% else %}Utwórz link{% endif %}</button></form>
+  {% if existing %}<form method="post" data-confirm="Unieważnić link? Kalendarz w telefonie przestanie się odświeżać.">{% csrf_token %}<input type="hidden" name="action" value="revoke"><button class="btn secondary small-btn" type="submit">Unieważnij link</button></form>{% endif %}
+</div>
+<div class="card small">
+  <strong>Jak dodać</strong>
+  <ul style="margin:6px 0 0;padding-left:18px">
+    <li><strong>Google Kalendarz</strong> (na komputerze): calendar.google.com → „Inne kalendarze” → <strong>+</strong> → „Z adresu URL” → wklej link → „Dodaj kalendarz”. Pojawi się też w telefonie (odświeżanie co kilka godzin — tak działa Google).</li>
+    <li><strong>iPhone</strong>: Ustawienia → Kalendarz → Konta → Dodaj konto → Inne → „Dodaj subskrybowany kalendarz” → wklej link.</li>
+    <li><strong>Outlook</strong>: Dodaj kalendarz → Subskrybuj z sieci Web → wklej link.</li>
+  </ul>
+</div>
+<script src="{% static 'js/reservation.js' %}" defer></script>
+{% endblock %}

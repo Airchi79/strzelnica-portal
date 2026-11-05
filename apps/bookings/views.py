@@ -766,3 +766,33 @@ def panel_waitlist(request):
 
     entries = WaitlistEntry.objects.filter(status__in=WaitlistEntry.ACTIVE, ends_at__gt=timezone.now()).select_related("user", "lane").order_by("starts_at", "created_at")
     return render(request, "panel/waitlist.html", {"entries": entries, "now": timezone.now()})
+
+
+def calendar_feed(request, token):
+    """Subskrypcja kalendarza (Google / iPhone). Dostęp tylko z prywatnym linkiem aktywnego członka zarządu."""
+    from . import feed
+
+    if feed.user_for_token(token) is None:
+        raise Http404
+    response = HttpResponse(feed.build(), content_type="text/calendar; charset=utf-8")
+    response["Cache-Control"] = "private, max-age=900"
+    response["X-Robots-Tag"] = "noindex"
+    return response
+
+
+@panel_required(PERM)
+def panel_calendar_link(request):
+    from . import feed
+    from .models import CalendarFeed
+
+    token = None
+    if request.method == "POST":
+        if request.POST.get("action") == "revoke":
+            CalendarFeed.objects.filter(user=request.user).delete()
+            log_event("kalendarz.link_usuniety", request.user, request.user.email)
+            messages.success(request, "Link kalendarza unieważniony — kalendarz w telefonie przestanie się odświeżać.")
+            return redirect("panel:calendar_link")
+        token = feed.new_token(request.user)
+        log_event("kalendarz.link_nowy", request.user, request.user.email)
+    url = settings.SITE_URL + reverse("calendar_feed", args=[token]) if token else None
+    return render(request, "panel/calendar_link.html", {"url": url, "existing": CalendarFeed.objects.filter(user=request.user).first()})

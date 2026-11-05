@@ -312,3 +312,16 @@ class WaitlistEntry(models.Model):
 
     def __str__(self):
         return f"{self.user} — {self.lane}, {self.starts_at:%d.%m %H:%M}"
+
+
+class CalendarFeed(models.Model):
+    """Prywatny link do subskrypcji kalendarza zajętości (dla zarządu). Przechowywany tylko skrót tokenu."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="calendar_feed")
+    token_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "link kalendarza"
+        verbose_name_plural = "linki kalendarza"

@@ -3,6 +3,7 @@
 {% block panel %}
 <h1>Rezerwacje — kalendarz {% if week_view %}tygodnia{% else %}dnia{% endif %}</h1>
 {% include "panel/_bookings_tabs.html" %}
+<p class="small"><a href="{% url 'panel:calendar_link' %}">📅 Kalendarz w telefonie</a> — subskrypcja zajętości w Google lub iPhone Kalendarzu.</p>
 {% include "bookings/_viewnav.html" %}
 {% if week_view %}{% include "bookings/_week_grid.html" with panel=True %}{% else %}{% include "bookings/_grid.html" with panel=True %}{% endif %}
 {% endblock %}

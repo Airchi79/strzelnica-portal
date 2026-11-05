@@ -61,6 +61,7 @@ urlpatterns = [
     path("ogloszenia/<int:pk>/", views.panel_announcement, name="announcement"),
     path("rezerwacje/lista/", bookings_views.panel_list, name="reservations"),
     path("rezerwacje/oczekujacy/", bookings_views.panel_waitlist, name="waitlist"),
+    path("rezerwacje/kalendarz-w-telefonie/", bookings_views.panel_calendar_link, name="calendar_link"),
     path("rezerwacje/dniami/", bookings_views.panel_days, name="reservations_days"),
     path("rezerwacje/nowa/", bookings_views.panel_new, name="reservation_new"),
     path("rezerwacje/ustawienia/", bookings_views.panel_settings, name="booking_settings"),

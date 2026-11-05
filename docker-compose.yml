@@ -5,7 +5,7 @@
 # odtworzenie docker.img na Unraid i były objęte kopią zapasową appdata:
 #   ./data/postgres  — baza danych
 #   ./data/private   — pliki prywatne (skany dokumentów do weryfikacji)
-#   ./backups        — codzienne kopie bazy (7 ostatnich)
+#   ./backups        — codzienne kopie bazy (7 ostatnich), każda sprawdzana przez odtworzenie (status.json)
 
 x-app: &app
   build: .
@@ -17,6 +17,7 @@ x-app: &app
     POSTGRES_HOST: db
   volumes:
     - ./data/private:/data/private
+    - ./backups:/backups:ro   # tylko odczyt: stan kopii zapasowych w panelu i alarmy
   depends_on:
     db:
       condition: service_healthy
@@ -63,6 +64,7 @@ services:
           python manage.py purge_logbook;
           python manage.py association_tasks;
           python manage.py sales_reports;
+          python manage.py check_backups;
         fi;
         n=$$((n + 1));
         sleep 300;
@@ -91,11 +93,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backups:/backups
-    entrypoint: >
-      sh -c 'export PGPASSWORD=$$POSTGRES_PASSWORD;
-      sleep 300;
-      while true; do
-        pg_dump -U $$POSTGRES_USER -d $$POSTGRES_DB -Fc -f /backups/satok-$$(date +%F).dump &&
-        ls -1t /backups/satok-*.dump | tail -n +8 | xargs -r rm --;
-        sleep 86400;
-      done'
+      - ./deploy/backup.sh:/backup.sh:ro
+    # Co dobę: kopia bazy (7 ostatnich) i sprawdzenie, czy da się ją odtworzyć (tymczasowa baza satok_verify,
+    # porównanie liczby danych z bazą produkcyjną). Wynik w backups/status.json — widoczny w panelu (System → Kopie zapasowe).
+    entrypoint: ["sh", "/backup.sh"]

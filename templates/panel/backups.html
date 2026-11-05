@@ -1,0 +1,18 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Kopie zapasowe{% endblock %}
+{% block panel %}
+<h1>Kopie zapasowe bazy</h1>
+<div class="res-banner {% if st.state == 'ok' %}ok{% else %}warn{% endif %}"><strong>{% if st.state == 'ok' %}Kopia działa ✓{% elif st.state == 'brak' %}Brak informacji o kopii{% else %}Problem z kopią zapasową{% endif %}</strong><span>{{ st.message }}</span></div>
+<div class="card">
+  <p class="small muted" style="margin-top:0">Co dobę kontener „backup” robi kopię bazy, <strong>odtwarza ją do tymczasowej bazy</strong> i porównuje liczbę danych z bazą produkcyjną. Gdy kopia jest uszkodzona albo starsza niż 36 h, zarząd dostaje alarm (raz na dobę).</p>
+  {% if st.counts %}<table class="small"><tr><th>Tabela</th><th>Wierszy w odtworzonej kopii</th></tr>
+    {% for t, n in st.counts.items %}<tr><td class="code">{{ t }}</td><td>{{ n }}</td></tr>{% endfor %}</table>{% endif %}
+</div>
+<div class="card table-wrap">
+  <h2 class="step-title">Pliki kopii na serwerze (najnowsze {{ st.files|length }})</h2>
+  <table>{% for f in st.files %}<tr><td class="code">{{ f.name }}</td><td class="nowrap">{{ f.size|filesizeformat }}</td><td class="small muted">{{ f.mtime|date:"j.m.Y H:i" }}</td></tr>
+    {% empty %}<tr><td class="muted">Brak plików (folder kopii niepodłączony albo pierwsza kopia jeszcze nie powstała).</td></tr>{% endfor %}</table>
+</div>
+<div class="msg warning small"><strong>Kopia na tym samym serwerze nie chroni przed awarią serwera, kradzieżą ani zaszyfrowaniem przez wirusa.</strong>
+  Folder <span class="code">backups</span> i <span class="code">data/private</span> (skany i zdjęcia) kopiuj także poza QNAP (HBS3: dysk USB i chmura).</div>
+{% endblock %}

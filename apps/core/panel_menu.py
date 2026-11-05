@@ -52,6 +52,7 @@ SECTIONS = [
     ("System", [
         ("Dane stowarzyszenia", "panel:settings", "building", "core.manage_settings", ["settings"]),
         ("Dziennik zdarzeń", "panel:audit", "history", "audit.view_auditlog", ["audit"]),
+        ("Kopie zapasowe", "panel:backups", "archive", "core.manage_settings", ["backups"]),
     ]),
 ]
 

@@ -283,3 +283,10 @@ def panel_announcement(request, pk=None):
         messages.success(request, msg)
         return redirect("panel:announcements")
     return render(request, "panel/announcement_edit.html", {"form": form, "obj": obj, "preview_count": preview_count})
+
+
+@panel_required("core.manage_settings")
+def panel_backups(request):
+    from .backups import read_status
+
+    return render(request, "panel/backups.html", {"st": read_status()})

@@ -227,3 +227,34 @@ harmonogram **05:00** → **szyfrowanie po stronie klienta: obowiązkowo** → w
 W HBS 3 → zadanie → **Przywróć** → wybierz najnowszą wersję → przywróć jeden plik `.dump` do **innego** folderu
 (np. `Public/test-przywracania`) → sprawdź, że plik ma rozmiar podobny jak w `backups`. Kopia, której nie dało się
 odtworzyć, nie jest kopią. Po teście usuń przywrócony plik.
+
+### D. Automatyczne sprawdzanie kopii (od listopada 2026)
+Kontener `backup` co dobę robi kopię i **od razu ją odtwarza** do tymczasowej bazy `satok_verify`, porównuje liczbę
+danych z bazą produkcyjną i usuwa tymczasową bazę. Wynik: panel → *System → Kopie zapasowe* (oraz kafelek w *Przeglądzie*).
+Gdy kopia jest uszkodzona albo od 36 h nie powstała nowa — zarząd dostaje alarm e-mailem (raz na dobę).
+
+Ręczne uruchomienie (np. po zmianach):
+```bash
+cd /share/strzelnica && docker compose exec backup sh /backup.sh --once
+```
+
+### E. Awaryjne odtworzenie bazy z kopii
+Gdy baza jest uszkodzona (albo trzeba cofnąć się do wczorajszego stanu). **Odtworzenie zastępuje bieżącą bazę.**
+1. Zatrzymaj aplikację (baza zostaje włączona):
+```bash
+cd /share/strzelnica && docker compose stop app cron
+```
+2. Wybierz plik kopii (najnowszy jest na górze):
+```bash
+ls -lt /share/strzelnica/backups/
+```
+3. Odtwórz (w miejsce `satok-RRRR-MM-DD.dump` wpisz nazwę pliku):
+```bash
+cd /share/strzelnica && docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --clean --if-exists' < backups/satok-RRRR-MM-DD.dump
+```
+4. Uruchom aplikację i sprawdź logowanie oraz ostatnie rezerwacje:
+```bash
+cd /share/strzelnica && docker compose up -d
+```
+Po awarii całego QNAP: zainstaluj program według punktów 0–2 i 5 na nowym serwerze, wgraj `.env` z menedżera haseł,
+przywróć z HBS 3 folder `backups` i `data/private`, a potem wykonaj kroki 3–4 powyżej.

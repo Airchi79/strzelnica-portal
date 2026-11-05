@@ -183,6 +183,9 @@ if not DEBUG:
 
 OTP_TOTP_ISSUER = "Strzelnica Sątok"
 
+# Folder kopii zapasowych bazy (w Dockerze: ./backups podłączony tylko do odczytu) — stan kopii w panelu i alarmy.
+BACKUP_DIR = env("BACKUP_DIR", "/backups")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

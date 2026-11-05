@@ -52,6 +52,7 @@ urlpatterns = [
     path("rezerwacje/", bookings_views.panel_calendar, name="bookings"),
     path("ustawienia/logo/", views.panel_logo, name="settings_logo"),
     path("ogloszenia/", views.panel_announcements, name="announcements"),
+    path("kopie/", views.panel_backups, name="backups"),
     path("wydarzenia/", events_views.panel_list, name="events"),
     path("wydarzenia/nowe/", events_views.panel_edit, name="event_new"),
     path("wydarzenia/<int:pk>/", events_views.panel_detail, name="event"),

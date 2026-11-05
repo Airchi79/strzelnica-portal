@@ -504,3 +504,21 @@ tr.neg td { color: var(--bad); }
 .logo-preview img { display: block; width: 96px; height: 96px; object-fit: contain; }
 .logo-preview .app-icon img { width: 72px; height: 72px; border-radius: 50%; }
 .logo-preview .app-icon.ios img { border-radius: 16px; }
+
+/* --- statystyki miesiąca --- */
+.kpi .delta { font-size: .78rem; margin-top: 2px; }
+.delta.up { color: var(--ok); } .delta.down { color: var(--bad); } .delta.same { color: var(--muted); }
+.two-col { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.hbars { display: grid; gap: 10px; }
+.hbar-row { display: grid; grid-template-columns: minmax(110px, 200px) 1fr minmax(150px, auto); gap: 10px; align-items: center; font-size: .88rem; }
+.hbar-track { height: 14px; background: color-mix(in srgb, var(--text) 8%, var(--surface)); border-radius: 4px; overflow: hidden; }
+.hbar-fill { display: block; height: 100%; background: var(--brand); border-radius: 0 4px 4px 0; min-width: 2px; }
+.hbar-value .delta { margin-left: 6px; font-size: .78rem; }
+@media (max-width: 640px) { .hbar-row { grid-template-columns: 1fr; gap: 3px; } }
+.heatmap { border-collapse: separate; border-spacing: 2px; font-size: .74rem; width: auto; }
+.heatmap th { font-weight: 600; color: var(--muted); padding: 2px 4px; text-align: center; }
+.heatmap td.hm { width: 30px; height: 26px; text-align: center; border-radius: 4px; padding: 0;
+  background: color-mix(in srgb, var(--brand) calc(var(--v) * 1%), var(--surface));
+  color: var(--text); border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
+@media print { .heatmap td.hm { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .hbar-fill { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+.heatmap td.hm.dark { color: var(--brand-contrast); }

@@ -1,0 +1,67 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Statystyki {{ first|date:"F Y" }}{% endblock %}
+{% block panel %}
+<div class="today-head">
+  <div><h1 style="margin-bottom:2px">Statystyki miesiąca</h1><p class="daylabel week-label" style="margin:0">{{ first|date:"F Y"|capfirst }} · zmiany wobec poprzedniego miesiąca ({{ prev.first|date:"F"|lower }})</p></div>
+  <div class="actions no-print" style="margin:0">
+    <a class="btn secondary small-btn" href="?m={{ prev_m }}" aria-label="Poprzedni miesiąc">←</a>
+    {% if not is_future %}<a class="btn secondary small-btn" href="?m={{ next_m }}" aria-label="Następny miesiąc">→</a>{% endif %}
+    <button type="button" class="btn small-btn" onclick="window.print()">Drukuj</button>
+  </div>
+</div>
+<div class="no-print">{% include "panel/_assoc_tabs.html" %}</div>
+
+{% with d=deltas %}
+<div class="today-tiles kpi-tiles">
+  {% include "panel/_kpi.html" with label="obłożenie osi" value=kpi.occupancy suffix="%" delta=d.occupancy unit="p.p." %}
+  {% include "panel/_kpi.html" with label="zarezerwowane godziny" value=kpi.hours delta=d.hours %}
+  {% include "panel/_kpi.html" with label="rezerwacji" value=kpi.reservations delta=d.reservations %}
+  {% include "panel/_kpi.html" with label="przychód (zaksięgowany)" value=kpi.income money=True delta=d.income %}
+  {% include "panel/_kpi.html" with label="wpisów w książce pobytu" value=kpi.entries delta=d.entries %}
+  {% include "panel/_kpi.html" with label="różnych osób na strzelnicy" value=kpi.people delta=d.people %}
+  {% include "panel/_kpi.html" with label="prowadzących (PS) z rezerwacją" value=kpi.officers delta=d.officers %}
+  {% include "panel/_kpi.html" with label="osób zadeklarowanych w rezerwacjach" value=kpi.persons delta=d.persons %}
+</div>
+{% endwith %}
+
+<div class="card">
+  <h2 class="step-title">Obłożenie osi</h2>
+  <p class="small muted" style="margin-top:0">Zarezerwowane godziny wobec godzin otwarcia osi w miesiącu (bez godzin objętych blokadami).</p>
+  <div class="hbars" role="table" aria-label="Obłożenie osi">
+    {% for x in lanes %}
+    <div class="hbar-row" role="row" title="{{ x.lane.name }}: {{ x.booked }} z {{ x.capacity }} h{% if x.prev_pct is not None %} · poprzednio {{ x.prev_pct }}%{% endif %}">
+      <span class="hbar-label" role="rowheader">{{ x.lane.name }}</span>
+      <span class="hbar-track" role="cell"><span class="hbar-fill" style="width:{{ x.pct|default:0 }}%"></span></span>
+      <span class="hbar-value" role="cell"><strong>{% if x.pct is None %}—{% else %}{{ x.pct }}%{% endif %}</strong> <span class="muted">{{ x.booked }}/{{ x.capacity }} h</span>
+        {% if x.delta is not None and x.delta != 0 %}<span class="delta {% if x.delta > 0 %}up{% else %}down{% endif %}">{% if x.delta > 0 %}▲ +{% else %}▼ {% endif %}{{ x.delta }} p.p.</span>{% endif %}</span>
+    </div>
+    {% empty %}<p class="muted">Brak czynnych osi.</p>{% endfor %}
+  </div>
+</div>
+
+<div class="card table-wrap">
+  <h2 class="step-title">Kiedy strzelnica jest zajęta</h2>
+  <p class="small muted" style="margin-top:0">Liczba zarezerwowanych godzin osi w danym dniu tygodnia i godzinie (wszystkie osie, cały miesiąc). Ciemniej = więcej.</p>
+  <table class="heatmap">
+    <tr><th></th>{% for h in heat_hours %}<th>{{ h }}</th>{% endfor %}</tr>
+    {% for day, cells in heat %}<tr><th>{{ day }}</th>{% for h, v, pct in cells %}<td class="hm{% if pct > 55 %} dark{% endif %}" style="--v:{{ pct }}" title="{{ day }} {{ h }}:00 — {{ v }} h">{% if v %}{{ v }}{% endif %}</td>{% endfor %}</tr>{% endfor %}
+  </table>
+</div>
+
+<div class="today-tiles two-col">
+  <div class="card table-wrap">
+    <h2 class="step-title">Przychód według sposobu płatności</h2>
+    <table>{% for label, amount in income %}<tr><td>{{ label }}</td><td class="nowrap" style="text-align:right"><strong>{{ amount|pln }}</strong></td></tr>
+      {% empty %}<tr><td class="muted">Brak zaksięgowanych wpłat.</td></tr>{% endfor %}
+      {% if income %}<tr><td><strong>Razem</strong></td><td class="nowrap" style="text-align:right"><strong>{{ kpi.income|pln }}</strong></td></tr>{% endif %}</table>
+    <p class="small muted">Wpłaty zaksięgowane w miesiącu (bez płatności testowych Tpay). Szczegóły i dokumenty — <a href="{% url 'panel:sales_reports' %}">Raporty sprzedaży</a>.</p>
+  </div>
+  <div class="card table-wrap">
+    <h2 class="step-title">Kluby (rezerwacje z kodem klubu)</h2>
+    <table>{% for c in clubs %}<tr><td>{{ c.club }}</td><td class="nowrap">{{ c.hours }} h</td><td class="nowrap muted">{{ c.reservations }} rez.</td></tr>
+      {% empty %}<tr><td class="muted">Brak rezerwacji klubowych.</td></tr>{% endfor %}</table>
+    <p class="small muted">Książka pobytu: {{ kpi.shooters }} wpisów „strzelanie” z {{ kpi.entries }}. Nieodbyte: {{ no_show }} · anulowane z należnością: {{ cancelled_late }}.</p>
+  </div>
+</div>
+<p class="small muted print-only">Wydrukowano {% now "j.m.Y H:i" %} · {{ user.full_name }}</p>
+{% endblock %}

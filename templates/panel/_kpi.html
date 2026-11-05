@@ -1,0 +1,6 @@
+{% load satok %}<div class="card tile kpi">
+  <span class="tile-n">{% if value is None %}—{% elif money %}{{ value|pln }}{% else %}{{ value }}{% if suffix %}{{ suffix }}{% endif %}{% endif %}</span>
+  <span class="tile-l">{{ label }}</span>
+  {% if delta and delta.abs != 0 %}<span class="delta {% if delta.abs > 0 %}up{% else %}down{% endif %}">{% if delta.abs > 0 %}▲ +{% else %}▼ {% endif %}{% if money %}{{ delta.abs|pln }}{% else %}{{ delta.abs }}{% endif %}{% if unit %} {{ unit }}{% endif %}{% if delta.pct is not None %} ({% if delta.pct > 0 %}+{% endif %}{{ delta.pct }}%){% endif %}</span>
+  {% elif delta %}<span class="delta same">bez zmian</span>{% else %}<span class="delta same">brak danych do porównania</span>{% endif %}
+</div>

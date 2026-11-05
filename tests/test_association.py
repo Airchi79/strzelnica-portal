@@ -448,3 +448,34 @@ def test_panel_import_xlsx_errors(owner_client):
     assert "poprawny plik Excel" in body
     body = owner_client.post("/panel/czlonkowie/import/", {"pakiet": SimpleUploadedFile("x.csv", b"a;b"), "tryb": "podglad"}).content.decode()
     assert "ZIP" in body and "XLSX" in body and not Member.objects.exists()
+
+
+def test_month_stats_occupancy_and_comparison(owner_client):
+    import datetime as dt
+
+    from apps.association import stats
+    from apps.bookings import services as booking_services
+    from apps.facilities.models import Lane
+
+    from .conftest import add_credential, approve, make_user
+
+    shooter = make_user("staty@example.com")
+    add_credential(shooter)
+    approve(shooter)
+    lane = Lane.objects.filter(is_active=True).first()
+    today = dt.date.today()
+    y, m = (today.year + 1, 3)  # przyszły miesiąc — bez innych danych
+    day = dt.date(y, m, 1)
+    while lane.hours_for(day) is None:
+        day += dt.timedelta(days=1)
+    h = lane.hours_for(day).opens.hour
+    booking_services.create_reservation(shooter, lane, day, h, h + 2, 3, created_by=shooter)
+    data = stats.with_comparison(y, m)
+    row = next(x for x in data["lanes"] if x["lane"].pk == lane.pk)
+    assert row["booked"] == 2 and row["capacity"] > 2 and row["pct"] == round(200 / row["capacity"])
+    assert data["kpi"]["reservations"] == 1 and data["kpi"]["persons"] == 3 and data["kpi"]["officers"] == 1
+    assert data["deltas"]["reservations"]["abs"] == 1  # poprzedni miesiąc pusty
+    assert sum(v for _, cells in data["heat"] for _, v, _ in cells) == 2
+    response = owner_client.get(f"/panel/raporty/miesiac/?m={y}-{m:02d}")
+    assert response.status_code == 200 and "Obłożenie osi" in response.content.decode()
+    assert owner_client.get("/panel/raporty/miesiac/?m=zle").status_code == 200

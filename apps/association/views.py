@@ -543,3 +543,24 @@ def panel_import_template(request):
     response = HttpResponse(template_xlsx(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = 'attachment; filename="wzor-importu-stowarzyszenie.xlsx"'
     return response
+
+
+@panel_required(PERM_REP)
+def panel_month_stats(request):
+    """Statystyki miesiąca z porównaniem do poprzedniego."""
+    from . import stats
+
+    today = timezone.localdate()
+    default = stats.prev_month(today.year, today.month) if today.day <= 3 else (today.year, today.month)
+    try:
+        year, month = (int(x) for x in request.GET.get("m", "").split("-"))
+        if not (2000 <= year <= 2100 and 1 <= month <= 12):
+            raise ValueError
+    except ValueError:
+        year, month = default
+    data = stats.with_comparison(year, month)
+    py, pm = stats.prev_month(year, month)
+    ny, nm = (year + 1, 1) if month == 12 else (year, month + 1)
+    data.update({"prev_m": f"{py}-{pm:02d}", "next_m": f"{ny}-{nm:02d}", "this_m": f"{year}-{month:02d}",
+                 "is_future": (ny, nm) > (today.year, today.month)})
+    return render(request, "panel/month_stats.html", data)

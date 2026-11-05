@@ -1,4 +1,4 @@
-<!doctype html>
+{% load static %}<!doctype html>
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Plakat — kod QR książki pobytu</title>
 <style>
@@ -9,11 +9,12 @@
   @media print { .noprint { display: none; } @page { size: A4 portrait; margin: 15mm; } }
 </style></head>
 <body>
-<div class="noprint"><button onclick="window.print()">Drukuj</button> <a href="javascript:history.back()">Wróć</a></div>
+<div class="noprint"><button data-print>Drukuj</button> <a href="#" data-back>Wróć</a></div>
 <img class="poster-logo" src="{{ BRAND.logo }}" alt="Logo {{ SITE_NAME }}">
 <h1>Książka pobytu</h1>
 <p><strong>Każda osoba przebywająca na strzelnicy wpisuje się do książki pobytu.</strong></p>
 <img src="{{ qr }}" alt="Kod QR wpisu do książki pobytu">
 <p>Zeskanuj kod aparatem telefonu, wybierz cel pobytu, uzupełnij dane i podpisz się palcem.</p>
 <p style="font-size:14px">Strzelasz? Możesz też użyć kodu QR rezerwacji od prowadzącego strzelanie.</p>
+<script src="{% static 'js/app.js' %}" defer></script>
 </body></html>

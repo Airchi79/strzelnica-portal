@@ -41,3 +41,26 @@ if ("serviceWorker" in navigator) {
     });
   });
 })();
+
+// Drobne akcje bez wbudowanych skryptów (polityka CSP: skrypty tylko z plików):
+// data-print — drukuj, data-reload — odśwież, data-back — wstecz, data-autosubmit — wyślij formularz po zmianie,
+// data-pick="#pole" + data-pick-from=".klasa" — wpisz zaznaczone wartości do ukrytego pola, data-hide-broken — ukryj niewczytany obrazek.
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-print],[data-reload],[data-back],[data-pick]");
+  if (!t) return;
+  if (t.hasAttribute("data-print")) { e.preventDefault(); window.print(); }
+  else if (t.hasAttribute("data-reload")) { e.preventDefault(); location.reload(); }
+  else if (t.hasAttribute("data-back")) { e.preventDefault(); history.back(); }
+  else if (t.dataset.pick) {
+    const field = document.querySelector(t.dataset.pick);
+    if (field) field.value = [...document.querySelectorAll(t.dataset.pickFrom || ".pick")].filter((c) => c.checked).map((c) => c.value).join(",");
+  }
+});
+document.addEventListener("change", (e) => {
+  const el = e.target.closest("[data-autosubmit]");
+  if (el && el.form) el.form.submit();
+});
+document.querySelectorAll("img[data-hide-broken]").forEach((img) => {
+  const hide = () => img.remove();
+  if (img.complete && img.naturalWidth === 0) hide(); else img.addEventListener("error", hide);
+});

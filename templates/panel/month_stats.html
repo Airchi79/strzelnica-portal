@@ -6,7 +6,7 @@
   <div class="actions no-print" style="margin:0">
     <a class="btn secondary small-btn" href="?m={{ prev_m }}" aria-label="Poprzedni miesiąc">←</a>
     {% if not is_future %}<a class="btn secondary small-btn" href="?m={{ next_m }}" aria-label="Następny miesiąc">→</a>{% endif %}
-    <button type="button" class="btn small-btn" onclick="window.print()">Drukuj</button>
+    <button type="button" class="btn small-btn" data-print>Drukuj</button>
   </div>
 </div>
 <div class="no-print">{% include "panel/_assoc_tabs.html" %}</div>

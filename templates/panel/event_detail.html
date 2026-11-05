@@ -9,7 +9,7 @@
     {% if event.status != 'odwolane' %}<a class="btn secondary small-btn" href="{% url 'panel:event_edit' event.pk %}">Edytuj</a>{% endif %}
     {% if event.status == 'opublikowane' %}<a class="btn secondary small-btn" href="{% url 'events:detail' event.pk %}" target="_blank" rel="noopener">Strona wydarzenia</a>{% endif %}
     <a class="btn secondary small-btn" href="?format=csv">CSV</a>
-    <button type="button" class="btn small-btn" onclick="window.print()">Drukuj listę</button>
+    <button type="button" class="btn small-btn" data-print>Drukuj listę</button>
   </div>
 </div>
 <div class="today-tiles no-print">

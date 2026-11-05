@@ -322,3 +322,9 @@
     ])).catch(() => {});
   }
 })();
+
+// Logo: bez sieci (kiosk offline) niewczytany obrazek znika zamiast pustej ramki.
+document.querySelectorAll("img[data-hide-broken]").forEach((img) => {
+  const hide = () => img.remove();
+  if (img.complete && img.naturalWidth === 0) hide(); else img.addEventListener("error", hide);
+});

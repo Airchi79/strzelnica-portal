@@ -10,7 +10,7 @@
   <form method="get" class="daynav">
     <input type="hidden" name="widok" value="tydzien">{% if lane %}<input type="hidden" name="os" value="{{ lane.pk }}">{% endif %}
     <a class="btn secondary" href="?widok=tydzien&amp;os={{ lane.pk }}&amp;dzien={{ prev|date:'Y-m-d' }}" aria-label="Poprzedni tydzień">←</a>
-    <input type="date" name="dzien" value="{{ week_start|date:'Y-m-d' }}" aria-label="Tydzień zawierający dzień" onchange="this.form.submit()">
+    <input type="date" name="dzien" value="{{ week_start|date:'Y-m-d' }}" aria-label="Tydzień zawierający dzień" data-autosubmit>
     <a class="btn secondary" href="?widok=tydzien&amp;os={{ lane.pk }}&amp;dzien={{ next|date:'Y-m-d' }}" aria-label="Następny tydzień">→</a>
     <noscript><button class="btn secondary" type="submit">Pokaż</button></noscript>
   </form>

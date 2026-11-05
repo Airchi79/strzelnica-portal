@@ -4,9 +4,9 @@
 <div class="today-head">
   <div><h1 style="margin-bottom:2px">Mój dziennik strzelca</h1><p class="daylabel week-label" style="margin:0">{{ user.full_name }} · rok {{ year }}</p></div>
   <form method="get" class="actions no-print" style="margin:0">
-    <select name="rok" onchange="this.form.submit()" aria-label="Rok">{% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select>
+    <select name="rok" data-autosubmit aria-label="Rok">{% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select>
     <a class="btn secondary small-btn" href="?rok={{ year }}&amp;format=csv">CSV</a>
-    <button type="button" class="btn small-btn" onclick="window.print()">Drukuj</button>
+    <button type="button" class="btn small-btn" data-print>Drukuj</button>
   </form>
 </div>
 

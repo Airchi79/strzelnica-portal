@@ -1,6 +1,6 @@
 <form method="get" class="daynav">
   <a class="btn secondary" href="?dzien={{ prev|date:'Y-m-d' }}" aria-label="Poprzedni dzień">←</a>
-  <input type="date" name="dzien" value="{{ day|date:'Y-m-d' }}" aria-label="Dzień" onchange="this.form.submit()">
+  <input type="date" name="dzien" value="{{ day|date:'Y-m-d' }}" aria-label="Dzień" data-autosubmit>
   <a class="btn secondary" href="?dzien={{ next|date:'Y-m-d' }}" aria-label="Następny dzień">→</a>
   <noscript><button class="btn secondary" type="submit">Pokaż</button></noscript>
 </form>

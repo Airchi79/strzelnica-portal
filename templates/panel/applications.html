@@ -13,8 +13,8 @@
   {% empty %}<tr><td colspan="4" class="muted">Brak deklaracji do rozpatrzenia.</td></tr>{% endfor %}
 </table></div>
 {% if pending %}<input type="hidden" name="deklaracje" id="picked"><div class="actions">
-  <button class="btn" name="skutek" value="przyjecie" onclick="document.getElementById('picked').value=[...document.querySelectorAll('.pick:checked')].map(c=>c.value).join(',')">Projekt uchwały o przyjęciu zaznaczonych</button>
-  <button class="btn secondary" name="skutek" value="odmowa" onclick="document.getElementById('picked').value=[...document.querySelectorAll('.pick:checked')].map(c=>c.value).join(',')">Projekt uchwały o odmowie</button></div>{% endif %}
+  <button class="btn" name="skutek" value="przyjecie" data-pick="#picked" data-pick-from=".pick">Projekt uchwały o przyjęciu zaznaczonych</button>
+  <button class="btn secondary" name="skutek" value="odmowa" data-pick="#picked" data-pick-from=".pick">Projekt uchwały o odmowie</button></div>{% endif %}
 </form>
 <h2>Rozpatrzone</h2>
 <div class="card table-wrap"><table>

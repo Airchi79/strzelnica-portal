@@ -90,3 +90,30 @@ def test_issue_reports_limited_per_day(user):
         issues.report(user, f"Usterka {i}")
     with pytest.raises(ValidationError):
         issues.report(user, "Jeszcze jedna")
+
+
+def test_csp_header_and_frame_ancestors(client, owner_client, user):
+    csp = client.get("/").headers["Content-Security-Policy"]
+    assert "script-src 'self'" in csp and "'unsafe-inline'" not in csp.split("script-src")[1].split(";")[0]
+    assert "frame-ancestors 'none'" in csp and "https://*.tpay.com" in csp
+    from django.core.files.base import ContentFile
+
+    from apps.credentials.models import Credential
+
+    from .conftest import add_credential
+
+    c = add_credential(user, status=Credential.Status.PENDING)
+    c.scan.save("skan.pdf", ContentFile(b"%PDF-1.4\n"))
+    r = owner_client.get(f"/panel/weryfikacja/{c.pk}/skan/")
+    assert "frame-ancestors 'self'" in r.headers["Content-Security-Policy"]
+    b"".join(r.streaming_content)
+    c.scan.delete(save=False)
+
+
+def test_no_inline_handlers_in_templates():
+    import pathlib
+    import re
+
+    root = pathlib.Path(__file__).resolve().parent.parent / "templates"
+    bad = [str(p) for p in root.rglob("*.html") if re.search(r"\son(click|change|error|load|submit|input)=|javascript:", p.read_text())]
+    assert bad == []

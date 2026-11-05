@@ -1,4 +1,4 @@
-<!doctype html>
+{% load static %}<!doctype html>
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ r.display_number }}</title>
 <style>
@@ -9,7 +9,7 @@
   .noprint { font-family: system-ui, sans-serif; margin-bottom: 16px; } @media print { .noprint { display: none; } }
 </style></head>
 <body>
-<div class="noprint"><button onclick="window.print()">Drukuj / zapisz jako PDF</button> <a href="javascript:history.back()">Wróć</a></div>
+<div class="noprint"><button data-print>Drukuj / zapisz jako PDF</button> <a href="#" data-back>Wróć</a></div>
 <p style="text-align:right">{{ association.address|default:"Sątok 4, 56-420 Bierutów" }}{% if r.adopted_on %}, {{ r.adopted_on|date:"j E Y" }} r.{% endif %}</p>
 <h1>{{ r.display_number }}</h1>
 <p class="sub">{% if r.adopted_on %}z dnia {{ r.adopted_on|date:"j E Y" }} r.<br>{% endif %}w sprawie: {{ r.title }}</p>
@@ -24,4 +24,5 @@
   {% if r.organ == 'zarzad' %}{% for m in board %}<div>…………………………<br>{{ m.full_name }}<br>{{ m.get_board_role_display }}</div>{% endfor %}
   {% else %}<div>…………………………<br>(protokolant)</div><div>…………………………<br>(przewodniczący zebrania)</div>{% endif %}
 </div>
+<script src="{% static 'js/app.js' %}" defer></script>
 </body></html>

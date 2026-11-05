@@ -27,6 +27,7 @@ PANEL_PERMISSIONS = [
     ("regulations.publish_regulation", "Regulaminy: tworzenie i publikacja wersji"),
     ("facilities.manage_facilities", "Osie, godziny otwarcia i cennik"),
     ("core.manage_settings", "Dane stowarzyszenia"),
+    ("core.publish_announcement", "Ogłoszenia dla strzelców (strona i e-mail)"),
     ("audit.view_auditlog", "Dziennik zdarzeń"),
     ("accounts.manage_permissions", "Nadawanie uprawnień innym osobom"),
 ]

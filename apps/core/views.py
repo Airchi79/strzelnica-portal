@@ -19,8 +19,8 @@ from apps.credentials.models import Credential, is_range_officer
 from apps.facilities.models import Lane
 
 from . import branding
-from .forms import AssociationSettingsForm, LogoForm, UserPermissionsForm
-from .models import AssociationSettings, Branding
+from .forms import AnnouncementForm, AssociationSettingsForm, LogoForm, UserPermissionsForm
+from .models import Announcement, AssociationSettings, Branding
 from .permissions import PANEL_PERMISSIONS, ROLE_PRESETS, panel_required
 
 User = get_user_model()
@@ -241,3 +241,45 @@ def healthz(request):
     with connection.cursor() as cur:
         cur.execute("SELECT 1")
     return HttpResponse("ok", content_type="text/plain")
+
+
+@panel_required("core.publish_announcement")
+def panel_announcements(request):
+    from . import announcements
+
+    items = list(Announcement.objects.select_related("created_by")[:100])
+    live = set(announcements.active().values_list("pk", flat=True))
+    return render(request, "panel/announcements.html", {"items": items, "live": live})
+
+
+@panel_required("core.publish_announcement")
+def panel_announcement(request, pk=None):
+    from . import announcements
+
+    obj = get_object_or_404(Announcement, pk=pk) if pk else Announcement(visible_from=timezone.now().replace(second=0, microsecond=0))
+    if request.method == "POST" and request.POST.get("action") == "end" and obj.pk:
+        obj.visible_until = timezone.now()
+        obj.save(update_fields=["visible_until"])
+        log_event("ogloszenie.zakonczenie", obj, obj.title)
+        messages.success(request, "Ogłoszenie zdjęte ze strony.")
+        return redirect("panel:announcements")
+    form = AnnouncementForm(request.POST or None, instance=obj)
+    preview_count = None
+    if request.method == "POST" and form.is_valid():
+        a = form.save(commit=False)
+        is_new = a.pk is None
+        if is_new:
+            a.created_by = request.user
+        if a.email_audience and not a.emailed_at and not a.email_queued:
+            if request.POST.get("action") != "confirm_email":
+                preview_count = announcements.recipients(a).count()
+                return render(request, "panel/announcement_edit.html", {"form": form, "obj": obj, "preview_count": preview_count})
+            a.email_queued = True
+        a.save()
+        log_event("ogloszenie.zapis", a, a.title, changes={"email": a.email_audience, "nowe": is_new})
+        msg = "Zapisano ogłoszenie."
+        if a.email_queued:
+            msg += " E-maile wyślą się w tle w ciągu kilku–kilkunastu minut."
+        messages.success(request, msg)
+        return redirect("panel:announcements")
+    return render(request, "panel/announcement_edit.html", {"form": form, "obj": obj, "preview_count": preview_count})

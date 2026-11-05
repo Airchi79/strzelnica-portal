@@ -32,6 +32,12 @@
   </div>
 </header>
 <main class="wrap">
+  {% for a in ANNOUNCEMENTS %}
+    <div class="announce {{ a.level }}" data-announce="{{ a.pk }}" role="status">
+      <div><strong>{{ a.title }}</strong>{% if a.body %}<div class="announce-body">{{ a.body|linebreaksbr }}</div>{% endif %}</div>
+      {% if a.level != 'zamkniete' %}<button type="button" class="announce-close" data-announce-close aria-label="Ukryj ogłoszenie">×</button>{% endif %}
+    </div>
+  {% endfor %}
   {% if pending_regulations and request.resolver_match.url_name != 'accept' %}
     <div class="msg warning">Obowiązują nowe dokumenty do akceptacji.
       <a href="{% url 'regulations:accept' %}?next={{ request.get_full_path|urlencode }}">Przeczytaj i zaakceptuj</a></div>

@@ -27,6 +27,7 @@ SECTIONS = [
         ("Osie i cennik", "panel:lanes", "target", "facilities.manage_facilities", ["lane*", "facility*", "price_add"]),
         ("Usterki", "panel:issues", "alert", "facilities.manage_facilities", ["issue*"]),
         ("Regulaminy", "panel:regulations", "file", "regulations.publish_regulation", ["regulation*"]),
+        ("Ogłoszenia", "panel:announcements", "bell", "core.publish_announcement", ["announcement*"]),
     ]),
     ("Klienci", [
         ("Klienci z kontem", "panel:users", "users", "accounts.view_users", ["users", "user", "client_*"]),

@@ -1,0 +1,17 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{% if obj.pk %}Ogłoszenie{% else %}Nowe ogłoszenie{% endif %}{% endblock %}
+{% block panel %}
+<p class="small"><a href="{% url 'panel:announcements' %}">← Ogłoszenia</a></p>
+<h1>{% if obj.pk %}{{ obj.title }}{% else %}Nowe ogłoszenie{% endif %}</h1>
+<div class="card"><form method="post" novalidate>{% csrf_token %}
+  {% include "partials/form.html" %}
+  {% if preview_count is not None %}
+    <div class="msg warning"><strong>E-mail trafi do {{ preview_count }} os.</strong> Sprawdź treść — po wysłaniu nie da się go cofnąć.</div>
+    <div class="actions"><button class="btn" type="submit" name="action" value="confirm_email">Zapisz i wyślij e-mail ({{ preview_count }})</button>
+      <button class="btn secondary" type="submit">Sprawdź ponownie</button></div>
+  {% else %}
+    <button class="btn" type="submit">Zapisz{% if not obj.emailed_at and not obj.email_queued %} / pokaż liczbę odbiorców{% endif %}</button>
+  {% endif %}
+</form></div>
+{% if obj.pk %}<p class="small muted">Utworzono {{ obj.created_at|date:"j.m.Y H:i" }}{% if obj.created_by %} · {{ obj.created_by.full_name }}{% endif %}{% if obj.emailed_at %} · e-mail wysłany {{ obj.emailed_at|date:"j.m.Y H:i" }} do {{ obj.emailed_count }} os.{% endif %}</p>{% endif %}
+{% endblock %}

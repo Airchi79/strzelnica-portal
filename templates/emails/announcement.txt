@@ -1,0 +1,11 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+{{ a.title }}
+{% if a.body %}
+{{ a.body }}
+{% endif %}
+Wiadomość dotyczy korzystania ze strzelnicy — wysyłamy ją osobom z kontem w systemie rezerwacji.
+{{ site_url }}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

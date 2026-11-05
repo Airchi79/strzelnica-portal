@@ -66,3 +66,51 @@ class Branding(models.Model):
     def save(self, *args, **kwargs):
         self.pk = 1
         super().save(*args, **kwargs)
+
+
+class Announcement(models.Model):
+    """Ogłoszenie zarządu dla strzelców: pasek na stronie i pulpicie, opcjonalnie e-mail (wysyłany w tle przez harmonogram)."""
+
+    class Level(models.TextChoices):
+        INFO = "info", "Informacja"
+        WARNING = "uwaga", "Uwaga (np. zmiana godzin)"
+        CLOSED = "zamkniete", "Ważne (np. strzelnica zamknięta)"
+
+    class Audience(models.TextChoices):
+        NONE = "", "Bez e-maila — tylko na stronie"
+        ALL = "wszyscy", "E-mail do wszystkich aktywnych kont"
+        BOOKED = "rezerwujacy", "E-mail do osób z rezerwacją w podanym okresie"
+
+    title = models.CharField("tytuł", max_length=120)
+    body = models.TextField("treść", max_length=3000, blank=True)
+    level = models.CharField("rodzaj", max_length=12, choices=Level.choices, default=Level.INFO)
+    visible_from = models.DateTimeField("widoczne od")
+    visible_until = models.DateTimeField("widoczne do", null=True, blank=True, help_text="Puste — do odwołania.")
+    email_audience = models.CharField("e-mail", max_length=12, choices=Audience.choices, blank=True)
+    booked_from = models.DateField("rezerwacje od dnia", null=True, blank=True)
+    booked_to = models.DateField("rezerwacje do dnia", null=True, blank=True)
+    email_queued = models.BooleanField("e-mail czeka na wysłanie", default=False)
+    emailed_at = models.DateTimeField("e-mail wysłany", null=True, blank=True)
+    emailed_count = models.PositiveIntegerField("wysłano do", default=0)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-visible_from"]
+        verbose_name = "ogłoszenie"
+        verbose_name_plural = "ogłoszenia"
+        permissions = [("publish_announcement", "Może publikować ogłoszenia dla strzelców")]
+
+    def __str__(self):
+        return self.title
+
+
+class AnnouncementDelivery(models.Model):
+    """Komu już wysłano e-mail z ogłoszeniem — wysyłka w partiach nie dubluje wiadomości."""
+
+    announcement = models.ForeignKey(Announcement, on_delete=models.CASCADE, related_name="deliveries")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["announcement", "user"], name="announcement_delivery_unique")]

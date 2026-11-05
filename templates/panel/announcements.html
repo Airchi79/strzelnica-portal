@@ -1,0 +1,16 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Ogłoszenia{% endblock %}
+{% block panel %}
+<h1>Ogłoszenia dla strzelców</h1>
+<div class="actions" style="margin-top:0;margin-bottom:12px"><a class="btn" href="{% url 'panel:announcement_new' %}">+ Nowe ogłoszenie</a></div>
+<div class="card table-wrap"><table>
+  <tr><th>Tytuł</th><th>Widoczne</th><th>E-mail</th><th></th></tr>
+  {% for a in items %}<tr>
+    <td><a href="{% url 'panel:announcement' a.pk %}"><strong>{{ a.title }}</strong></a> <span class="badge {% if a.level == 'zamkniete' %}bad{% elif a.level == 'uwaga' %}warn{% endif %}">{{ a.get_level_display|truncatewords:1 }}</span>
+      {% if a.pk in live %}<span class="badge ok">na stronie</span>{% endif %}</td>
+    <td class="small nowrap">{{ a.visible_from|date:"j.m.Y H:i" }} – {% if a.visible_until %}{{ a.visible_until|date:"j.m.Y H:i" }}{% else %}do odwołania{% endif %}</td>
+    <td class="small">{% if a.email_queued %}<span class="badge warn">wysyłanie… {{ a.emailed_count }}</span>{% elif a.emailed_at %}wysłano do {{ a.emailed_count }} os.{% elif a.email_audience %}—{% else %}<span class="muted">bez e-maila</span>{% endif %}</td>
+    <td>{% if a.pk in live %}<form method="post" action="{% url 'panel:announcement' a.pk %}" data-confirm="Zdjąć ogłoszenie ze strony?">{% csrf_token %}<button class="btn secondary small-btn" name="action" value="end">Zdejmij</button></form>{% endif %}</td>
+  </tr>{% empty %}<tr><td colspan="4" class="muted">Brak ogłoszeń.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

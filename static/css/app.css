@@ -522,3 +522,10 @@ tr.neg td { color: var(--bad); }
   color: var(--text); border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
 @media print { .heatmap td.hm { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .hbar-fill { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 .heatmap td.hm.dark { color: var(--brand-contrast); }
+
+/* --- ogłoszenia --- */
+.announce { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 12px 14px; margin: 12px 0; border-radius: var(--radius); border-left: 5px solid var(--brand); background: color-mix(in srgb, var(--brand) 9%, var(--surface)); }
+.announce.uwaga { border-left-color: var(--warn); background: var(--warn-bg); }
+.announce.zamkniete { border-left-color: var(--bad); background: var(--bad-bg); }
+.announce-body { font-size: .92rem; margin-top: 2px; }
+.announce-close { background: none; border: 0; font-size: 1.4rem; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 4px; }

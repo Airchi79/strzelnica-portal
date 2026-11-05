@@ -3,7 +3,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from . import branding
-from .models import AssociationSettings
+from .models import Announcement, AssociationSettings
 from .permissions import PANEL_PERMISSIONS
 
 
@@ -78,4 +78,48 @@ class LogoForm(forms.Form):
                 data["icons"] = {k: branding.check_icon_data_url(data.get(k, ""), size) for k, size in branding.ICON_SIZES.items()}
             except ValidationError as e:
                 self.add_error("logo", "Ikony z pliku SVG tworzy przeglądarka — wybierz plik ponownie i poczekaj na podgląd. " + e.messages[0])
+        return data
+
+
+class DateTimeInput(forms.DateTimeInput):
+    input_type = "datetime-local"
+
+    def __init__(self, **kwargs):
+        super().__init__(format="%Y-%m-%dT%H:%M", **kwargs)
+
+
+class AnnouncementForm(forms.ModelForm):
+    class Meta:
+        model = Announcement
+        fields = ["title", "body", "level", "visible_from", "visible_until", "email_audience", "booked_from", "booked_to"]
+        widgets = {
+            "body": forms.Textarea(attrs={"rows": 4}),
+            "visible_from": DateTimeInput(), "visible_until": DateTimeInput(),
+            "booked_from": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "booked_to": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        }
+        help_texts = {
+            "email_audience": "E-mail tylko w sprawach korzystania ze strzelnicy (zamknięcie, zmiany godzin, regulamin). Wysyłka w tle, w partiach — może potrwać kilkanaście minut.",
+            "booked_from": "Dla „osób z rezerwacją”: np. dzień zamknięcia strzelnicy.",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for f in ("visible_from", "visible_until"):
+            self.fields[f].input_formats = ["%Y-%m-%dT%H:%M"]
+        if self.instance.pk and (self.instance.emailed_at or self.instance.email_queued):
+            self.fields["email_audience"].disabled = True  # e-mail raz wysłany — nie wysyłamy drugi raz
+            self.fields["email_audience"].help_text = "E-mail już wysłany lub w kolejce — nie zostanie wysłany ponownie."
+
+    def clean(self):
+        data = super().clean()
+        a, b = data.get("visible_from"), data.get("visible_until")
+        if a and b and b <= a:
+            self.add_error("visible_until", "Koniec musi być później niż początek.")
+        if data.get("email_audience") == Announcement.Audience.BOOKED:
+            f, t = data.get("booked_from"), data.get("booked_to")
+            if not f or not t:
+                self.add_error("booked_from", "Podaj okres rezerwacji, których dotyczy ogłoszenie.")
+            elif t < f:
+                self.add_error("booked_to", "Data końcowa nie może być wcześniejsza.")
         return data

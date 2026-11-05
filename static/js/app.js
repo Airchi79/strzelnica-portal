@@ -26,3 +26,18 @@ document.addEventListener("click", (e) => {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 }
+
+// Ogłoszenia: ukrycie zapamiętane w tej przeglądarce (ważne ogłoszenia, np. zamknięcie strzelnicy, nie mają przycisku).
+(function () {
+  let hidden = [];
+  try { hidden = JSON.parse(localStorage.getItem("satok-hidden-announcements") || "[]"); } catch (e) { hidden = []; }
+  document.querySelectorAll("[data-announce]").forEach((el) => {
+    const id = el.dataset.announce;
+    if (hidden.includes(id) && el.querySelector("[data-announce-close]")) { el.remove(); return; }
+    const btn = el.querySelector("[data-announce-close]");
+    if (btn) btn.addEventListener("click", () => {
+      el.remove(); hidden.push(id);
+      try { localStorage.setItem("satok-hidden-announcements", JSON.stringify(hidden.slice(-50))); } catch (e) { /* brak pamięci */ }
+    });
+  });
+})();

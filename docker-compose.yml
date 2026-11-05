@@ -44,7 +44,7 @@ services:
       retries: 3
       start_period: 40s
 
-  # Zadania okresowe: co 5 minut zwalnianie nieopłaconych rezerwacji; co godzinę przypomnienia, rozliczenia rezerwacji,
+  # Zadania okresowe: co 5 minut zwalnianie nieopłaconych rezerwacji i wysyłka ogłoszeń; co godzinę przypomnienia, rozliczenia rezerwacji,
   # wygaszanie dokumentów, zamykanie pobytów i czyszczenie książki pobytu, zadania stowarzyszenia.
   cron:
     <<: *app
@@ -54,6 +54,7 @@ services:
     command: >
       sh -c 'n=0; while true; do
         python manage.py expire_reservations;
+        python manage.py send_announcements;
         if [ $$((n % 12)) -eq 0 ]; then
           python manage.py send_reminders;
           python manage.py settle_reservations;

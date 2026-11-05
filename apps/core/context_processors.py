@@ -12,9 +12,12 @@ def site(request):
             unread = user.notifications.filter(read_at__isnull=True).count()
     from apps.payments.models import PaymentSettings
 
+    from .announcements import active
     from .branding import current_urls
 
     return {
+        "ANNOUNCEMENTS": sorted(active().only("pk", "title", "body", "level", "visible_from")[:5],
+                                key=lambda a: ({"zamkniete": 0, "uwaga": 1}.get(a.level, 2), -a.visible_from.timestamp()))[:3],
         "BRAND": current_urls(),
         "WALLET_ENABLED": PaymentSettings.load().wallet_enabled,
         "SITE_NAME": "Strzelnica Sątok",

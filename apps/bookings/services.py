@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
+from django.conf import settings as dj_settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -292,7 +293,8 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     if not notify:  # rezerwacje cykliczne: jedno zbiorcze powiadomienie dla całej serii
         return reservation
     if pending:
-        notify_user(user, f"Rezerwacja {reservation.number} czeka na zatwierdzenie", "emails/reservation_pending.txt", reservation=reservation)
+        notify_user(user, f"Rezerwacja {reservation.number} czeka na zatwierdzenie", "emails/reservation_pending.txt", reservation=reservation,
+                    options=payment_options(reservation), tpay=dj_settings.TPAY_ENABLED)
     else:
         notify_user(user, f"Rezerwacja {reservation.number} potwierdzona", "emails/reservation_created.txt", reservation=reservation,
                     options=payment_options(reservation))
@@ -443,15 +445,45 @@ def approve_reservation(reservation, by, now=None):
     r.pay_by = payment_deadline(r, now, after_approval=True)
     r.save()
     log_event("rezerwacja.zatwierdzenie", r, str(r), actor=by)
-    notify_user(r.user, f"Rezerwacja {r.number} zatwierdzona", "emails/reservation_created.txt", reservation=r, options=payment_options(r))
+    paid = r.payment_status == Reservation.Payment.PAID
+    notify_user(r.user, f"Rezerwacja {r.number} potwierdzona" + (" i opłacona" if paid else ""), "emails/reservation_created.txt",
+                reservation=r, options=payment_options(r), approved=True)
     return r
 
 
 def reject_reservation(reservation, by, reason=""):
+    """Odrzucenie rezerwacji czekającej na zatwierdzenie. Wpłata online (Tpay) wraca automatycznie na rachunek/kartę
+    płacącego; inne wpłaty (gotówka, przelew) zostają jako nadpłata, a zarząd dostaje informację o zwrocie ręcznym."""
+    from apps.payments.models import Payment
+    from apps.payments.services import refund_to_payer
+
     r = Reservation.objects.get(pk=reservation.pk)
     if r.status != Reservation.Status.PENDING_APPROVAL:
         raise ValidationError("Ta rezerwacja nie czeka na zatwierdzenie.")
-    return cancel_reservation(r, by, reason or "Rezerwacja nie została zatwierdzona", as_board=True)
+    paid = r.paid_amount
+    r = cancel_reservation(r, by, reason or "Rezerwacja nie została zatwierdzona", as_board=True, notify=False)
+    refunded, manual = 0, 0
+    remaining = paid
+    for p in Payment.objects.filter(reservation=r, status=Payment.Status.COMPLETED).order_by("completed_at"):
+        if remaining <= 0:
+            break
+        part = min(p.amount, remaining)
+        if refund_to_payer(p, part, by=by, reason=f"Rezerwacja {r.number} nie została zatwierdzona"):
+            refunded += part
+        else:
+            manual += part
+        remaining -= part
+    manual += max(remaining, 0)
+    notify_user(r.user, f"Rezerwacja {r.number} nie została zatwierdzona", "emails/reservation_rejected.txt", reservation=r,
+                refunded=refunded, manual=manual)
+    if manual:
+        notify_board(f"Zwrot do wykonania ręcznie: {r.number}", "emails/board_generic.txt", "payments.manage_payments",
+                     url=reverse("panel:wallet", args=[r.user_id]),
+                     body=f"{r.user.full_name}: {manual / 100:.2f} zł (wpłata poza Tpay albo zwrot Tpay nie powiódł się).",
+                     event=f"Zwrot do wykonania ręcznie: {r.number}",
+                     text=f"{r.user.full_name}: {manual / 100:.2f} zł — zwróć przelewem/gotówką albo w panelu Tpay.",
+                     url_path=reverse("panel:wallet", args=[r.user_id]))
+    return r
 
 
 def expire_unpaid(now=None):

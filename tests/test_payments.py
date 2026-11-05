@@ -602,3 +602,76 @@ def test_payment_receipt_pdf_owner_only(client, ps, owner_client):
     other = make_user("obcy@example.com")
     client.force_login(other)
     assert client.get(f"/platnosci/potwierdzenie/{p.pk}.pdf").status_code == 404
+
+
+from apps.payments.services import balance_of  # noqa: E402
+
+
+def _newbie(email):
+    u = make_user(email, first_name="Nowy", last_name="Klient")
+    add_credential(u)
+    return u  # bez zatwierdzenia — grupa „nowy”, rezerwacje czekają na zatwierdzenie
+
+
+def _pay_pending_online(client, user, tpay_keys, monkeypatch):
+    r = book(user)
+    assert r.status == Reservation.Status.PENDING_APPROVAL
+    monkeypatch.setattr(tpay, "create_transaction", lambda **kw: {"transaction_id": "01PEND", "title": "TR-TEST-1", "payment_url": "https://secure.sandbox.tpay.com/?t=1"})
+    client.force_login(user)
+    assert "Zapłać online" in client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    assert client.post("/platnosci/tpay/start/", {"reservation": r.pk}).status_code == 302
+    payment = Payment.objects.get(reservation=r)
+    assert _post(client, tpay_keys, _notification(payment)).content == b"TRUE"
+    r.refresh_from_db()
+    assert r.payment_status == Reservation.Payment.PAID and r.status == Reservation.Status.PENDING_APPROVAL
+    return r, payment
+
+
+def test_pending_paid_then_approved_sends_paid_confirmation(client, owner, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    u = _newbie("nowy-op@example.com")
+    r, _ = _pay_pending_online(client, u, tpay_keys, monkeypatch)
+    from django.core import mail
+
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        booking_services.approve_reservation(r, owner)
+    msg = [m for m in mail.outbox if m.to == [u.email]][0]
+    assert "potwierdzona i opłacona" in msg.subject and "opłacona" in msg.body
+
+
+def test_pending_paid_then_rejected_refunds_via_tpay(client, owner, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    u = _newbie("nowy-zw@example.com")
+    r, payment = _pay_pending_online(client, u, tpay_keys, monkeypatch)
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append((tid, amount)) or {"result": "success"})
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        booking_services.reject_reservation(r, owner, "Brak wolnego prowadzącego")
+    assert calls == [("01PEND", None)]  # pełny zwrot
+    assert balance_of(u) == 0  # nie zostaje „nadpłata” — pieniądze poszły do płacącego
+    assert LedgerEntry.objects.filter(payment=payment, kind=LedgerEntry.Kind.CHARGEBACK).count() == 1
+    body = [m for m in mail.outbox if m.to == [u.email]][0].body
+    assert "Zwrot" in body and "Brak wolnego prowadzącego" in body
+    # późniejsze powiadomienie Tpay o zwrocie nie księguje drugi raz
+    assert _post(client, tpay_keys, _notification(payment, status="CHARGEBACK")).content == b"TRUE"
+    assert LedgerEntry.objects.filter(payment=payment, kind=LedgerEntry.Kind.CHARGEBACK).count() == 1
+
+
+def test_reject_refund_failure_notifies_board(client, owner, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    u = _newbie("nowy-err@example.com")
+    r, _ = _pay_pending_online(client, u, tpay_keys, monkeypatch)
+
+    def boom(*a, **k):
+        raise tpay.TpayError("awaria")
+
+    monkeypatch.setattr(tpay, "refund_transaction", boom)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        booking_services.reject_reservation(r, owner, "x")
+    assert balance_of(u) == r.amount  # zostaje jako nadpłata do ręcznego zwrotu
+    assert any("Zwrot do wykonania ręcznie" in m.subject for m in mail.outbox)
+    assert "zwrócimy ręcznie" in [m for m in mail.outbox if m.to == [u.email]][0].body

@@ -1,0 +1,13 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
+
+niestety rezerwacja {{ reservation.number }} ({{ reservation.lane }}, {{ reservation.starts_at|date:"j.m.Y H:i" }}) nie została zatwierdzona.
+{% if reservation.cancel_reason %}Powód: {{ reservation.cancel_reason }}
+{% endif %}{% if refunded %}
+Zwrot {{ refunded|pln }} został zlecony na rachunek / kartę, z której płaciłeś (Tpay). Pieniądze zwykle docierają w ciągu kilku dni roboczych.
+{% endif %}{% if manual %}
+Kwotę {{ manual|pln }} zwrócimy ręcznie — skontaktujemy się w sprawie sposobu zwrotu.
+{% endif %}
+W razie pytań odpowiedz na tę wiadomość albo skontaktuj się z obsługą strzelnicy.
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

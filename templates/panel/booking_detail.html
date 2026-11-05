@@ -38,9 +38,11 @@
 {% if r.status == 'do_zatwierdzenia' %}
 <h2>Zatwierdzenie</h2>
 <div class="card">
-  <p>Nowy klient — <a href="{% url 'panel:user' r.user_id %}">karta klienta</a>. Po zatwierdzeniu klient dostanie e-mail z informacją o płatności.</p>
+  <p>Nowy klient — <a href="{% url 'panel:user' r.user_id %}">karta klienta</a>.
+    {% if r.paid_amount %}<span class="badge ok">opłacona z góry: {{ r.paid_amount|pln }}</span> Po zatwierdzeniu klient dostanie potwierdzenie; po odrzuceniu wpłata Tpay <strong>wróci automatycznie</strong> na jego rachunek / kartę (inne wpłaty — zwrot ręczny, dostaniesz przypomnienie).
+    {% else %}Klient jeszcze nie zapłacił. Po zatwierdzeniu dostanie e-mail z informacją o płatności.{% endif %}</p>
   <form method="post" class="actions" style="margin-top:0">{% csrf_token %}<button class="btn" name="action" value="approve">Zatwierdź rezerwację</button></form>
-  <form method="post" data-confirm="Odrzucić rezerwację {{ r.number }}? Klient otrzyma e-mail z powodem.">{% csrf_token %}<input type="hidden" name="action" value="reject">
+  <form method="post" data-confirm="Odrzucić rezerwację {{ r.number }}? Klient otrzyma e-mail z powodem{% if r.paid_amount %}, a wpłata {{ r.paid_amount|pln }} zostanie zwrócona{% endif %}.">{% csrf_token %}<input type="hidden" name="action" value="reject">
     {% include "partials/form.html" with form=cancel_form %}
     <button class="btn danger" type="submit">Odrzuć</button></form>
 </div>

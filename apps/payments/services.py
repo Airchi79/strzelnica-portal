@@ -469,3 +469,29 @@ def apply_all_overpayments(by=None):
     for wallet in Wallet.objects.filter(balance__gt=0).select_related("user"):
         count += apply_wallet(wallet.user, by=by)
     return count
+
+
+def refund_to_payer(payment, amount, by=None, reason="Zwrot"):
+    """Zwrot pieniędzy płacącemu przez Tpay (na kartę / rachunek / BLIK). Księguje operację „zwrot do wpłacającego”
+    na saldzie (ta sama, którą dodaje powiadomienie Tpay o zwrocie — nie zostanie zaksięgowana drugi raz).
+    Zwraca True, gdy Tpay przyjął zwrot; False (i powiadomienie zarządu), gdy trzeba zwrócić ręcznie."""
+    from . import tpay
+
+    if amount <= 0:
+        return True
+    if payment.method != Payment.Method.TPAY or payment.status != Payment.Status.COMPLETED or not (payment.external_id or "").startswith("tpay:"):
+        return False
+    with transaction.atomic():
+        p = Payment.objects.select_for_update().get(pk=payment.pk)
+        if p.ledger_entries.filter(kind=LedgerEntry.Kind.CHARGEBACK).exists() or (p.raw or {}).get("zwrot_api"):
+            return True  # już zwrócone
+        try:
+            tpay.refund_transaction(p.external_id.split(":", 1)[1], None if amount >= p.amount else amount)
+        except tpay.TpayError as e:
+            log_event("platnosc.zwrot_nieudany", p, f"{p}: {e}", actor=by)
+            return False
+        p.raw = {**(p.raw or {}), "zwrot_api": {"kwota_gr": amount, "kiedy": timezone.now().isoformat(), "powod": reason[:120]}}
+        p.save(update_fields=["raw"])
+        post(p.user, -amount, LedgerEntry.Kind.CHARGEBACK, f"{reason} — zwrot na rachunek płacącego (Tpay)", payment=p, by=by)
+        log_event("platnosc.zwrot_tpay", p, f"{p}: zwrot {amount / 100:.2f} zł", actor=by)
+    return True

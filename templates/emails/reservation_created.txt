@@ -1,12 +1,13 @@
 {% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
 
-potwierdzamy rezerwację osi.
+{% if approved %}obsługa strzelnicy zatwierdziła Twoją rezerwację{% if reservation.payment_status == 'oplacona' %} — jest potwierdzona i opłacona ✓{% else %}.{% endif %}{% else %}potwierdzamy rezerwację osi.{% endif %}
 
 {% include "emails/_reservation_summary.txt" %}
 Samodzielne anulowanie możliwe do: {{ reservation.free_cancel_deadline|date:"j.m.Y H:i" }} (później tylko przez obsługę strzelnicy).
 {% if reservation.payment_status == 'do_zaplaty' %}{% if reservation.pay_by %}
 WAŻNE: opłać rezerwację online do {{ reservation.pay_by|date:"j.m.Y H:i" }} — inaczej termin zostanie zwolniony.
 {% endif %}Płatność ({{ reservation.amount|pln }}):{% if options.online %} online na stronie rezerwacji{% endif %}{% if options.online and options.offline %} albo{% endif %}{% if options.offline %} offline — {{ options.instructions }}{% endif %}
+{% elif reservation.payment_status == 'oplacona' %}Rezerwacja opłacona — dziękujemy.
 {% elif reservation.payment_status == 'kod' %}Opłacona kodem wejścia {{ reservation.client_pass.code }}.
 {% endif %}
 Szczegóły i anulowanie: {{ site_url }}{% url 'bookings:detail' reservation.pk %}

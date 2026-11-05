@@ -7,7 +7,10 @@
 {% elif r.status == 'nieodbyta' %}
   <div class="res-banner gray"><strong>Rezerwacja nieodbyta</strong></div>
 {% elif r.status == 'do_zatwierdzenia' %}
-  <div class="res-banner warn"><strong>Czeka na zatwierdzenie przez obsługę</strong><span>Termin jest już zablokowany dla Ciebie. Po zatwierdzeniu dostaniesz e-mail z informacją o płatności.</span></div>
+  <div class="res-banner warn"><strong>Czeka na zatwierdzenie przez obsługę</strong><span>Termin jest już zablokowany dla Ciebie.
+    {% if r.payment_status == 'oplacona' %}Rezerwacja jest opłacona — po zatwierdzeniu dostaniesz potwierdzenie, a jeśli nie zostanie zatwierdzona, pieniądze wrócą automatycznie.
+    {% elif tpay_enabled and pay_options.online %}Możesz zapłacić od razu poniżej — jeśli rezerwacja nie zostanie zatwierdzona, pieniądze wrócą automatycznie na Twoje konto lub kartę.
+    {% else %}Po zatwierdzeniu dostaniesz e-mail z informacją o płatności.{% endif %}</span></div>
 {% elif r.is_finished %}
   <div class="res-banner gray"><strong>Rezerwacja zakończona</strong><span>Dziękujemy za wizytę.</span></div>
 {% elif r.payment_status == 'do_zaplaty' %}
@@ -43,15 +46,16 @@
 </div>
 
 {# --- płatność --- #}
-{% if r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' %}
+{% if r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' or r.payment_status == 'do_zaplaty' and r.status == 'do_zatwierdzenia' and tpay_enabled and pay_options.online %}
 <div class="card res-pay">
   <h2 style="margin-top:0">Płatność: {{ r.amount|sub:r.paid_amount|pln }}</h2>
+  {% if r.status == 'do_zatwierdzenia' %}<p class="small">Płatność przed zatwierdzeniem jest bezpieczna: jeśli obsługa nie zatwierdzi rezerwacji, pieniądze wrócą automatycznie na Twoje konto lub kartę.</p>{% endif %}
   {% if WALLET_ENABLED %}<p class="small">Opłata zostanie pobrana automatycznie z Twojego salda, gdy będzie na nim wystarczająco środków.</p>{% endif %}
   {% if tpay_enabled and pay_options.online %}
     <form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}">
       <button class="btn res-pay-btn" type="submit">Zapłać online — BLIK, przelew, karta</button></form>
   {% endif %}
-  {% if pay_options.offline %}
+  {% if pay_options.offline and r.status == 'potwierdzona' %}
     <div class="res-offline"><strong>{% if tpay_enabled and pay_options.online %}Albo offline{% else %}Jak zapłacić{% endif %}</strong>
       <p class="small">{{ pay_options.instructions }}</p>
       <p class="small">Tytuł przelewu: <strong class="code" data-copy-text>{{ r.number }}</strong> <button type="button" class="link-btn" data-copy="{{ r.number }}">kopiuj</button>

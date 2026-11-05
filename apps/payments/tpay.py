@@ -98,6 +98,17 @@ def create_transaction(*, amount_grosze, description, hidden_description, payer_
     return {"transaction_id": data.get("transactionId", ""), "title": data.get("title", ""), "payment_url": url}
 
 
+def refund_transaction(transaction_id, amount_grosze=None):
+    """Zwrot (całości albo części) zaksięgowanej transakcji na rachunek/kartę płacącego — Open API: POST /transactions/{id}/refunds."""
+    if not transaction_id:
+        raise TpayError("Brak identyfikatora transakcji Tpay")
+    payload = {} if amount_grosze is None else {"amount": float(Decimal(amount_grosze) / 100)}
+    data = _request("POST", f"{api_base()}/transactions/{transaction_id}/refunds", json_body=payload, token=access_token())
+    if data.get("result") not in (None, "success"):
+        raise TpayError("Tpay odrzucił zwrot")
+    return data
+
+
 # --- weryfikacja powiadomień ----------------------------------------------------------------
 
 

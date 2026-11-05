@@ -10,6 +10,7 @@
     <a class="btn secondary small-btn" href="?dzien={{ prev|date:'Y-m-d' }}" aria-label="Poprzedni dzień">←</a>
     {% if not is_today %}<a class="btn secondary small-btn" href="?">Dziś</a>{% endif %}
     <a class="btn secondary small-btn" href="?dzien={{ next|date:'Y-m-d' }}" aria-label="Następny dzień">→</a>
+    <a class="btn secondary small-btn" href="{% url 'core:issue_new' %}">Zgłoś usterkę</a>
     <button type="button" class="btn small-btn" onclick="window.print()">Drukuj</button>
   </div>
 </div>

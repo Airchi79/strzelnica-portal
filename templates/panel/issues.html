@@ -1,0 +1,17 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Usterki{% endblock %}
+{% block panel %}
+<h1>Usterki</h1>
+<div class="tabs">{% for v, l, n in tabs %}<a href="?status={{ v }}" class="{% if v == status %}active{% endif %}">{{ l }}{% if n %} <span class="tab-count">{{ n }}</span>{% endif %}</a>{% endfor %}</div>
+<div class="actions" style="margin-top:0;margin-bottom:12px"><a class="btn secondary small-btn" href="{% url 'core:issue_new' %}">+ Dodaj zgłoszenie</a></div>
+<div class="card table-wrap"><table>
+  <tr><th>Zgłoszono</th><th>Co</th><th>Gdzie</th><th class="hide-sm">Zgłaszający</th><th>Status</th></tr>
+  {% for i in issues %}<tr>
+    <td class="nowrap small">{{ i.created_at|date:"j.m.Y" }}<div class="muted">{{ i.created_at|timesince }} temu</div></td>
+    <td><a href="{% url 'panel:issue' i.pk %}"><strong>{{ i.title }}</strong></a>{% if i.urgent %} <span class="badge bad">pilne</span>{% endif %}{% if i.photo %} <span class="badge">zdjęcie</span>{% endif %}</td>
+    <td class="small">{{ i.lane|default:"inne" }}</td>
+    <td class="hide-sm small">{{ i.reported_by.full_name|default:"—" }}</td>
+    <td><span class="badge {% if i.status == 'naprawione' %}ok{% elif i.status == 'nowe' %}warn{% endif %}">{{ i.get_status_display }}</span></td>
+  </tr>{% empty %}<tr><td colspan="5" class="muted">{% if status == 'otwarte' %}Brak otwartych zgłoszeń ✓{% else %}Brak zgłoszeń.{% endif %}</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

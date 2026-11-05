@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Moje zgłoszenia{% endblock %}
+{% block content %}
+<h1>Zgłoszenia usterek</h1>
+<div class="actions" style="margin-top:0;margin-bottom:16px"><a class="btn" href="{% url 'core:issue_new' %}">Zgłoś usterkę</a></div>
+{% for i in issues %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>{{ i.title }}</strong>
+    <span class="badge {% if i.status == 'naprawione' %}ok{% elif i.status == 'odrzucone' %}{% else %}warn{% endif %}">{{ i.get_status_display }}</span></div>
+  <div class="small muted">{{ i.created_at|date:"j.m.Y H:i" }}{% if i.lane %} · {{ i.lane }}{% endif %}{% if i.urgent %} · pilne{% endif %}</div>
+  {% if i.resolution_note %}<p class="small" style="margin:6px 0 0">Zarząd: {{ i.resolution_note }}</p>{% endif %}
+</div>
+{% empty %}<div class="card muted">Nie masz jeszcze zgłoszeń.</div>{% endfor %}
+{% endblock %}

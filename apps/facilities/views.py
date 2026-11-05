@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -159,3 +160,86 @@ def panel_lane_delete(request, pk):
     lane.delete()
     messages.success(request, f"Usunięto oś {name}.")
     return redirect("panel:lanes")
+
+
+# --- zgłoszenia usterek ---------------------------------------------------
+
+
+@login_required
+def my_issues(request):
+    from .models import Issue
+
+    return render(request, "facilities/my_issues.html", {"issues": Issue.objects.filter(reported_by=request.user).select_related("lane")[:50]})
+
+
+@login_required
+def issue_new(request):
+    from .forms import IssueForm
+    from . import issues
+
+    initial = {"lane": request.GET["os"]} if request.GET.get("os", "").isdigit() else {}
+    form = IssueForm(request.POST or None, request.FILES or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        d = form.cleaned_data
+        issues.report(request.user, d["title"], d["description"], d["lane"], d["urgent"], d["photo"])
+        messages.success(request, "Dziękujemy — zgłoszenie trafiło do zarządu. O naprawie dostaniesz e-mail.")
+        return redirect("core:issues")
+    from apps.core.models import AssociationSettings
+
+    return render(request, "facilities/issue_new.html", {"form": form, "association": AssociationSettings.load()})
+
+
+@panel_required("facilities.manage_facilities")
+def panel_issues(request):
+    from django.db.models import Count
+
+    from .models import Issue
+
+    status = request.GET.get("status", "otwarte")
+    qs = Issue.objects.select_related("lane", "reported_by")
+    counts = {r["status"]: r["n"] for r in qs.order_by().values("status").annotate(n=Count("pk"))}
+    if status == "otwarte":
+        qs = qs.filter(status__in=Issue.OPEN)
+    elif status in Issue.Status.values:
+        qs = qs.filter(status=status)
+    tabs = [("otwarte", "Otwarte", sum(counts.get(s, 0) for s in Issue.OPEN))] + [
+        (v, l, counts.get(v, 0)) for v, l in Issue.Status.choices]
+    return render(request, "panel/issues.html", {"issues": qs[:200], "status": status, "tabs": tabs})
+
+
+@panel_required("facilities.manage_facilities")
+def panel_issue(request, pk):
+    from django.core.exceptions import ValidationError
+
+    from .forms import IssueStatusForm
+    from .models import Issue
+    from . import issues
+
+    issue = get_object_or_404(Issue.objects.select_related("lane", "reported_by", "resolved_by"), pk=pk)
+    form = IssueStatusForm(request.POST or None, initial={"status": issue.status})
+    if request.method == "POST" and form.is_valid():
+        try:
+            issues.change_status(issue, form.cleaned_data["status"], request.user, form.cleaned_data["note"])
+        except ValidationError as e:
+            form.add_error("note", e.messages[0])
+        else:
+            messages.success(request, "Zapisano." + (" Zgłaszający dostanie e-mail." if issue.reported_by_id and issue.reported_by_id != request.user.pk else ""))
+            return redirect("panel:issue", pk=issue.pk)
+    from apps.audit.models import AuditLog
+
+    history = AuditLog.objects.filter(object_type=Issue._meta.label_lower, object_id=str(issue.pk)).select_related("actor")[:20]
+    return render(request, "panel/issue_detail.html", {"issue": issue, "form": form, "history": history})
+
+
+@panel_required("facilities.manage_facilities")
+def panel_issue_photo(request, pk):
+    from django.http import FileResponse, Http404
+
+    from .models import Issue
+
+    issue = get_object_or_404(Issue, pk=pk)
+    if not issue.photo:
+        raise Http404
+    response = FileResponse(issue.photo.open("rb"), content_type="image/jpeg")
+    response["Cache-Control"] = "private, no-store"
+    return response

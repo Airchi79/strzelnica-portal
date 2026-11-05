@@ -94,6 +94,6 @@
 {% elif r.status == 'potwierdzona' and not r.is_finished %}
 <p class="small muted">Do terminu zostało mniej niż {{ cancel_hours }} h — anulować może już tylko obsługa strzelnicy{% if association.contact_phone %} (tel. <a href="tel:{{ association.contact_phone }}">{{ association.contact_phone }}</a>){% endif %}.</p>
 {% endif %}
-<p><a href="{% url 'bookings:my_list' %}">← Moje rezerwacje</a></p>
+<p><a href="{% url 'bookings:my_list' %}">← Moje rezerwacje</a> · <a href="{% url 'core:issue_new' %}?os={{ r.lane_id }}">Zgłoś usterkę na tej osi</a></p>
 <script src="{% static 'js/reservation.js' %}" defer></script>
 {% endblock %}

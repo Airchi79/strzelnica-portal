@@ -25,6 +25,7 @@ SECTIONS = [
         ("Ustawienia książki", "panel:logbook_settings", "sliders", "logbook.manage_logbook",
          ["logbook_settings", "logbook_rotate", "logbook_poster"]),
         ("Osie i cennik", "panel:lanes", "target", "facilities.manage_facilities", ["lane*", "facility*", "price_add"]),
+        ("Usterki", "panel:issues", "alert", "facilities.manage_facilities", ["issue*"]),
         ("Regulaminy", "panel:regulations", "file", "regulations.publish_regulation", ["regulation*"]),
     ]),
     ("Klienci", [
@@ -64,6 +65,10 @@ def _counts(user):
         from apps.credentials.models import Credential
 
         counts["panel:credentials"] = Credential.objects.filter(status=Credential.Status.PENDING).count()
+    if user.has_perm("facilities.manage_facilities"):
+        from apps.facilities.models import Issue
+
+        counts["panel:issues"] = Issue.objects.filter(status=Issue.Status.NEW).count()
     return counts
 
 

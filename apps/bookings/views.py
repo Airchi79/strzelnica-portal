@@ -464,7 +464,12 @@ def panel_blocks(request):
 
 @panel_required(PERM)
 def panel_block_new(request):
-    form = BlockForm(request.POST or None, initial={"day_from": timezone.localdate(), "day_to": timezone.localdate()})
+    initial = {"day_from": timezone.localdate(), "day_to": timezone.localdate()}
+    if request.GET.get("os", "").isdigit():
+        initial["lanes"] = [int(request.GET["os"])]  # np. z zgłoszenia usterki
+    if request.GET.get("tytul"):
+        initial["title"] = request.GET["tytul"][:120]
+    form = BlockForm(request.POST or None, initial=initial)
     conflicts = None
     if request.method == "POST" and form.is_valid():
         d = form.cleaned_data

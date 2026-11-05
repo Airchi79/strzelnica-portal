@@ -128,3 +128,40 @@ class PriceRuleForm(forms.ModelForm):
         if commit:
             rule.save()
         return rule
+
+
+class IssueForm(forms.Form):
+    lane = forms.ModelChoiceField(label="Gdzie", queryset=Lane.objects.none(), required=False, empty_label="inne miejsce / budynek / teren")
+    title = forms.CharField(label="Co się stało", max_length=120, widget=forms.TextInput(attrs={"placeholder": "np. nie działa transporter tarcz"}))
+    description = forms.CharField(label="Opis", max_length=2000, required=False, widget=forms.Textarea(attrs={"rows": 3, "placeholder": "gdzie dokładnie, od kiedy, czy da się strzelać"}))
+    urgent = forms.BooleanField(label="Pilne — zagraża bezpieczeństwu albo uniemożliwia strzelanie", required=False)
+    photo = forms.FileField(label="Zdjęcie", required=False, widget=forms.FileInput(attrs={"accept": "image/jpeg,image/png,image/*"}),
+                            help_text="Opcjonalnie — JPG lub PNG do 5 MB.")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["lane"].queryset = Lane.objects.filter(is_active=True).select_related("facility")
+
+    def clean_photo(self):
+        from django.conf import settings
+
+        from .issues import clean_photo
+
+        f = self.cleaned_data.get("photo")
+        if not f:
+            return None
+        if f.size > settings.MAX_UPLOAD_BYTES:
+            raise forms.ValidationError("Zdjęcie jest za duże (maksymalnie 5 MB).")
+        return clean_photo(f)
+
+
+class IssueStatusForm(forms.Form):
+    status = forms.ChoiceField(label="Status", choices=[])
+    note = forms.CharField(label="Uwagi / opis naprawy (zobaczy zgłaszający)", max_length=500, required=False,
+                           widget=forms.Textarea(attrs={"rows": 2}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import Issue
+
+        self.fields["status"].choices = Issue.Status.choices

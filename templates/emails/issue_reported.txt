@@ -1,0 +1,11 @@
+{% autoescape off %}Nowe zgłoszenie usterki{% if issue.urgent %} — PILNE{% endif %}
+
+{{ issue.title }}{% if issue.lane %} · {{ issue.lane }}{% endif %}
+{% if issue.description %}
+{{ issue.description }}
+{% endif %}
+Zgłaszający: {% if issue.reported_by %}{{ issue.reported_by.full_name }} ({{ issue.reported_by.email }}{% if issue.reported_by.phone %}, {{ issue.reported_by.phone }}{% endif %}){% else %}—{% endif %}
+{% if issue.photo %}Dołączono zdjęcie.
+{% endif %}
+Zgłoszenie w panelu: {{ site_url }}{% url 'panel:issue' issue.pk %}
+{% endautoescape %}

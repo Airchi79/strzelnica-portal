@@ -1,0 +1,31 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Usterka — {{ issue.title }}{% endblock %}
+{% block panel %}
+<p class="small"><a href="{% url 'panel:issues' %}">← Usterki</a></p>
+<h1>{{ issue.title }} {% if issue.urgent %}<span class="badge bad">pilne</span>{% endif %} <span class="badge {% if issue.status == 'naprawione' %}ok{% elif issue.status == 'nowe' %}warn{% endif %}">{{ issue.get_status_display }}</span></h1>
+<div class="verify-grid">
+  <div class="card">
+    {% if issue.photo %}<a href="{% url 'panel:issue_photo' issue.pk %}" target="_blank" rel="noopener"><img src="{% url 'panel:issue_photo' issue.pk %}" alt="Zdjęcie usterki" style="width:100%;border-radius:8px"></a>
+    {% else %}<div class="scan-empty"><strong>Bez zdjęcia</strong></div>{% endif %}
+  </div>
+  <div>
+    <div class="card">
+      <dl class="verify-facts">
+        <div><dt>Gdzie</dt><dd>{{ issue.lane|default:"inne miejsce / budynek / teren" }}</dd></div>
+        <div><dt>Opis</dt><dd>{{ issue.description|default:"—"|linebreaksbr }}</dd></div>
+        <div><dt>Zgłaszający</dt><dd>{% if issue.reported_by %}{{ issue.reported_by.full_name }}<br><span class="small">{{ issue.reported_by.email }}{% if issue.reported_by.phone %} · <a href="tel:{{ issue.reported_by.phone }}">{{ issue.reported_by.phone }}</a>{% endif %}</span>{% else %}—{% endif %}</dd></div>
+        <div><dt>Zgłoszono</dt><dd>{{ issue.created_at|date:"j.m.Y H:i" }}</dd></div>
+        {% if issue.resolved_at %}<div><dt>Zamknięto</dt><dd>{{ issue.resolved_at|date:"j.m.Y H:i" }}{% if issue.resolved_by %}, {{ issue.resolved_by.full_name }}{% endif %}</dd></div>{% endif %}
+        {% if issue.resolution_note %}<div><dt>Uwagi</dt><dd>{{ issue.resolution_note }}</dd></div>{% endif %}
+      </dl>
+    </div>
+    <div class="card">
+      <h2 class="step-title">Zmień status</h2>
+      <form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Zapisz</button></form>
+      {% if issue.lane and issue.is_open %}<p class="small" style="margin-bottom:0">Oś nie nadaje się do użytku? <a href="{% url 'panel:block_new' %}?os={{ issue.lane.pk }}&amp;tytul={{ issue.title|urlencode }}">Zablokuj oś</a> — kolidujące rezerwacje zobaczysz przed zapisem.</p>{% endif %}
+    </div>
+    {% if history %}<div class="card"><h2 class="step-title">Historia</h2>
+      <table class="small">{% for h in history %}<tr><td class="muted nowrap">{{ h.at|date:"j.m.Y H:i" }}</td><td>{{ h.summary }}</td><td class="muted">{{ h.actor.full_name|default:"" }}</td></tr>{% endfor %}</table></div>{% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+Twoje zgłoszenie „{{ issue.title }}”{% if issue.lane %} ({{ issue.lane }}){% endif %} ma teraz status: {{ issue.get_status_display }}.
+{% if issue.resolution_note %}
+Informacja od zarządu: {{ issue.resolution_note }}
+{% endif %}
+Dziękujemy za zgłoszenie — dzięki temu strzelnica jest bezpieczniejsza.
+
+Moje zgłoszenia: {{ site_url }}{% url 'core:issues' %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

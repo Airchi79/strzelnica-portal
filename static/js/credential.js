@@ -2,7 +2,7 @@
 // Bez JavaScriptu działa zwykłe pole pliku; serwer i tak sprawdza typ (sygnaturę) i rozmiar pliku.
 (function () {
   "use strict";
-  const form = document.getElementById("credential-form");
+  const form = document.querySelector("#credential-form, [data-photo-form]");
   if (!form) return;
   const hintsEl = document.getElementById("kind-hints");
   const hints = hintsEl ? JSON.parse(hintsEl.textContent) : {};
@@ -52,7 +52,7 @@
     if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
     if (!file) { preview.hidden = true; img.hidden = true; setMsg(defaultMsg, false); return; }
     preview.hidden = false;
-    nameEl.textContent = file.type === "application/pdf" ? "Plik PDF: " + file.name : "Zdjęcie dokumentu";
+    nameEl.textContent = file.type === "application/pdf" ? "Plik PDF: " + file.name : "Zdjęcie";
     sizeEl.textContent = kb(file.size);
     if (file.type.startsWith("image/")) { objectUrl = URL.createObjectURL(file); img.src = objectUrl; img.hidden = false; }
     else img.hidden = true;

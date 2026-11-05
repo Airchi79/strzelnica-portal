@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Zgłoś usterkę{% endblock %}
+{% block content %}
+<h1>Zgłoś usterkę</h1>
+<p class="muted">Coś jest zepsute albo niebezpieczne? Daj znać zarządowi — najlepiej ze zdjęciem.</p>
+<form method="post" enctype="multipart/form-data" novalidate data-photo-form>{% csrf_token %}
+  {% if form.errors %}<div class="msg error" role="alert">Popraw pola zaznaczone na czerwono.</div>{% endif %}
+  <div class="card">
+    {% include "partials/field.html" with field=form.lane %}
+    {% include "partials/field.html" with field=form.title %}
+    {% include "partials/field.html" with field=form.description %}
+    {% include "partials/field.html" with field=form.urgent %}
+    <p class="small muted" style="margin-top:-6px">Bezpośrednie zagrożenie? Przerwij strzelanie i zadzwoń do prowadzącego lub zarządu{% if association.contact_phone %} (tel. <a href="tel:{{ association.contact_phone }}">{{ association.contact_phone }}</a>){% endif %}.</p>
+  </div>
+  <div class="card">
+    <div class="field scan-field{% if form.photo.errors %} has-error{% endif %}" data-scan data-max="5242880">
+      <label for="{{ form.photo.id_for_label }}">{{ form.photo.label }} <span class="muted small">(opcjonalnie)</span></label>
+      {{ form.photo }}
+      <div class="scan-buttons actions" hidden>
+        <button type="button" class="btn" data-scan-camera>📷 Zrób zdjęcie</button>
+        <button type="button" class="btn secondary" data-scan-pick>Wybierz z galerii</button>
+      </div>
+      <div class="scan-preview" data-scan-preview hidden>
+        <img alt="Podgląd zdjęcia usterki" data-scan-img hidden>
+        <div class="scan-info"><strong data-scan-name></strong><span class="small muted" data-scan-size></span>
+          <button type="button" class="link-btn" data-scan-clear>Usuń i wybierz ponownie</button></div>
+      </div>
+      <span class="helptext" data-scan-msg>{{ form.photo.help_text }}</span>
+      {{ form.photo.errors }}
+    </div>
+  </div>
+  <div class="actions"><button class="btn" type="submit">Wyślij zgłoszenie</button><a class="btn secondary" href="{% url 'core:issues' %}">Anuluj</a></div>
+</form>
+<script src="{% static 'js/credential.js' %}" defer></script>
+{% endblock %}

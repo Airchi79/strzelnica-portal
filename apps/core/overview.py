@@ -141,6 +141,12 @@ def attention(user, now=None):
     if me:
         to_vote = Resolution.objects.filter(status=Resolution.Status.VOTING).exclude(votes__member=me).count()
         tiles.append(("Uchwały do głosowania", "Twój głos w Zarządzie", to_vote, reverse("panel:resolutions")))
+    if user.has_perm("facilities.manage_facilities"):
+        from apps.facilities.models import Issue
+
+        open_issues = Issue.objects.filter(status__in=Issue.OPEN)
+        urgent = open_issues.filter(urgent=True).count()
+        tiles.append(("Usterki", f"Otwarte zgłoszenia{f', pilne: {urgent}' if urgent else ''}", open_issues.count(), reverse("panel:issues")))
     if user.has_perm("payments.manage_payments"):
         tiles.append(("Wpłaty do przypisania", "Przelewy bez rozpoznanego tytułu", Payment.objects.filter(status=Payment.Status.UNMATCHED).count(), reverse("panel:payments") + "?status=nieprzypisana"))
     return tiles

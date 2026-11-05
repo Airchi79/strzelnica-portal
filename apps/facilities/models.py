@@ -120,3 +120,50 @@ class PriceRule(models.Model):
 def format_pln(grosze: int) -> str:
     zl, gr = divmod(int(grosze), 100)
     return f"{zl:,}".replace(",", " ") + (f",{gr:02d}" if gr else "") + " zł"
+
+
+from apps.credentials.models import private_storage  # noqa: E402 — zdjęcia usterek poza publicznym dostępem
+
+
+def issue_photo_upload_to(instance, filename):
+    import uuid
+
+    return f"usterki/{uuid.uuid4().hex}.jpg"
+
+
+class Issue(models.Model):
+    """Zgłoszenie usterki infrastruktury (oś, transporter, kulochwyt, budynek…) — od zgłoszenia do naprawy."""
+
+    class Status(models.TextChoices):
+        NEW = "nowe", "Nowe"
+        IN_PROGRESS = "w_naprawie", "W naprawie"
+        FIXED = "naprawione", "Naprawione"
+        REJECTED = "odrzucone", "Odrzucone / nie dotyczy"
+
+    OPEN = (Status.NEW, Status.IN_PROGRESS)
+
+    lane = models.ForeignKey(Lane, verbose_name="oś", null=True, blank=True, on_delete=models.SET_NULL, related_name="issues")
+    title = models.CharField("co się stało", max_length=120)
+    description = models.TextField("opis", max_length=2000, blank=True)
+    urgent = models.BooleanField("pilne — zagraża bezpieczeństwu albo uniemożliwia strzelanie", default=False)
+    photo = models.FileField("zdjęcie", upload_to=issue_photo_upload_to, blank=True, storage=private_storage)
+    status = models.CharField("status", max_length=12, choices=Status.choices, default=Status.NEW, db_index=True)
+    reported_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="zgłaszający", null=True, blank=True,
+                                    on_delete=models.SET_NULL, related_name="reported_issues")
+    resolution_note = models.CharField("uwagi zarządu / opis naprawy", max_length=500, blank=True)
+    resolved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    resolved_at = models.DateTimeField("zamknięto", null=True, blank=True)
+    created_at = models.DateTimeField("zgłoszono", auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-urgent", "-created_at"]
+        verbose_name = "zgłoszenie usterki"
+        verbose_name_plural = "zgłoszenia usterek"
+
+    def __str__(self):
+        return f"{self.title}{' (' + self.lane.name + ')' if self.lane else ''}"
+
+    @property
+    def is_open(self):
+        return self.status in self.OPEN

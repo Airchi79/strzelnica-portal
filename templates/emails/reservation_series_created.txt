@@ -1,0 +1,18 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
+
+obsługa strzelnicy zarezerwowała dla Ciebie stały termin — co tydzień:
+{% with r=reservations.0 %}{{ r.lane }}, {{ r.starts_at|date:"l"|lower }} {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}, {{ r.persons }} os.{% endwith %}
+
+Terminy ({{ reservations|length }}):
+{% for r in reservations %}• {{ r.starts_at|date:"j.m.Y" }} — {{ r.number }}{% if r.payment_status == 'do_zaplaty' %} — {{ r.amount|pln }}{% elif r.payment_status == 'umowa' %} — wg umowy klubu{% elif r.payment_status == 'oplacona' %} — opłacona{% endif %}
+{% endfor %}{% if skipped %}
+Pominięte terminy (zajęte lub niedostępne):
+{% for d, why in skipped %}• {{ d|date:"j.m.Y" }} — {{ why }}
+{% endfor %}{% endif %}{% if total %}
+Łączna należność za serię: {{ total|pln }} — każdy termin rozliczany osobno, płatność na stronie danej rezerwacji.
+{% endif %}
+Wszystkie rezerwacje: {{ site_url }}{% url 'bookings:my_list' %}
+Pojedynczy termin możesz anulować sam na stronie rezerwacji (na zasadach jak zwykłą rezerwację); całą serię odwołuje obsługa strzelnicy.
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

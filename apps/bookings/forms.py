@@ -56,13 +56,29 @@ def range_officers():
 class BoardReservationForm(ReservationForm):
     user = forms.ModelChoiceField(label="Rezerwujący (zweryfikowany PS)", queryset=get_user_model().objects.none())
 
-    field_order = ["user", "lane", "day", "start_hour", "end_hour", "persons", "access_code", "notes"]
+    repeat_until = forms.DateField(
+        label="Powtarzaj co tydzień do dnia", required=False, widget=DateInput(),
+        help_text="Rezerwacja cykliczna: ten sam dzień tygodnia i godziny, co tydzień do tej daty (najwyżej rok). "
+                  "Przed zapisem zobaczysz listę terminów i kolizji.",
+    )
+
+    field_order = ["user", "lane", "day", "start_hour", "end_hour", "persons", "repeat_until", "access_code", "notes"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["user"].queryset = range_officers()
         self.fields["user"].label_from_instance = lambda u: f"{u.full_name} ({u.email})"
         self.fields["day"].widget.attrs.pop("min", None)
+
+    def clean(self):
+        data = super().clean()
+        day, until = data.get("day"), data.get("repeat_until")
+        if day and until:
+            if until <= day:
+                self.add_error("repeat_until", "Data końca serii musi być późniejsza niż pierwszy termin.")
+            elif (until - day).days > 366:
+                self.add_error("repeat_until", "Seria może obejmować najwyżej rok.")
+        return data
 
 
 class CancelForm(forms.Form):

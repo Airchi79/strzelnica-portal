@@ -1,0 +1,13 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+obsługa strzelnicy anulowała Twoje rezerwacje cykliczne ({{ reservations|length }} terminów):
+{% for r in reservations %}• {{ r.starts_at|date:"j.m.Y H:i" }} — {{ r.lane }} — {{ r.number }}
+{% endfor %}{% if reason %}
+Powód: {{ reason }}
+{% endif %}
+Anulowanie jest bez opłat; ewentualne wpłaty za te terminy zostały zwrócone na Twoje saldo / jako nadpłata.
+
+Moje rezerwacje: {{ site_url }}{% url 'bookings:my_list' %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

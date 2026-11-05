@@ -480,3 +480,11 @@ tr.muted td { color: var(--muted); }
   .tile-l { color: #333 !important; }
 }
 .preset-box { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 12px; border: 1px dashed var(--border); border-radius: 8px; }
+.series-preview { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
+.series-preview table { max-width: 640px; }
+tr.neg td { color: var(--bad); }
+.series-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.series-item { padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: .8rem; text-decoration: none; color: var(--text); font-variant-numeric: tabular-nums; }
+.series-item.current { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand); font-weight: 700; }
+.series-item.past { opacity: .55; } .series-item.cancelled { text-decoration: line-through; color: var(--bad); opacity: .7; }
+.danger-summary { cursor: pointer; color: var(--bad); font-weight: 600; margin-top: 8px; }

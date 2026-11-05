@@ -5,5 +5,19 @@
 {% include "panel/_bookings_tabs.html" %}
 <div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
   <p class="small muted">Rezerwujący musi mieć zweryfikowane uprawnienia PS i zaakceptowane regulaminy. Otrzyma potwierdzenie e-mail.</p>
-  <button class="btn" type="submit">Zarezerwuj</button></form></div>
+  {% if preview %}
+  <div class="series-preview">
+    <h2 class="step-title">Terminy serii: {{ preview.ok }} wolnych{% if preview.bad %}, {{ preview.bad }} odpada{% endif %}</h2>
+    <table class="small">{% for d, why in preview.rows %}
+      <tr class="{% if why %}neg{% endif %}"><td class="nowrap">{{ d|date:"D j.m.Y" }}</td><td>{% if why %}✕ {{ why }}{% else %}<span class="pos">✓ wolne</span>{% endif %}</td></tr>{% endfor %}</table>
+    {% if preview.ok %}<p class="small muted">Zapisane zostaną tylko wolne terminy — każdy jako osobna rezerwacja z numerem i rozliczeniem. Strzelec dostanie jeden e-mail z listą.</p>{% endif %}
+  </div>
+  <div class="actions">
+    {% if preview.ok %}<button class="btn" type="submit" name="action" value="confirm_series">Utwórz {{ preview.ok }} rezerwacji</button>{% endif %}
+    <button class="btn secondary" type="submit">Sprawdź ponownie</button>
+  </div>
+  {% else %}
+  <button class="btn" type="submit">Zarezerwuj{% if form.repeat_until.value %} / pokaż terminy serii{% endif %}</button>
+  {% endif %}
+</form></div>
 {% endblock %}

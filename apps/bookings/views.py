@@ -341,6 +341,14 @@ def panel_detail(request, pk):
                     services.cancel_reservation(r, request.user, cancel_form.cleaned_data["reason"], as_board=True, keep_fee=keep)
                     messages.success(request, "Rezerwacja anulowana" + (" z zachowaniem należności" if keep else "") + ". Klient otrzyma e-mail.")
                     return redirect("panel:reservation", pk=r.pk)
+            elif action == "cancel_series":
+                reason = request.POST.get("series_reason", "").strip()[:255]
+                if not reason:
+                    messages.error(request, "Podaj powód anulowania serii.")
+                    return redirect("panel:reservation", pk=r.pk)
+                cancelled = services.cancel_series(r, request.user, reason)
+                messages.success(request, f"Anulowano {len(cancelled)} przyszłych terminów serii. Strzelec otrzyma jeden e-mail.")
+                return redirect("panel:reservation", pk=r.pk)
             elif action == "approve":
                 services.approve_reservation(r, request.user)
                 messages.success(request, "Rezerwacja zatwierdzona. Klient otrzyma e-mail z informacją o płatności.")
@@ -378,11 +386,22 @@ def panel_detail(request, pk):
             "cancel_form": cancel_form,
             "persons_form": persons_form,
             "started": r.starts_at <= timezone.now(),
+            "now": timezone.now(),
             "wallet_balance": balance_of(r.user),
             "remaining_pln": f"{(r.amount - r.paid_amount) / 100:.2f}".replace(".", ","),
             "log_entries": list(r.log_entries.order_by("entered_at")) if request.user.has_perm("logbook.view_logbook") else None,
+            "series": _series_info(r),
         },
     )
+
+
+def _series_info(r):
+    if not r.series:
+        return None
+    items = list(Reservation.objects.filter(series=r.series).order_by("starts_at"))
+    now = timezone.now()
+    future = [x for x in items if x.starts_at > now and x.status in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL)]
+    return {"items": items, "future": future}
 
 
 @panel_required(PERM)
@@ -394,6 +413,22 @@ def panel_new(request):
         initial["start_hour"] = int(request.GET["od"])
         initial["end_hour"] = int(request.GET["od"]) + 1
     form = BoardReservationForm(request.POST or None, initial=initial)
+    preview = None
+    if request.method == "POST" and form.is_valid() and form.cleaned_data.get("repeat_until"):
+        d = form.cleaned_data
+        days = services.weekly_days(d["day"], d["repeat_until"])
+        if request.POST.get("action") == "confirm_series":
+            created, skipped = services.create_series(
+                d["user"], d["lane"], days, d["start_hour"], d["end_hour"], d["persons"], d["notes"], request.user,
+                access_code=d["access_code"],
+            )
+            if created:
+                messages.success(request, f"Utworzono serię: {len(created)} rezerwacji" + (f", pominięto {len(skipped)} (kolizje)." if skipped else "."))
+                return redirect("panel:reservation", pk=created[0].pk)
+            form.add_error(None, "Żaden termin serii nie jest wolny — nic nie zapisano.")
+        rows = services.preview_series(d["user"], d["lane"], days, d["start_hour"], d["end_hour"], d["persons"], d["access_code"])
+        preview = {"rows": rows, "ok": sum(1 for _, why in rows if why is None), "bad": sum(1 for _, why in rows if why)}
+        return render(request, "panel/booking_new.html", {"form": form, "preview": preview})
     if request.method == "POST" and form.is_valid():
         d = form.cleaned_data
         try:
@@ -407,7 +442,7 @@ def panel_new(request):
         else:
             messages.success(request, f"Utworzono rezerwację {r.number}.")
             return redirect("panel:reservation", pk=r.pk)
-    return render(request, "panel/booking_new.html", {"form": form})
+    return render(request, "panel/booking_new.html", {"form": form, "preview": preview})
 
 
 @panel_required(PERM)

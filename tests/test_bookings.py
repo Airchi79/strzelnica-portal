@@ -708,3 +708,52 @@ def test_panel_today_flags_block_conflict(owner_client, ps, lane, owner):
     b.lanes.add(lane)
     ctx = owner_client.get(f"/panel/dzis/?dzien={day.isoformat()}").context
     assert [(x.pk, y.pk) for x, y in ctx["attention"]["conflicts"]] == [(r.pk, b.pk)]
+
+
+def test_series_preview_create_and_cancel(owner_client, owner, ps, lane, django_capture_on_commit_callbacks):
+    first = next_weekday() + timedelta(days=7)
+    other = make_user("inny-ps@example.com")
+    add_credential(other)
+    approve(other)
+    taken = book(other, lane, day=first + timedelta(days=14), start=10, end=12)  # trzeci termin zajęty
+    data = {"user": ps.pk, "lane": lane.pk, "day": first.isoformat(), "start_hour": 10, "end_hour": 12, "persons": 2,
+            "repeat_until": (first + timedelta(days=28)).isoformat(), "access_code": "", "notes": "Klub — trening"}
+    # podgląd: nic nie zapisuje
+    page = owner_client.post("/panel/rezerwacje/nowa/", data)
+    assert page.status_code == 200
+    rows = page.context["preview"]["rows"]
+    assert len(rows) == 5 and page.context["preview"]["bad"] == 1 and taken.number in rows[2][1]
+    assert Reservation.objects.filter(user=ps).count() == 0
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        response = owner_client.post("/panel/rezerwacje/nowa/", {**data, "action": "confirm_series"})
+    assert response.status_code == 302
+    series = list(Reservation.objects.filter(user=ps).order_by("starts_at"))
+    assert len(series) == 4 and len({r.series for r in series}) == 1 and series[0].series
+    assert all(r.number and r.amount > 0 for r in series)
+    to_ps = [m for m in mail.outbox if m.to == [ps.email]]
+    assert len(to_ps) == 1 and "cykliczne" in to_ps[0].subject and series[3].number in to_ps[0].body
+    assert AuditLog.objects.filter(action="rezerwacja.seria").count() == 1
+    detail = owner_client.get(f"/panel/rezerwacje/{series[1].pk}/")
+    assert len(detail.context["series"]["items"]) == 4 and len(detail.context["series"]["future"]) == 4
+    # anulowanie przyszłych terminów serii — wymaga powodu
+    owner_client.post(f"/panel/rezerwacje/{series[1].pk}/", {"action": "cancel_series", "series_reason": ""})
+    assert Reservation.objects.filter(series=series[0].series, status=Reservation.Status.CANCELLED).count() == 0
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        owner_client.post(f"/panel/rezerwacje/{series[1].pk}/", {"action": "cancel_series", "series_reason": "Koniec sezonu"})
+    assert Reservation.objects.filter(series=series[0].series, status=Reservation.Status.CANCELLED).count() == 4
+    assert len([m for m in mail.outbox if m.to == [ps.email]]) == 1
+    taken.refresh_from_db()
+    assert taken.status == Reservation.Status.CONFIRMED  # cudza rezerwacja nietknięta
+
+
+def test_series_limits(owner_client, ps, lane):
+    first = next_weekday()
+    data = {"user": ps.pk, "lane": lane.pk, "day": first.isoformat(), "start_hour": 10, "end_hour": 12, "persons": 2,
+            "access_code": "", "notes": ""}
+    page = owner_client.post("/panel/rezerwacje/nowa/", {**data, "repeat_until": (first + timedelta(days=400)).isoformat()})
+    assert "repeat_until" in page.context["form"].errors
+    page = owner_client.post("/panel/rezerwacje/nowa/", {**data, "repeat_until": first.isoformat()})
+    assert "repeat_until" in page.context["form"].errors
+    assert len(services.weekly_days(first, first + timedelta(days=366))) <= services.SERIES_MAX

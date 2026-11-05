@@ -1,5 +1,6 @@
 """Reguły rezerwacji osi (decyzje właściciela z 30.10.2026, specyfikacja rozdz. 5 i 9)."""
 
+import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
@@ -208,7 +209,8 @@ def _next_number(year):
     return f"SATOK-R-{year}-{seq.last:04d}"
 
 
-def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="", created_by=None, now=None, access_code=""):
+def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="", created_by=None, now=None, access_code="",
+                       series=None, notify=True):
     reasons = check_can_book(user)
     if reasons:
         raise ValidationError(reasons)
@@ -252,6 +254,7 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
                 ),
                 status=Reservation.Status.PENDING_APPROVAL if pending else Reservation.Status.CONFIRMED,
                 client_group=group or "",
+                series=series,
             )
             if not pending:
                 reservation.pay_by = payment_deadline(reservation, now)
@@ -271,6 +274,8 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     # Opłata pobierana od razu z salda, jeśli wystarcza środków (w przeciwnym razie należność „do zapłaty”).
     apply_wallet(user, by=created_by)
     reservation.refresh_from_db()
+    if not notify:  # rezerwacje cykliczne: jedno zbiorcze powiadomienie dla całej serii
+        return reservation
     if pending:
         notify_user(user, f"Rezerwacja {reservation.number} czeka na zatwierdzenie", "emails/reservation_pending.txt", reservation=reservation)
     else:
@@ -286,6 +291,93 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
         event="Rezerwacja do zatwierdzenia" if pending else "Nowa rezerwacja",
     )
     return reservation
+
+
+# --- rezerwacje cykliczne (tworzy obsługa w panelu) -------------------------------------------
+
+SERIES_MAX = 53  # najwyżej rok co tydzień
+
+
+def weekly_days(first_day, until):
+    """Ten sam dzień tygodnia co `first_day`, co 7 dni, do `until` włącznie."""
+    days, d = [], first_day
+    while d <= until and len(days) < SERIES_MAX:
+        days.append(d)
+        d += timedelta(days=7)
+    return days
+
+
+def preview_series(user, lane, days, start_hour, end_hour, persons, access_code="", now=None):
+    """Sprawdza każdy termin serii bez zapisu. Zwraca [(dzień, None | powód, że termin odpada)]."""
+    rows = []
+    for d in days:
+        try:
+            q = quote(lane, d, start_hour, end_hour, persons, now, access_code=access_code, user=user)
+        except ValidationError as e:
+            rows.append((d, "; ".join(e.messages)))
+            continue
+        clash = (
+            Reservation.objects.filter(lane=lane, starts_at__lt=q["ends_at"], ends_at__gt=q["starts_at"])
+            .exclude(status__in=[Reservation.Status.CANCELLED, Reservation.Status.NO_SHOW])
+            .select_related("user").first()
+        )
+        rows.append((d, f"zajęte: {clash.number} ({clash.user.last_name})" if clash else None))
+    return rows
+
+
+def create_series(user, lane, days, start_hour, end_hour, persons, notes, by, access_code=""):
+    """Tworzy rezerwacje cykliczne jako zwykłe rezerwacje ze wspólnym `series`. Terminy kolidujące są pomijane.
+    Zwraca (utworzone, pominięte [(dzień, powód)]). Klient i zarząd dostają po jednym zbiorczym powiadomieniu."""
+    series = uuid.uuid4()
+    created, skipped = [], []
+    for d in days:
+        try:
+            created.append(create_reservation(user, lane, d, start_hour, end_hour, persons, notes, created_by=by,
+                                              access_code=access_code, series=series, notify=False))
+        except ValidationError as e:
+            skipped.append((d, "; ".join(e.messages)))
+    if not created:
+        return created, skipped
+    log_event(
+        "rezerwacja.seria",
+        created[0],
+        f"Seria {len(created)} rezerwacji: {lane}, {timezone.localtime(created[0].starts_at):%H:%M}, co tydzień",
+        changes={"seria": str(series), "numery": [r.number for r in created], "pominiete": [str(d) for d, _ in skipped]},
+        actor=by,
+    )
+    notify_user(user, f"Rezerwacje cykliczne: {lane}, {len(created)} terminów", "emails/reservation_series_created.txt",
+                reservations=created, skipped=skipped, total=sum(r.amount for r in created))
+    notify_board(
+        f"Nowa seria rezerwacji: {lane}, {len(created)} terminów",
+        "emails/reservation_board.txt",
+        PERM,
+        url=reverse("panel:reservation", args=[created[0].pk]),
+        body=f"{user.full_name}, co tydzień od {timezone.localtime(created[0].starts_at):%d.%m %H:%M}",
+        reservation=created[0],
+        event="Nowa seria rezerwacji",
+    )
+    return created, skipped
+
+
+def cancel_series(reservation, by, reason, now=None):
+    """Anuluje wszystkie przyszłe, aktywne terminy serii (bez opłaty). Zwraca listę anulowanych."""
+    now = now or timezone.now()
+    if not reservation.series:
+        raise ValidationError("Ta rezerwacja nie należy do serii.")
+    future = Reservation.objects.filter(
+        series=reservation.series, starts_at__gt=now,
+        status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL],
+    ).order_by("starts_at")
+    cancelled = []
+    with transaction.atomic():
+        for r in future:
+            cancelled.append(cancel_reservation(r, by, reason, as_board=True, now=now, notify=False))
+    if cancelled:
+        log_event("rezerwacja.seria_anulowanie", cancelled[0], f"Anulowano {len(cancelled)} terminów serii",
+                  changes={"seria": str(reservation.series), "numery": [r.number for r in cancelled], "powod": reason}, actor=by)
+        notify_user(cancelled[0].user, f"Anulowano rezerwacje cykliczne ({len(cancelled)})", "emails/reservation_series_cancelled.txt",
+                    reservations=cancelled, reason=reason)
+    return cancelled
 
 
 # --- zasady grup klientów: płatności, zatwierdzanie, wygasanie ------------------------------
@@ -367,7 +459,7 @@ def expire_unpaid(now=None):
 
 
 @transaction.atomic
-def cancel_reservation(reservation, by, reason="", as_board=False, now=None, keep_fee=False, expired=False):
+def cancel_reservation(reservation, by, reason="", as_board=False, now=None, keep_fee=False, expired=False, notify=True):
     """Anulowanie. Klient: sam do terminu z ustawień (domyślnie 24 h przed), bez opłaty; później tylko obsługa.
     Obsługa: bez opłaty albo — przy późnym odwołaniu — z zachowaniem należności (`keep_fee`)."""
     now = now or timezone.now()
@@ -398,6 +490,8 @@ def cancel_reservation(reservation, by, reason="", as_board=False, now=None, kee
         changes={"z_oplata": late, "przez_obsluge": as_board, "wygasla": expired, "powod": reservation.cancel_reason},
         actor=by,
     )
+    if not notify:
+        return reservation
     notify_user(reservation.user, f"Rezerwacja {reservation.number} anulowana", "emails/reservation_cancelled.txt", reservation=reservation)
     notify_board(
         f"Anulowano rezerwację: {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m %H:%M}",

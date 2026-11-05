@@ -6,7 +6,7 @@ from datetime import timezone as dt_timezone
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import Http404, HttpResponse
@@ -341,6 +341,16 @@ def panel_detail(request, pk):
                     services.cancel_reservation(r, request.user, cancel_form.cleaned_data["reason"], as_board=True, keep_fee=keep)
                     messages.success(request, "Rezerwacja anulowana" + (" z zachowaniem należności" if keep else "") + ". Klient otrzyma e-mail.")
                     return redirect("panel:reservation", pk=r.pk)
+            elif action == "pay_from_balance":
+                if not request.user.has_perm("payments.manage_payments"):
+                    raise PermissionDenied
+                from apps.payments.services import apply_wallet
+
+                if apply_wallet(r.user, by=request.user, targets=[r]):
+                    messages.success(request, "Rezerwacja opłacona z nadpłaty strzelca.")
+                else:
+                    messages.error(request, "Nadpłata nie wystarcza na całą należność.")
+                return redirect("panel:reservation", pk=r.pk)
             elif action == "cancel_series":
                 reason = request.POST.get("series_reason", "").strip()[:255]
                 if not reason:
@@ -389,6 +399,7 @@ def panel_detail(request, pk):
             "now": timezone.now(),
             "wallet_balance": balance_of(r.user),
             "remaining_pln": f"{(r.amount - r.paid_amount) / 100:.2f}".replace(".", ","),
+            "remaining": r.amount - r.paid_amount,
             "log_entries": list(r.log_entries.order_by("entered_at")) if request.user.has_perm("logbook.view_logbook") else None,
             "series": _series_info(r),
         },

@@ -77,6 +77,7 @@ urlpatterns = [
     path("platnosci/", payments_views.panel_payments, name="payments"),
     path("platnosci/wplata/", payments_views.panel_manual, name="payment_manual"),
     path("platnosci/import/", payments_views.panel_import, name="payment_import"),
+    path("platnosci/ustawienia/", payments_views.panel_settings, name="payment_settings"),
     path("platnosci/<uuid:pk>/", payments_views.panel_payment, name="payment"),
     path("salda/", payments_views.panel_wallets, name="wallets"),
     path("salda/<int:user_pk>/", payments_views.panel_wallet, name="wallet"),

@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 
 from apps.facilities.forms import PLNField
 
-from .models import Payment
+from .models import Payment, PaymentSettings
 
 MIN_TOPUP = Decimal("10")
 MAX_TOPUP = Decimal("5000")
@@ -88,3 +88,9 @@ class AssignForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["user"].queryset = _users()
+
+
+class PaymentSettingsForm(forms.ModelForm):
+    class Meta:
+        model = PaymentSettings
+        fields = ["wallet_enabled", "overpayment_pays_reservations"]

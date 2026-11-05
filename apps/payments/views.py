@@ -22,8 +22,8 @@ from apps.core.permissions import panel_required
 from apps.facilities.models import format_pln
 
 from . import services, tpay
-from .forms import AssignForm, BankImportForm, CorrectionForm, ManualPaymentForm, TopupForm
-from .models import BankImport, LedgerEntry, Payment, Wallet
+from .forms import AssignForm, BankImportForm, CorrectionForm, ManualPaymentForm, PaymentSettingsForm, TopupForm
+from .models import BankImport, LedgerEntry, Payment, PaymentSettings, Wallet
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -309,3 +309,25 @@ def panel_wallet(request, user_pk):
             "consistent": services.ledger_consistent(subject),
         },
     )
+
+
+@panel_required(PERM)
+def panel_settings(request):
+    obj = PaymentSettings.load()
+    before = {f: getattr(obj, f) for f in PaymentSettingsForm.Meta.fields}
+    form = PaymentSettingsForm(request.POST or None, instance=obj)
+    if request.method == "POST" and form.is_valid():
+        obj = form.save()
+        changes = {f: [before[f], getattr(obj, f)] for f in before if before[f] != getattr(obj, f)}
+        if changes:
+            log_event("platnosci.ustawienia", obj, changes=changes)
+        msg = "Zapisano ustawienia płatności."
+        turned_on = (not before["overpayment_pays_reservations"] and obj.overpayment_pays_reservations) or (
+            not before["wallet_enabled"] and obj.wallet_enabled)
+        if turned_on:
+            paid = services.apply_all_overpayments(by=request.user)
+            msg += f" Z istniejących nadpłat opłacono należności: {paid}."
+        messages.success(request, msg)
+        return redirect("panel:payment_settings")
+    overpaid = Wallet.objects.filter(balance__gt=0).count()
+    return render(request, "panel/payment_settings.html", {"form": form, "overpaid": overpaid})

@@ -57,6 +57,7 @@
   <form method="post" class="actions" style="margin-top:0">{% csrf_token %}
   {% if r.payment_status == 'do_zaplaty' %}
     {% if perms.payments.manage_payments or perms.payments.accept_onsite %}<a class="btn" href="{% url 'panel:payment_manual' %}?user={{ r.user.pk }}&amp;kwota={{ remaining_pln }}&amp;rezerwacja={{ r.pk }}">Przyjmij wpłatę (gotówka / BLIK)</a>{% endif %}
+    {% if perms.payments.manage_payments and wallet_balance >= remaining and remaining > 0 %}<button class="btn secondary" name="action" value="pay_from_balance" data-confirm-click="Opłacić rezerwację z nadpłaty strzelca ({{ remaining|pln }})?">Opłać z nadpłaty ({{ remaining|pln }})</button>{% endif %}
     <button class="btn secondary" name="action" value="waive" data-confirm-click="Zwolnić z pozostałej opłaty?">Zwolnij z opłaty</button>
   {% elif r.payment_status == 'zwolniona' %}
     <button class="btn secondary" name="action" value="unwaive">Cofnij zwolnienie</button>

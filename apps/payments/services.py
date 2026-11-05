@@ -148,14 +148,21 @@ def apply_wallet(user, by=None, targets=None):
     """Opłaca należności ze środków na saldzie.
 
     targets — konkretne należności (rezerwacje / składki), np. te, których dotyczy wpłata; opłacane zawsze.
-    Bez targets: automatyczne pobieranie od najstarszej należności — tylko gdy saldo strzelca jest włączone.
+    Bez targets: automatyczne pobieranie od najstarszej należności — gdy saldo strzelca jest włączone, albo (tylko
+    rezerwacje) gdy włączono „nadpłata opłaca kolejne rezerwacje”.
     Zwraca liczbę opłaconych należności."""
     if user is None:
         return 0
     if targets is None:
-        if not wallet_enabled():
+        cfg = PaymentSettings.load()
+        if cfg.wallet_enabled:
+            targets = _due_items(user)
+        elif cfg.overpayment_pays_reservations:
+            from apps.bookings.models import Reservation
+
+            targets = [x for x in _due_items(user) if isinstance(x, Reservation)]
+        else:
             return 0
-        targets = _due_items(user)
     paid = 0
     for item in targets:
         if item is not None and _pay_item(user, item, by):
@@ -424,3 +431,11 @@ def ignore_unmatched(payment, reason, by):
     payment.save(update_fields=["status", "note"])
     log_event("platnosc.pominieta", payment, reason, actor=by)
     return payment
+
+
+def apply_all_overpayments(by=None):
+    """Po włączeniu „nadpłata opłaca rezerwacje”: rozlicza istniejące nadpłaty. Zwraca liczbę opłaconych należności."""
+    count = 0
+    for wallet in Wallet.objects.filter(balance__gt=0).select_related("user"):
+        count += apply_wallet(wallet.user, by=by)
+    return count

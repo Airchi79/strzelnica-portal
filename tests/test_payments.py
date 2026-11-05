@@ -495,3 +495,70 @@ def test_tpay_test_notification_not_booked_in_production(client, ps, tpay_keys, 
     _post(client, tpay_keys, _notification(live).replace(b"test_mode=1", b"test_mode=0"))
     live.refresh_from_db()
     assert live.status == Payment.Status.COMPLETED
+
+
+def test_overpayment_pays_reservations_setting(owner_client, django_capture_on_commit_callbacks):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.bookings import services as booking_services
+    from apps.bookings.models import Reservation
+    from apps.facilities.models import Lane
+    from apps.payments.models import PaymentSettings
+    from apps.payments.services import balance_of, post
+    from apps.payments.models import LedgerEntry
+
+    from .conftest import add_credential, approve, make_user
+
+    shooter = make_user("nadplata@example.com")
+    add_credential(shooter)
+    approve(shooter)
+    lane = Lane.objects.filter(is_active=True).first()
+    day = timezone.localdate() + timedelta(days=2)
+    while lane.hours_for(day) is None:
+        day += timedelta(days=1)
+    h = lane.hours_for(day).opens.hour
+    r1 = booking_services.create_reservation(shooter, lane, day, h, h + 1, 1)
+    assert r1.payment_status == Reservation.Payment.DUE
+    post(shooter, r1.amount + 1000, LedgerEntry.Kind.REFUND, "Zwrot testowy", by=None)  # nadpłata
+    assert "Nadpłata opłaca kolejne rezerwacje" in owner_client.get("/panel/platnosci/ustawienia/").content.decode()
+    # wyłączone: nadpłata leży, rezerwacja nieopłacona
+    r2 = booking_services.create_reservation(shooter, lane, day, h + 1, h + 2, 1)
+    assert Reservation.objects.get(pk=r2.pk).payment_status == Reservation.Payment.DUE
+    # włączenie w panelu rozlicza istniejące nadpłaty (od najwcześniejszej rezerwacji)
+    response = owner_client.post("/panel/platnosci/ustawienia/", {"overpayment_pays_reservations": "on"})
+    assert response.status_code == 302 and PaymentSettings.load().overpayment_pays_reservations
+    assert Reservation.objects.get(pk=r1.pk).payment_status == Reservation.Payment.PAID
+    assert Reservation.objects.get(pk=r2.pk).payment_status == Reservation.Payment.DUE  # nie starczyło na drugą
+    assert balance_of(shooter) == 1000
+
+
+def test_pay_from_balance_button(owner_client):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.bookings import services as booking_services
+    from apps.bookings.models import Reservation
+    from apps.facilities.models import Lane
+    from apps.payments.models import LedgerEntry
+    from apps.payments.services import post
+
+    from .conftest import add_credential, approve, make_user
+
+    shooter = make_user("przycisk@example.com")
+    add_credential(shooter)
+    approve(shooter)
+    lane = Lane.objects.filter(is_active=True).first()
+    day = timezone.localdate() + timedelta(days=2)
+    while lane.hours_for(day) is None:
+        day += timedelta(days=1)
+    h = lane.hours_for(day).opens.hour
+    r = booking_services.create_reservation(shooter, lane, day, h, h + 1, 1)
+    page = owner_client.get(f"/panel/rezerwacje/{r.pk}/").content.decode()
+    assert "pay_from_balance" not in page  # brak nadpłaty
+    post(shooter, r.amount, LedgerEntry.Kind.REFUND, "Zwrot testowy", by=None)
+    assert "pay_from_balance" in owner_client.get(f"/panel/rezerwacje/{r.pk}/").content.decode()
+    owner_client.post(f"/panel/rezerwacje/{r.pk}/", {"action": "pay_from_balance"})
+    assert Reservation.objects.get(pk=r.pk).payment_status == Reservation.Payment.PAID

@@ -12,6 +12,11 @@ class PaymentSettings(models.Model):
         "saldo strzelca (przedpłaty, automatyczne pobieranie opłat)", default=False,
         help_text="Wyłączone: wpłata opłaca tylko wskazaną rezerwację lub składkę; nadpłaty widzi zarząd jako kwoty do zwrotu.",
     )
+    overpayment_pays_reservations = models.BooleanField(
+        "nadpłata opłaca kolejne rezerwacje", default=False,
+        help_text="Przy wyłączonym saldzie: nadpłata strzelca (np. zwrot za anulowaną rezerwację) sama opłaca jego "
+                  "nieopłacone rezerwacje, od najwcześniejszej. Składek nie opłaca.",
+    )
 
     class Meta:
         verbose_name = "ustawienia płatności"

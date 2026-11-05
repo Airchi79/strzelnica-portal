@@ -1,7 +1,8 @@
 {% extends "panel/base_panel.html" %}{% load satok %}
 {% block title %}{{ subject.full_name }}{% endblock %}
 {% block panel %}
-<h1>{{ subject.full_name|default:subject.email }}</h1>
+<h1>{{ subject.full_name|default:subject.email }}{% if not subject.is_active %} <span class="badge">dezaktywowane</span>{% endif %}</h1>
+<p class="small"><a href="{% url 'panel:gdpr_user' subject.pk %}">RODO: eksport, dezaktywacja, usunięcie danych</a></p>
 <p><span class="badge {% if subject.client_type == 'czlonek' %}ok{% elif subject.client_type == 'nowy' %}warn{% endif %}">{{ subject.client_type_label }}</span>
   <span class="badge {% if subject.ps_status == 'wazne' %}ok{% elif subject.ps_status == 'do_weryfikacji' %}warn{% elif subject.ps_status == 'wygasle' %}bad{% endif %}">PS: {{ subject.ps_label }}</span>
   <span class="muted small">wizyty: {{ subject.visits }}{% if subject.last_visit %}, ostatnia {{ subject.last_visit|date:"j.m.Y" }}{% endif %}</span></p>

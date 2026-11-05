@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Permission
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import Http404, HttpResponse
@@ -290,3 +290,42 @@ def panel_backups(request):
     from .backups import read_status
 
     return render(request, "panel/backups.html", {"st": read_status()})
+
+
+@panel_required("accounts.view_users")
+def panel_gdpr(request, pk=None):
+    from apps.audit.models import AuditLog
+
+    from apps.accounts import gdpr
+
+    if pk is None:
+        pending = User.objects.filter(is_active=False, anonymized_at__isnull=True).order_by("-deactivated_at")
+        for u in pending:
+            u.blockers = gdpr.anonymize_blockers(u)
+        log = AuditLog.objects.filter(action__in=["rodo.eksport", "rodo.anonimizacja", "konto.dezaktywacja"]).select_related("actor")[:50]
+        return render(request, "panel/gdpr.html", {"pending": pending, "log": log})
+    subject = get_object_or_404(User, pk=pk)
+    can_act = request.user.has_perm("accounts.manage_permissions") and subject.pk != request.user.pk
+    if request.method == "POST":
+        if not can_act:
+            raise PermissionDenied
+        action = request.POST.get("action")
+        if action == "deactivate" and subject.is_active and not subject.is_superuser:
+            subject.is_active = False
+            subject.deactivated_at = timezone.now()
+            subject.save(update_fields=["is_active", "deactivated_at"])
+            log_event("konto.dezaktywacja", subject, f"Dezaktywacja przez zarząd: {request.POST.get('reason', '')[:120]}")
+            messages.success(request, "Konto dezaktywowane — osoba nie może się zalogować.")
+        elif action == "anonymize":
+            if request.POST.get("confirm") != f"USUŃ {subject.pk}":
+                messages.error(request, f"Wpisz dokładnie: USUŃ {subject.pk}")
+            else:
+                try:
+                    gdpr.anonymize(subject, request.user)
+                except ValidationError as e:
+                    messages.error(request, " ".join(e.messages))
+                else:
+                    messages.success(request, "Dane osobowe usunięte. Zostały tylko dane, które przepisy każą przechowywać.")
+        return redirect("panel:gdpr_user", pk=subject.pk)
+    log_sensitive_access(subject, f"rodo:{subject.pk}", "obsługa żądania RODO")
+    return render(request, "panel/gdpr_user.html", {"subject": subject, "blockers": gdpr.anonymize_blockers(subject), "can_act": can_act})

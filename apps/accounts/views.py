@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -278,3 +279,25 @@ class PasswordResetConfirmView(auth_views.PasswordResetConfirmView):
         log_event("konto.reset_hasla", form.user, actor=form.user)
         messages.success(self.request, "Hasło ustawione. Zaloguj się.")
         return response
+
+
+@login_required
+def my_data(request):
+    """RODO: pobranie kompletu własnych danych (JSON)."""
+    import json
+
+    from . import gdpr
+
+    if request.method == "POST":
+        if not ratelimit.allow("gdpr-export", request.user.email, 5, 24 * 3600):
+            messages.error(request, "Eksport danych można pobrać najwyżej 5 razy na dobę.")
+            return redirect("accounts:my_data")
+        payload = json.dumps(gdpr.export_data(request.user), ensure_ascii=False, indent=2)
+        response = HttpResponse(payload, content_type="application/json; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="moje-dane-{timezone.localdate():%Y-%m-%d}.json"'
+        response["Cache-Control"] = "no-store"
+        return response
+    from apps.core.models import AssociationSettings
+
+    return render(request, "accounts/my_data.html", {"association": AssociationSettings.load()})
+

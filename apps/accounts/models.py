@@ -54,6 +54,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     email_verified_at = models.DateTimeField("e-mail potwierdzony", null=True, blank=True)
     date_joined = models.DateTimeField("data rejestracji", default=timezone.now)
     deactivated_at = models.DateTimeField("dezaktywowane", null=True, blank=True)
+    anonymized_at = models.DateTimeField("dane osobowe usunięte (RODO)", null=True, blank=True)
     # Sekret stałego kodu QR strzelca; zmiana unieważnia wcześniej wydane kody.
     qr_secret = models.CharField(max_length=32, default=new_qr_secret, editable=False)
 

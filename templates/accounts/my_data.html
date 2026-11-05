@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Moje dane{% endblock %}
+{% block content %}
+<h1>Moje dane (RODO)</h1>
+<div class="card">
+  <p style="margin-top:0">Możesz pobrać komplet danych, które system przechowuje o Tobie: konto, dokumenty, akceptacje regulaminu, rezerwacje, wpisy w książce pobytu, płatności, zapisy na wydarzenia, zgłoszenia — oraz listę, <strong>kto z zarządu i kiedy oglądał Twoje dane</strong>.</p>
+  <form method="post">{% csrf_token %}<button class="btn" type="submit">Pobierz moje dane (plik JSON)</button></form>
+  <p class="small muted">Plik JSON otworzysz w przeglądarce lub edytorze tekstu. Najwyżej 5 pobrań na dobę.</p>
+</div>
+<div class="card small">
+  <strong>Usunięcie danych</strong>
+  <p style="margin-bottom:0">Chcesz usunąć konto i dane? <a href="{% url 'accounts:deactivate' %}">Dezaktywuj konto</a> i napisz do zarządu{% if association.contact_email %} ({{ association.contact_email }}){% endif %} — usuniemy dane osobowe. Zostaną tylko te, które przepisy każą przechowywać: wpisy w książce pobytu (przez okres wymagany prawem), rozliczenia księgowe i — dla członków — ewidencja stowarzyszenia.</p>
+</div>
+{% endblock %}

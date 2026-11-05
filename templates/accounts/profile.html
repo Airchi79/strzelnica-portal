@@ -12,6 +12,7 @@
   <div class="actions">
     <a class="btn secondary" href="{% url 'accounts:password_change' %}">Zmień hasło</a>
     {% if not has_2fa %}<a class="btn secondary" href="{% url 'accounts:otp_setup' %}">Włącz 2FA</a>{% endif %}
+    <a class="btn secondary" href="{% url 'accounts:my_data' %}">Pobierz moje dane (RODO)</a>
     <a class="btn secondary" href="{% url 'accounts:deactivate' %}">Dezaktywuj konto</a>
   </div>
 </div>

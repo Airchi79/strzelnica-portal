@@ -16,6 +16,7 @@ urlpatterns = [
     path("profil/", views.profile, name="profile"),
     path("profil/haslo/", views.PasswordChangeView.as_view(), name="password_change"),
     path("profil/dezaktywuj/", views.deactivate, name="deactivate"),
+    path("profil/moje-dane/", views.my_data, name="my_data"),
     path("haslo/reset/", views.PasswordResetView.as_view(), name="password_reset"),
     path(
         "haslo/reset/wyslano/",

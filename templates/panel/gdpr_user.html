@@ -1,0 +1,29 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}RODO — {{ subject.full_name }}{% endblock %}
+{% block panel %}
+<p class="small"><a href="{% url 'panel:gdpr' %}">← RODO</a> · <a href="{% url 'panel:user' subject.pk %}">karta osoby</a></p>
+<h1>{{ subject.full_name }} {% if subject.anonymized_at %}<span class="badge">dane usunięte {{ subject.anonymized_at|date:"j.m.Y" }}</span>{% elif not subject.is_active %}<span class="badge warn">dezaktywowane</span>{% endif %}</h1>
+{% if subject.anonymized_at %}
+  <div class="card"><p style="margin:0">Dane osobowe tego konta zostały usunięte. Pozostały wyłącznie dane wymagane przepisami (książka pobytu do upływu okresu przechowywania, rozliczenia, ewidencja członków).</p></div>
+{% else %}
+<div class="card">
+  <h2 class="step-title">1. Dezaktywacja konta</h2>
+  {% if subject.is_active %}
+    <p class="small">Osoba nie będzie mogła się zalogować. Dane zostają.</p>
+    {% if can_act %}<form method="post" data-confirm="Dezaktywować konto {{ subject.email }}?">{% csrf_token %}<input type="hidden" name="action" value="deactivate">
+      <div class="field"><label for="reason">Powód (np. „żądanie usunięcia z 5.11, e-mail”)</label><input id="reason" name="reason" maxlength="120"></div>
+      <button class="btn secondary" type="submit">Dezaktywuj konto</button></form>{% endif %}
+  {% else %}<p class="small" style="margin:0">Konto jest dezaktywowane ({{ subject.deactivated_at|date:"j.m.Y H:i"|default:"—" }}).</p>{% endif %}
+</div>
+<div class="card">
+  <h2 class="step-title">2. Usunięcie danych osobowych (nieodwracalne)</h2>
+  <p class="small">Usuwane: imię i nazwisko na koncie, e-mail, telefon, adres, dokumenty i ich zdjęcia, notatki w kartotece, wpisy kartoteki osób, lista oczekujących, kalendarz, powiadomienia, logowanie dwuskładnikowe. <strong>Zostają</strong> (bez danych kontaktowych): wpisy w książce pobytu — do upływu okresu przechowywania, rozliczenia i płatności — przepisy rachunkowe, ewidencja członków stowarzyszenia, dziennik zdarzeń.</p>
+  {% if blockers %}<div class="msg warning"><strong>Teraz nie można:</strong><ul style="margin:4px 0 0;padding-left:18px">{% for b in blockers %}<li>{{ b }}</li>{% endfor %}</ul></div>
+  {% elif can_act %}
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="anonymize">
+    <div class="field"><label for="confirm">Aby potwierdzić, wpisz: <strong class="code">USUŃ {{ subject.pk }}</strong></label><input id="confirm" name="confirm" autocomplete="off"></div>
+    <button class="btn danger" type="submit">Usuń dane osobowe</button></form>
+  {% else %}<p class="small muted">Usunięcie danych wymaga uprawnienia „Nadawanie uprawnień innym osobom”.</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

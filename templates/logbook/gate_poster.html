@@ -5,11 +5,13 @@
   body { font-family: system-ui, sans-serif; text-align: center; color: #000; background: #fff; margin: 24px; }
   h1 { font-size: 34px; margin: 12px 0; } p { font-size: 18px; max-width: 640px; margin: 8px auto; }
   img { width: 420px; height: 420px; } .noprint { margin-bottom: 16px; }
+  img.poster-logo { width: 190px; height: 190px; display: block; margin: 0 auto 4px; }
   @media print { .noprint { display: none; } @page { size: A4 portrait; margin: 15mm; } }
 </style></head>
 <body>
 <div class="noprint"><button onclick="window.print()">Drukuj</button> <a href="javascript:history.back()">Wróć</a></div>
-<h1>STRZELNICA SĄTOK<br>Książka pobytu</h1>
+<img class="poster-logo" src="{{ BRAND.logo }}" alt="Logo {{ SITE_NAME }}">
+<h1>Książka pobytu</h1>
 <p><strong>Każda osoba przebywająca na strzelnicy wpisuje się do książki pobytu.</strong></p>
 <img src="{{ qr }}" alt="Kod QR wpisu do książki pobytu">
 <p>Zeskanuj kod aparatem telefonu, wybierz cel pobytu, uzupełnij dane i podpisz się palcem.</p>

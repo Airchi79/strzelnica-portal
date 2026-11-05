@@ -44,3 +44,25 @@ class Notification(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class Branding(models.Model):
+    """Logo stowarzyszenia i wygenerowane z niego ikony aplikacji (jeden rekord). Brak rekordu — logo domyślne z plików
+    statycznych. Trzymane w bazie, więc trafia do kopii zapasowych razem z danymi."""
+
+    logo = models.BinaryField("logo")
+    logo_type = models.CharField("typ pliku logo", max_length=32)  # image/svg+xml albo image/png
+    icon_192 = models.BinaryField("ikona 192×192 (PNG)")
+    icon_512 = models.BinaryField("ikona 512×512 (PNG)")
+    icon_maskable = models.BinaryField("ikona maskowalna 512×512 (PNG, z tłem)")
+    icon_background = models.CharField("kolor tła ikony", max_length=7, default="#ffffff")
+    updated_at = models.DateTimeField("zmieniono", auto_now=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        verbose_name = "logo"
+        verbose_name_plural = "logo"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)

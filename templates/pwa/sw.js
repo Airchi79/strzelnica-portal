@@ -1,9 +1,9 @@
 {% load static %}// Service worker: zasoby statyczne z pamięci podręcznej, strony zawsze z sieci (dane muszą być aktualne).
-const CACHE = "satok-v2";
+const CACHE = "satok-v3-{{ BRAND.version }}"; // nowa wersja przy zmianie logo — stare zasoby są usuwane
 const KIOSK_URL = "{% url 'kiosk:home' %}";
 const KIOSK_CACHE = "satok-kiosk"; // osobna pamięć — nie jest czyszczona przy zmianie wersji zasobów
 const OFFLINE_URL = "{% url 'core:offline' %}";
-const ASSETS = [OFFLINE_URL, "{% static 'css/app.css' %}", "{% static 'js/app.js' %}", "{% static 'icons/icon-192.png' %}", "{% static 'js/kiosk.js' %}"];
+const ASSETS = [OFFLINE_URL, "{% static 'css/app.css' %}", "{% static 'js/app.js' %}", "{{ BRAND.icon_192 }}", "{{ BRAND.logo }}", "{% static 'js/kiosk.js' %}"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -34,5 +34,14 @@ self.addEventListener("fetch", (event) => {
   }
   if (req.url.includes("/static/")) {
     event.respondWith(caches.match(req).then((hit) => hit || fetch(req)));
+    return;
+  }
+  const path = new URL(req.url).pathname;
+  if (path === "/logo/" || path.startsWith("/ikona/")) {
+    // Logo i ikony (adres z ?v= zmienia się przy każdej zmianie logo): z pamięci, a gdy brak — z sieci i do pamięci.
+    event.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+      if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+      return res;
+    })));
   }
 });

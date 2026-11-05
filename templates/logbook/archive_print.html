@@ -11,7 +11,7 @@
 <body>
 <div class="noprint"><button onclick="window.print()">Drukuj / zapisz jako PDF</button> <a href="javascript:history.back()">Wróć</a>
 {% if truncated %}<strong> Pokazano pierwsze 5000 wpisów — zawęź zakres dat.</strong>{% endif %}</div>
-<h1>Książka rejestru pobytu na strzelnicy — archiwum (system GunTracker)</h1>
+<img src="{{ BRAND.logo }}" alt="" style="float:right;width:64px;height:64px;margin:0 0 6px 12px"><h1>Książka rejestru pobytu na strzelnicy — archiwum (system GunTracker)</h1>
 <p>{{ association.name }}{% if association.address %}, {{ association.address }}{% endif %} · okres {{ f.od|date:"d.m.Y" }}–{{ f.do|date:"d.m.Y" }} · wydruk {% now "d.m.Y H:i" %}</p>
 <p>Wpisy przeniesione z poprzedniego systemu; oświadczenia i ich potwierdzenia składano w systemie GunTracker.</p>
 <table>

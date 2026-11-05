@@ -1,5 +1,8 @@
 from django import forms
 
+from django.core.exceptions import ValidationError
+
+from . import branding
 from .models import AssociationSettings
 from .permissions import PANEL_PERMISSIONS
 
@@ -35,3 +38,44 @@ class UserPermissionsForm(forms.Form):
     permissions = forms.MultipleChoiceField(
         label="Uprawnienia w panelu zarządu", choices=PANEL_PERMISSIONS, widget=forms.CheckboxSelectMultiple, required=False
     )
+
+
+class LogoForm(forms.Form):
+    """Wgranie logo. Dla SVG ikony generuje przeglądarka (ukryte pola), dla PNG/JPG — serwer."""
+
+    logo = forms.FileField(label="Plik logo", help_text="SVG (najlepiej), PNG lub JPG, do 1 MB. Najlepiej kwadratowe, na przezroczystym tle.")
+    icon_background = forms.RegexField(
+        label="Kolor tła ikony aplikacji", regex=r"^#[0-9a-fA-F]{6}$", initial="#1c2a21",
+        widget=forms.TextInput(attrs={"type": "color"}),
+        help_text="Tło ikony na telefonie (Android przycina ikonę do koła lub zaokrąglonego kwadratu, iPhone nie obsługuje przezroczystości).",
+    )
+    icon_192 = forms.CharField(widget=forms.HiddenInput, required=False)
+    icon_512 = forms.CharField(widget=forms.HiddenInput, required=False)
+    icon_maskable = forms.CharField(widget=forms.HiddenInput, required=False)
+
+    def clean_logo(self):
+        f = self.cleaned_data["logo"]
+        if f.size > branding.MAX_LOGO_BYTES:
+            raise ValidationError("Plik jest za duży (najwyżej 1 MB).")
+        data = f.read()
+        kind = branding.detect_type(data)
+        if not kind:
+            raise ValidationError("Dozwolone są pliki SVG, PNG i JPG.")
+        if kind == "image/svg+xml":
+            return {"type": kind, "data": branding.check_svg(data)}
+        img = branding._open_raster(data)
+        return {"type": "image/png", "data": branding.raster_to_png(img), "image": img}
+
+    def clean(self):
+        data = super().clean()
+        logo = data.get("logo")
+        if not logo or "icon_background" not in data:
+            return data
+        if "image" in logo:
+            data["icons"] = branding.make_icons(logo["image"], data["icon_background"])
+        else:
+            try:
+                data["icons"] = {k: branding.check_icon_data_url(data.get(k, ""), size) for k, size in branding.ICON_SIZES.items()}
+            except ValidationError as e:
+                self.add_error("logo", "Ikony z pliku SVG tworzy przeglądarka — wybierz plik ponownie i poczekaj na podgląd. " + e.messages[0])
+        return data

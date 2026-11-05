@@ -216,13 +216,25 @@ def to_pdf(report, association):
                             title=f"Raport sprzedaży {report.number}", author=association.name or "Strzelnica Sątok")
     s = report.data["summary"]
     period = report.period_start.strftime("%d.%m.%Y") + ("" if report.period_start == report.period_end else "–" + report.period_end.strftime("%d.%m.%Y"))
-    story = [
+    header = [
         Paragraph(f"Raport sprzedaży {report.get_kind_display().lower()} nr {report.number}", head),
         Paragraph(escape(f"{association.name}{', ' + association.address if association.address else ''}"
                          f"{' · NIP ' + association.nip if association.nip else ''}"), base),
         Paragraph(f"Okres: {period} · wygenerowano: {timezone.localtime(report.generated_at):%d.%m.%Y %H:%M}", base),
-        Spacer(1, 6 * mm),
     ]
+    try:  # logo w nagłówku (wgrane w danych stowarzyszenia albo domyślne); brak logo nie blokuje raportu
+        from reportlab.platypus import Image
+
+        from apps.core.branding import icon_png_for_pdf
+
+        logo = Image(io.BytesIO(icon_png_for_pdf()), width=20 * mm, height=20 * mm)
+        top = Table([[header, logo]], colWidths=[doc.width - 24 * mm, 24 * mm])
+        top.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                                 ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
+        story = [top]
+    except Exception:  # noqa: BLE001
+        story = list(header)
+    story.append(Spacer(1, 6 * mm))
 
     def table(data, widths, bold_last=False):
         t = Table(data, colWidths=widths, repeatRows=1)

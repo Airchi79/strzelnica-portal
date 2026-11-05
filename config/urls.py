@@ -21,6 +21,8 @@ urlpatterns = [
     path("kiosk/", include("apps.kiosk.urls")),
     path("techniczny/", admin.site.urls),
     path("manifest.webmanifest", core_views.manifest, name="manifest"),
+    path("logo/", core_views.brand_logo, name="brand_logo"),
+    path("ikona/<str:size>.png", core_views.brand_icon, name="brand_icon"),
     path("sw.js", core_views.service_worker, name="service_worker"),
     path("healthz", core_views.healthz, name="healthz"),
 ]

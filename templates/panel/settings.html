@@ -1,6 +1,36 @@
-{% extends "panel/base_panel.html" %}
+{% extends "panel/base_panel.html" %}{% load static %}
 {% block title %}Stowarzyszenie{% endblock %}
 {% block panel %}
 <h1>Dane stowarzyszenia</h1>
 <div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Zapisz</button></form></div>
+
+<h2 id="logo">Logo</h2>
+<div class="card">
+  <p class="small muted" style="margin-top:0">Logo pojawia się na stronie, w panelu, w kiosku, na plakacie z kodem QR, na wydrukach książki pobytu i w raportach PDF. Z logo powstaje też ikona aplikacji na telefonie.
+    {% if branding %}Wgrane {{ branding.updated_at|date:"j.m.Y H:i" }}{% if branding.updated_by %} przez {{ branding.updated_by.full_name }}{% endif %}.{% else %}Teraz: logo domyślne.{% endif %}</p>
+  <div class="logo-preview" data-logo-current>
+    <figure><div class="on-light"><img src="{{ BRAND.logo }}" alt="Obecne logo na jasnym tle"></div>jasne tło</figure>
+    <figure><div class="on-dark"><img src="{{ BRAND.logo }}" alt="Obecne logo na ciemnym tle"></div>ciemne tło</figure>
+    <figure class="app-icon"><img src="{{ BRAND.icon_maskable }}" alt="Ikona aplikacji (Android)"><br>Android</figure>
+    <figure class="app-icon ios"><img src="{{ BRAND.icon_maskable }}" alt="Ikona aplikacji (iPhone)"><br>iPhone</figure>
+  </div>
+
+  <form method="post" action="{% url 'panel:settings_logo' %}" enctype="multipart/form-data" novalidate id="logo-form">{% csrf_token %}
+    {% include "partials/form.html" with form=logo_form %}
+    <div class="logo-preview" data-logo-new hidden>
+      <figure><div class="on-light"><img data-prev="logo" alt="Nowe logo na jasnym tle"></div>nowe — jasne tło</figure>
+      <figure><div class="on-dark"><img data-prev="logo2" alt="Nowe logo na ciemnym tle"></div>ciemne tło</figure>
+      <figure class="app-icon"><img data-prev="icon_maskable" alt="Nowa ikona (Android)"><br>Android</figure>
+      <figure class="app-icon ios"><img data-prev="icon_maskable2" alt="Nowa ikona (iPhone)"><br>iPhone</figure>
+      <figure><div class="on-light"><img data-prev="icon_192" alt="Nowa ikona karty" style="width:32px;height:32px"></div>karta przeglądarki</figure>
+    </div>
+    <p class="small" data-logo-msg></p>
+    <div class="actions"><button class="btn" type="submit" data-logo-submit>Zapisz nowe logo</button></div>
+  </form>
+  {% if branding %}
+  <form method="post" action="{% url 'panel:settings_logo' %}" data-confirm="Przywrócić logo domyślne?">{% csrf_token %}<input type="hidden" name="action" value="reset">
+    <button class="btn secondary small-btn" type="submit">Przywróć logo domyślne</button></form>
+  {% endif %}
+</div>
+<script src="{% static 'js/logo.js' %}" defer></script>
 {% endblock %}

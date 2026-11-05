@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#2f5d3a">
   <title>{% block title %}{{ SITE_NAME }}{% endblock %} · {{ SITE_NAME }}</title>
   <link rel="manifest" href="{% url 'manifest' %}">
-  <link rel="icon" href="{% static 'icons/icon-192.png' %}">
-  <link rel="apple-touch-icon" href="{% static 'icons/icon-192.png' %}">
+  <link rel="icon" type="image/png" href="{{ BRAND.icon_192 }}">
+  <link rel="apple-touch-icon" href="{{ BRAND.icon_maskable }}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="{% static 'js/theme.js' %}"></script>
 </head>
@@ -15,7 +15,7 @@
 {% block shell %}
 <header class="topbar">
   <div class="wrap">
-    <a class="brand" href="{% url 'core:home' %}">{{ SITE_NAME }}</a>
+    <a class="brand" href="{% url 'core:home' %}"><img class="brand-logo" src="{{ BRAND.logo }}" alt="" width="34" height="34">{{ SITE_NAME }}</a>
     <nav class="nav">
       <a href="{% url 'bookings:calendar' %}">Zajętość osi</a>
       <a href="{% url 'core:lanes' %}">Cennik</a>

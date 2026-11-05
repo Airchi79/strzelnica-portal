@@ -5,7 +5,7 @@ from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -18,8 +18,9 @@ from apps.audit.services import diff, log_event, log_sensitive_access
 from apps.credentials.models import Credential, is_range_officer
 from apps.facilities.models import Lane
 
-from .forms import AssociationSettingsForm, UserPermissionsForm
-from .models import AssociationSettings
+from . import branding
+from .forms import AssociationSettingsForm, LogoForm, UserPermissionsForm
+from .models import AssociationSettings, Branding
 from .permissions import PANEL_PERMISSIONS, ROLE_PRESETS, panel_required
 
 User = get_user_model()
@@ -97,7 +98,61 @@ def panel_settings(request):
         log_event("ustawienia.zmiana", obj, changes=diff(before, obj, form.Meta.fields))
         messages.success(request, "Zapisano dane stowarzyszenia.")
         return redirect("panel:settings")
-    return render(request, "panel/settings.html", {"form": form})
+    current = Branding.objects.filter(pk=1).only("updated_at", "logo_type", "icon_background", "updated_by").first()
+    logo_form = LogoForm(initial={"icon_background": current.icon_background} if current else None)
+    return render(request, "panel/settings.html", {"form": form, "logo_form": logo_form, "branding": current})
+
+
+@panel_required("core.manage_settings")
+def panel_logo(request):
+    if request.method != "POST":
+        return redirect("panel:settings")
+    if request.POST.get("action") == "reset":
+        deleted, _ = Branding.objects.filter(pk=1).delete()
+        if deleted:
+            log_event("ustawienia.logo", None, "Przywrócono logo domyślne")
+        messages.success(request, "Przywrócono logo domyślne.")
+        return redirect("panel:settings")
+    form = LogoForm(request.POST, request.FILES)
+    if form.is_valid():
+        d = form.cleaned_data
+        Branding(
+            logo=d["logo"]["data"], logo_type=d["logo"]["type"], icon_background=d["icon_background"], updated_by=request.user,
+            **d["icons"],
+        ).save()
+        log_event("ustawienia.logo", None, f"Nowe logo ({d['logo']['type']}, {len(d['logo']['data']) // 1024} kB)")
+        messages.success(request, "Zapisano nowe logo. Ikona aplikacji na telefonach odświeży się przy następnym otwarciu (na iPhonie — po ponownym dodaniu do ekranu początkowego).")
+        return redirect("panel:settings")
+    obj = AssociationSettings.load()
+    return render(request, "panel/settings.html", {"form": AssociationSettingsForm(instance=obj), "logo_form": form,
+                                                   "branding": Branding.objects.filter(pk=1).only("updated_at", "logo_type", "icon_background").first()})
+
+
+def _brand_response(data, content_type, request):
+    response = HttpResponse(bytes(data), content_type=content_type)
+    # Adres z ?v= zmienia się przy każdej zmianie logo — można go trzymać długo w pamięci podręcznej.
+    response["Cache-Control"] = "public, max-age=31536000, immutable" if request.GET.get("v") else "public, max-age=300"
+    response["X-Content-Type-Options"] = "nosniff"
+    if content_type == "image/svg+xml":
+        response["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox"
+    return response
+
+
+def brand_logo(request):
+    row = Branding.objects.filter(pk=1).values_list("logo", "logo_type").first()
+    if not row:
+        return redirect(branding.brand_urls()["logo"])
+    return _brand_response(row[0], row[1], request)
+
+
+def brand_icon(request, size):
+    field = {"192": "icon_192", "512": "icon_512", "maskable": "icon_maskable"}.get(size)
+    if field is None:
+        raise Http404
+    data = Branding.objects.filter(pk=1).values_list(field, flat=True).first()
+    if not data:
+        return redirect(branding.brand_urls()[field])
+    return _brand_response(data, "image/png", request)
 
 
 def _perm_objects(codes):

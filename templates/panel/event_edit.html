@@ -1,0 +1,17 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{% if event %}Edycja: {{ event.title }}{% else %}Nowe wydarzenie{% endif %}{% endblock %}
+{% block panel %}
+<p class="small"><a href="{% if event %}{% url 'panel:event' event.pk %}{% else %}{% url 'panel:events' %}{% endif %}">← Wróć</a></p>
+<h1>{% if event %}Edycja wydarzenia{% else %}Nowe wydarzenie{% endif %}</h1>
+<div class="card"><form method="post" novalidate>{% csrf_token %}
+  {% include "partials/form.html" %}
+  {% if conflicts %}
+    <div class="msg warning"><strong>Kolizje z rezerwacjami ({{ conflicts|length }})</strong> na zaznaczonych osiach:
+      <ul style="margin:4px 0 0;padding-left:18px">{% for r in conflicts %}<li>{{ r.starts_at|date:"j.m H:i" }} · {{ r.lane }} · {{ r.user.full_name }} ({{ r.number }})</li>{% endfor %}</ul>
+      Zaznacz wyżej „Anuluj kolidujące rezerwacje”, jeśli mają zostać anulowane, i zapisz ponownie.</div>
+    <input type="hidden" name="confirm" value="1">
+    <button class="btn" type="submit">Zapisz mimo kolizji</button>
+  {% else %}<button class="btn" type="submit">Zapisz</button>{% endif %}
+</form></div>
+<p class="small muted">Szkic jest niewidoczny dla strzelców. Po opublikowaniu wydarzenie pojawi się w zakładce „Wydarzenia” na stronie, a zaznaczone osie zostaną zablokowane.</p>
+{% endblock %}

@@ -18,6 +18,7 @@ from .models import ReportSequence, SalesReport
 CATEGORY_LABELS = {
     "rezerwacja": "Rezerwacje",
     "skladka": "Składki i wpisowe",
+    "wydarzenie": "Wydarzenia (opłaty startowe)",
     "kod_wejscia": "Kody wejścia (karnety, abonamenty)",
     "inne": "Inne wpłaty",
     "zwrot": "Zwroty do wpłacających",
@@ -44,13 +45,14 @@ def collect(start, end):
     lo, hi = _bounds(start, end)
     rows = []
     payments = Payment.objects.filter(status=Payment.Status.COMPLETED, completed_at__gte=lo, completed_at__lt=hi).select_related(
-        "user", "reservation", "fee"
+        "user", "reservation", "fee", "event_registration__event"
     )
     for p in payments.order_by("completed_at", "id"):
         if p.is_test:
             continue  # płatność testowa (sandbox Tpay) — bez prawdziwych pieniędzy
-        category = "rezerwacja" if p.reservation_id else "skladka" if p.fee_id else "inne"
-        doc = p.reservation.number if p.reservation_id else (p.fee.label if p.fee_id else (p.title or ""))
+        category = "rezerwacja" if p.reservation_id else "skladka" if p.fee_id else "wydarzenie" if p.event_registration_id else "inne"
+        doc = (p.reservation.number if p.reservation_id else p.fee.label if p.fee_id
+               else p.event_registration.event.title if p.event_registration_id else (p.title or ""))
         rows.append({
             "at": timezone.localtime(p.completed_at).isoformat(timespec="minutes"), "category": category, "method": p.method,
             "doc": doc[:80], "client": (p.user.full_name if p.user else p.payer_name)[:80], "amount": p.amount, "ref": str(p.pk),

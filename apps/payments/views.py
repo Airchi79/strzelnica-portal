@@ -64,8 +64,19 @@ def tpay_start(request):
     if not settings.TPAY_ENABLED:
         messages.error(request, "Płatności online są chwilowo niedostępne.")
         return redirect("payments:wallet")
-    reservation = fee = None
-    if request.POST.get("fee"):
+    reservation = fee = registration = None
+    if request.POST.get("registration"):
+        from apps.events.models import Registration
+
+        registration = get_object_or_404(Registration, pk=request.POST["registration"], user=request.user,
+                                         status=Registration.Status.REGISTERED, payment_status=Registration.Payment.DUE)
+        amount = max(registration.amount - registration.paid_amount - max(services.balance_of(request.user), 0), 0)
+        if amount == 0:
+            services.apply_wallet(request.user, targets=[registration])
+            messages.success(request, "Opłata startowa została pokryta z nadpłaty.")
+            return redirect("events:detail", pk=registration.event_id)
+        amount = max(amount, 100)
+    elif request.POST.get("fee"):
         from apps.association.models import Fee
 
         fee = get_object_or_404(Fee, pk=request.POST["fee"], member__user=request.user, status=Fee.Status.DUE)
@@ -95,14 +106,15 @@ def tpay_start(request):
             return redirect("payments:wallet")
         amount = form.cleaned_data["amount"]
     payment = Payment.objects.create(
-        user=request.user, amount=amount, method=Payment.Method.TPAY, reservation=reservation, fee=fee,
-        title=reservation.number if reservation else (fee.label if fee else services.topup_code(request.user)), created_by=request.user,
+        user=request.user, amount=amount, method=Payment.Method.TPAY, reservation=reservation, fee=fee, event_registration=registration,
+        title=reservation.number if reservation else (fee.label if fee else (registration.label if registration else services.topup_code(request.user))),
+        created_by=request.user,
     )
     base = settings.SITE_URL
     try:
         tx = tpay.create_transaction(
             amount_grosze=amount,
-            description="Strzelnica Sątok — " + (f"rezerwacja {reservation.number}" if reservation else (fee.label if fee else "doładowanie salda")),
+            description="Strzelnica Sątok — " + (f"rezerwacja {reservation.number}" if reservation else (fee.label if fee else (registration.label if registration else "doładowanie salda")))[:100],
             hidden_description=str(payment.pk),
             payer_email=request.user.email,
             payer_name=request.user.full_name,

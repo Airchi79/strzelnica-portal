@@ -529,3 +529,12 @@ tr.neg td { color: var(--bad); }
 .announce.zamkniete { border-left-color: var(--bad); background: var(--bad-bg); }
 .announce-body { font-size: .92rem; margin-top: 2px; }
 .announce-close { background: none; border: 0; font-size: 1.4rem; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 4px; }
+
+/* --- wydarzenia --- */
+.event-card { display: flex; gap: 14px; align-items: center; text-decoration: none; color: var(--text); }
+.event-card:hover { border-color: var(--brand); }
+.event-date { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 58px; height: 58px; flex: none; border-radius: 10px; background: color-mix(in srgb, var(--brand) 12%, var(--surface)); color: var(--brand); }
+.event-date .d { font-size: 1.4rem; font-weight: 800; line-height: 1; } .event-date .m { font-size: .75rem; text-transform: uppercase; }
+.event-info { display: flex; flex-direction: column; gap: 3px; }
+.event-desc { margin-top: 10px; } .event-desc p { margin: 0 0 8px; }
+.inline-actions { display: flex; gap: 4px; flex-wrap: wrap; }

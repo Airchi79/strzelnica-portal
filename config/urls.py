@@ -19,6 +19,7 @@ urlpatterns = [
     path("stowarzyszenie/", include("apps.association.urls")),
     path("panel/", include("apps.core.panel_urls")),
     path("kiosk/", include("apps.kiosk.urls")),
+    path("wydarzenia/", include("apps.events.urls")),
     path("techniczny/", admin.site.urls),
     path("manifest.webmanifest", core_views.manifest, name="manifest"),
     path("logo/", core_views.brand_logo, name="brand_logo"),

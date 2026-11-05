@@ -14,6 +14,7 @@ SECTIONS = [
          ["reservations_days", "reservation", "reservation_new", "reservations"]),
         ("Kalendarz osi", "panel:bookings", "grid", "bookings.manage_reservations", ["bookings"]),
         ("Blokady osi", "panel:blocks", "lock", "bookings.manage_reservations", ["block*"]),
+        ("Wydarzenia i zawody", "panel:events", "calendar", "events.manage_events", ["event*"]),
         ("Archiwum GunTracker", "panel:reservations_archive", "archive", "bookings.manage_reservations", ["reservations_archive*"]),
         ("Ustawienia rezerwacji", "panel:booking_settings", "sliders", "bookings.manage_booking_settings", ["booking_settings"]),
     ]),

@@ -562,3 +562,27 @@ def test_pay_from_balance_button(owner_client):
     assert "pay_from_balance" in owner_client.get(f"/panel/rezerwacje/{r.pk}/").content.decode()
     owner_client.post(f"/panel/rezerwacje/{r.pk}/", {"action": "pay_from_balance"})
     assert Reservation.objects.get(pk=r.pk).payment_status == Reservation.Payment.PAID
+
+
+def test_tpay_event_registration_start_and_notification(client, ps, owner, tpay_keys, monkeypatch):
+    import datetime as dt
+
+    from django.utils import timezone
+
+    from apps.events import services as event_services
+    from apps.events.models import Event, Registration
+
+    start = timezone.now() + dt.timedelta(days=5)
+    e = Event(title="Zawody", starts_at=start, ends_at=start + dt.timedelta(hours=3), fee=4000,
+              registration_until=start - dt.timedelta(hours=1), status=Event.Status.PUBLISHED)
+    event_services.save_event(e, [], owner)
+    reg = event_services.register(ps, e)
+    monkeypatch.setattr(tpay, "create_transaction", lambda **kw: {"transaction_id": "01EV", "title": "TR-TEST-1", "payment_url": "https://secure.sandbox.tpay.com/?t=1"})
+    client.force_login(ps)
+    response = client.post("/platnosci/tpay/start/", {"registration": reg.pk})
+    assert response.status_code == 302
+    payment = Payment.objects.get(event_registration=reg)
+    assert payment.amount == 4000
+    assert _post(client, tpay_keys, _notification(payment)).content == b"TRUE"
+    reg.refresh_from_db()
+    assert reg.payment_status == Registration.Payment.PAID and reg.paid_amount == 4000

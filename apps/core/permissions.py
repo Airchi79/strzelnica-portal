@@ -28,6 +28,7 @@ PANEL_PERMISSIONS = [
     ("facilities.manage_facilities", "Osie, godziny otwarcia i cennik"),
     ("core.manage_settings", "Dane stowarzyszenia"),
     ("core.publish_announcement", "Ogłoszenia dla strzelców (strona i e-mail)"),
+    ("events.manage_events", "Wydarzenia i zawody: tworzenie, listy startowe, opłaty"),
     ("audit.view_auditlog", "Dziennik zdarzeń"),
     ("accounts.manage_permissions", "Nadawanie uprawnień innym osobom"),
 ]

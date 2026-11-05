@@ -76,6 +76,9 @@ class Payment(models.Model):
     reservation = models.ForeignKey(
         "bookings.Reservation", verbose_name="za rezerwację", null=True, blank=True, on_delete=models.PROTECT, related_name="payments"
     )
+    event_registration = models.ForeignKey(
+        "events.Registration", verbose_name="za zapis na wydarzenie", null=True, blank=True, on_delete=models.PROTECT, related_name="payments"
+    )
     fee = models.ForeignKey(
         "association.Fee", verbose_name="za składkę / wpisowe", null=True, blank=True, on_delete=models.PROTECT, related_name="payments"
     )
@@ -111,6 +114,7 @@ class LedgerEntry(models.Model):
         DEPOSIT = "wplata", "Wpłata"
         RESERVATION_FEE = "oplata", "Opłata za rezerwację"
         MEMBERSHIP_FEE = "skladka", "Składka / wpisowe"
+        EVENT_FEE = "startowe", "Opłata startowa (wydarzenie)"
         REFUND = "zwrot", "Zwrot za rezerwację"
         CHARGEBACK = "zwrot_tpay", "Zwrot płatności do wpłacającego"
         CORRECTION = "korekta", "Korekta zarządu"

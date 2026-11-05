@@ -1,0 +1,13 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
+
+{% if reg.status == 'rezerwowy' %}wszystkie miejsca na „{{ reg.event.title }}” są zajęte — jesteś na liście rezerwowej. Gdy ktoś zrezygnuje, wejdziesz na jego miejsce automatycznie i dostaniesz e-mail.{% else %}potwierdzamy zapis na „{{ reg.event.title }}”.{% endif %}
+
+Termin: {{ reg.event.starts_at|date:"l, j E Y" }}, {{ reg.event.starts_at|time:"H:i" }}–{{ reg.event.ends_at|time:"H:i" }}
+{% if reg.note %}{{ reg.event.note_label|default:"Informacja" }}: {{ reg.note }}
+{% endif %}{% if reg.status == 'zapisany' and reg.payment_status == 'do_zaplaty' %}Opłata startowa: {{ reg.amount|pln }} — zapłać na stronie wydarzenia (online) albo na miejscu.
+{% elif reg.payment_status == 'oplacona' %}Opłata startowa opłacona.
+{% endif %}
+Szczegóły i rezygnacja (do {{ reg.event.registration_until|date:"j.m.Y H:i" }}): {{ site_url }}{% url 'events:detail' reg.event_id %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

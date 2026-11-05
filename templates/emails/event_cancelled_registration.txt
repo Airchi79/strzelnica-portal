@@ -1,0 +1,8 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+organizator wycofał Twój zapis na „{{ reg.event.title }}” ({{ reg.event.starts_at|date:"j.m.Y H:i" }}).{% if reason %}
+Powód: {{ reason }}{% endif %}
+Ewentualna wpłata została zapisana jako nadpłata do zwrotu lub wykorzystania.
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "apps.clients",
     "apps.reports",
     "apps.kiosk",
+    "apps.events",
 ]
 
 MIDDLEWARE = [

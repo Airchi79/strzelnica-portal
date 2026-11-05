@@ -3,6 +3,7 @@ from django.urls import path
 from apps.association import views as association_views
 from apps.bookings import views as bookings_views
 from apps.credentials import views as credentials_views
+from apps.events import views as events_views
 from apps.facilities import views as facilities_views
 from apps.clients import views as clients_views
 from apps.kiosk import views as kiosk_views
@@ -51,6 +52,10 @@ urlpatterns = [
     path("rezerwacje/", bookings_views.panel_calendar, name="bookings"),
     path("ustawienia/logo/", views.panel_logo, name="settings_logo"),
     path("ogloszenia/", views.panel_announcements, name="announcements"),
+    path("wydarzenia/", events_views.panel_list, name="events"),
+    path("wydarzenia/nowe/", events_views.panel_edit, name="event_new"),
+    path("wydarzenia/<int:pk>/", events_views.panel_detail, name="event"),
+    path("wydarzenia/<int:pk>/edycja/", events_views.panel_edit, name="event_edit"),
     path("ogloszenia/nowe/", views.panel_announcement, name="announcement_new"),
     path("ogloszenia/<int:pk>/", views.panel_announcement, name="announcement"),
     path("rezerwacje/lista/", bookings_views.panel_list, name="reservations"),

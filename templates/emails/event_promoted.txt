@@ -1,0 +1,8 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
+
+zwolniło się miejsce — jesteś zapisany na „{{ reg.event.title }}” ({{ reg.event.starts_at|date:"j.m.Y H:i" }}).
+{% if reg.payment_status == 'do_zaplaty' %}Opłata startowa: {{ reg.amount|pln }} — zapłać na stronie wydarzenia albo na miejscu.
+{% endif %}Nie możesz przyjechać? Zrezygnuj, żeby miejsce dostała kolejna osoba: {{ site_url }}{% url 'events:detail' reg.event_id %}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

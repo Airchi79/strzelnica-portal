@@ -1,0 +1,8 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+wydarzenie „{{ reg.event.title }}” ({{ reg.event.starts_at|date:"j.m.Y H:i" }}) zostało odwołane.
+Powód: {{ reason }}
+Ewentualna opłata startowa została zapisana jako nadpłata do zwrotu lub wykorzystania — w razie pytań skontaktuj się z zarządem.
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

@@ -132,6 +132,22 @@ def _pay_item(user, item, by):
         r.save(update_fields=["paid_amount", "payment_status", "payment_marked_at", "payment_marked_by", "updated_at"])
         log_event("rezerwacja.oplacona", r, f"{r.number}: {remaining / 100:.2f} zł", actor=by)
         return True
+    from apps.events.models import Registration
+
+    if isinstance(item, Registration):
+        reg = Registration.objects.select_for_update().select_related("event").get(pk=item.pk)
+        if reg.payment_status != Registration.Payment.DUE or reg.status != Registration.Status.REGISTERED:
+            return False
+        remaining = reg.amount - reg.paid_amount
+        if remaining > 0:
+            if wallet.balance < remaining:
+                return False
+            post(user, -remaining, LedgerEntry.Kind.EVENT_FEE, reg.label, by=by)
+            reg.paid_amount += remaining
+        reg.payment_status = Registration.Payment.PAID
+        reg.save(update_fields=["paid_amount", "payment_status"])
+        log_event("wydarzenie.oplacone", reg, str(reg), actor=by)
+        return True
     fee = Fee.objects.select_for_update().get(pk=item.pk)
     if fee.status != Fee.Status.DUE or wallet.balance < fee.amount:
         return False
@@ -168,6 +184,19 @@ def apply_wallet(user, by=None, targets=None):
         if item is not None and _pay_item(user, item, by):
             paid += 1
     return paid
+
+
+@transaction.atomic
+def refund_registration(registration, by=None, reason="Zwrot opłaty startowej"):
+    """Zwraca na saldo (jako nadpłatę) wszystko, co pobrano za zapis na wydarzenie."""
+    from apps.events.models import Registration
+
+    r = Registration.objects.select_for_update().select_related("event").get(pk=registration.pk)
+    if r.paid_amount > 0:
+        post(r.user, r.paid_amount, LedgerEntry.Kind.REFUND, f"{reason}: {r.event.title}", by=by)
+        r.paid_amount = 0
+        r.save(update_fields=["paid_amount"])
+    return r
 
 
 @transaction.atomic
@@ -237,8 +266,8 @@ def complete_payment(payment, user=None, by=None, note=""):
             body=f"{payment.user.full_name}: {payment.amount / 100:.2f} zł. Zwróć wpłatę albo utwórz rezerwację ponownie.",
             event="Wpłata za anulowaną rezerwację",
         )
-    elif payment.reservation_id or payment.fee_id:
-        apply_wallet(payment.user, by=by, targets=[payment.reservation or payment.fee])
+    elif payment.reservation_id or payment.fee_id or payment.event_registration_id:
+        apply_wallet(payment.user, by=by, targets=[payment.reservation or payment.fee or payment.event_registration])
     elif wallet_enabled():
         apply_wallet(payment.user, by=by)
     else:
@@ -251,15 +280,16 @@ def complete_payment(payment, user=None, by=None, note=""):
 
 
 @transaction.atomic
-def register_manual_payment(user, amount, method, by, reservation=None, note="", fee=None):
+def register_manual_payment(user, amount, method, by, reservation=None, note="", fee=None, registration=None):
     """Gotówka lub BLIK na telefon przyjęte przez zarząd/obsługę."""
     if method not in (Payment.Method.CASH, Payment.Method.BLIK_PHONE, Payment.Method.TRANSFER):
         raise ValidationError("Nieprawidłowy sposób płatności.")
     if amount <= 0:
         raise ValidationError("Kwota musi być dodatnia.")
     payment = Payment.objects.create(
-        user=user, amount=amount, method=method, reservation=reservation, fee=fee, created_by=by, note=note[:255],
-        title=reservation.number if reservation else (fee.label if fee else ""), booked_on=timezone.localdate(),
+        user=user, amount=amount, method=method, reservation=reservation, fee=fee, event_registration=registration, created_by=by,
+        note=note[:255], booked_on=timezone.localdate(),
+        title=reservation.number if reservation else (fee.label if fee else (registration.label if registration else "")),
     )
     return complete_payment(payment, by=by)
 

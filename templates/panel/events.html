@@ -1,0 +1,16 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Wydarzenia{% endblock %}
+{% block panel %}
+<h1>Wydarzenia i zawody</h1>
+<div class="tabs"><a href="?pokaz=nadchodzace" class="{% if show == 'nadchodzace' %}active{% endif %}">Nadchodzące</a><a href="?pokaz=minione" class="{% if show != 'nadchodzace' %}active{% endif %}">Minione</a></div>
+<div class="actions" style="margin-top:0;margin-bottom:12px"><a class="btn" href="{% url 'panel:event_new' %}">+ Nowe wydarzenie</a></div>
+<div class="card table-wrap"><table>
+  <tr><th>Termin</th><th>Wydarzenie</th><th>Zapisani</th><th>Status</th></tr>
+  {% for e in events %}<tr>
+    <td class="nowrap small">{{ e.starts_at|date:"D j.m.Y" }}<div class="muted">{{ e.starts_at|time:"H:i" }}–{{ e.ends_at|time:"H:i" }}</div></td>
+    <td><a href="{% url 'panel:event' e.pk %}"><strong>{{ e.title }}</strong></a>{% if e.fee %} <span class="small muted">{{ e.fee|pln }}</span>{% endif %}</td>
+    <td class="nowrap">{{ e.n_taken }}{% if e.capacity %} / {{ e.capacity }}{% endif %}</td>
+    <td><span class="badge {% if e.status == 'opublikowane' %}ok{% elif e.status == 'odwolane' %}bad{% endif %}">{% if e.status == 'opublikowane' %}opublikowane{% elif e.status == 'odwolane' %}odwołane{% else %}szkic{% endif %}</span></td>
+  </tr>{% empty %}<tr><td colspan="4" class="muted">Brak wydarzeń.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}{% load satok %}
+{% block title %}{{ event.title }}{% endblock %}
+{% block content %}
+{% if event.status == 'odwolane' %}<div class="res-banner gray"><strong>Wydarzenie odwołane</strong></div>{% endif %}
+<h1>{{ event.title }}</h1>
+<div class="card res-main">
+  <div class="res-date"><span class="res-dow">{{ event.starts_at|date:"l" }}</span><span class="res-day">{{ event.starts_at|date:"j E Y" }}</span>
+    <span class="res-time">{{ event.starts_at|time:"H:i" }}–{% if event.ends_at|date:"Ymd" != event.starts_at|date:"Ymd" %}{{ event.ends_at|date:"j.m" }} {% endif %}{{ event.ends_at|time:"H:i" }}</span></div>
+  <dl class="res-facts">
+    <div><dt>Opłata startowa</dt><dd>{% if event.fee %}<strong>{{ event.fee|pln }}</strong>{% else %}bezpłatne{% endif %}</dd></div>
+    <div><dt>Miejsca</dt><dd>{% if event.capacity %}{{ taken }} / {{ event.capacity }}{% else %}{{ taken }} zapisanych (bez limitu){% endif %}</dd></div>
+    <div><dt>Zapisy do</dt><dd>{{ event.registration_until|date:"j.m.Y H:i" }}</dd></div>
+    {% if event.lanes.exists %}<div><dt>Osie</dt><dd>{% for l in event.lanes.all %}{{ l.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd></div>{% endif %}
+  </dl>
+  {% if event.description %}<div class="event-desc">{{ event.description|linebreaks }}</div>{% endif %}
+</div>
+
+{% if reg %}
+<div class="card">
+  {% if reg.status == 'rezerwowy' %}<div class="res-banner warn"><strong>Jesteś na liście rezerwowej</strong><span>Gdy zwolni się miejsce, wejdziesz automatycznie i dostaniesz e-mail.</span></div>
+  {% else %}<div class="res-banner ok"><strong>Jesteś zapisany ✓</strong>{% if reg.note %}<span>{{ event.note_label }}: {{ reg.note }}</span>{% endif %}</div>{% endif %}
+  {% if reg.status == 'zapisany' and reg.payment_status == 'do_zaplaty' %}
+    <p>Opłata startowa: <strong>{{ reg.amount|sub:reg.paid_amount|pln }}</strong></p>
+    {% if tpay_enabled %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="registration" value="{{ reg.pk }}"><button class="btn" type="submit">Zapłać online — BLIK, przelew, karta</button></form>{% endif %}
+    <p class="small muted">Możesz też zapłacić na miejscu u organizatora.</p>
+  {% elif reg.payment_status == 'oplacona' %}<p><span class="badge ok">opłacone</span></p>{% endif %}
+  {% if event.registration_open %}
+  <form method="post" data-confirm="Wycofać zapis na „{{ event.title }}”?">{% csrf_token %}<input type="hidden" name="action" value="cancel">
+    <button class="btn secondary small-btn" type="submit">Zrezygnuj</button>{% if reg.paid_amount %} <span class="small muted">Wpłata zostanie zapisana jako nadpłata.</span>{% endif %}</form>
+  {% endif %}
+</div>
+{% elif event.registration_open %}
+<div class="card">
+  <h2 class="step-title">Zapisz się</h2>
+  {% if not user.is_authenticated %}<p><a class="btn" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Zaloguj się, aby się zapisać</a> <a href="{% url 'accounts:register' %}">albo załóż konto</a></p>
+  {% elif reasons %}<div class="msg warning">{% for r in reasons %}{{ r }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>
+  {% else %}
+  <form method="post" novalidate>{% csrf_token %}<input type="hidden" name="action" value="register">
+    {% include "partials/form.html" %}
+    {% if free == 0 %}<p class="small muted">Brak wolnych miejsc — zapiszesz się na listę rezerwową.</p>{% endif %}
+    <button class="btn" type="submit">{% if free == 0 %}Zapisz na listę rezerwową{% else %}Zapisz się{% endif %}</button>
+  </form>{% endif %}
+</div>
+{% elif event.status != 'odwolane' %}<div class="card muted">Zapisy są zamknięte.{% if association.contact_phone %} Pytania: tel. {{ association.contact_phone }}{% endif %}</div>{% endif %}
+<p><a href="{% url 'events:list' %}">← Wszystkie wydarzenia</a></p>
+{% endblock %}

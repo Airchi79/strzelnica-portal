@@ -416,3 +416,30 @@ def panel_archive_import(request):
                 if not preview:
                     messages.success(request, "Import archiwum zakończony.")
     return render(request, "panel/logbook_archive_import.html", {"result": result, "preview": preview})
+
+
+@login_required
+def my_diary(request):
+    import csv
+
+    from .diary import summary
+
+    this_year = timezone.localdate().year
+    try:
+        year = int(request.GET.get("rok", this_year))
+    except ValueError:
+        year = this_year
+    year = min(max(year, 2015), this_year)
+    data = summary(request.user, year)
+    if request.GET.get("format") == "csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="dziennik-{year}.csv"'
+        response.write("\ufeff")
+        w = csv.writer(response, delimiter=";")
+        w.writerow(["Data", "Wejście", "Wyjście", "Czas [min]", "Cel", "Oś", "Prowadzący", "Źródło"])
+        for r in data["visits"]:
+            at = timezone.localtime(r["at"])
+            w.writerow([f"{at:%d.%m.%Y}", f"{at:%H:%M}", f"{timezone.localtime(r['end']):%H:%M}" if r["end"] else "", r["minutes"] or "",
+                        r["purpose"], r["lane"], r["officer"], r["source"]])
+        return response
+    return render(request, "logbook/my_diary.html", {**data, "years": list(range(this_year, max(this_year - 6, 2015) - 1, -1))})

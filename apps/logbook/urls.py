@@ -10,5 +10,6 @@ urlpatterns = [
     path("wpisano/<int:pk>/", views.done, name="done"),
     path("wyjscie/<str:token>/", views.exit_view, name="exit"),
     path("moj-kod/", views.my_qr, name="my_qr"),
+    path("dziennik/", views.my_diary, name="diary"),
     path("osoba/<str:token>/", views.personal_add, name="personal"),
 ]

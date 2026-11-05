@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% load satok %}
+{% block title %}Mój dziennik {{ year }}{% endblock %}
+{% block content %}
+<div class="today-head">
+  <div><h1 style="margin-bottom:2px">Mój dziennik strzelca</h1><p class="daylabel week-label" style="margin:0">{{ user.full_name }} · rok {{ year }}</p></div>
+  <form method="get" class="actions no-print" style="margin:0">
+    <select name="rok" onchange="this.form.submit()" aria-label="Rok">{% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select>
+    <a class="btn secondary small-btn" href="?rok={{ year }}&amp;format=csv">CSV</a>
+    <button type="button" class="btn small-btn" onclick="window.print()">Drukuj</button>
+  </form>
+</div>
+
+<div class="today-tiles">
+  <div class="card tile"><span class="tile-n">{{ days }}</span><span class="tile-l">dni na strzelnicy{% if shooting_days != days %} · w tym strzelanie: {{ shooting_days }}{% endif %}</span></div>
+  <div class="card tile"><span class="tile-n">{% widthratio minutes 60 1 %} h</span><span class="tile-l">łącznie na strzelnicy (wg wejść i wyjść)</span></div>
+  <div class="card tile"><span class="tile-n">{{ reservations }}</span><span class="tile-l">rezerwacji jako prowadzący · {{ res_hours }} h</span></div>
+  <div class="card tile"><span class="tile-n">{{ spent|pln }}</span><span class="tile-l">wydatki na strzelnicy (po zwrotach)</span></div>
+</div>
+
+<div class="card">
+  <h2 class="step-title">Dni na strzelnicy w miesiącach</h2>
+  {% if days %}<div class="month-bars" role="table" aria-label="Dni na strzelnicy w miesiącach">
+    {% for m, n, pct in months %}<div class="mb" role="row" title="{{ m }}: {{ n }} dni"><span class="mb-v" role="cell">{% if n %}{{ n }}{% endif %}</span><span class="mb-bar" style="height:{{ pct }}%"></span><span class="mb-l" role="rowheader">{{ m }}</span></div>{% endfor %}
+  </div>{% else %}<p class="muted small" style="margin:0">W {{ year }} r. nie ma jeszcze Twoich wpisów w książce pobytu. Wpisuj się kodem QR — wtedy wizyty pojawią się tutaj.</p>{% endif %}
+</div>
+
+{% if lanes or events %}
+<div class="today-tiles two-col">
+  {% if lanes %}<div class="card"><h2 class="step-title">Osie (Twoje rezerwacje)</h2><table class="small">{% for l, h in lanes %}<tr><td>{{ l }}</td><td class="nowrap"><strong>{{ h }} h</strong></td></tr>{% endfor %}</table></div>{% endif %}
+  {% if events %}<div class="card"><h2 class="step-title">Wydarzenia i zawody</h2><table class="small">{% for r in events %}<tr><td>{{ r.event.starts_at|date:"j.m" }}</td><td>{{ r.event.title }}{% if r.note %} <span class="muted">({{ r.note }})</span>{% endif %}</td></tr>{% endfor %}</table></div>{% endif %}
+</div>
+{% endif %}
+
+<div class="card table-wrap">
+  <h2 class="step-title">Wizyty ({{ visits|length }})</h2>
+  <table>
+    <tr><th>Data</th><th>Godziny</th><th>Cel</th><th class="hide-sm">Oś</th><th class="hide-sm">Prowadzący</th></tr>
+    {% for r in visits %}<tr>
+      <td class="nowrap">{{ r.at|date:"D j.m.Y" }}</td>
+      <td class="nowrap small">{{ r.at|time:"H:i" }}{% if r.end %}–{{ r.end|time:"H:i" }}{% endif %}</td>
+      <td class="small">{{ r.purpose }}{% if r.source == 'archiwum' %} <span class="badge">GunTracker</span>{% endif %}</td>
+      <td class="hide-sm small">{{ r.lane|default:"—" }}</td><td class="hide-sm small">{{ r.officer|default:"—" }}</td>
+    </tr>{% empty %}<tr><td colspan="5" class="muted">Brak wpisów w książce pobytu w {{ year }} r.</td></tr>{% endfor %}
+  </table>
+  <p class="small muted">Wizyty z książki pobytu powiązane z Twoim kontem{% if has_archive %} oraz z archiwum GunTracker (dopasowane po imieniu, nazwisku i numerze pozwolenia z Twoich dokumentów){% endif %}. Wpisy dodane bez konta nie są tu widoczne. Wydruk to zestawienie z systemu, nie zaświadczenie.</p>
+</div>
+<p class="small muted print-only">Wydrukowano {% now "j.m.Y H:i" %} · {{ SITE_NAME }}</p>
+{% endblock %}

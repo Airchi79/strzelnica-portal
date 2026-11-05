@@ -458,3 +458,29 @@ def test_mask_helpers():
     assert services.mask("AB 123456") == "AB•••••56"
     assert services.mask("Sątok 5, 56-420 Bierutów", 3, 0) == "Sąt••••••"
     assert services.mask("ab") == "a•" and services.mask("") == ""
+
+
+def test_my_diary_shows_own_visits_and_matched_archive_only(client):
+    import datetime as dt
+
+    from django.utils import timezone
+
+    from apps.logbook.models import ArchivedEntry
+
+    from .conftest import add_credential, make_user
+
+    u = make_user("diary@example.com", first_name="Anna", last_name="Kowalska")
+    add_credential(u, kind="pozwolenie", number="AB 123456")
+    now = timezone.now()
+    ArchivedEntry.objects.create(row_hash="h1", started_at=now - dt.timedelta(days=2), first_name="Anna", last_name="Kowalska",
+                                 permit_number="ab123456", lane="Oś 25 m", entry_type="strzelanie")
+    ArchivedEntry.objects.create(row_hash="h2", started_at=now - dt.timedelta(days=3), first_name="Anna", last_name="Kowalska",
+                                 permit_number="ZZ999", lane="Oś 100 m", entry_type="strzelanie")  # imienniczka
+    client.force_login(u)
+    response = client.get("/ksiazka/dziennik/")
+    assert response.status_code == 200
+    visits = response.context["visits"]
+    assert len(visits) == 1 and visits[0]["lane"] == "Oś 25 m"
+    assert response.context["days"] == 1
+    csv = client.get(f"/ksiazka/dziennik/?rok={now.year}&format=csv").content.decode("utf-8-sig")
+    assert "Oś 25 m" in csv and "Oś 100 m" not in csv

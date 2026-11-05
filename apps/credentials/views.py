@@ -31,6 +31,7 @@ def my_list(request):
             "credentials": credentials,
             "ps_valid": any(c.is_valid for c in ps),
             "ps_pending": any(c.effective_status == Credential.Status.PENDING for c in ps),
+            "soon": timezone.localdate() + timedelta(days=30),
         },
     )
 
@@ -84,6 +85,9 @@ REJECT_REASONS = [
 ]
 
 
+EXPIRING = "wygasa"  # zakładka: zweryfikowane, ważne jeszcze najwyżej 30 dni
+
+
 def _pending_queue():
     return Credential.objects.filter(status=Credential.Status.PENDING).order_by("created_at", "pk")
 
@@ -102,14 +106,19 @@ def panel_list(request):
     if kind in Credential.Kind.values:
         qs = qs.filter(kind=kind)
     counts = {r["status"]: r["n"] for r in qs.order_by().values("status").annotate(n=Count("pk"))}
-    if status in Credential.Status.values:
-        qs = qs.filter(status=status)
-    if status == Credential.Status.PENDING:
-        qs = qs.order_by("created_at", "pk")  # najdłużej czekające na górze
+    today = timezone.localdate()
+    expiring = qs.filter(status=Credential.Status.VERIFIED, valid_until__gte=today, valid_until__lte=today + timedelta(days=30))
+    if status == EXPIRING:
+        qs = expiring.order_by("valid_until")  # najbliższy koniec ważności na górze
+    elif status == Credential.Status.PENDING:
+        qs = qs.filter(status=status).order_by("created_at", "pk")  # najdłużej czekające na górze
+    elif status in Credential.Status.values:
+        qs = qs.filter(status=status).order_by("-reviewed_at", "-updated_at")
     else:
         qs = qs.order_by("-reviewed_at", "-updated_at")
     page = Paginator(qs, 30).get_page(request.GET.get("page"))
     tabs = [(value, label, counts.get(value, 0)) for value, label in Credential.Status.choices]
+    tabs.insert(2, (EXPIRING, "Wygasa w 30 dni", expiring.count()))
     return render(
         request,
         "panel/credentials_list.html",

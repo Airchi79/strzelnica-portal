@@ -5,6 +5,7 @@ import pytest
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.utils import timezone
 
 from apps.audit.models import AuditLog, SensitiveAccessLog
 from apps.credentials.models import Credential, is_range_officer
@@ -256,3 +257,39 @@ def test_revoke_requires_permission_and_post(client, user):
     assert client.post(f"/panel/weryfikacja/{credential.pk}/cofnij/", {"reason": "x"}).status_code in (302, 403)
     credential.refresh_from_db()
     assert credential.status == Credential.Status.VERIFIED
+
+
+def test_expiry_reminders_30_and_7_days_once(user, django_capture_on_commit_callbacks):
+    from apps.credentials.services import remind_expiring
+
+    today = datetime.date(2026, 11, 5)
+    c = add_credential(user, kind=Credential.Kind.LICENSE, valid_until=today + datetime.timedelta(days=30), number="L-9")
+    add_credential(user, number="PS-BEZ")  # bezterminowy — bez przypomnień
+    with django_capture_on_commit_callbacks(execute=True):
+        assert remind_expiring(today) == 1
+        assert remind_expiring(today) == 0  # drugi raz tego samego dnia — nic
+        assert remind_expiring(today + datetime.timedelta(days=10)) == 0  # nadal próg 30
+        assert remind_expiring(today + datetime.timedelta(days=23)) == 1  # 7 dni przed
+        assert remind_expiring(today + datetime.timedelta(days=25)) == 0
+    subjects = [m.subject for m in mail.outbox]
+    assert any("wygasa za 30 dni" in s for s in subjects) and any("wygasa za 7 dni" in s for s in subjects)
+    c.refresh_from_db()
+    assert c.expiry_notice_days == 7
+
+
+def test_expiry_reminder_skips_30_when_added_late(user):
+    from apps.credentials.services import remind_expiring
+
+    today = datetime.date(2026, 11, 5)
+    c = add_credential(user, valid_until=today + datetime.timedelta(days=5), number="PS-K")
+    assert remind_expiring(today) == 1
+    c.refresh_from_db()
+    assert c.expiry_notice_days == 7
+
+
+def test_panel_expiring_tab(owner_client, user):
+    soon = add_credential(user, valid_until=timezone.localdate() + datetime.timedelta(days=12), number="PS-SOON")
+    add_credential(user, kind=Credential.Kind.LICENSE, valid_until=timezone.localdate() + datetime.timedelta(days=90), number="L-LATER")
+    response = owner_client.get("/panel/weryfikacja/?status=wygasa")
+    assert [c.pk for c in response.context["page"]] == [soon.pk]
+    assert dict((v, n) for v, _, n in response.context["tabs"])["wygasa"] == 1

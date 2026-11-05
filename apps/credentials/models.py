@@ -55,6 +55,10 @@ class Credential(models.Model):
         settings.AUTH_USER_MODEL, verbose_name="zweryfikował", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
     reviewed_at = models.DateTimeField("data weryfikacji", null=True, blank=True)
+    expiry_notice_days = models.PositiveSmallIntegerField(
+        "wysłano przypomnienie o wygasaniu [dni przed]", null=True, blank=True,
+        help_text="30 albo 7 — ostatnie wysłane przypomnienie; czyszczone przy zmianie dokumentu.",
+    )
     created_at = models.DateTimeField("dodano", auto_now_add=True)
     updated_at = models.DateTimeField("zmieniono", auto_now=True)
 

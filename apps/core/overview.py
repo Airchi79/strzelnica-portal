@@ -132,6 +132,9 @@ def attention(user, now=None):
         tiles.append(("Braki w książce pobytu", "Odbyte rezerwacje bez wpisów (30 dni)", missing, reverse("panel:reservations_days") + "?filtr=braki_ksiega"))
     if user.has_perm("credentials.review_credential"):
         tiles.append(("Dokumenty do weryfikacji", "Pozwolenia i legitymacje PS", Credential.objects.filter(status=Credential.Status.PENDING).count(), reverse("panel:credentials")))
+        today = timezone.localdate()
+        soon = Credential.objects.filter(status=Credential.Status.VERIFIED, valid_until__gte=today, valid_until__lte=today + timedelta(days=30)).count()
+        tiles.append(("Dokumenty wygasają", "Ważność kończy się w ciągu 30 dni", soon, reverse("panel:credentials") + "?status=wygasa"))
     if user.has_perm("association.manage_members"):
         tiles.append(("Deklaracje członkowskie", "Czekają na uchwałę Zarządu", MembershipApplication.objects.filter(status=MembershipApplication.Status.PENDING).count(), reverse("panel:applications")))
     me = Member.objects.filter(user=user, status=Member.Status.ACTIVE).exclude(board_role="").first()

@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
@@ -24,6 +26,8 @@ def submit(credential, changed_fields=None):
         credential.reviewed_by = None
         credential.reviewed_at = None
         credential.review_note = ""
+    if changed_fields and "valid_until" in changed_fields:
+        credential.expiry_notice_days = None  # nowa data ważności — przypomnienia od nowa
     credential.save()
     log_event(
         "dokument.dodanie" if is_new else "dokument.zmiana",
@@ -97,6 +101,30 @@ def revoke(credential, actor, reason):
     )
     notify_user(credential.user, "Cofnięto weryfikację dokumentu", "emails/credential_revoked.txt", credential=credential, reason=reason)
     return credential
+
+
+EXPIRY_NOTICES = (30, 7)  # dni przed końcem ważności
+
+
+def remind_expiring(today=None):
+    """E-mail do właściciela 30 i 7 dni przed końcem ważności zweryfikowanego dokumentu (każde przypomnienie raz).
+    Zwraca liczbę wysłanych przypomnień."""
+    today = today or timezone.localdate()
+    sent = 0
+    horizon = today + timedelta(days=max(EXPIRY_NOTICES))
+    qs = Credential.objects.filter(status=Credential.Status.VERIFIED, valid_until__gte=today, valid_until__lte=horizon).select_related("user")
+    for credential in qs:
+        days_left = (credential.valid_until - today).days
+        due = min((d for d in EXPIRY_NOTICES if days_left <= d), default=None)  # najbliższy próg, który już minął
+        if due is None or (credential.expiry_notice_days is not None and credential.expiry_notice_days <= due):
+            continue
+        credential.expiry_notice_days = due
+        credential.save(update_fields=["expiry_notice_days", "updated_at"])
+        log_event("dokument.przypomnienie", credential, f"{credential} — wygasa za {days_left} dni")
+        notify_user(credential.user, f"Dokument wygasa za {days_left} dni", "emails/credential_expiring.txt",
+                    credential=credential, days_left=days_left)
+        sent += 1
+    return sent
 
 
 def expire_outdated(today=None):

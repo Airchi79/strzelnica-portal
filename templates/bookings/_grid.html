@@ -13,6 +13,7 @@
         {% else %}wolne{% endif %}</td>
       {% elif s.state == 'zajete' %}<td class="cell busy">
         {% if panel %}<a href="{% url 'panel:reservation' s.reservation.pk %}">{{ s.reservation.user.last_name }}<br><span class="small">{{ s.reservation.persons }} os.</span></a>
+        {% elif user.is_authenticated %}<a href="{% url 'bookings:waitlist' %}?os={{ lane.pk }}&amp;dzien={{ day|date:'Y-m-d' }}&amp;od={{ hour }}" title="Zapisz się na listę oczekujących">zajęte</a>
         {% else %}zajęte{% endif %}</td>
       {% elif s.state == 'blokada' %}<td class="cell blocked">{% if panel %}{{ s.block.title }}{% else %}niedostępne{% endif %}</td>
       {% elif s.state == 'za_pozno' %}<td class="cell past" title="za krótko przed terminem na rezerwację online">za krótko</td>

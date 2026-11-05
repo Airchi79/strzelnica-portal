@@ -131,7 +131,7 @@ class BlockForm(forms.Form):
 class BookingSettingsForm(forms.ModelForm):
     class Meta:
         model = BookingSettings
-        fields = ["free_cancel_hours", "online_payment_minutes", "approval_payment_hours", "offline_instructions", "min_lead_hours", "max_advance_days", "max_persons"]
+        fields = ["free_cancel_hours", "online_payment_minutes", "approval_payment_hours", "offline_instructions", "min_lead_hours", "waitlist_hold_minutes", "max_advance_days", "max_persons"]
         widgets = {"offline_instructions": forms.Textarea(attrs={"rows": 3})}
 
     def clean_max_persons(self):
@@ -151,3 +151,22 @@ class GroupRuleForm(forms.ModelForm):
         if not (d.get("pay_online") or d.get("pay_offline") or d.get("pay_pass")):
             raise forms.ValidationError("Każda grupa musi mieć co najmniej jeden sposób płatności.")
         return d
+
+
+class WaitlistForm(forms.Form):
+    lane = forms.ModelChoiceField(label="Oś", queryset=Lane.objects.none(), empty_label=None)
+    day = forms.DateField(label="Dzień", widget=DateInput())
+    start_hour = forms.TypedChoiceField(label="Od", choices=HOUR_START, coerce=int)
+    end_hour = forms.TypedChoiceField(label="Do", choices=HOUR_END, coerce=int)
+    persons = forms.IntegerField(label="Liczba osób", min_value=1, initial=1)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["lane"].queryset = active_lanes()
+        self.fields["day"].widget.attrs["min"] = timezone.localdate().isoformat()
+
+    def clean(self):
+        data = super().clean()
+        if data.get("start_hour") is not None and data.get("end_hour") is not None and data["end_hour"] <= data["start_hour"]:
+            self.add_error("end_hour", "Koniec musi być później niż początek.")
+        return data

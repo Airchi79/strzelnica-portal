@@ -47,7 +47,7 @@ class Slot:
         return f"{timezone.localtime(self.start):%H:%M}–{timezone.localtime(self.end):%H:%M}"
 
 
-def day_slots(lane, day: date, now=None, lead_hours=0):
+def day_slots(lane, day: date, now=None, lead_hours=0, holds=False, viewer=None):
     """Godzinowe sloty osi w danym dniu, zgodnie z godzinami otwarcia osi.
     `lead_hours` > 0 (widok klienta): wolne godziny zaczynające się wcześniej niż za tyle godzin mają stan „za_pozno”."""
     now = now or timezone.now()
@@ -62,6 +62,11 @@ def day_slots(lane, day: date, now=None, lead_hours=0):
         .select_related("user")
     )
     blocks = list(Block.objects.filter(lanes=lane, starts_at__lt=day_end, ends_at__gt=day_start))
+    held = []
+    if holds:  # widok klienta: godziny trzymane dla kogoś z listy oczekujących są zajęte
+        from .waitlist import held_ranges
+
+        held = held_ranges(lane, day_start, day_end, now, exclude_user=viewer if viewer and viewer.is_authenticated else None)
     current_hour = hour_floor(now)
     slots = []
     for h in range(hours.opens.hour, hours.closes.hour):
@@ -70,7 +75,7 @@ def day_slots(lane, day: date, now=None, lead_hours=0):
         blk = next((b for b in blocks if b.starts_at < end and b.ends_at > start), None)
         if blk:
             state = "blokada"
-        elif res:
+        elif res or any(a < end and b > start for a, b in held):
             state = "zajete"
         elif start < current_hour:
             state = "minione"
@@ -145,7 +150,7 @@ def booking_readiness(user):
     return {"steps": steps, "ready": not blocking, "done": done, "total": len(steps)}
 
 
-def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: int, now=None, enforce_lead=False):
+def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: int, now=None, enforce_lead=False, user=None):
     """Sprawdza termin i liczbę osób. Zwraca (starts_at, ends_at, price_rule).
     `enforce_lead` — rezerwacja przez klienta: obowiązuje minimalny czas przed terminem z ustawień."""
     now = now or timezone.now()
@@ -174,6 +179,13 @@ def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: i
         raise ValidationError(f"Rezerwować można najwyżej {cfg.max_advance_days} dni naprzód.")
     if Block.objects.filter(lanes=lane, starts_at__lt=ends_at, ends_at__gt=starts_at).exists():
         raise ValidationError("W wybranym czasie oś jest zablokowana przez zarząd.")
+    if enforce_lead:  # klient: termin trzymany dla osoby z listy oczekujących
+        from .waitlist import active_holds
+
+        hold = active_holds(lane, starts_at, ends_at, now, exclude_user=user).order_by("hold_until").first()
+        if hold:
+            raise ValidationError(f"Ten termin jest chwilowo zarezerwowany dla osoby z listy oczekujących "
+                                  f"(do {timezone.localtime(hold.hold_until):%H:%M}). Wybierz inny albo zapisz się na listę.")
     rule = lane.price_rule_for(day)
     if rule is None:
         raise ValidationError("Dla tej osi nie ustalono cennika. Skontaktuj się z zarządem.")
@@ -181,7 +193,7 @@ def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: i
 
 
 def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", user=None, enforce_lead=False):
-    starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, persons, now, enforce_lead=enforce_lead)
+    starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, persons, now, enforce_lead=enforce_lead, user=user)
     hours = end_hour - start_hour
     base = {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "code": None, "client_pass": None}
     if access_code:
@@ -274,6 +286,9 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     # Opłata pobierana od razu z salda, jeśli wystarcza środków (w przeciwnym razie należność „do zapłaty”).
     apply_wallet(user, by=created_by)
     reservation.refresh_from_db()
+    from .waitlist import mark_booked
+
+    mark_booked(reservation)
     if not notify:  # rezerwacje cykliczne: jedno zbiorcze powiadomienie dla całej serii
         return reservation
     if pending:
@@ -481,6 +496,14 @@ def cancel_reservation(reservation, by, reason="", as_board=False, now=None, kee
     if not late:
         reservation.payment_status = Reservation.Payment.NONE
     reservation.save()  # anulowanie po terminie: należność (lub rozliczenie wg umowy klubu) pozostaje
+    lane, freed_from, freed_to = reservation.lane, reservation.starts_at, reservation.ends_at
+
+    def _offer():
+        from .waitlist import offer_freed
+
+        offer_freed(lane, freed_from, freed_to)
+
+    transaction.on_commit(_offer)  # zwolniony termin — oferta dla pierwszej osoby z listy oczekujących
     if not late:
         reservation = refund_reservation(reservation, by=by)
     log_event(

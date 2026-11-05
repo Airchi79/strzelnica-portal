@@ -55,6 +55,7 @@ services:
       sh -c 'n=0; while true; do
         python manage.py expire_reservations;
         python manage.py send_announcements;
+        python manage.py process_waitlist;
         if [ $$((n % 12)) -eq 0 ]; then
           python manage.py send_reminders;
           python manage.py settle_reservations;

@@ -1,0 +1,16 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Lista oczekujących{% endblock %}
+{% block panel %}
+<h1>Lista oczekujących</h1>
+{% include "panel/_bookings_tabs.html" %}
+<div class="card table-wrap"><table>
+  <tr><th>Termin</th><th>Oś</th><th>Strzelec</th><th>Status</th><th class="hide-sm">Zapisano</th></tr>
+  {% for e in entries %}<tr>
+    <td class="nowrap">{{ e.starts_at|date:"D j.m" }} {{ e.starts_at|time:"H:i" }}–{{ e.ends_at|time:"H:i" }}</td><td>{{ e.lane }}</td>
+    <td>{{ e.user.full_name }}<div class="small muted">{{ e.user.email }}</div></td>
+    <td>{% if e.status == 'oferta' and e.hold_until > now %}<span class="badge ok">oferta do {{ e.hold_until|time:"H:i" }}</span>{% else %}<span class="badge">czeka</span>{% endif %}</td>
+    <td class="hide-sm small muted">{{ e.created_at|date:"j.m H:i" }}</td>
+  </tr>{% empty %}<tr><td colspan="5" class="muted">Nikt nie czeka.</td></tr>{% endfor %}
+</table></div>
+<p class="small muted">Kolejność według czasu zapisu. Gdy termin się zwolni, oferta trafia do pierwszej osoby, której cały oczekiwany zakres godzin jest wolny.</p>
+{% endblock %}

@@ -48,12 +48,12 @@ def _parse_day(value, default=None):
         return default or timezone.localdate()
 
 
-def _day_grid(day, lanes, now=None, lead_hours=0):
+def _day_grid(day, lanes, now=None, lead_hours=0, holds=False, viewer=None):
     """Siatka dnia: wiersze = godziny, kolumny = osie. Zwraca (godziny, {oś: {godzina: Slot}})."""
     columns = []
     hours = set()
     for lane in lanes:
-        slots = {s.hour: s for s in services.day_slots(lane, day, now, lead_hours=lead_hours)}
+        slots = {s.hour: s for s in services.day_slots(lane, day, now, lead_hours=lead_hours, holds=holds, viewer=viewer)}
         hours.update(slots)
         columns.append((lane, slots))
     ordered = sorted(hours)
@@ -61,13 +61,13 @@ def _day_grid(day, lanes, now=None, lead_hours=0):
     return [lane for lane, _ in columns], rows
 
 
-def _week_grid(lane, start, now=None, lead_hours=0):
+def _week_grid(lane, start, now=None, lead_hours=0, holds=False, viewer=None):
     """Siatka tygodnia jednej osi: kolumny = 7 dni od `start`, wiersze = godziny.
     Zwraca (dni [(dzień, liczba wolnych godzin, czy czynna)], wiersze [(godzina, [(dzień, Slot|None)])])."""
     days, columns, hours = [], [], set()
     for i in range(7):
         d = start + timedelta(days=i)
-        slots = {s.hour: s for s in services.day_slots(lane, d, now, lead_hours=lead_hours)}
+        slots = {s.hour: s for s in services.day_slots(lane, d, now, lead_hours=lead_hours, holds=holds, viewer=viewer)}
         hours.update(slots)
         columns.append((d, slots))
         days.append((d, sum(1 for s in slots.values() if s.state == "wolne"), bool(slots)))
@@ -97,9 +97,9 @@ def calendar(request):
     lead = BookingSettings.load().min_lead_hours
     ctx["can_book"] = request.user.is_authenticated and not services.check_can_book(request.user)
     if ctx["week_view"]:
-        ctx["week_days"], ctx["rows"] = _week_grid(ctx["lane"], start, lead_hours=lead) if ctx["lane"] else ([], [])
+        ctx["week_days"], ctx["rows"] = _week_grid(ctx["lane"], start, lead_hours=lead, holds=True, viewer=request.user) if ctx["lane"] else ([], [])
     else:
-        ctx["lanes"], ctx["rows"] = _day_grid(start, lanes, lead_hours=lead)
+        ctx["lanes"], ctx["rows"] = _day_grid(start, lanes, lead_hours=lead, holds=True, viewer=request.user)
         ctx.update({"prev": start - timedelta(days=1), "next": start + timedelta(days=1)})
     return render(request, "bookings/calendar.html", ctx)
 
@@ -113,7 +113,7 @@ def slots_json(request):
     if lane is None:
         return JsonResponse({"error": "Nieznana oś."}, status=404)
     day = _parse_day(request.GET.get("dzien"))
-    slots = services.day_slots(lane, day, lead_hours=BookingSettings.load().min_lead_hours)
+    slots = services.day_slots(lane, day, lead_hours=BookingSettings.load().min_lead_hours, holds=True, viewer=request.user)
     rule = lane.price_rule_for(day)
     return JsonResponse({
         "lane": lane.pk, "day": day.isoformat(),
@@ -148,6 +148,8 @@ def new(request):
     if request.GET.get("od", "").isdigit():
         initial["start_hour"] = int(request.GET["od"])
         initial["end_hour"] = int(request.GET["od"]) + 1
+        if request.GET.get("do", "").isdigit() and int(request.GET["do"]) > initial["start_hour"]:
+            initial["end_hour"] = int(request.GET["do"])
     form = ReservationForm(request.POST or None, initial=initial)
     preview = None
     if request.method == "POST" and form.is_valid() and request.POST.get("action") != "edit":
@@ -178,7 +180,7 @@ def new(request):
     lane = Lane.objects.filter(pk=lane_id).first() if str(lane_id).isdigit() else None
     day = _parse_day(form.data.get("day"), initial["day"])
     min_lead = BookingSettings.load().min_lead_hours
-    slots = services.day_slots(lane, day, lead_hours=min_lead) if lane else []
+    slots = services.day_slots(lane, day, lead_hours=min_lead, holds=True, viewer=request.user) if lane else []
     lane_cards = [(l, l.price_rule_for(day)) for l in active_lanes().order_by("facility__order", "order")]
     week = [timezone.localdate() + timedelta(days=i) for i in range(7)]
     return render(request, "bookings/new.html", {"form": form, "preview": preview, "slots": slots, "lane": lane, "day": day,
@@ -719,3 +721,48 @@ def panel_today(request):
         ctx["cash_total"] = totals[Payment.Method.CASH]
         ctx["pay_sum"] = sum(totals.values())
     return render(request, "panel/today.html", ctx)
+
+
+# --- lista oczekujących ---------------------------------------------------
+
+
+@login_required
+def waitlist(request):
+    from .forms import WaitlistForm
+    from . import waitlist as wl
+    from .models import WaitlistEntry
+
+    initial = {"day": _parse_day(request.GET.get("dzien")), "start_hour": 10, "end_hour": 12}
+    if request.GET.get("os", "").isdigit():
+        initial["lane"] = int(request.GET["os"])
+    if request.GET.get("od", "").isdigit():
+        initial["start_hour"], initial["end_hour"] = int(request.GET["od"]), int(request.GET["od"]) + 1
+    form = WaitlistForm(request.POST or None, initial=initial)
+    if request.method == "POST" and request.POST.get("action") == "cancel":
+        entry = get_object_or_404(WaitlistEntry, pk=request.POST.get("entry"), user=request.user, status__in=WaitlistEntry.ACTIVE)
+        entry.status = WaitlistEntry.Status.CANCELLED
+        entry.save(update_fields=["status"])
+        if entry.hold_until:  # oddana oferta — od razu dla kolejnej osoby
+            wl.offer_freed(entry.lane, entry.starts_at, entry.ends_at)
+        messages.success(request, "Wycofano z listy oczekujących.")
+        return redirect("bookings:waitlist")
+    if request.method == "POST" and form.is_valid():
+        d = form.cleaned_data
+        try:
+            wl.join(request.user, d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"])
+        except ValidationError as e:
+            for m in _messages_from(e):
+                form.add_error(None, m)
+        else:
+            messages.success(request, "Zapisano na listę oczekujących. Gdy termin się zwolni, dostaniesz e-mail.")
+            return redirect("bookings:waitlist")
+    entries = request.user.waitlist.filter(status__in=WaitlistEntry.ACTIVE, ends_at__gt=timezone.now()).select_related("lane").order_by("starts_at")
+    return render(request, "bookings/waitlist.html", {"form": form, "entries": entries, "now": timezone.now()})
+
+
+@panel_required(PERM)
+def panel_waitlist(request):
+    from .models import WaitlistEntry
+
+    entries = WaitlistEntry.objects.filter(status__in=WaitlistEntry.ACTIVE, ends_at__gt=timezone.now()).select_related("user", "lane").order_by("starts_at", "created_at")
+    return render(request, "panel/waitlist.html", {"entries": entries, "now": timezone.now()})

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Lista oczekujących{% endblock %}
+{% block content %}
+<h1>Lista oczekujących</h1>
+<p class="muted">Termin zajęty? Zapisz się — gdy się zwolni, dostaniesz e-mail, a termin będzie przez chwilę trzymany tylko dla Ciebie.</p>
+{% if entries %}
+<div class="card">
+  <h2 class="step-title">Czekasz na</h2>
+  <table>{% for e in entries %}<tr>
+    <td><strong>{{ e.lane }}</strong><div class="small">{{ e.starts_at|date:"D j.m.Y" }}, {{ e.starts_at|time:"H:i" }}–{{ e.ends_at|time:"H:i" }}</div></td>
+    <td>{% if e.status == 'oferta' and e.hold_until > now %}<span class="badge ok">wolne — trzymane do {{ e.hold_until|time:"H:i" }}</span>
+      <div><a class="btn small-btn" href="{% url 'bookings:new' %}?os={{ e.lane_id }}&amp;dzien={{ e.starts_at|date:'Y-m-d' }}&amp;od={{ e.starts_at|time:'G' }}&amp;do={{ e.ends_at|time:'G' }}">Zarezerwuj</a></div>
+      {% else %}<span class="badge">czeka</span>{% endif %}</td>
+    <td><form method="post">{% csrf_token %}<input type="hidden" name="action" value="cancel"><input type="hidden" name="entry" value="{{ e.pk }}"><button class="btn secondary small-btn" type="submit">Wycofaj</button></form></td>
+  </tr>{% endfor %}</table>
+</div>
+{% endif %}
+<div class="card">
+  <h2 class="step-title">Zapisz się na termin</h2>
+  <form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Zapisz na listę</button></form>
+</div>
+<p><a href="{% url 'bookings:calendar' %}">← Zajętość osi</a></p>
+{% endblock %}

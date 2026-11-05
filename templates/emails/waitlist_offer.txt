@@ -1,0 +1,10 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+zwolnił się termin, na który czekasz:
+{{ entry.lane }}, {{ entry.starts_at|date:"l, j E Y" }}, {{ entry.starts_at|time:"H:i" }}–{{ entry.ends_at|time:"H:i" }}
+
+Termin jest trzymany dla Ciebie do {{ entry.hold_until|time:"H:i" }} ({{ entry.hold_until|date:"j.m" }}). Później zaproponujemy go kolejnej osobie.
+Zarezerwuj: {{ site_url }}{{ link }}
+
+Stowarzyszenie STRZELNICA SĄTOK
+{% endautoescape %}

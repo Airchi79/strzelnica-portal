@@ -41,6 +41,10 @@ class BookingSettings(models.Model):
         help_text="Np. 2 — klient nie zarezerwuje sam terminu zaczynającego się za mniej niż 2 h. "
                   "0 — można rezerwować do rozpoczęcia godziny. Obsługa w panelu rezerwuje bez tego ograniczenia.",
     )
+    waitlist_hold_minutes = models.PositiveIntegerField(
+        "lista oczekujących: termin trzymany [min]", default=30,
+        help_text="Po zwolnieniu terminu pierwsza osoba z listy dostaje e-mail; przez ten czas tylko ona może go zarezerwować.",
+    )
     max_advance_days = models.PositiveIntegerField("rezerwacja najwyżej [dni] naprzód", default=180)
     max_persons = models.PositiveIntegerField("maksymalna liczba osób w rezerwacji", default=50)
 
@@ -275,3 +279,36 @@ class ArchivedReservation(models.Model):
 
     def __str__(self):
         return f"{self.number} {self.starts_at:%Y-%m-%d %H:%M}"
+
+
+class WaitlistEntry(models.Model):
+    """Zapis na liście oczekujących na zajęty termin osi. Po zwolnieniu terminu pierwsza osoba dostaje ofertę
+    i przez `hold_until` tylko ona może go zarezerwować."""
+
+    class Status(models.TextChoices):
+        WAITING = "czeka", "Czeka"
+        OFFERED = "oferta", "Termin zwolniony — czeka na rezerwację"
+        DONE = "zarezerwowane", "Zarezerwowane"
+        EXPIRED = "wygasla", "Oferta wygasła"
+        CANCELLED = "anulowany", "Wycofany"
+
+    ACTIVE = (Status.WAITING, Status.OFFERED)
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="waitlist")
+    lane = models.ForeignKey(Lane, verbose_name="oś", on_delete=models.CASCADE, related_name="waitlist")
+    starts_at = models.DateTimeField("od")
+    ends_at = models.DateTimeField("do")
+    persons = models.PositiveIntegerField("liczba osób", default=1)
+    status = models.CharField("status", max_length=14, choices=Status.choices, default=Status.WAITING, db_index=True)
+    offered_at = models.DateTimeField(null=True, blank=True)
+    hold_until = models.DateTimeField("termin trzymany do", null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+        verbose_name = "lista oczekujących"
+        verbose_name_plural = "lista oczekujących"
+        constraints = [models.CheckConstraint(condition=Q(ends_at__gt=models.F("starts_at")), name="waitlist_positive_length")]
+
+    def __str__(self):
+        return f"{self.user} — {self.lane}, {self.starts_at:%d.%m %H:%M}"

@@ -65,6 +65,7 @@
   <section class="book-step">
     <h2><span class="step-no">3</span> Wybierz godziny</h2>
     <p class="small muted" data-slot-hint>Kliknij godzinę rozpoczęcia, a potem ostatnią godzinę strzelania. Rezerwacja obejmuje całą oś.</p>
+    <p class="small">Termin zajęty? <a href="{% url 'bookings:waitlist' %}">Zapisz się na listę oczekujących</a>.</p>
     {% if min_lead %}<p class="small muted">Online rezerwujesz najpóźniej {{ min_lead }} h przed rozpoczęciem{% if association.contact_phone %} — na krótszy termin zadzwoń: <a href="tel:{{ association.contact_phone }}">{{ association.contact_phone }}</a>{% endif %}.</p>{% endif %}
     <div class="slot-grid" data-slot-grid>
       {% for s in slots %}<button type="button" class="slot {{ s.state }}" data-hour="{{ s.hour }}"{% if s.state != 'wolne' %} disabled{% endif %}>{{ s.start|time:"H:i" }}</button>{% empty %}<span class="muted">Wybierz oś i dzień.</span>{% endfor %}

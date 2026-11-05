@@ -216,6 +216,7 @@ def detail(request, pk):
             "form": form,
             "association": AssociationSettings.load(),
             "pay_options": services.payment_options(reservation),
+            "receipts": list(reservation.payments.filter(status="zaksiegowana").order_by("completed_at")) if reservation.user_id == request.user.pk else [],
             "gcal_url": _google_calendar_url(reservation, request),
             "map_url": ("https://www.google.com/maps/search/?api=1&query=" + quote(AssociationSettings.load().address))
             if AssociationSettings.load().address else "",

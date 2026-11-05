@@ -32,6 +32,7 @@
       <dd>{% if r.access_code %}wg umowy klubu {{ r.access_code.club }}{% elif r.client_pass %}kod {{ r.client_pass.code }}{% else %}<strong>{{ r.amount|pln }}</strong> <span class="small muted">({{ r.hourly_amount|pln }}/h)</span>{% endif %}</dd></div>
   </dl>
   {% if r.notes %}<p class="small muted">Uwagi: {{ r.notes }}</p>{% endif %}
+  {% if receipts %}<p class="small">Potwierdzenie wpłaty: {% for p in receipts %}<a href="{% url 'payments:receipt' p.pk %}" target="_blank" rel="noopener">PDF {{ p.amount|pln }} ({{ p.completed_at|date:"j.m" }})</a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
   {% if r.status == 'potwierdzona' and not r.is_finished %}
   <div class="actions res-links">
     <a class="btn secondary small-btn" href="{% url 'bookings:ics' r.pk %}">Dodaj do kalendarza</a>

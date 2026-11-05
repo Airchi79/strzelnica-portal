@@ -36,7 +36,7 @@ def wallet(request):
 
     due = request.user.reservations.filter(payment_status=Reservation.Payment.DUE).order_by("starts_at")
     fees = Fee.objects.filter(member__user=request.user, status=Fee.Status.DUE).order_by("due_on")
-    ledger = Paginator(request.user.ledger.select_related("reservation"), 30).get_page(request.GET.get("page"))
+    ledger = Paginator(request.user.ledger.select_related("reservation", "payment"), 30).get_page(request.GET.get("page"))
     pending = request.user.payments.filter(status=Payment.Status.PENDING, method=Payment.Method.TPAY)[:5]
     return render(
         request,
@@ -343,3 +343,27 @@ def panel_settings(request):
         return redirect("panel:payment_settings")
     overpaid = Wallet.objects.filter(balance__gt=0).count()
     return render(request, "panel/payment_settings.html", {"form": form, "overpaid": overpaid})
+
+
+def _receipt_response(payment):
+    from . import receipt
+
+    response = HttpResponse(receipt.to_pdf(payment, AssociationSettings.load()), content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="potwierdzenie-{receipt.receipt_number(payment).replace("/", "-")}.pdf"'
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+@login_required
+def receipt(request, pk):
+    payment = get_object_or_404(Payment.objects.select_related("user", "reservation__lane", "fee", "event_registration__event"),
+                                pk=pk, user=request.user, status=Payment.Status.COMPLETED)
+    return _receipt_response(payment)
+
+
+@panel_required((PERM, "payments.accept_onsite"))
+def panel_receipt(request, pk):
+    payment = get_object_or_404(Payment.objects.select_related("user", "reservation__lane", "fee", "event_registration__event"),
+                                pk=pk, status=Payment.Status.COMPLETED)
+    log_event("platnosc.potwierdzenie", payment, f"Potwierdzenie wpłaty dla {payment.user or payment.payer_name}")
+    return _receipt_response(payment)

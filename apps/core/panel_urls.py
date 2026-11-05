@@ -90,6 +90,7 @@ urlpatterns = [
     path("platnosci/import/", payments_views.panel_import, name="payment_import"),
     path("platnosci/ustawienia/", payments_views.panel_settings, name="payment_settings"),
     path("platnosci/<uuid:pk>/", payments_views.panel_payment, name="payment"),
+    path("platnosci/<uuid:pk>/potwierdzenie.pdf", payments_views.panel_receipt, name="payment_receipt"),
     path("salda/", payments_views.panel_wallets, name="wallets"),
     path("salda/<int:user_pk>/", payments_views.panel_wallet, name="wallet"),
     path("czlonkowie/", association_views.panel_members, name="members"),

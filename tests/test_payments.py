@@ -586,3 +586,19 @@ def test_tpay_event_registration_start_and_notification(client, ps, owner, tpay_
     assert _post(client, tpay_keys, _notification(payment)).content == b"TRUE"
     reg.refresh_from_db()
     assert reg.payment_status == Registration.Payment.PAID and reg.paid_amount == 4000
+
+
+def test_payment_receipt_pdf_owner_only(client, ps, owner_client):
+    from apps.payments.services import register_manual_payment
+
+    r = book(ps)
+    p = register_manual_payment(ps, r.amount, "gotowka", ps, reservation=r)
+    assert owner_client.get(f"/panel/platnosci/{p.pk}/potwierdzenie.pdf").status_code == 200  # ten sam klient — najpierw panel
+    client.force_login(ps)
+    response = client.get(f"/platnosci/potwierdzenie/{p.pk}.pdf")
+    assert response.status_code == 200 and response["Content-Type"] == "application/pdf" and response.content.startswith(b"%PDF")
+    assert f"/platnosci/potwierdzenie/{p.pk}.pdf" in client.get("/platnosci/").content.decode()
+    assert f"/platnosci/potwierdzenie/{p.pk}.pdf" in client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    other = make_user("obcy@example.com")
+    client.force_login(other)
+    assert client.get(f"/platnosci/potwierdzenie/{p.pk}.pdf").status_code == 404

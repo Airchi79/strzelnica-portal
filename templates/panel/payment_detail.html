@@ -13,7 +13,9 @@
   {% if p.reservation %}<tr><th>Rezerwacja</th><td><a href="{% url 'panel:reservation' p.reservation.pk %}">{{ p.reservation.number }}</a></td></tr>{% endif %}
   {% if p.note %}<tr><th>Uwagi</th><td>{{ p.note }}</td></tr>{% endif %}
   {% if p.created_by %}<tr><th>Zarejestrował</th><td>{{ p.created_by.full_name }}</td></tr>{% endif %}
-</table></div>
+</table>
+{% if p.status == 'zaksiegowana' %}<div class="actions"><a class="btn secondary small-btn" href="{% url 'panel:payment_receipt' p.pk %}" target="_blank" rel="noopener">Potwierdzenie wpłaty (PDF)</a></div>{% endif %}
+</div>
 {% if p.status == 'nieprzypisana' %}
 <div class="card"><form method="post">{% csrf_token %}
   {% include "partials/form.html" %}

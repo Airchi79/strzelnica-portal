@@ -50,7 +50,7 @@
 <h2>Historia</h2>
 <div class="card table-wrap"><table>
   <tr><th>Data</th><th>Operacja</th><th>Kwota</th>{% if WALLET_ENABLED %}<th class="hide-sm">Saldo</th>{% endif %}</tr>
-  {% for e in page %}<tr><td>{{ e.created_at|date:"j.m.Y H:i" }}</td><td>{{ e.description }}</td>
+  {% for e in page %}<tr><td>{{ e.created_at|date:"j.m.Y H:i" }}</td><td>{{ e.description }}{% if e.payment_id and e.kind == 'wplata' and e.payment.status == 'zaksiegowana' %} <a class="small" href="{% url 'payments:receipt' e.payment_id %}" target="_blank" rel="noopener">potwierdzenie PDF</a>{% endif %}</td>
     <td class="{% if e.amount < 0 %}neg{% else %}pos{% endif %}">{% if e.amount > 0 %}+{% endif %}{{ e.amount|pln }}</td>{% if WALLET_ENABLED %}<td class="hide-sm">{{ e.balance_after|pln }}</td>{% endif %}</tr>
   {% empty %}<tr><td colspan="4" class="muted">Brak operacji.</td></tr>{% endfor %}
 </table></div>

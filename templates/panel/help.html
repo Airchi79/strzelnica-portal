@@ -1,0 +1,130 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Pomoc{% endblock %}
+{% block panel %}
+<h1>Pomoc — jak to zrobić</h1>
+<p class="muted">Krótkie instrukcje do najczęstszych spraw. Przycisk <strong>?</strong> w górnym pasku otwiera pomoc do sekcji, w której jesteś. Widzisz tylko tematy, do których masz uprawnienia.</p>
+<nav class="card help-toc" aria-label="Spis treści"><strong>Spis treści</strong><ol>
+  {% if perms.bookings.manage_reservations %}<li><a href="#dzien">Dzień dyżuru</a></li><li><a href="#rezerwacje">Rezerwacje: na miejscu, dla kogoś, zmiany, anulowanie</a></li><li><a href="#cykliczne">Stały termin dla klubu (rezerwacja cykliczna)</a></li><li><a href="#blokady">Awaria lub zawody — blokada osi</a></li><li><a href="#oczekujacy">Lista oczekujących</a></li>{% endif %}
+  {% if perms.payments.manage_payments or perms.payments.accept_onsite %}<li><a href="#gotowka">Przyjęcie gotówki / BLIK</a></li>{% endif %}
+  {% if perms.payments.manage_payments %}<li><a href="#platnosci">Przelewy, nadpłaty, potwierdzenia, Tpay</a></li>{% endif %}
+  {% if perms.credentials.review_credential %}<li><a href="#weryfikacja">Weryfikacja uprawnień PS</a></li>{% endif %}
+  {% if perms.logbook.view_logbook %}<li><a href="#ksiazka">Książka pobytu, kod QR, kiosk</a></li>{% endif %}
+  {% if perms.events.manage_events %}<li><a href="#zawody">Zawody i wydarzenia</a></li>{% endif %}
+  {% if perms.core.publish_announcement %}<li><a href="#ogloszenia">Ogłoszenie (np. strzelnica zamknięta)</a></li>{% endif %}
+  {% if perms.facilities.manage_facilities %}<li><a href="#usterki">Usterki, osie, cennik</a></li>{% endif %}
+  {% if perms.accounts.manage_permissions %}<li><a href="#uprawnienia">Uprawnienia i dyżurny</a></li>{% endif %}
+  {% if perms.accounts.view_users %}<li><a href="#rodo">RODO: żądanie danych lub usunięcia</a></li>{% endif %}
+  {% if perms.core.manage_settings %}<li><a href="#kopie">Kopie zapasowe i awaria</a></li><li><a href="#ustawienia">Dane stowarzyszenia i logo</a></li>{% endif %}
+</ol></nav>
+
+{% if perms.bookings.manage_reservations %}
+<section class="card help" id="dzien"><h2>Dzień dyżuru</h2><ol>
+  <li>Rano otwórz <strong>Dziś na strzelnicy</strong>: lista rezerwacji z telefonami, kto nie zapłacił, kolizje z blokadami.</li>
+  <li>Sekcja <strong>Wymaga uwagi</strong> pokazuje, czym się zająć: nieopłacone, czekające na zatwierdzenie, rezerwacje bez strzelców w książce.</li>
+  <li><strong>Drukuj</strong> daje kartkę na dzień (w druku ustaw orientację pionową, wyłącz „nagłówki i stopki”).</li>
+  <li>Wieczorem sprawdź <strong>gotówkę do rozliczenia</strong> i osoby „na terenie” bez wyjścia.</li></ol></section>
+
+<section class="card help" id="rezerwacje"><h2>Rezerwacje</h2><ul>
+  <li><strong>Na miejscu / dla kogoś:</strong> Wszystkie rezerwacje → zakładka <em>Nowa rezerwacja</em> → wybierz strzelca (musi mieć zweryfikowane PS). Obsługa rezerwuje bez limitów czasu i zatwierdzania.</li>
+  <li><strong>Szybko z kalendarza:</strong> Kalendarz osi → kliknij wolną godzinę (dzień albo <em>Tydzień</em>).</li>
+  <li><strong>Zmiana liczby osób:</strong> karta rezerwacji → <em>Zmiany</em> → należność przelicza się sama.</li>
+  <li><strong>Anulowanie:</strong> karta rezerwacji → podaj powód. Zaznacz <em>Zachowaj należność</em>, gdy klient odwołał za późno. Klient dostaje e-mail.</li>
+  <li><strong>Nieodbyta:</strong> po rozpoczęciu — przycisk <em>Oznacz jako nieodbytą</em>.</li>
+  <li><strong>Nowy klient czeka na zatwierdzenie:</strong> karta rezerwacji → <em>Zatwierdź</em> albo <em>Odrzuć</em> (zasady grup klientów: Ustawienia rezerwacji).</li></ul></section>
+
+<section class="card help" id="cykliczne"><h2>Stały termin dla klubu</h2><ol>
+  <li>Nowa rezerwacja → wypełnij jak zwykle, wpisz kod klubu (rozliczenie wg umowy) i <strong>Powtarzaj co tydzień do dnia</strong>.</li>
+  <li>Pierwsze kliknięcie pokaże listę terminów: ✓ wolne, ✕ kolizja z powodem. Nic nie jest jeszcze zapisane.</li>
+  <li><strong>Utwórz N rezerwacji</strong> — powstają tylko wolne terminy; strzelec dostaje jeden e-mail.</li>
+  <li>Koniec sezonu: karta dowolnego terminu serii → <em>Anuluj wszystkie przyszłe terminy</em>.</li></ol></section>
+
+<section class="card help" id="blokady"><h2>Awaria lub zawody — blokada osi</h2><ol>
+  <li>Blokady osi → <em>Nowa blokada</em> → osie, dni, godziny (opcja: co tydzień).</li>
+  <li>Przed zapisem zobaczysz rezerwacje w tym czasie. Możesz je <strong>anulować bez opłat</strong> albo zostawić (klienci dostaną informację).</li>
+  <li>Z usterki: karta usterki → <em>Zablokuj oś</em> wypełnia formularz automatycznie.</li>
+  <li>Zawody utworzone w <em>Wydarzeniach</em> blokują osie same.</li></ol></section>
+
+<section class="card help" id="oczekujacy"><h2>Lista oczekujących</h2>
+  <p>Strzelcy zapisują się na zajęte terminy. Po anulowaniu rezerwacji pierwsza osoba dostaje e-mail, a termin jest trzymany dla niej (czas: Ustawienia rezerwacji). Podgląd: Wszystkie rezerwacje → zakładka <em>Oczekujący</em>. Obsługa może zarezerwować trzymany termin.</p></section>
+{% endif %}
+
+{% if perms.payments.manage_payments or perms.payments.accept_onsite %}
+<section class="card help" id="gotowka"><h2>Przyjęcie gotówki / BLIK</h2><ol>
+  <li>Otwórz rezerwację (np. z <em>Dziś na strzelnicy</em> → <em>rozlicz</em>).</li>
+  <li><strong>Przyjmij wpłatę (gotówka / BLIK)</strong> → kwota jest wpisana → zapisz.</li>
+  <li>Opłata startowa na zawodach: Wydarzenia → lista startowa → <em>Gotówka</em> / <em>BLIK</em> przy uczestniku.</li>
+  <li>Wpłata trafia do raportu sprzedaży; klient może pobrać potwierdzenie PDF.</li></ol></section>
+{% endif %}
+
+{% if perms.payments.manage_payments %}
+<section class="card help" id="platnosci"><h2>Przelewy, nadpłaty, potwierdzenia, Tpay</h2><ul>
+  <li><strong>Przelewy z banku:</strong> Wpłaty → <em>Import wyciągu</em> (CSV z banku). Wpłaty z numerem rezerwacji w tytule przypiszą się same; resztę przypisz z komunikatu „wpłat czeka na przypisanie” na liście wpłat.</li>
+  <li><strong>Nadpłaty:</strong> widać w <em>Salda</em>. Karta rezerwacji → <em>Opłać z nadpłaty</em>, albo automatycznie: Wpłaty → <em>Ustawienia</em> → „nadpłata opłaca kolejne rezerwacje”.</li>
+  <li><strong>Potwierdzenie wpłaty (PDF):</strong> karta wpłaty → <em>Potwierdzenie wpłaty</em>. To nie faktura.</li>
+  <li><strong>Raporty sprzedaży</strong> tworzą się same (dzienne i miesięczne); PDF i CSV dla księgowości.</li>
+  <li><strong>Płatności testowe Tpay</strong> są oznaczone „TEST” i nie wchodzą do raportów.</li></ul></section>
+{% endif %}
+
+{% if perms.credentials.review_credential %}
+<section class="card help" id="weryfikacja"><h2>Weryfikacja uprawnień PS</h2><ol>
+  <li>Weryfikacja dokumentów → <em>Zacznij weryfikację</em> (najdłużej czekające pierwsze).</li>
+  <li>Porównaj zdjęcie z danymi i odhacz listę kontrolną (imię i nazwisko = konto, numer, organ, ważność).</li>
+  <li><strong>Zatwierdź</strong> — osoba może rezerwować od razu. <strong>Odrzuć</strong> — kliknij gotowy powód; strzelec dostanie go e-mailem.</li>
+  <li>Zdjęcie usuwa się samo po decyzji. Utrata uprawnień: dokument zweryfikowany → <em>Cofnij weryfikację</em> z powodem.</li>
+  <li>Zakładka <em>Wygasa w 30 dni</em> — przypomnienia e-mail idą same (30 i 7 dni przed).</li></ol></section>
+{% endif %}
+
+{% if perms.logbook.view_logbook %}
+<section class="card help" id="ksiazka"><h2>Książka pobytu, kod QR, kiosk</h2><ul>
+  <li>Każdy wpisuje się telefonem: <strong>kod QR rezerwacji</strong> (od prowadzącego) albo <strong>plakat przy wejściu</strong> (Ustawienia książki → plakat do druku).</li>
+  {% if perms.logbook.staff_entry %}<li><strong>Wpis za kogoś</strong> (np. bez telefonu): karta rezerwacji → <em>Dopisz osobę</em>.</li>{% endif %}
+  <li><strong>Wydruk dla policji / kontroli:</strong> Książka pobytu → okres → <em>Drukuj</em>.</li>
+  {% if perms.logbook.manage_logbook %}<li><strong>Kiosk (tablet):</strong> Kioski → <em>Dodaj urządzenie</em> → <em>Dodaj i pokaż kod</em> → wpisz kod na tablecie (adres <span class="code">/kiosk/</span>). Działa także bez internetu.</li>{% endif %}
+  <li>Pobyty bez wyjścia zamykają się same po czasie z ustawień książki.</li></ul></section>
+{% endif %}
+
+{% if perms.events.manage_events %}
+<section class="card help" id="zawody"><h2>Zawody i wydarzenia</h2><ol>
+  <li>Wydarzenia i zawody → <em>Nowe wydarzenie</em>: termin, osie, limit miejsc, opłata, koniec zapisów, opcjonalnie pole „klasa / kategoria”.</li>
+  <li>Najpierw <strong>Szkic</strong> (niewidoczny). <strong>Opublikowane</strong> — pojawia się na stronie i blokuje osie (zobaczysz kolizje przed zapisem).</li>
+  <li>Lista startowa: opłaty (gotówka / BLIK / zwolnij), wycofanie uczestnika — wchodzi pierwszy z listy rezerwowej. <em>Drukuj listę</em> i CSV.</li>
+  <li><strong>Odwołanie</strong>: na dole karty, z powodem — wszyscy dostają e-mail, wpłaty wracają jako nadpłata.</li></ol></section>
+{% endif %}
+
+{% if perms.core.publish_announcement %}
+<section class="card help" id="ogloszenia"><h2>Ogłoszenie (np. strzelnica zamknięta)</h2><ol>
+  <li>Ogłoszenia → <em>Nowe ogłoszenie</em>: tytuł, treść, rodzaj (<em>Ważne</em> = czerwone, nie da się ukryć), widoczne od–do.</li>
+  <li>E-mail: do wszystkich albo tylko do osób z rezerwacją w podanych dniach. Zobaczysz liczbę odbiorców przed wysłaniem.</li>
+  <li>Zdejmij ogłoszenie przyciskiem <em>Zdejmij</em> albo ustaw datę końca.</li></ol></section>
+{% endif %}
+
+{% if perms.facilities.manage_facilities %}
+<section class="card help" id="usterki"><h2>Usterki, osie, cennik</h2><ul>
+  <li><strong>Usterki:</strong> nowe zgłoszenia mają licznik w menu. Zmień status (W naprawie → Naprawione z opisem) — zgłaszający dostanie e-mail.</li>
+  <li><strong>Osie i cennik:</strong> godziny otwarcia każdej osi, nowe stawki od daty (stare rezerwacje zachowują swoją cenę), dodawanie i wyłączanie osi.</li></ul></section>
+{% endif %}
+
+{% if perms.accounts.manage_permissions %}
+<section class="card help" id="uprawnienia"><h2>Uprawnienia i dyżurny</h2><ol>
+  <li>Klienci z kontem → osoba → <em>Uprawnienia w panelu zarządu</em>.</li>
+  <li><strong>Gotowy zestaw: Dyżurny</strong> — jedno kliknięcie (rezerwacje, książka, gotówka; bez ustawień i członków).</li>
+  <li>Osoba przy pierwszym wejściu do panelu ustawi logowanie dwuskładnikowe (aplikacja w telefonie).</li></ol></section>
+{% endif %}
+
+{% if perms.accounts.view_users %}
+<section class="card help" id="rodo"><h2>RODO: żądanie danych lub usunięcia</h2><ul>
+  <li><strong>Dostęp do danych:</strong> osoba pobiera je sama — Profil → <em>Pobierz moje dane</em>.</li>
+  <li><strong>Usunięcie:</strong> karta osoby → <em>RODO</em> → dezaktywuj → <em>Usuń dane osobowe</em> (wpisz potwierdzenie). Książka pobytu, rozliczenia i ewidencja członków zostają, bo wymagają tego przepisy.</li>
+  <li>Odpowiedz osobie w ciągu miesiąca od żądania.</li></ul></section>
+{% endif %}
+
+{% if perms.core.manage_settings %}
+<section class="card help" id="kopie"><h2>Kopie zapasowe i awaria</h2><ul>
+  <li>Kopie powstają co dobę i są automatycznie <strong>odtwarzane na próbę</strong>. Stan: System → <em>Kopie zapasowe</em>; przy problemie przyjdzie alarm e-mailem.</li>
+  <li>Kopia poza serwerem (USB, chmura): HBS 3 na QNAP — instrukcja w <span class="code">docs/WDROZENIE-QNAP.md</span>, punkt 9.</li>
+  <li>Awaryjne odtworzenie bazy: ten sam plik, punkt 9 E.</li></ul></section>
+
+<section class="card help" id="ustawienia"><h2>Dane stowarzyszenia i logo</h2>
+  <p>System → <em>Dane stowarzyszenia</em>: nazwa, adres, NIP, REGON, rachunek (do instrukcji przelewu), telefon i e-mail kontaktowy (widoczne dla strzelców), e-mail powiadomień zarządu. Niżej <strong>Logo</strong>: wgraj SVG lub PNG — ikony aplikacji powstaną same.</p></section>
+{% endif %}
+{% endblock %}

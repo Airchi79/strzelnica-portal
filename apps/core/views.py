@@ -329,3 +329,8 @@ def panel_gdpr(request, pk=None):
         return redirect("panel:gdpr_user", pk=subject.pk)
     log_sensitive_access(subject, f"rodo:{subject.pk}", "obsługa żądania RODO")
     return render(request, "panel/gdpr_user.html", {"subject": subject, "blockers": gdpr.anonymize_blockers(subject), "can_act": can_act})
+
+
+@panel_required()
+def panel_help(request):
+    return render(request, "panel/help.html")

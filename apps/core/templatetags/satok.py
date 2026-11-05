@@ -102,6 +102,15 @@ def panel_menu(context):
     return build(request) if request is not None and request.user.is_authenticated else []
 
 
+@register.simple_tag(takes_context=True)
+def panel_help_anchor(context):
+    from apps.core.panel_menu import help_anchor
+
+    request = context.get("request")
+    match = getattr(request, "resolver_match", None) if request is not None else None
+    return help_anchor(match.url_name or "") if match else ""
+
+
 DAY_SHORT = ["pon", "wt", "śr", "czw", "pt", "sob", "ndz"]
 
 

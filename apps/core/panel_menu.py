@@ -91,3 +91,20 @@ def build(request):
         if visible:
             sections.append({"title": title, "items": visible})
     return sections
+
+
+# Kotwica w „Pomocy” dla bieżącej sekcji panelu (przycisk „?” w górnym pasku).
+HELP_ANCHORS = [
+    (("today",), "dzien"), (("reservation", "reservations", "bookings"), "rezerwacje"), (("block",), "blokady"),
+    (("waitlist",), "oczekujacy"), (("payment_manual",), "gotowka"), (("payment", "wallet", "sales_report"), "platnosci"),
+    (("credential",), "weryfikacja"), (("logbook", "kiosk"), "ksiazka"), (("event",), "zawody"), (("announcement",), "ogloszenia"),
+    (("issue", "lane", "facility", "price"), "usterki"), (("user",), "uprawnienia"), (("gdpr",), "rodo"), (("backups",), "kopie"),
+    (("settings",), "ustawienia"),
+]
+
+
+def help_anchor(url_name):
+    for prefixes, anchor in HELP_ANCHORS:
+        if any(url_name == p or url_name.startswith(p) for p in prefixes):
+            return anchor
+    return ""

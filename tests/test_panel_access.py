@@ -146,3 +146,16 @@ def test_existing_staff_keep_settings_after_permission_split():
     migration.forwards(django_apps, None)
     staff = User.objects.get(pk=staff.pk)
     assert staff.has_perm("bookings.manage_booking_settings") and staff.has_perm("payments.accept_onsite")
+
+
+def test_help_page_and_context_anchor(owner_client):
+    page = owner_client.get("/panel/pomoc/").content.decode()
+    assert 'id="gotowka"' in page and 'id="rodo"' in page
+    assert 'href="/panel/pomoc/#weryfikacja"' in owner_client.get("/panel/weryfikacja/").content.decode()
+
+
+def test_help_shows_only_permitted_topics(client):
+    staff = grant(make_user("help@example.com"), "bookings.manage_reservations")
+    login_with_otp(client, staff)
+    page = client.get("/panel/pomoc/").content.decode()
+    assert 'id="dzien"' in page and 'id="rodo"' not in page and 'id="kopie"' not in page

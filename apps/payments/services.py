@@ -486,11 +486,12 @@ def refund_to_payer(payment, amount, by=None, reason="Zwrot"):
         if p.ledger_entries.filter(kind=LedgerEntry.Kind.CHARGEBACK).exists() or (p.raw or {}).get("zwrot_api"):
             return True  # już zwrócone
         try:
-            tpay.refund_transaction(p.external_id.split(":", 1)[1], None if amount >= p.amount else amount)
+            resp = tpay.refund_transaction(p.external_id.split(":", 1)[1], None if amount >= p.amount else amount) or {}
         except tpay.TpayError as e:
             log_event("platnosc.zwrot_nieudany", p, f"{p}: {e}", actor=by)
             return False
-        p.raw = {**(p.raw or {}), "zwrot_api": {"kwota_gr": amount, "kiedy": timezone.now().isoformat(), "powod": reason[:120]}}
+        p.raw = {**(p.raw or {}), "zwrot_api": {"kwota_gr": amount, "kiedy": timezone.now().isoformat(), "powod": reason[:120],
+                                     "odpowiedz": {k: resp.get(k) for k in ("result", "requestId", "status", "transactionId") if k in resp}}}
         p.save(update_fields=["raw"])
         post(p.user, -amount, LedgerEntry.Kind.CHARGEBACK, f"{reason} — zwrot na rachunek płacącego (Tpay)", payment=p, by=by)
         log_event("platnosc.zwrot_tpay", p, f"{p}: zwrot {amount / 100:.2f} zł", actor=by)

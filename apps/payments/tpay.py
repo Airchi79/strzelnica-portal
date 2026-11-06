@@ -104,6 +104,8 @@ def refund_transaction(transaction_id, amount_grosze=None):
         raise TpayError("Brak identyfikatora transakcji Tpay")
     payload = {} if amount_grosze is None else {"amount": float(Decimal(amount_grosze) / 100)}
     data = _request("POST", f"{api_base()}/transactions/{transaction_id}/refunds", json_body=payload, token=access_token())
+    logger.warning("Tpay zwrot %s (%s) → %s", transaction_id, "całość" if amount_grosze is None else f"{amount_grosze} gr",
+                   json.dumps(data, ensure_ascii=False)[:500])
     if data.get("result") not in (None, "success"):
         raise TpayError("Tpay odrzucił zwrot")
     return data

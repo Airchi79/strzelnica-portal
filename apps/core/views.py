@@ -32,6 +32,34 @@ def home(request):
 
 
 @login_required
+def my_notifications(request):
+    """Powiadomienia klienta (dzwonek w nagłówku): lista, oznaczanie jako przeczytane."""
+    from .models import Notification
+
+    qs = request.user.notifications.filter(channel=Notification.Channel.PORTAL)
+    if request.method == "POST":
+        qs.filter(read_at__isnull=True).update(read_at=timezone.now())
+        return redirect("core:notifications")
+    page = Paginator(qs, 30).get_page(request.GET.get("page"))
+    return render(request, "core/notifications.html", {"page": page})
+
+
+@login_required
+def notification_open(request, pk):
+    from django.utils.http import url_has_allowed_host_and_scheme
+
+    from .models import Notification
+
+    n = get_object_or_404(Notification, pk=pk, recipient=request.user, channel=Notification.Channel.PORTAL)
+    if n.read_at is None:
+        n.read_at = timezone.now()
+        n.save(update_fields=["read_at"])
+    if n.url.startswith("/") and url_has_allowed_host_and_scheme(n.url, allowed_hosts=None):
+        return redirect(n.url)
+    return redirect("core:notifications")
+
+
+@login_required
 def dashboard(request):
     credentials = list(request.user.credentials.all())
     from apps.bookings.services import booking_readiness

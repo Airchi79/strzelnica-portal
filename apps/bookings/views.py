@@ -548,7 +548,7 @@ def panel_settings(request):
 
 @panel_required()
 def panel_notifications(request):
-    qs = request.user.notifications.all()
+    qs = request.user.notifications.filter(channel=Notification.Channel.PANEL)
     if request.method == "POST":
         qs.filter(read_at__isnull=True).update(read_at=timezone.now())
         return redirect("panel:notifications")
@@ -558,7 +558,7 @@ def panel_notifications(request):
 
 @panel_required()
 def panel_notification_open(request, pk):
-    n = get_object_or_404(Notification, pk=pk, recipient=request.user)
+    n = get_object_or_404(Notification, pk=pk, recipient=request.user, channel=Notification.Channel.PANEL)
     if n.read_at is None:
         n.read_at = timezone.now()
         n.save(update_fields=["read_at"])

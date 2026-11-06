@@ -1,15 +1,18 @@
 from django.conf import settings
+from django.db.models import Count
 
 
 def site(request):
-    pending, unread = [], 0
+    pending, unread, unread_portal = [], 0, 0
     user = getattr(request, "user", None)
     if user is not None and user.is_authenticated:
         from apps.regulations.models import pending_acceptances
 
         pending = pending_acceptances(user)
+        counts = dict(user.notifications.filter(read_at__isnull=True).values_list("channel").annotate(n=Count("pk")))
+        unread_portal = counts.get("portal", 0)
         if user.is_staff:
-            unread = user.notifications.filter(read_at__isnull=True).count()
+            unread = counts.get("panel", 0)
     from apps.payments.models import PaymentSettings
 
     from .announcements import active
@@ -24,4 +27,5 @@ def site(request):
         "SITE_URL": settings.SITE_URL,
         "pending_regulations": pending,
         "unread_notifications": unread,
+        "unread_portal": unread_portal,
     }

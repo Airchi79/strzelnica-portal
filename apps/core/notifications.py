@@ -29,8 +29,37 @@ def _send(subject, template, context, recipients):
     transaction.on_commit(deliver)
 
 
-def notify_user(user, subject, template, **context):
+def _portal_link(template, context):
+    """Strona w portalu, której dotyczy wiadomość (powiadomienie pod dzwonkiem prowadzi prosto do niej)."""
+    from django.urls import reverse
+
+    if context.get("link"):
+        return context["link"]
+    if context.get("reservation") is not None:
+        return reverse("bookings:detail", args=[context["reservation"].pk])
+    if context.get("reservations") is not None:
+        return reverse("bookings:my_list")
+    if context.get("payment") is not None or "balance" in context:
+        return reverse("payments:wallet")
+    if context.get("credential") is not None:
+        return reverse("credentials:my_list")
+    if context.get("reg") is not None:
+        return reverse("events:detail", args=[context["reg"].event_id])
+    if context.get("issue") is not None:
+        return reverse("core:issues")
+    if template.startswith(("emails/application", "emails/member", "emails/fee")):
+        return reverse("association:membership")
+    return reverse("core:dashboard")
+
+
+def notify_user(user, subject, template, portal=True, **context):
+    """E-mail do użytkownika oraz powiadomienie pod dzwonkiem w portalu (`portal=False` — tylko e-mail)."""
     _send(subject, template, {"user": user, **context}, [user.email])
+    if portal and user.pk and user.is_active:
+        from apps.core.models import Notification
+
+        Notification.objects.create(recipient=user, channel=Notification.Channel.PORTAL,
+                                    title=" ".join(str(subject).split())[:160], url=_portal_link(template, context)[:255])
 
 
 def board_users(permission_codename=None):
@@ -62,7 +91,22 @@ def notify_board(subject, template, permission_codename=None, url="", body="", *
     if url or body:
         subject = " ".join(str(subject).split())
         Notification.objects.bulk_create(
-            Notification(recipient=u, title=subject[:160], body=body[:500], url=url[:255])
+            Notification(recipient=u, channel=Notification.Channel.PANEL, title=subject[:160], body=body[:500], url=url[:255])
             for u in board_users(permission_codename)
         )
     _send(subject, template, context, board_recipients(permission_codename))
+
+
+NOTIFICATION_RETENTION_DAYS = 365
+
+
+def purge_old_notifications(now=None):
+    """Usuwa powiadomienia starsze niż rok (minimalizacja danych) — treść i tak została wysłana e-mailem."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.core.models import Notification
+
+    now = now or timezone.now()
+    return Notification.objects.filter(created_at__lt=now - timedelta(days=NOTIFICATION_RETENTION_DAYS)).delete()[0]

@@ -40,7 +40,7 @@ def _safe_next(request, default="core:dashboard"):
 def send_verification_email(user):
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = email_verification_token.make_token(user)
-    notify_user(user, "Potwierdź adres e-mail", "emails/verify_email.txt", path=reverse("accounts:verify", args=[uid, token]))
+    notify_user(user, "Potwierdź adres e-mail", "emails/verify_email.txt", portal=False, path=reverse("accounts:verify", args=[uid, token]))
 
 
 def register(request):

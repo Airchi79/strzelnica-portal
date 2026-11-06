@@ -64,3 +64,11 @@ document.querySelectorAll("img[data-hide-broken]").forEach((img) => {
   const hide = () => img.remove();
   if (img.complete && img.naturalWidth === 0) hide(); else img.addEventListener("error", hide);
 });
+
+// Liczba nowych powiadomień na ikonie zainstalowanej aplikacji (Android/Chrome, iOS 16.4+, Edge; inne — bez zmian).
+(() => {
+  const n = document.body.dataset.unread;
+  if (n === undefined || !("setAppBadge" in navigator)) return;
+  const count = Number(n) || 0;
+  (count ? navigator.setAppBadge(count) : navigator.clearAppBadge()).catch(() => {});
+})();

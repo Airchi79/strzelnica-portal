@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Powiadomienia{% endblock %}
+{% block content %}
+<h1>Powiadomienia</h1>
+{% if page.paginator.count %}
+<form method="post" style="margin-bottom:12px">{% csrf_token %}<button class="btn secondary" type="submit">Oznacz wszystkie jako przeczytane</button></form>
+{% endif %}
+<div class="card notif-list">
+  {% for n in page %}
+  <a class="notif{% if not n.read_at %} unread{% endif %}" href="{% url 'core:notification' n.pk %}">
+    <span class="notif-dot" aria-hidden="true"></span>
+    <span><strong>{{ n.title }}</strong>{% if not n.read_at %}<span class="sr-only"> (nowe)</span>{% endif %}
+      {% if n.body %}<span class="small muted" style="display:block">{{ n.body }}</span>{% endif %}
+      <span class="small muted" style="display:block">{{ n.created_at|date:"j.m.Y H:i" }}</span></span>
+  </a>
+  {% empty %}<p class="muted">Brak powiadomień. Tutaj pojawią się wiadomości o rezerwacjach, płatnościach, dokumentach i wydarzeniach.</p>{% endfor %}
+</div>
+{% include "partials/pagination.html" %}
+<p class="small muted">Te same wiadomości wysyłamy też e-mailem. Powiadomienia starsze niż rok są usuwane.</p>
+{% endblock %}

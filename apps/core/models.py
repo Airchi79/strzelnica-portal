@@ -33,8 +33,13 @@ class AssociationSettings(models.Model):
 
 
 class Notification(models.Model):
-    """Powiadomienie w panelu zarządu (lista „Powiadomienia”)."""
+    """Powiadomienie w portalu: dla zarządu (panel → Powiadomienia) albo dla klienta (dzwonek w nagłówku)."""
 
+    class Channel(models.TextChoices):
+        PANEL = "panel", "Panel zarządu"
+        PORTAL = "portal", "Portal klienta"
+
+    channel = models.CharField(max_length=8, choices=Channel.choices, default=Channel.PANEL, db_index=True)
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
     title = models.CharField(max_length=160)
     body = models.CharField(max_length=500, blank=True)

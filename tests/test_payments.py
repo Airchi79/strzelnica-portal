@@ -884,3 +884,13 @@ def test_panel_refund_overpayment_via_tpay(client, owner, ps, tpay_keys, monkeyp
     assert calls == [("01CANC", None)] and balance_of(ps) == 0
     assert services.refundable_overpayments(ps) == []
     assert "Zwróć przez Tpay" not in client.get(f"/panel/salda/{ps.pk}/").content.decode()
+
+
+def test_client_cancel_with_wallet_still_refunds_online_payment(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    """Saldo włączone (autouse w tym pliku) — wpłata online i tak wraca przez Tpay, nie na saldo."""
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append(tid) or {"result": "success"})
+    with django_capture_on_commit_callbacks(execute=True):
+        r, refunded, manual, to_wallet = booking_services.cancel_by_client(r, ps)
+    assert calls == ["01CANC"] and (refunded, manual, to_wallet) == (24000, 0, 0) and balance_of(ps) == 0

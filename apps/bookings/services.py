@@ -451,7 +451,7 @@ def approve_reservation(reservation, by, now=None):
     return r
 
 
-def refund_paid_to_payer(r, amount, by, reason):
+def refund_paid_to_payer(r, amount, by, reason, remind_manual=True):
     """Zwraca `amount` z wpłat za rezerwację na rachunek/kartę płacącego (Tpay). Kwota, której nie da się zwrócić
     automatycznie (wpłata poza Tpay, błąd Tpay), zostaje nadpłatą — zarząd dostaje przypomnienie o zwrocie ręcznym.
     Zwraca (zwrócono_automatycznie, do_zwrotu_ręcznie)."""
@@ -467,7 +467,7 @@ def refund_paid_to_payer(r, amount, by, reason):
             refunded += part
             remaining -= part
     manual = max(remaining, 0)
-    if manual:
+    if manual and remind_manual:
         url = reverse("panel:wallet", args=[r.user_id])
         notify_board(f"Zwrot do wykonania ręcznie: {r.number}", "emails/board_generic.txt", "payments.manage_payments", url=url,
                      body=f"{r.user.full_name}: {manual / 100:.2f} zł (wpłata poza Tpay albo zwrot Tpay nie powiódł się).",
@@ -504,10 +504,9 @@ def cancel_by_board(reservation, by, reason, keep_fee=False, refund=False):
 
 
 def cancel_by_client(reservation, by, reason="", now=None):
-    """Anulowanie przez klienta w terminie bezpłatnym. Wpłata za rezerwację:
-    - saldo wyłączone (domyślnie): wraca automatycznie na rachunek/kartę płacącego (Tpay); wpłata poza Tpay albo błąd
-      Tpay — zarząd dostaje przypomnienie o zwrocie ręcznym;
-    - saldo włączone: zostaje na saldzie klienta (opłaci następną rezerwację).
+    """Anulowanie przez klienta w terminie bezpłatnym. Wpłata online (Tpay) za rezerwację wraca zawsze automatycznie
+    na rachunek/kartę płacącego. Reszta (gotówka, przelew, błąd Tpay): przy włączonym saldzie zostaje na saldzie
+    klienta; przy wyłączonym — zarząd dostaje przypomnienie o zwrocie ręcznym.
     Zwraca (rezerwacja, zwrócono_tpay, do_zwrotu_ręcznie, na_saldo)."""
     from apps.payments.services import wallet_enabled
 
@@ -515,10 +514,12 @@ def cancel_by_client(reservation, by, reason="", now=None):
     r = cancel_reservation(reservation, by, reason, now=now, notify=False)
     refunded = manual = to_wallet = 0
     if paid:
-        if wallet_enabled():
-            to_wallet = paid
+        wallet = wallet_enabled()
+        refunded, rest = refund_paid_to_payer(r, paid, by, f"Anulowano rezerwację {r.number}", remind_manual=not wallet)
+        if wallet:
+            to_wallet = rest
         else:
-            refunded, manual = refund_paid_to_payer(r, paid, by, f"Anulowano rezerwację {r.number}")
+            manual = rest
     _notify_cancelled(r, refunded=refunded, manual=manual, to_wallet=to_wallet)
     return r, refunded, manual, to_wallet
 

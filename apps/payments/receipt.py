@@ -7,6 +7,8 @@ from pathlib import Path
 
 from django.utils import timezone
 
+from apps.facilities.models import format_pln
+
 
 def receipt_number(payment):
     return f"PW/{timezone.localtime(payment.completed_at):%Y}/{str(payment.pk)[:8].upper()}"
@@ -77,6 +79,8 @@ def to_pdf(payment, association):
         ["Data przyjęcia", f"{timezone.localtime(payment.completed_at):%d.%m.%Y %H:%M}"],
         ["Kwota", Paragraph(_amount_words_hint(payment.amount), big)],
     ]
+    if payment.surcharge:
+        rows.insert(-1, ["Opłata za płatność online", f"{format_pln(payment.surcharge)} — wliczona w kwotę, bezzwrotna"])
     if payment.method == payment.Method.TPAY and payment.external_id:
         rows.insert(3, ["Identyfikator transakcji", payment.external_id.replace("tpay:", "")])
     table = Table(rows, colWidths=[42 * mm, doc.width - 42 * mm])

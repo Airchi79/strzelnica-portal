@@ -1,6 +1,7 @@
 import uuid
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -12,6 +13,13 @@ class PaymentSettings(models.Model):
         "saldo strzelca (przedpłaty, automatyczne pobieranie opłat)", default=False,
         help_text="Wyłączone: wpłata opłaca tylko wskazaną rezerwację lub składkę; nadpłaty widzi zarząd jako kwoty do zwrotu.",
     )
+    online_fee_percent = models.DecimalField(
+        "opłata za płatność online — procent", max_digits=4, decimal_places=2, default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+        help_text="Doliczana do każdej płatności przez Tpay (np. 1,59). Nie wraca przy anulowaniu — klient może zapłacić przelewem "
+                  "lub na miejscu bez opłaty. 0 = bez opłaty.",
+    )
+    online_fee_fixed = models.PositiveIntegerField("opłata za płatność online — kwota stała [gr]", default=0)
     overpayment_pays_reservations = models.BooleanField(
         "nadpłata opłaca kolejne rezerwacje", default=False,
         help_text="Przy wyłączonym saldzie: nadpłata strzelca (np. zwrot za anulowaną rezerwację) sama opłaca jego "
@@ -83,6 +91,7 @@ class Payment(models.Model):
         "association.Fee", verbose_name="za składkę / wpisowe", null=True, blank=True, on_delete=models.PROTECT, related_name="payments"
     )
     note = models.CharField("uwagi", max_length=255, blank=True)
+    surcharge = models.PositiveIntegerField("w tym opłata za płatność online [gr]", default=0)
     raw = models.JSONField("dane źródłowe", default=dict, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField("utworzono", auto_now_add=True, db_index=True)
@@ -118,6 +127,7 @@ class LedgerEntry(models.Model):
         REFUND = "zwrot", "Zwrot za rezerwację"
         CHARGEBACK = "zwrot_tpay", "Zwrot płatności do wpłacającego"
         CORRECTION = "korekta", "Korekta zarządu"
+        ONLINE_FEE = "oplata_online", "Opłata za płatność online"
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="ledger")
     amount = models.IntegerField("kwota [gr]")

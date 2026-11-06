@@ -91,6 +91,30 @@ class AssignForm(forms.Form):
 
 
 class PaymentSettingsForm(forms.ModelForm):
+    online_fee_fixed_pln = PLNField(label="Opłata za płatność online — kwota stała [zł]", required=False,
+                                    help_text="Doliczana razem z procentem (np. 0,30). Puste = 0.")
+
     class Meta:
         model = PaymentSettings
-        fields = ["wallet_enabled", "overpayment_pays_reservations"]
+        fields = ["wallet_enabled", "overpayment_pays_reservations", "online_fee_percent"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["online_fee_percent"].required = False
+        self.fields["online_fee_percent"].localize = True
+        self.fields["online_fee_percent"].widget.is_localized = True
+        if self.instance.online_fee_fixed:
+            self.initial["online_fee_fixed_pln"] = Decimal(self.instance.online_fee_fixed) / 100
+
+    def clean_online_fee_percent(self):
+        return self.cleaned_data.get("online_fee_percent") or 0
+
+    def clean_online_fee_fixed_pln(self):
+        value = self.fields["online_fee_fixed_pln"].to_grosze(self.cleaned_data.get("online_fee_fixed_pln")) or 0
+        if value > 2000:
+            raise forms.ValidationError("Najwyżej 20 zł.")
+        return value
+
+    def save(self, commit=True):
+        self.instance.online_fee_fixed = self.cleaned_data.get("online_fee_fixed_pln") or 0
+        return super().save(commit)

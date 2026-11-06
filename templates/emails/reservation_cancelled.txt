@@ -6,7 +6,8 @@ rezerwacja {{ reservation.number }} została anulowana{% if reservation.cancel_r
 Rezerwację odwołano zbyt późno — należność {{ reservation.amount|pln }} pozostaje do zapłaty zgodnie z regulaminem.{% endif %}{% if refunded %}
 Zwrot {{ refunded|pln }} został zlecony na rachunek / kartę, z której płaciłeś (Tpay). Pieniądze zwykle docierają w ciągu kilku dni roboczych.{% endif %}{% if manual %}
 Kwotę {{ manual|pln }} zwrócimy ręcznie — skontaktujemy się w sprawie sposobu zwrotu.{% endif %}{% if to_wallet %}
-Wpłata {{ to_wallet|pln }} wróciła na Twoje saldo w portalu — opłaci kolejną rezerwację.{% endif %}{% if overpaid %}
+Wpłata {{ to_wallet|pln }} wróciła na Twoje saldo w portalu — opłaci kolejną rezerwację.{% endif %}{% if fee_kept %}
+Opłata za płatność online ({{ fee_kept|pln }}) nie podlega zwrotowi — to koszt obsługi płatności przez operatora.{% endif %}{% if overpaid %}
 Wpłata {{ overpaid|pln }} została zapisana na Twoim koncie jako nadpłata — w sprawie jej wykorzystania lub zwrotu skontaktuj się z obsługą.{% endif %}
 
 Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}

@@ -1,0 +1,1 @@
+{% load satok %}{% with fee=base|online_fee %}{% if fee %}<p class="small muted online-fee">Płatność online: {{ base|pln }} + opłata za płatność online {{ fee|pln }} = <strong>{{ base|add:fee|pln }}</strong>. Opłata nie wraca przy anulowaniu{% if offline %} — przelewem lub na miejscu płacisz bez opłaty{% endif %}.</p>{% endif %}{% endwith %}

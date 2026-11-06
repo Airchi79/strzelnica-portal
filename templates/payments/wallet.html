@@ -16,7 +16,7 @@
 <div class="card table-wrap"><table>
   {% for r in due %}<tr><td><a href="{% url 'bookings:detail' r.pk %}">{{ r.number }}</a><div class="small muted">{{ r.lane }}, {{ r.starts_at|date:"j.m.Y H:i" }} · tytuł przelewu: {{ r.number }}</div></td>
     <td>{{ r.amount|sub:r.paid_amount|pln }}</td>
-    <td>{% if tpay_enabled %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}"><button class="btn" type="submit">Zapłać online</button></form>{% endif %}</td></tr>{% endfor %}
+    <td>{% if tpay_enabled %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}"><button class="btn" type="submit">Zapłać online</button></form>{% with fee=r.amount|sub:r.paid_amount|online_fee %}{% if fee %}<div class="small muted">+ {{ fee|pln }} opłaty za płatność online</div>{% endif %}{% endwith %}{% endif %}</td></tr>{% endfor %}
 </table></div>
 {% endif %}
 
@@ -24,7 +24,7 @@
 <h2>Składki członkowskie do zapłaty</h2>
 <div class="card table-wrap"><table>
   {% for f in fees %}<tr><td>{{ f.label }}<div class="small muted">termin {{ f.due_on|date:"j.m.Y" }} · tytuł przelewu: {{ topup_code }}</div></td><td>{{ f.amount|pln }}</td>
-    <td>{% if tpay_enabled %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="fee" value="{{ f.pk }}"><button class="btn" type="submit">Zapłać online</button></form>{% endif %}</td></tr>{% endfor %}
+    <td>{% if tpay_enabled %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="fee" value="{{ f.pk }}"><button class="btn" type="submit">Zapłać online</button></form>{% with fee=f.amount|online_fee %}{% if fee %}<div class="small muted">+ {{ fee|pln }} opłaty za płatność online</div>{% endif %}{% endwith %}{% endif %}</td></tr>{% endfor %}
 </table></div>
 {% endif %}
 
@@ -33,6 +33,7 @@
 <div class="card">
   <form method="post" action="{% url 'payments:tpay_start' %}" novalidate>{% csrf_token %}{% include "partials/form.html" %}
     <button class="btn" type="submit">Zapłać online (BLIK, przelew, karta — Tpay)</button></form>
+  {% if online_fee_on %}<p class="small muted">Do doładowania online doliczamy opłatę za płatność online{% if online_fee_desc %} ({{ online_fee_desc }}){% endif %}. Przelewem tradycyjnym — bez opłaty.</p>{% endif %}
 </div>
 {% endif %}
 <h2>Przelew tradycyjny</h2>

@@ -462,8 +462,8 @@ def refund_paid_to_payer(r, amount, by, reason, remind_manual=True):
     for p in Payment.objects.filter(reservation=r, status=Payment.Status.COMPLETED).order_by("completed_at"):
         if remaining <= 0:
             break
-        part = min(p.amount, remaining)
-        if refund_to_payer(p, part, by=by, reason=reason):
+        part = min(p.amount - p.surcharge, remaining)  # opłata za płatność online nie wraca
+        if part > 0 and refund_to_payer(p, part, by=by, reason=reason):
             refunded += part
             remaining -= part
     manual = max(remaining, 0)
@@ -486,7 +486,7 @@ def reject_reservation(reservation, by, reason=""):
     r = cancel_reservation(r, by, reason or "Rezerwacja nie została zatwierdzona", as_board=True, notify=False)
     refunded, manual = refund_paid_to_payer(r, paid, by, f"Rezerwacja {r.number} nie została zatwierdzona") if paid else (0, 0)
     notify_user(r.user, f"Rezerwacja {r.number} nie została zatwierdzona", "emails/reservation_rejected.txt", reservation=r,
-                refunded=refunded, manual=manual)
+                refunded=refunded, manual=manual, fee_kept=_online_fee_kept(r) if (refunded or manual) else 0)
     return r
 
 
@@ -589,10 +589,20 @@ def cancel_reservation(reservation, by, reason="", as_board=False, now=None, kee
     return reservation
 
 
+def _online_fee_kept(r):
+    """Opłaty za płatność online zapłacone za rezerwację — nie wracają przy zwrocie."""
+    from django.db.models import Sum
+
+    from apps.payments.models import Payment
+
+    return Payment.objects.filter(reservation=r, status=Payment.Status.COMPLETED).aggregate(s=Sum("surcharge"))["s"] or 0
+
+
 def _notify_cancelled(reservation, expired=False, refunded=0, manual=0, overpaid=0, to_wallet=0):
     late = reservation.late_cancellation
+    kept = _online_fee_kept(reservation) if (refunded or manual or to_wallet) else 0
     notify_user(reservation.user, f"Rezerwacja {reservation.number} anulowana", "emails/reservation_cancelled.txt", reservation=reservation,
-                refunded=refunded, manual=manual, overpaid=overpaid, to_wallet=to_wallet)
+                refunded=refunded, manual=manual, overpaid=overpaid, to_wallet=to_wallet, fee_kept=kept)
     notify_board(
         f"Anulowano rezerwację: {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m %H:%M}",
         "emails/reservation_board.txt",

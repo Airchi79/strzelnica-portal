@@ -8,7 +8,7 @@ import hashlib
 import io
 import re
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -98,6 +98,15 @@ def post(user, amount, kind, description, *, payment=None, reservation=None, by=
 
 def wallet_enabled():
     return PaymentSettings.load().wallet_enabled
+
+
+def online_fee(amount, cfg=None):
+    """Opłata za płatność online (Tpay) doliczana do kwoty `amount` [gr] — wg ustawień płatności. Bezzwrotna."""
+    if not amount or amount <= 0:
+        return 0
+    cfg = cfg or PaymentSettings.load()
+    pct = Decimal(cfg.online_fee_percent or 0)
+    return int((Decimal(amount) * pct / 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) + (cfg.online_fee_fixed or 0)
 
 
 def _due_items(user):
@@ -257,6 +266,9 @@ def complete_payment(payment, user=None, by=None, note=""):
         payment=payment,
         by=by,
     )
+    if payment.surcharge:
+        post(payment.user, -payment.surcharge, LedgerEntry.Kind.ONLINE_FEE,
+             f"Opłata za płatność online (bezzwrotna){': ' + payment.title if payment.title else ''}", payment=payment, by=by)
     log_event("platnosc.zaksiegowana", payment, str(payment), changes={"dla": payment.user.email}, actor=by)
     if payment.reservation_id and payment.reservation.status == payment.reservation.Status.CANCELLED:
         # Wpłata dotarła po zwolnieniu/anulowaniu rezerwacji — środki zostają na koncie klienta, decyzję podejmuje obsługa.
@@ -509,7 +521,9 @@ def refundable_overpayments(user):
     for p in qs:
         if (p.raw or {}).get("zwrot_api") or balance <= 0:
             continue
-        amount = min(p.amount, balance)
+        amount = min(p.amount - p.surcharge, balance)  # bez opłaty za płatność online
+        if amount <= 0:
+            continue
         out.append((p, amount))
         balance -= amount
     return out

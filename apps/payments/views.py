@@ -30,6 +30,16 @@ User = get_user_model()
 PERM = "payments.manage_payments"
 
 
+def _online_fee_context():
+    cfg = PaymentSettings.load()
+    parts = []
+    if cfg.online_fee_percent:
+        parts.append(f"{cfg.online_fee_percent.normalize():f}".replace(".", ",") + "%")
+    if cfg.online_fee_fixed:
+        parts.append(format_pln(cfg.online_fee_fixed))
+    return {"online_fee_on": bool(parts), "online_fee_desc": " + ".join(parts)}
+
+
 @login_required
 def wallet(request):
     from apps.association.models import Fee
@@ -53,6 +63,7 @@ def wallet(request):
             "association": AssociationSettings.load(),
             "tpay_enabled": settings.TPAY_ENABLED,
             "form": TopupForm(),
+            **_online_fee_context(),
         },
     )
 
@@ -110,8 +121,10 @@ def tpay_start(request):
             messages.error(request, form.errors["amount"][0])
             return redirect("payments:wallet")
         amount = form.cleaned_data["amount"]
+    surcharge = services.online_fee(amount)
+    amount += surcharge
     payment = Payment.objects.create(
-        user=request.user, amount=amount, method=Payment.Method.TPAY, reservation=reservation, fee=fee, event_registration=registration,
+        user=request.user, amount=amount, surcharge=surcharge, method=Payment.Method.TPAY, reservation=reservation, fee=fee, event_registration=registration,
         title=reservation.number if reservation else (fee.label if fee else (registration.label if registration else services.topup_code(request.user))),
         created_by=request.user,
     )
@@ -342,11 +355,11 @@ def panel_wallet(request, user_pk):
 @panel_required(PERM)
 def panel_settings(request):
     obj = PaymentSettings.load()
-    before = {f: getattr(obj, f) for f in PaymentSettingsForm.Meta.fields}
+    before = {f: getattr(obj, f) for f in PaymentSettingsForm.Meta.fields + ["online_fee_fixed"]}
     form = PaymentSettingsForm(request.POST or None, instance=obj)
     if request.method == "POST" and form.is_valid():
         obj = form.save()
-        changes = {f: [before[f], getattr(obj, f)] for f in before if before[f] != getattr(obj, f)}
+        changes = {f: [str(before[f]), str(getattr(obj, f))] for f in before if before[f] != getattr(obj, f)}
         if changes:
             log_event("platnosci.ustawienia", obj, changes=changes)
         msg = "Zapisano ustawienia płatności."

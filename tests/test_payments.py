@@ -894,3 +894,77 @@ def test_client_cancel_with_wallet_still_refunds_online_payment(client, owner, p
     with django_capture_on_commit_callbacks(execute=True):
         r, refunded, manual, to_wallet = booking_services.cancel_by_client(r, ps)
     assert calls == ["01CANC"] and (refunded, manual, to_wallet) == (24000, 0, 0) and balance_of(ps) == 0
+
+
+# --- opłata za płatność online (bezzwrotna) -------------------------------------------------
+
+
+def _fee_on(percent="1.59", fixed=30, wallet=False):
+    from decimal import Decimal
+
+    PaymentSettings.objects.filter(pk=1).update(online_fee_percent=Decimal(percent), online_fee_fixed=fixed, wallet_enabled=wallet)
+
+
+def test_online_fee_calculation(db):
+    assert services.online_fee(24000) == 0  # domyślnie bez opłaty
+    _fee_on()
+    assert services.online_fee(24000) == 382 + 30  # 1,59% z 240 zł = 3,816 → 3,82 zł + 0,30 zł
+    assert services.online_fee(0) == 0
+
+
+def test_online_fee_charged_booked_and_not_refunded(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    _fee_on()
+    r = book(ps)
+    sent = {}
+    monkeypatch.setattr(tpay, "create_transaction", lambda **kw: sent.update(kw) or {"transaction_id": "01FEE", "title": "TR-TEST-1",
+                                                                                      "payment_url": "https://secure.sandbox.tpay.com/?t=1"})
+    client.force_login(ps)
+    page = client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    assert "opłata za płatność online 4,12\xa0zł" in page and "244,12\xa0zł" in page
+    client.post("/platnosci/tpay/start/", {"reservation": r.pk})
+    payment = Payment.objects.get(reservation=r)
+    assert sent["amount_grosze"] == 24412 and payment.amount == 24412 and payment.surcharge == 412
+    _post(client, tpay_keys, _notification(payment))
+    r.refresh_from_db()
+    assert r.payment_status == Reservation.Payment.PAID and r.paid_amount == 24000 and balance_of(ps) == 0
+    assert LedgerEntry.objects.filter(user=ps, kind=LedgerEntry.Kind.ONLINE_FEE, amount=-412).exists()
+    assert services.ledger_consistent(ps)
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append((tid, amount)) or {"result": "success"})
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        r, refunded, manual, to_wallet = booking_services.cancel_by_client(r, ps)
+    assert calls == [("01FEE", 24000)]  # zwrot częściowy: tylko cena rezerwacji
+    assert (refunded, manual) == (24000, 0) and balance_of(ps) == 0 and services.ledger_consistent(ps)
+    assert services.refundable_overpayments(ps) == []
+    body = [m for m in mail.outbox if m.to == [ps.email]][0].body
+    assert "Zwrot 240\xa0zł" in body and "Opłata za płatność online (4,12\xa0zł) nie podlega zwrotowi" in body
+
+
+def test_online_fee_not_refunded_on_reject(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    _fee_on(percent="0", fixed=100)
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    assert payment.surcharge == 100 and payment.amount == 24100
+    Reservation.objects.filter(pk=r.pk).update(status=Reservation.Status.PENDING_APPROVAL)
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append(amount) or {"result": "success"})
+    with django_capture_on_commit_callbacks(execute=True):
+        booking_services.reject_reservation(r, owner, "brak miejsc")
+    assert calls == [24000] and balance_of(ps) == 0
+
+
+def test_online_fee_settings_form_and_receipt(owner_client, ps, owner):
+    response = owner_client.post("/panel/platnosci/ustawienia/", {"online_fee_percent": "1,59", "online_fee_fixed_pln": "0,30"})
+    assert response.status_code == 302
+    cfg = PaymentSettings.load()
+    assert str(cfg.online_fee_percent) == "1.59" and cfg.online_fee_fixed == 30
+    assert "0,30" in owner_client.get("/panel/platnosci/ustawienia/").content.decode()
+    assert owner_client.post("/panel/platnosci/ustawienia/", {"online_fee_percent": "11"}).status_code == 200  # ponad 10%
+    from apps.core.models import AssociationSettings
+    from apps.payments.receipt import to_pdf
+
+    p = Payment.objects.create(user=ps, amount=24412, surcharge=412, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED,
+                               completed_at=timezone.now(), title="x")
+    assert to_pdf(p, AssociationSettings.load()).startswith(b"%PDF")

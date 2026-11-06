@@ -54,6 +54,7 @@
   {% if tpay_enabled and pay_options.online %}
     <form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}">
       <button class="btn res-pay-btn" type="submit">Zapłać online — BLIK, przelew, karta</button></form>
+    {% include "partials/online_fee_note.html" with base=r.amount|sub:r.paid_amount offline=pay_options.offline %}
   {% endif %}
   {% if pay_options.offline and r.status == 'potwierdzona' %}
     <div class="res-offline"><strong>{% if tpay_enabled and pay_options.online %}Albo offline{% else %}Jak zapłacić{% endif %}</strong>

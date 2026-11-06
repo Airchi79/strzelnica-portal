@@ -6,7 +6,9 @@ niestety rezerwacja {{ reservation.number }} ({{ reservation.lane }}, {{ reserva
 Zwrot {{ refunded|pln }} został zlecony na rachunek / kartę, z której płaciłeś (Tpay). Pieniądze zwykle docierają w ciągu kilku dni roboczych.
 {% endif %}{% if manual %}
 Kwotę {{ manual|pln }} zwrócimy ręcznie — skontaktujemy się w sprawie sposobu zwrotu.
-{% endif %}
+{% endif %}{% if fee_kept %}
+Opłata za płatność online ({{ fee_kept|pln }}) nie podlega zwrotowi — to koszt obsługi płatności przez operatora.{% endif %}
+
 W razie pytań odpowiedz na tę wiadomość albo skontaktuj się z obsługą strzelnicy.
 
 Stowarzyszenie STRZELNICA SĄTOK

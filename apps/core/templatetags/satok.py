@@ -85,6 +85,17 @@ ICONS = {
 }
 
 
+@register.filter
+def online_fee(grosze):
+    """Opłata za płatność online doliczana do kwoty (wg ustawień płatności); 0 = brak opłaty."""
+    from apps.payments.services import online_fee as calc
+
+    try:
+        return calc(int(grosze))
+    except (TypeError, ValueError):
+        return 0
+
+
 @register.simple_tag
 def icon(name, size=16):
     path = ICONS.get(name, ICONS["file"])

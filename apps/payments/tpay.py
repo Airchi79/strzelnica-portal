@@ -57,7 +57,7 @@ def _request(method, url, *, data=None, json_body=None, token=None):
         with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
             return json.loads(resp.read().decode() or "{}")
     except urllib.error.HTTPError as e:
-        detail = e.read().decode(errors="replace")[:500]
+        detail = " ".join(e.read().decode(errors="replace").split())[:800]  # jedna linia w logu
         logger.warning("Tpay %s %s → %s %s", method, url, e.code, detail)
         raise TpayError(f"Tpay odpowiedział błędem {e.code}") from e
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:

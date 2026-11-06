@@ -13,6 +13,7 @@
 <h2>Podsumowanie</h2>
 <div class="card"><table>
   {% for label, v in categories %}<tr><td>{{ label }}</td><td style="text-align:right">{{ v|pln }}</td></tr>{% endfor %}
+  {% if s.online_fees %}<tr><td class="muted">w tym we wpływach: opłaty za płatność online (bezzwrotne)</td><td style="text-align:right" class="muted">{{ s.online_fees|pln }}</td></tr>{% endif %}
   <tr><th>Razem netto</th><th style="text-align:right">{{ s.net|pln }}</th></tr>
 </table>
 {% if methods %}<h3>Wpływy według sposobu zapłaty</h3><table>{% for label, v in methods %}<tr><td>{{ label }}</td><td style="text-align:right">{{ v|pln }}</td></tr>{% endfor %}</table>{% endif %}

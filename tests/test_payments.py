@@ -985,3 +985,39 @@ def test_block_cancellation_refunds_online_payment(client, owner, ps, tpay_keys,
     assert calls == [("01CANC", 24000)] and balance_of(ps) == 0 and services.ledger_consistent(ps)
     body = [m for m in mail.outbox if m.to == [ps.email]][0].body
     assert "Blokada osi: Zawody" in body and "Zwrot 240\xa0zł" in body
+
+
+def test_manual_refund_and_sales_report(owner_client, owner, ps):
+    from apps.reports.services import collect, summarize
+
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    services.register_manual_payment(ps, 30000, Payment.Method.CASH, owner)  # nadpłata 300 zł
+    url = f"/panel/salda/{ps.pk}/"
+    assert "Zwrot ręczny do klienta" in owner_client.get(url).content.decode()
+    # ponad nadpłatę — odmowa
+    owner_client.post(url, {"action": "manual_refund", "zwrot-method": "przelew", "zwrot-amount": "400", "zwrot-reason": "x"})
+    assert balance_of(ps) == 30000
+    owner_client.post(url, {"action": "manual_refund", "zwrot-method": "tpay_panel", "zwrot-amount": "272,28", "zwrot-reason": "SATOK-R-1"})
+    assert balance_of(ps) == 2772 and services.ledger_consistent(ps)
+    e = LedgerEntry.objects.get(user=ps, kind=LedgerEntry.Kind.CHARGEBACK)
+    assert e.amount == -27228 and "panel Tpay" in e.description
+    # korekta salda dalej działa (bez pola action)
+    owner_client.post(url, {"direction": "minus", "amount": "27,72", "reason": "prowizja"})
+    assert balance_of(ps) == 0
+    rows = collect(timezone.localdate(), timezone.localdate())
+    refund_rows = [r for r in rows if r["category"] == "zwrot"]
+    assert [(r["method"], r["amount"]) for r in refund_rows] == [("zwrot_reczny", -27228)]
+
+
+def test_sales_report_online_fees(ps, owner, monkeypatch):
+    from apps.reports.services import collect, summarize, to_csv
+    from apps.reports.models import SalesReport
+
+    _fee_on(percent="0", fixed=150)
+    p = Payment.objects.create(user=ps, amount=24150, surcharge=150, method=Payment.Method.TPAY, external_id="tpay:01REP", title="x")
+    services.complete_payment(p)
+    s = summarize(collect(timezone.localdate(), timezone.localdate()))
+    assert s["online_fees"] == 150 and s["inflow"] == 24150
+    report = SalesReport(number="RS/T/1", kind=SalesReport.Kind.DAILY, period_start=timezone.localdate(), period_end=timezone.localdate(),
+                         data={"rows": [], "summary": s})
+    assert "opłaty za płatność online (bezzwrotne);1,50" in to_csv(report)

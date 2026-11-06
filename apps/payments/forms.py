@@ -69,6 +69,22 @@ class CorrectionForm(forms.Form):
         return data
 
 
+class ManualRefundForm(forms.Form):
+    method = forms.ChoiceField(label="Sposób zwrotu", choices=[("przelew", "Przelew"), ("gotowka", "Gotówka"),
+                                                               ("tpay_panel", "Zwrot ręczny w panelu Tpay"), ("blik", "BLIK na telefon")])
+    amount = PLNField(label="Kwota zwrócona klientowi [zł]")
+    reason = forms.CharField(label="Powód / numer rezerwacji", max_length=150)
+
+    def clean(self):
+        data = super().clean()
+        if data.get("amount") is not None:
+            if data["amount"] <= 0:
+                self.add_error("amount", "Kwota musi być dodatnia.")
+            else:
+                data["grosze"] = self.fields["amount"].to_grosze(data["amount"])
+        return data
+
+
 class BankImportForm(forms.Form):
     file = forms.FileField(label="Plik wyciągu (CSV z bankowości internetowej)")
 

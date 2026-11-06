@@ -25,6 +25,7 @@ CATEGORY_LABELS = {
 }
 METHOD_LABELS = {
     "tpay": "Online (Tpay)", "przelew": "Przelew", "gotowka": "Gotówka", "blik": "BLIK na telefon", "karta": "Karta",
+    "zwrot": "Zwrot przez Tpay", "zwrot_reczny": "Zwrot ręczny",
 }
 
 
@@ -56,6 +57,7 @@ def collect(start, end):
         rows.append({
             "at": timezone.localtime(p.completed_at).isoformat(timespec="minutes"), "category": category, "method": p.method,
             "doc": doc[:80], "client": (p.user.full_name if p.user else p.payer_name)[:80], "amount": p.amount, "ref": str(p.pk),
+            "surcharge": p.surcharge,
         })
     passes = ClientPass.objects.filter(paid_at__gte=lo, paid_at__lt=hi, price__gt=0).exclude(paid_with__in=["", "bezplatny"])
     for cp in passes.select_related("user").order_by("paid_at", "id"):
@@ -65,7 +67,8 @@ def collect(start, end):
         })
     for le in LedgerEntry.objects.filter(kind=LedgerEntry.Kind.CHARGEBACK, created_at__gte=lo, created_at__lt=hi).select_related("user"):
         rows.append({
-            "at": timezone.localtime(le.created_at).isoformat(timespec="minutes"), "category": "zwrot", "method": "zwrot",
+            "at": timezone.localtime(le.created_at).isoformat(timespec="minutes"), "category": "zwrot",
+            "method": "zwrot" if le.payment_id else "zwrot_reczny",
             "doc": le.description[:80], "client": le.user.full_name[:80], "amount": le.amount, "ref": f"saldo:{le.pk}",
         })
     rows.sort(key=lambda r: (r["at"], r["ref"]))
@@ -74,8 +77,9 @@ def collect(start, end):
 
 def summarize(rows):
     by_category, by_method = {}, {}
-    inflow = refunds = 0
+    inflow = refunds = online_fees = 0
     for r in rows:
+        online_fees += r.get("surcharge", 0)
         by_category[r["category"]] = by_category.get(r["category"], 0) + r["amount"]
         if r["category"] == "zwrot":
             refunds += r["amount"]
@@ -83,7 +87,7 @@ def summarize(rows):
             inflow += r["amount"]
             by_method[r["method"]] = by_method.get(r["method"], 0) + r["amount"]
     return {"count": len(rows), "inflow": inflow, "refunds": refunds, "net": inflow + refunds,
-            "by_category": by_category, "by_method": by_method}
+            "by_category": by_category, "by_method": by_method, "online_fees": online_fees}
 
 
 def _next_number(kind, year):
@@ -191,6 +195,8 @@ def to_csv(report):
     w.writerow([])
     w.writerow(["Wpływy", _pln(s["inflow"])])
     w.writerow(["Zwroty", _pln(s["refunds"])])
+    if s.get("online_fees"):
+        w.writerow(["W tym we wpływach: opłaty za płatność online (bezzwrotne)", _pln(s["online_fees"])])
     w.writerow(["Razem netto", _pln(s["net"])])
     w.writerow(["Suma kontrolna SHA-256", report.sha256])
     return "﻿" + buf.getvalue()  # BOM — poprawne polskie znaki w Excelu
@@ -250,6 +256,8 @@ def to_pdf(report, association):
 
     summary = [["Podsumowanie", "Kwota [zł]"]]
     summary += [[CATEGORY_LABELS.get(k, k), _pln(v)] for k, v in sorted(s["by_category"].items())]
+    if s.get("online_fees"):
+        summary += [["W tym we wpływach: opłaty za płatność online (bezzwrotne)", _pln(s["online_fees"])]]
     summary += [["Razem netto (wpływy − zwroty)", _pln(s["net"])]]
     story += [table(summary, [120 * mm, 40 * mm], bold_last=True), Spacer(1, 4 * mm)]
     methods = [["Wpływy według sposobu zapłaty", "Kwota [zł]"]] + [[METHOD_LABELS.get(k, k), _pln(v)] for k, v in sorted(s["by_method"].items())]

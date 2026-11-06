@@ -22,7 +22,7 @@ from apps.core.permissions import panel_required
 from apps.facilities.models import format_pln
 
 from . import services, tpay
-from .forms import AssignForm, BankImportForm, CorrectionForm, ManualPaymentForm, PaymentSettingsForm, TopupForm
+from .forms import AssignForm, BankImportForm, CorrectionForm, ManualPaymentForm, ManualRefundForm, PaymentSettingsForm, TopupForm
 from .models import BankImport, LedgerEntry, Payment, PaymentSettings, Wallet
 
 logger = logging.getLogger(__name__)
@@ -326,7 +326,18 @@ def panel_wallet(request, user_pk):
         else:
             messages.error(request, "Tpay nie przyjął zwrotu — zwróć ręcznie (przelew / panel Tpay) i zaksięguj korektę salda.")
         return redirect("panel:wallet", user_pk=subject.pk)
-    form = CorrectionForm(request.POST or None)
+    refund_form = ManualRefundForm(request.POST if request.POST.get("action") == "manual_refund" else None, prefix="zwrot")
+    if request.method == "POST" and request.POST.get("action") == "manual_refund":
+        if refund_form.is_valid():
+            d = refund_form.cleaned_data
+            try:
+                services.manual_refund(subject, d["grosze"], d["method"], d["reason"], request.user)
+            except ValidationError as e:
+                messages.error(request, e.messages[0])
+            else:
+                messages.success(request, f"Zaksięgowano zwrot ręczny {d['grosze'] / 100:.2f} zł — będzie w raporcie sprzedaży jako zwrot.")
+            return redirect("panel:wallet", user_pk=subject.pk)
+    form = CorrectionForm(request.POST if request.method == "POST" and not request.POST.get("action") else None)
     if request.method == "POST" and form.is_valid():
         try:
             services.correction(subject, form.cleaned_data["signed"], form.cleaned_data["reason"], request.user)
@@ -348,6 +359,7 @@ def panel_wallet(request, user_pk):
             "topup_code": services.topup_code(subject),
             "consistent": services.ledger_consistent(subject),
             "refundable": services.refundable_overpayments(subject),
+            "refund_form": refund_form,
         },
     )
 

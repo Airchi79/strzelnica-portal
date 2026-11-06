@@ -317,6 +317,28 @@ def correction(user, amount, reason, by):
     return entry
 
 
+MANUAL_REFUND_METHODS = {"przelew": "przelew", "gotowka": "gotówka", "tpay_panel": "panel Tpay", "blik": "BLIK na telefon"}
+
+
+@transaction.atomic
+def manual_refund(user, amount, method, reason, by):
+    """Zwrot wykonany poza systemem (przelew, gotówka, zwrot ręczny w panelu Tpay) — księgowany jako „zwrot do
+    wpłacającego”, więc trafia do raportu sprzedaży jako zwrot. Najwyżej do wysokości nadpłaty."""
+    if method not in MANUAL_REFUND_METHODS:
+        raise ValidationError("Wybierz sposób zwrotu.")
+    if not reason.strip():
+        raise ValidationError("Podaj powód zwrotu.")
+    if amount <= 0:
+        raise ValidationError("Kwota musi być dodatnia.")
+    _locked_wallet(user)
+    if amount > balance_of(user):
+        raise ValidationError(f"Zwrot nie może przekroczyć nadpłaty klienta ({balance_of(user) / 100:.2f} zł).")
+    entry = post(user, -amount, LedgerEntry.Kind.CHARGEBACK, f"Zwrot ręczny ({MANUAL_REFUND_METHODS[method]}): {reason.strip()}", by=by)
+    log_event("platnosc.zwrot_reczny", entry, f"{user.full_name}: {amount / 100:.2f} zł ({MANUAL_REFUND_METHODS[method]})",
+              changes={"kwota_gr": amount, "sposob": method, "powod": reason.strip()}, actor=by)
+    return entry
+
+
 def ledger_consistent(user):
     total = LedgerEntry.objects.filter(user=user).aggregate(s=Sum("amount"))["s"] or 0
     return total == balance_of(user)

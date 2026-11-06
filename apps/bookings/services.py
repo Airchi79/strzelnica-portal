@@ -503,6 +503,26 @@ def cancel_by_board(reservation, by, reason, keep_fee=False, refund=False):
     return r
 
 
+def cancel_by_client(reservation, by, reason="", now=None):
+    """Anulowanie przez klienta w terminie bezpłatnym. Wpłata za rezerwację:
+    - saldo wyłączone (domyślnie): wraca automatycznie na rachunek/kartę płacącego (Tpay); wpłata poza Tpay albo błąd
+      Tpay — zarząd dostaje przypomnienie o zwrocie ręcznym;
+    - saldo włączone: zostaje na saldzie klienta (opłaci następną rezerwację).
+    Zwraca (rezerwacja, zwrócono_tpay, do_zwrotu_ręcznie, na_saldo)."""
+    from apps.payments.services import wallet_enabled
+
+    paid = Reservation.objects.get(pk=reservation.pk).paid_amount
+    r = cancel_reservation(reservation, by, reason, now=now, notify=False)
+    refunded = manual = to_wallet = 0
+    if paid:
+        if wallet_enabled():
+            to_wallet = paid
+        else:
+            refunded, manual = refund_paid_to_payer(r, paid, by, f"Anulowano rezerwację {r.number}")
+    _notify_cancelled(r, refunded=refunded, manual=manual, to_wallet=to_wallet)
+    return r, refunded, manual, to_wallet
+
+
 def expire_unpaid(now=None):
     """Zwalnia rezerwacje nieopłacone w terminie (grupy „tylko online”). Pomija trwające płatności Tpay."""
     from apps.payments.models import Payment
@@ -568,10 +588,10 @@ def cancel_reservation(reservation, by, reason="", as_board=False, now=None, kee
     return reservation
 
 
-def _notify_cancelled(reservation, expired=False, refunded=0, manual=0, overpaid=0):
+def _notify_cancelled(reservation, expired=False, refunded=0, manual=0, overpaid=0, to_wallet=0):
     late = reservation.late_cancellation
     notify_user(reservation.user, f"Rezerwacja {reservation.number} anulowana", "emails/reservation_cancelled.txt", reservation=reservation,
-                refunded=refunded, manual=manual, overpaid=overpaid)
+                refunded=refunded, manual=manual, overpaid=overpaid, to_wallet=to_wallet)
     notify_board(
         f"Anulowano rezerwację: {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m %H:%M}",
         "emails/reservation_board.txt",

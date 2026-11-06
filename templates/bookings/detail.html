@@ -93,7 +93,7 @@
 {% if r.can_user_cancel %}
 <details class="card res-cancel"{% if form.errors %} open{% endif %}>
   <summary>{% if r.status == 'do_zatwierdzenia' %}Wycofaj rezerwację{% else %}Anuluj rezerwację{% endif %}</summary>
-  {% if r.status == 'potwierdzona' %}<p class="small">Bez opłat, samodzielnie do <strong>{{ r.free_cancel_deadline|date:"j.m.Y H:i" }}</strong>. Później anulować może tylko obsługa strzelnicy.</p>{% endif %}
+  {% if r.status == 'potwierdzona' %}<p class="small">Bez opłat, samodzielnie do <strong>{{ r.free_cancel_deadline|date:"j.m.Y H:i" }}</strong>. Później anulować może tylko obsługa strzelnicy.{% if r.paid_amount %} Wpłata {{ r.paid_amount|pln }} {% if WALLET_ENABLED %}wróci na Twoje saldo{% else %}wróci na kartę / rachunek, z którego płaciłeś{% endif %}.{% endif %}</p>{% endif %}
   <form method="post" data-confirm="Anulować rezerwację {{ r.number }}?">{% csrf_token %}{% include "partials/form.html" %}<button class="btn danger" type="submit">Anuluj rezerwację</button></form>
 </details>
 {% elif r.status == 'potwierdzona' and not r.is_finished %}

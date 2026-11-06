@@ -17,7 +17,7 @@ from apps.bookings import services as booking_services
 from apps.bookings.models import Reservation
 from apps.facilities.models import Lane
 from apps.payments import services, tpay
-from apps.payments.models import LedgerEntry, Payment
+from apps.payments.models import LedgerEntry, Payment, PaymentSettings
 
 from .conftest import approve, add_credential, grant, login_with_otp, make_user
 
@@ -800,3 +800,87 @@ def test_panel_change_term_form(owner_client, ps):
     owner_client.post(f"/panel/rezerwacje/{r.pk}/", {"action": "change_term", "t-lane": r.lane_id, "t-day": day, "t-start_hour": 12, "t-end_hour": 14})
     r.refresh_from_db()
     assert timezone.localtime(r.starts_at).hour == 12
+
+
+def test_client_cancel_paid_online_refunds_to_card(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    """Klient sam anuluje opłaconą online rezerwację (saldo wyłączone) — zwrot przez Tpay, informacja w e-mailu i na stronie."""
+    from django.core import mail
+
+    from apps.core.models import Notification
+
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)  # tryb domyślny: bez salda
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append((tid, amount)) or {"result": "success"})
+    mail.outbox.clear()
+    client.force_login(ps)
+    with django_capture_on_commit_callbacks(execute=True):
+        resp = client.post(f"/rezerwacje/{r.pk}/", {"reason": "zmiana planów"}, follow=True)
+    assert calls == [("01CANC", None)]
+    assert "Zwrot 240.00 zł zlecony" in resp.content.decode()
+    r.refresh_from_db()
+    payment.refresh_from_db()
+    assert r.status == Reservation.Status.CANCELLED and payment.raw["zwrot_api"]["kwota_gr"] == 24000
+    assert balance_of(ps) == 0
+    assert "Zwrot" in [m for m in mail.outbox if m.to == [ps.email]][0].body
+    assert Notification.objects.filter(recipient=ps, channel="portal", title__contains="anulowana").exists()
+
+
+def test_client_cancel_paid_cash_needs_manual_refund(ps, owner, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r = book(ps, days=10)
+    services.register_manual_payment(ps, 24000, Payment.Method.CASH, owner, reservation=r)
+    r.refresh_from_db()
+    assert r.paid_amount == 24000
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        r, refunded, manual, to_wallet = booking_services.cancel_by_client(r, ps, now=r.starts_at - timedelta(days=3))
+    assert (refunded, manual, to_wallet) == (0, 24000, 0)
+    assert services.balance_of(ps) == 24000  # nadpłata do zwrotu ręcznego, zarząd ma przypomnienie
+    assert any("Zwrot do wykonania ręcznie" in m.subject for m in mail.outbox)
+    assert "zwrócimy ręcznie" in [m for m in mail.outbox if m.to == [ps.email]][0].body
+
+
+def test_client_cancel_with_wallet_keeps_money_on_balance(ps, owner, monkeypatch, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    cfg = PaymentSettings.load()
+    cfg.wallet_enabled = True
+    cfg.save()
+    services.register_manual_payment(ps, 24000, Payment.Method.CASH, owner)
+    r = book(ps, days=10)
+    called = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda *a, **k: called.append(a))
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        r, refunded, manual, to_wallet = booking_services.cancel_by_client(r, ps, now=r.starts_at - timedelta(days=3))
+    assert (refunded, manual, to_wallet) == (0, 0, 24000) and not called
+    assert services.balance_of(ps) == 24000
+    assert "wróciła na Twoje saldo" in [m for m in mail.outbox if m.to == [ps.email]][0].body
+
+
+def test_panel_refund_overpayment_via_tpay(client, owner, ps, tpay_keys, monkeypatch):
+    """Nadpłata po anulowaniu bez zwrotu (np. stary przypadek, blokada osi) — zarząd zwraca ją z panelu, tylko raz."""
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    booking_services.cancel_reservation(r, ps)  # dawna ścieżka: wpłata zostaje nadpłatą
+    assert balance_of(ps) == 24000
+    assert services.refundable_overpayments(ps) == [(payment, 24000)]
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append((tid, amount)) or {"result": "success"})
+    client.logout()
+    other = make_user("bez-uprawnien@example.com", is_staff=True)
+    login_with_otp(client, other)
+    client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})
+    assert not calls  # bez uprawnień do płatności
+    client.logout()
+    login_with_otp(client, owner)
+    page = client.get(f"/panel/salda/{ps.pk}/").content.decode()
+    assert "Zwróć przez Tpay" in page and r.number in page
+    client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})
+    client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})  # drugi raz — nic
+    assert calls == [("01CANC", None)] and balance_of(ps) == 0
+    assert services.refundable_overpayments(ps) == []
+    assert "Zwróć przez Tpay" not in client.get(f"/panel/salda/{ps.pk}/").content.decode()

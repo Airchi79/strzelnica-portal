@@ -303,6 +303,16 @@ def panel_wallets(request):
 @panel_required(PERM)
 def panel_wallet(request, user_pk):
     subject = get_object_or_404(User, pk=user_pk)
+    if request.method == "POST" and request.POST.get("action") == "refund_tpay":
+        match = [(p, a) for p, a in services.refundable_overpayments(subject) if str(p.pk) == request.POST.get("payment")]
+        if not match:
+            messages.error(request, "Tej wpłaty nie można już zwrócić (zwrócona wcześniej albo brak nadpłaty).")
+        elif services.refund_to_payer(match[0][0], match[0][1], by=request.user,
+                                      reason=f"Zwrot nadpłaty za anulowaną rezerwację {match[0][0].reservation.number}"):
+            messages.success(request, f"Zlecono zwrot {match[0][1] / 100:.2f} zł przez Tpay na rachunek / kartę płacącego.")
+        else:
+            messages.error(request, "Tpay nie przyjął zwrotu — zwróć ręcznie (przelew / panel Tpay) i zaksięguj korektę salda.")
+        return redirect("panel:wallet", user_pk=subject.pk)
     form = CorrectionForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
@@ -324,6 +334,7 @@ def panel_wallet(request, user_pk):
             "due": subject.reservations.filter(payment_status=Reservation.Payment.DUE).order_by("starts_at"),
             "topup_code": services.topup_code(subject),
             "consistent": services.ledger_consistent(subject),
+            "refundable": services.refundable_overpayments(subject),
         },
     )
 

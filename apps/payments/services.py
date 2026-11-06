@@ -495,3 +495,20 @@ def refund_to_payer(payment, amount, by=None, reason="Zwrot"):
         post(p.user, -amount, LedgerEntry.Kind.CHARGEBACK, f"{reason} — zwrot na rachunek płacącego (Tpay)", payment=p, by=by)
         log_event("platnosc.zwrot_tpay", p, f"{p}: zwrot {amount / 100:.2f} zł", actor=by)
     return True
+
+
+def refundable_overpayments(user):
+    """Wpłaty Tpay za anulowane (bez zachowania należności) rezerwacje, które nie zostały jeszcze zwrócone płacącemu —
+    nadpłata klienta, którą zarząd może zwrócić jednym kliknięciem. [(wpłata, kwota_do_zwrotu)]"""
+    balance = balance_of(user)
+    out = []
+    qs = (Payment.objects.filter(user=user, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED, external_id__startswith="tpay:",
+                                 reservation__status="anulowana", reservation__late_cancellation=False)
+          .exclude(ledger_entries__kind=LedgerEntry.Kind.CHARGEBACK).select_related("reservation").order_by("completed_at"))
+    for p in qs:
+        if (p.raw or {}).get("zwrot_api") or balance <= 0:
+            continue
+        amount = min(p.amount, balance)
+        out.append((p, amount))
+        balance -= amount
+    return out

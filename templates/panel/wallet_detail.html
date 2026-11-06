@@ -9,6 +9,12 @@
   <div class="card"><span class="muted small">Rezerwacje do zapłaty</span><div class="stat">{{ due|length }}</div>
     {% for r in due %}<div class="small"><a href="{% url 'panel:reservation' r.pk %}">{{ r.number }}</a> · {{ r.amount|sub:r.paid_amount|pln }}</div>{% endfor %}</div>
 </div>
+{% if refundable %}<div class="card"><h2 style="margin-top:0">Nadpłata do zwrotu przez Tpay</h2>
+  {% for p, amount in refundable %}<form method="post" class="actions" style="margin:0 0 8px;align-items:center" data-confirm="Zwrócić {{ amount|pln }} na rachunek / kartę płacącego?">{% csrf_token %}
+    <input type="hidden" name="action" value="refund_tpay"><input type="hidden" name="payment" value="{{ p.pk }}">
+    <span>Wpłata online {{ p.completed_at|date:"j.m.Y H:i" }} za anulowaną rezerwację <a href="{% url 'panel:reservation' p.reservation_id %}">{{ p.reservation.number }}</a> — <strong>{{ amount|pln }}</strong></span>
+    <button class="btn secondary" type="submit">Zwróć przez Tpay</button></form>{% endfor %}
+  <p class="small muted">Pieniądze wracają na rachunek / kartę, z której klient płacił; operacja „zwrot do wpłacającego” zmniejszy saldo.</p></div>{% endif %}
 <div class="actions" style="margin-top:0;margin-bottom:16px"><a class="btn" href="{% url 'panel:payment_manual' %}?user={{ subject.pk }}">Przyjmij wpłatę</a></div>
 <h2>Historia</h2>
 <div class="card table-wrap"><table>

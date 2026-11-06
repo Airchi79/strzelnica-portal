@@ -205,11 +205,18 @@ def detail(request, pk):
     form = CancelForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
-            reservation = services.cancel_reservation(reservation, request.user, form.cleaned_data["reason"])
+            reservation, refunded, manual, to_wallet = services.cancel_by_client(reservation, request.user, form.cleaned_data["reason"])
         except ValidationError as e:
             messages.error(request, _messages_from(e)[0])
         else:
-            messages.success(request, "Rezerwacja anulowana bez opłat.")
+            msg = "Rezerwacja anulowana bez opłat."
+            if refunded:
+                msg += f" Zwrot {refunded / 100:.2f} zł zlecony na kartę / rachunek, z którego płaciłeś — zwykle kilka dni roboczych."
+            if manual:
+                msg += f" Kwotę {manual / 100:.2f} zł zwrócimy ręcznie — skontaktujemy się."
+            if to_wallet:
+                msg += f" Wpłata {to_wallet / 100:.2f} zł wróciła na Twoje saldo."
+            messages.success(request, msg)
         return redirect("bookings:detail", pk=reservation.pk)
     return render(
         request,

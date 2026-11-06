@@ -133,3 +133,80 @@ def test_panel_edit_shows_lane_conflicts(owner_client, owner):
     assert e.fee == 3000 and e.block_id
     assert Reservation.objects.get(pk=r.pk).status == Reservation.Status.CANCELLED
     assert AuditLog.objects.filter(action="wydarzenie.zapis").exists()
+
+
+# --- zwroty przez Tpay ---------------------------------------------------------------------------
+
+
+def _paid_online(user, reg, surcharge=0, ext="tpay:01EVT"):
+    from apps.payments.services import complete_payment
+
+    p = Payment.objects.create(user=user, amount=reg.amount + surcharge, surcharge=surcharge, method=Payment.Method.TPAY,
+                               event_registration=reg, external_id=ext, title=reg.label)
+    complete_payment(p)
+    reg.refresh_from_db()
+    assert reg.payment_status == Registration.Payment.PAID and balance_of(user) == 0
+    return p
+
+
+@pytest.fixture
+def refunds(monkeypatch):
+    from apps.payments import tpay
+
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append((tid, amount)) or {"result": "success"})
+    return calls
+
+
+def test_self_withdrawal_refunds_online_payment(owner, refunds, django_capture_on_commit_callbacks):
+    e = make_event(owner)
+    a = shooter("zwrot@example.com")
+    reg = services.register(a, e)
+    _paid_online(a, reg, surcharge=150)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        reg = services.cancel_registration(reg, a)
+    assert refunds == [("01EVT", 5000)]  # zwrot częściowy: bez opłaty za płatność online
+    assert reg.refund_info["refunded"] == 5000 and balance_of(a) == 0
+    body = [m for m in mail.outbox if m.to == [a.email]][0].body
+    assert "wycofałeś zapis" in body and "Zwrot 50\xa0zł" in body and "nie podlega zwrotowi" in body
+
+
+def test_staff_withdraw_with_and_without_refund(owner_client, owner, refunds):
+    e = make_event(owner, capacity=5)
+    a, b = shooter("a1@example.com"), shooter("b1@example.com")
+    ra, rb = services.register(a, e), services.register(b, e)
+    _paid_online(a, ra, ext="tpay:01A")
+    _paid_online(b, rb, ext="tpay:01B")
+    page = owner_client.get(f"/panel/wydarzenia/{e.pk}/").content.decode()
+    assert "Wycofaj bez zwrotu" in page
+    owner_client.post(f"/panel/wydarzenia/{e.pk}/", {"action": "withdraw", "reg": ra.pk})
+    owner_client.post(f"/panel/wydarzenia/{e.pk}/", {"action": "withdraw_keep", "reg": rb.pk})
+    assert refunds == [("01A", None)]
+    assert balance_of(a) == 0 and balance_of(b) == 5000  # b: nadpłata do decyzji zarządu
+
+
+def test_cancel_event_refund_checkbox(owner_client, owner, refunds, django_capture_on_commit_callbacks):
+    from apps.payments.services import register_manual_payment
+
+    e = make_event(owner, capacity=5)
+    a, c = shooter("a2@example.com"), shooter("c2@example.com")
+    ra, rc = services.register(a, e), services.register(c, e)
+    _paid_online(a, ra, ext="tpay:01C")
+    register_manual_payment(c, 5000, Payment.Method.CASH, owner, registration=rc)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        owner_client.post(f"/panel/wydarzenia/{e.pk}/", {"action": "cancel_event", "reason": "Burza", "refund": "1"})
+    e.refresh_from_db()
+    assert e.status == Event.Status.CANCELLED and refunds == [("01C", None)]
+    assert balance_of(a) == 0 and balance_of(c) == 5000  # gotówka — zwrot ręczny
+    assert any("Zwrot do wykonania ręcznie" in m.subject for m in mail.outbox)
+
+
+def test_cancel_event_without_refund_keeps_overpayment(owner_client, owner, refunds):
+    e = make_event(owner)
+    a = shooter("a3@example.com")
+    ra = services.register(a, e)
+    _paid_online(a, ra, ext="tpay:01D")
+    owner_client.post(f"/panel/wydarzenia/{e.pk}/", {"action": "cancel_event", "reason": "Burza"})
+    assert refunds == [] and balance_of(a) == 5000

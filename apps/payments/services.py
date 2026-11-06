@@ -510,6 +510,34 @@ def refund_to_payer(payment, amount, by=None, reason="Zwrot"):
     return True
 
 
+def refund_to_payers(payments, amount, by, reason):
+    """Zwraca `amount` z podanych wpłat (najstarsze najpierw) na rachunek/kartę płacących przez Tpay — bez opłaty za
+    płatność online. Wpłaty poza Tpay i odrzucone przez Tpay pomija. Zwraca (zwrócono, pozostało)."""
+    refunded, remaining = 0, amount
+    for p in payments.filter(status=Payment.Status.COMPLETED).order_by("completed_at"):
+        if remaining <= 0:
+            break
+        part = min(p.amount - p.surcharge, remaining)  # opłata za płatność online nie wraca
+        if part > 0 and refund_to_payer(p, part, by=by, reason=reason):
+            refunded += part
+            remaining -= part
+    return refunded, max(remaining, 0)
+
+
+def remind_manual_refund(user, amount, label):
+    """Przypomnienie dla zarządu: kwotę trzeba zwrócić ręcznie (wpłata poza Tpay albo Tpay odrzucił zwrot)."""
+    url = reverse("panel:wallet", args=[user.pk])
+    notify_board(f"Zwrot do wykonania ręcznie: {label}", "emails/board_generic.txt", "payments.manage_payments", url=url,
+                 body=f"{user.full_name}: {amount / 100:.2f} zł (wpłata poza Tpay albo zwrot Tpay nie powiódł się).",
+                 event=f"Zwrot do wykonania ręcznie: {label}",
+                 text=f"{user.full_name}: {amount / 100:.2f} zł — zwróć przelewem/gotówką albo w panelu Tpay.", url_path=url)
+
+
+def surcharge_of(payments):
+    """Suma opłat za płatność online w zaksięgowanych wpłatach (nie wracają przy zwrocie)."""
+    return payments.filter(status=Payment.Status.COMPLETED).aggregate(s=Sum("surcharge"))["s"] or 0
+
+
 def refundable_overpayments(user):
     """Wpłaty Tpay za anulowane (bez zachowania należności) rezerwacje, które nie zostały jeszcze zwrócone płacącemu —
     nadpłata klienta, którą zarząd może zwrócić jednym kliknięciem. [(wpłata, kwota_do_zwrotu)]"""

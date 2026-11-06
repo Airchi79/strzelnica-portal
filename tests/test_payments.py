@@ -968,3 +968,20 @@ def test_online_fee_settings_form_and_receipt(owner_client, ps, owner):
     p = Payment.objects.create(user=ps, amount=24412, surcharge=412, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED,
                                completed_at=timezone.now(), title="x")
     assert to_pdf(p, AssociationSettings.load()).startswith(b"%PDF")
+
+
+def test_block_cancellation_refunds_online_payment(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    _fee_on(percent="0", fixed=100)
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append((tid, amount)) or {"result": "success"})
+    occ = [(r.starts_at, r.ends_at)]
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        _, _, cancelled = booking_services.create_blocks("Zawody", "", [r.lane], occ, owner, cancel_conflicts=True)
+    assert [c.pk for c in cancelled] == [r.pk]
+    assert calls == [("01CANC", 24000)] and balance_of(ps) == 0 and services.ledger_consistent(ps)
+    body = [m for m in mail.outbox if m.to == [ps.email]][0].body
+    assert "Blokada osi: Zawody" in body and "Zwrot 240\xa0zł" in body

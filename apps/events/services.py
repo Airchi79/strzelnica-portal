@@ -111,8 +111,35 @@ def _promote_reserve(event, by):
     return nxt
 
 
+def _refund_paid(reg, paid, by, reason, refund):
+    """Wpłata za zapis po wycofaniu/odwołaniu. `refund`: wpłaty online wracają przez Tpay (bez opłaty za płatność
+    online); reszta — przy włączonym saldzie zostaje na saldzie, przy wyłączonym zarząd dostaje przypomnienie o zwrocie
+    ręcznym. Bez `refund` cała kwota zostaje nadpłatą. Zwraca słownik do e-maila i komunikatu."""
+    from apps.payments.models import Payment
+    from apps.payments.services import refund_to_payers, remind_manual_refund, surcharge_of, wallet_enabled
+
+    info = {"refunded": 0, "manual": 0, "to_wallet": 0, "overpaid": 0, "fee_kept": 0}
+    if not paid:
+        return info
+    if not refund:
+        info["overpaid"] = paid
+        return info
+    payments = Payment.objects.filter(event_registration=reg)
+    info["refunded"], rest = refund_to_payers(payments, paid, by, reason)
+    if wallet_enabled():
+        info["to_wallet"] = rest
+    else:
+        info["manual"] = rest
+        if rest:
+            remind_manual_refund(reg.user, rest, f"{reg.event.title} — {reg.user.full_name}")
+    info["fee_kept"] = surcharge_of(payments)
+    return info
+
+
 @transaction.atomic
-def cancel_registration(reg, by, by_staff=False, reason=""):
+def cancel_registration(reg, by, by_staff=False, reason="", refund=True):
+    """Wycofanie zapisu. Uczestnik sam (do zamknięcia zapisów) — wpłata online wraca automatycznie przez Tpay;
+    organizator — zwrot, gdy `refund` (domyślnie tak). Ustawia `reg.refund_info` (kwoty zwrotu)."""
     from apps.payments.services import refund_registration
 
     reg = Registration.objects.select_for_update().select_related("event", "user").get(pk=reg.pk)
@@ -128,17 +155,21 @@ def cancel_registration(reg, by, by_staff=False, reason=""):
     reg.status = Registration.Status.CANCELLED
     reg.cancelled_at = timezone.now()
     reg.save(update_fields=["status", "cancelled_at"])
+    paid = reg.paid_amount
     refund_registration(reg, by=by)
-    log_event("wydarzenie.wycofanie", reg, str(reg), changes={"przez_organizatora": by_staff, "powod": reason}, actor=by)
-    if by_staff and reg.user_id != by.pk:
-        notify_user(reg.user, f"Wycofano zapis: {event.title}", "emails/event_cancelled_registration.txt", reg=reg, reason=reason)
+    info = _refund_paid(reg, paid, by, f"Wycofano zapis: {event.title}", refund or not by_staff)
+    log_event("wydarzenie.wycofanie", reg, str(reg), changes={"przez_organizatora": by_staff, "powod": reason, **info}, actor=by)
+    by_self = not by_staff or reg.user_id == by.pk
+    notify_user(reg.user, f"Wycofano zapis: {event.title}", "emails/event_cancelled_registration.txt", reg=reg, reason=reason,
+                by_self=by_self, **info)
+    reg.refund_info = info
     if was_registered:
         _promote_reserve(event, by)
     return reg
 
 
 @transaction.atomic
-def cancel_event(event, by, reason):
+def cancel_event(event, by, reason, refund=True):
     if not reason.strip():
         raise ValidationError("Podaj powód odwołania — uczestnicy dostaną go e-mailem.")
     event = Event.objects.select_for_update().get(pk=event.pk)
@@ -152,9 +183,11 @@ def cancel_event(event, by, reason):
         reg.status = Registration.Status.CANCELLED
         reg.cancelled_at = timezone.now()
         reg.save(update_fields=["status", "cancelled_at"])
+        paid = reg.paid_amount
         refund_registration(reg, by=by)
-        notify_user(reg.user, f"Odwołano: {event.title}", "emails/event_cancelled.txt", reg=reg, reason=reason)
-    log_event("wydarzenie.odwolanie", event, str(event), changes={"powod": reason, "uczestnicy": len(affected)}, actor=by)
+        info = _refund_paid(reg, paid, by, f"Odwołano wydarzenie: {event.title}", refund)
+        notify_user(reg.user, f"Odwołano: {event.title}", "emails/event_cancelled.txt", reg=reg, reason=reason, **info)
+    log_event("wydarzenie.odwolanie", event, str(event), changes={"powod": reason, "uczestnicy": len(affected), "zwrot_tpay": refund}, actor=by)
     url = reverse("panel:event", args=[event.pk])
     notify_board(f"Odwołano wydarzenie: {event.title}", "emails/board_generic.txt", PERM, url=url,
                  body=f"Powód: {reason}. Uczestników: {len(affected)}.",

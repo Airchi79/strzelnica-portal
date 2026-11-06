@@ -456,23 +456,11 @@ def refund_paid_to_payer(r, amount, by, reason, remind_manual=True):
     automatycznie (wpłata poza Tpay, błąd Tpay), zostaje nadpłatą — zarząd dostaje przypomnienie o zwrocie ręcznym.
     Zwraca (zwrócono_automatycznie, do_zwrotu_ręcznie)."""
     from apps.payments.models import Payment
-    from apps.payments.services import refund_to_payer
+    from apps.payments.services import refund_to_payers, remind_manual_refund
 
-    refunded, remaining = 0, amount
-    for p in Payment.objects.filter(reservation=r, status=Payment.Status.COMPLETED).order_by("completed_at"):
-        if remaining <= 0:
-            break
-        part = min(p.amount - p.surcharge, remaining)  # opłata za płatność online nie wraca
-        if part > 0 and refund_to_payer(p, part, by=by, reason=reason):
-            refunded += part
-            remaining -= part
-    manual = max(remaining, 0)
+    refunded, manual = refund_to_payers(Payment.objects.filter(reservation=r), amount, by, reason)
     if manual and remind_manual:
-        url = reverse("panel:wallet", args=[r.user_id])
-        notify_board(f"Zwrot do wykonania ręcznie: {r.number}", "emails/board_generic.txt", "payments.manage_payments", url=url,
-                     body=f"{r.user.full_name}: {manual / 100:.2f} zł (wpłata poza Tpay albo zwrot Tpay nie powiódł się).",
-                     event=f"Zwrot do wykonania ręcznie: {r.number}",
-                     text=f"{r.user.full_name}: {manual / 100:.2f} zł — zwróć przelewem/gotówką albo w panelu Tpay.", url_path=url)
+        remind_manual_refund(r.user, manual, r.number)
     return refunded, manual
 
 
@@ -591,11 +579,10 @@ def cancel_reservation(reservation, by, reason="", as_board=False, now=None, kee
 
 def _online_fee_kept(r):
     """Opłaty za płatność online zapłacone za rezerwację — nie wracają przy zwrocie."""
-    from django.db.models import Sum
-
     from apps.payments.models import Payment
+    from apps.payments.services import surcharge_of
 
-    return Payment.objects.filter(reservation=r, status=Payment.Status.COMPLETED).aggregate(s=Sum("surcharge"))["s"] or 0
+    return surcharge_of(Payment.objects.filter(reservation=r))
 
 
 def _notify_cancelled(reservation, expired=False, refunded=0, manual=0, overpaid=0, to_wallet=0):
@@ -787,7 +774,8 @@ def create_blocks(title, reason, lanes, occurrences, by, cancel_conflicts):
     cancelled = []
     if cancel_conflicts:
         for r in conflicts:
-            cancelled.append(cancel_reservation(r, by, reason=f"Blokada osi: {title}", as_board=True))
+            # klient nie zawinił — wpłata online wraca automatycznie przez Tpay (bez opłaty za płatność online)
+            cancelled.append(cancel_by_board(r, by, f"Blokada osi: {title}", refund=True))
     else:
         for r in conflicts:
             notify_user(r.user, f"Blokada osi w terminie rezerwacji {r.number}", "emails/reservation_block_conflict.txt", reservation=r, title=title)

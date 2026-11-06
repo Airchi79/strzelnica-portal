@@ -1,4 +1,4 @@
-{% extends "panel/base_panel.html" %}
+{% extends "panel/base_panel.html" %}{% load satok %}
 {% block title %}Nowa blokada{% endblock %}
 {% block panel %}
 <h1>Nowa blokada osi</h1>
@@ -8,13 +8,15 @@
   <div class="card">
     <div class="msg warning">Blokada koliduje z {{ conflicts|length }} rezerwacją(-ami). Zdecyduj, co z nimi zrobić.</div>
     <div class="table-wrap"><table>
-      {% for r in conflicts %}<tr><td>{{ r.starts_at|date:"j.m.Y H:i" }}–{{ r.ends_at|time:"H:i" }}</td><td>{{ r.lane }}</td><td>{{ r.user.full_name }}</td><td>{{ r.number }}</td></tr>{% endfor %}
+      {% for r in conflicts %}<tr><td>{{ r.starts_at|date:"j.m.Y H:i" }}–{{ r.ends_at|time:"H:i" }}</td><td>{{ r.lane }}</td><td>{{ r.user.full_name }}</td><td>{{ r.number }}</td>
+        <td>{% if r.paid_amount %}opłacona {{ r.paid_amount|pln }}{% else %}<span class="muted">nieopłacona</span>{% endif %}</td></tr>{% endfor %}
     </table></div>
     <div class="actions">
       <button class="btn danger" type="submit" name="decision" value="cancel">Utwórz blokadę i anuluj te rezerwacje</button>
       <button class="btn secondary" type="submit" name="decision" value="keep">Utwórz blokadę, rezerwacje zostaw</button>
     </div>
-    <p class="small muted">W obu przypadkach strzelcy otrzymają e-mail.</p>
+    <p class="small muted">W obu przypadkach strzelcy otrzymają e-mail. Przy anulowaniu wpłaty online wracają automatycznie przez Tpay
+      (bez opłaty za płatność online); wpłaty gotówką i przelewem trafią na listę zwrotów do wykonania ręcznie.</p>
   </div>
   {% endif %}
   <div class="card">

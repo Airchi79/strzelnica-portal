@@ -48,8 +48,16 @@ def detail(request, pk):
                     messages.success(request, "Zapisano na listę rezerwową." if reg.status == Registration.Status.RESERVE else "Zapisano! Potwierdzenie wysłaliśmy e-mailem.")
                     return redirect("events:detail", pk=event.pk)
             elif action == "cancel" and reg:
-                services.cancel_registration(reg, request.user)
-                messages.success(request, "Wycofano zapis.")
+                reg = services.cancel_registration(reg, request.user)
+                info = reg.refund_info
+                msg = "Wycofano zapis."
+                if info["refunded"]:
+                    msg += f" Zwrot {info['refunded'] / 100:.2f} zł zlecony na kartę / rachunek, z którego płaciłeś."
+                if info["manual"]:
+                    msg += f" Kwotę {info['manual'] / 100:.2f} zł zwrócimy ręcznie."
+                if info["to_wallet"]:
+                    msg += f" {info['to_wallet'] / 100:.2f} zł wróciło na Twoje saldo."
+                messages.success(request, msg)
                 return redirect("events:detail", pk=event.pk)
         except ValidationError as e:
             for m in e.messages:
@@ -107,13 +115,18 @@ def panel_detail(request, pk):
         action = request.POST.get("action")
         try:
             if action == "cancel_event":
-                services.cancel_event(event, request.user, request.POST.get("reason", ""))
+                services.cancel_event(event, request.user, request.POST.get("reason", ""), refund=bool(request.POST.get("refund")))
                 messages.success(request, "Wydarzenie odwołane. Uczestnicy dostali e-mail.")
-            elif action in ("cash", "blik", "waive", "withdraw"):
+            elif action in ("cash", "blik", "waive", "withdraw", "withdraw_keep"):
                 reg = get_object_or_404(Registration, pk=request.POST.get("reg"), event=event)
-                if action == "withdraw":
-                    services.cancel_registration(reg, request.user, by_staff=True, reason=request.POST.get("reason", ""))
-                    messages.success(request, f"Wycofano: {reg.user.full_name}.")
+                if action in ("withdraw", "withdraw_keep"):
+                    reg = services.cancel_registration(reg, request.user, by_staff=True, reason=request.POST.get("reason", ""),
+                                                       refund=action == "withdraw")
+                    info = reg.refund_info
+                    extra = "".join([f" Zwrot przez Tpay: {info['refunded'] / 100:.2f} zł." if info["refunded"] else "",
+                                     f" Do zwrotu ręcznie: {info['manual'] / 100:.2f} zł." if info["manual"] else "",
+                                     f" Nadpłata: {info['overpaid'] / 100:.2f} zł." if info["overpaid"] else ""])
+                    messages.success(request, f"Wycofano: {reg.user.full_name}.{extra}")
                 elif action == "waive":
                     reg.payment_status = Registration.Payment.WAIVED
                     reg.save(update_fields=["payment_status"])

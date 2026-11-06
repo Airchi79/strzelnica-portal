@@ -86,3 +86,20 @@ def test_purge_old(client_user):
     Notification.objects.create(recipient=client_user, channel="portal", title="nowe")
     assert purge_old_notifications() == 1
     assert list(Notification.objects.values_list("title", flat=True)) == ["nowe"]
+
+
+def test_header_balance_only_when_wallet_enabled(client, client_user):
+    from apps.payments.models import PaymentSettings
+    from apps.payments.services import post
+    from apps.payments.models import LedgerEntry
+
+    client.force_login(client_user)
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    assert "balance-chip" not in client.get("/pulpit/").content.decode()
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=True)
+    body = client.get("/pulpit/").content.decode()
+    assert 'class="balance-chip"' in body and "Saldo: 0\xa0zł" in body
+    post(client_user, 12550, LedgerEntry.Kind.CORRECTION, "test")
+    assert "125,50\xa0zł" in client.get("/powiadomienia/").content.decode()
+    client.logout()
+    assert "balance-chip" not in client.get("/").content.decode()

@@ -13,7 +13,12 @@ def site(request):
         unread_portal = counts.get("portal", 0)
         if user.is_staff:
             unread = counts.get("panel", 0)
-    from apps.payments.models import PaymentSettings
+    from apps.payments.models import PaymentSettings, Wallet
+
+    wallet_on = PaymentSettings.load().wallet_enabled
+    header_balance = None
+    if wallet_on and user is not None and user.is_authenticated:
+        header_balance = Wallet.objects.filter(user=user).values_list("balance", flat=True).first() or 0
 
     from .announcements import active
     from .branding import current_urls
@@ -22,7 +27,8 @@ def site(request):
         "ANNOUNCEMENTS": sorted(active().only("pk", "title", "body", "level", "visible_from")[:5],
                                 key=lambda a: ({"zamkniete": 0, "uwaga": 1}.get(a.level, 2), -a.visible_from.timestamp()))[:3],
         "BRAND": current_urls(),
-        "WALLET_ENABLED": PaymentSettings.load().wallet_enabled,
+        "WALLET_ENABLED": wallet_on,
+        "header_balance": header_balance,
         "SITE_NAME": "Strzelnica Sątok",
         "SITE_URL": settings.SITE_URL,
         "pending_regulations": pending,

@@ -591,4 +591,13 @@ tr.now-bez_rezerwacji td { background: var(--bad-bg); }
 .notif-dot { flex: 0 0 10px; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; }
 .notif.unread .notif-dot { background: var(--bad); }
 .notif:not(.unread) strong { font-weight: 500; }
-@media (min-width: 900px) { .topbar .bell { order: 3; } }
+.topbar .top-icons { display: flex; align-items: center; gap: 2px; }
+@media (min-width: 1150px) {  /* szeroki ekran: saldo i dzwonek na końcu menu; węższy — w pierwszej linii obok logo */
+  .topbar .wrap { max-width: 1200px; }
+  .topbar .top-icons { order: 3; }
+}
+/* saldo klienta w nagłówku (gdy saldo strzelca jest włączone) */
+.topbar .balance-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border-radius: 8px;
+  font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.topbar .balance-chip:hover { background: rgba(255,255,255,.15); }
+.topbar .balance-chip.neg span { text-decoration: underline; text-decoration-style: dotted; }

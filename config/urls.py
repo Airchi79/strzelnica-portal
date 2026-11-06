@@ -4,6 +4,7 @@ from django_otp.admin import OTPAdminSite
 
 from apps.bookings import views as bookings_views
 from apps.core import views as core_views
+from apps.core import widget as widget_views
 
 # Panel techniczny Django tylko dla superużytkownika i tylko po weryfikacji dwuskładnikowej.
 admin.site.__class__ = OTPAdminSite
@@ -26,6 +27,8 @@ urlpatterns = [
     path("logo/", core_views.brand_logo, name="brand_logo"),
     path("ikona/<str:size>.png", core_views.brand_icon, name="brand_icon"),
     path("kalendarz/<str:token>.ics", bookings_views.calendar_feed, name="calendar_feed"),
+    path("widget/<str:kind>/", widget_views.widget_page, name="widget"),
+    path("widget.js", widget_views.embed_js, name="widget_js"),
     path("sw.js", core_views.service_worker, name="service_worker"),
     path("healthz", core_views.healthz, name="healthz"),
 ]

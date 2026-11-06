@@ -334,3 +334,14 @@ def panel_gdpr(request, pk=None):
 @panel_required()
 def panel_help(request):
     return render(request, "panel/help.html")
+
+
+@panel_required("core.manage_settings")
+def panel_widget(request):
+    from django.conf import settings as dj_settings
+
+    from apps.bookings.forms import active_lanes
+
+    from .widget import KINDS
+
+    return render(request, "panel/widget.html", {"kinds": KINDS, "site": dj_settings.SITE_URL, "lanes": active_lanes()})

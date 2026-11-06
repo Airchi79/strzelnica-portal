@@ -572,3 +572,11 @@ main:focus { outline: none; }
 tr.now-ok .now-mark, tr.now-prace .now-mark { color: var(--ok); } tr.now-bez_rezerwacji .now-mark { color: var(--bad); } tr.now-po_czasie .now-mark { color: var(--warn); }
 tr.now-bez_rezerwacji td { background: var(--bad-bg); }
 .res-banner.bad-banner { background: var(--bad-bg); border-left-color: var(--bad); color: var(--text); }
+
+/* --- widżet na stronę zewnętrzną --- */
+.widget-body { background: var(--bg); margin: 0; }
+.widget { padding: 10px; }
+.widget-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.widget-nav { display: flex; justify-content: space-between; font-size: .85rem; margin: 6px 0; }
+.widget-foot { margin: 10px 0 0; text-align: right; }
+.code-box { background: color-mix(in srgb, var(--text) 6%, var(--surface)); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-size: .8rem; white-space: pre-wrap; word-break: break-all; }

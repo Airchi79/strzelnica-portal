@@ -41,6 +41,9 @@ class SecurityLimitsMiddleware:
         response.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
         if "Content-Security-Policy" not in response:  # np. logo SVG ma własną, ostrzejszą politykę
             # osadzanie w ramce tylko tam, gdzie widok na to pozwala (podgląd PDF w weryfikacji dokumentów)
-            ancestors = "'self'" if response.get("X-Frame-Options") == "SAMEORIGIN" else "'none'"
+            if getattr(response, "xframe_options_exempt", False):
+                ancestors = "*"  # strony widżetu (tylko dane publiczne) — do osadzania na stronie stowarzyszenia
+            else:
+                ancestors = "'self'" if response.get("X-Frame-Options") == "SAMEORIGIN" else "'none'"
             response["Content-Security-Policy"] = f"{CSP}; frame-ancestors {ancestors}"
         return response

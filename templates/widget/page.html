@@ -1,0 +1,33 @@
+{% load static satok %}<!doctype html>
+<html lang="pl" data-theme="{{ theme }}"{% if theme == 'dark' %} class="is-dark"{% endif %}>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<title>Strzelnica Sątok — {{ kind }}</title>
+<base target="_blank">
+<link rel="stylesheet" href="{% static 'css/app.css' %}"></head>
+<body class="widget-body">
+<div class="widget" data-widget>
+{% if kind == 'zajetosc' %}
+  <div class="widget-head"><strong>Zajętość osi</strong>
+    <span class="small">{{ week_start|date:"j.m" }}–{{ week_end|date:"j.m" }}</span></div>
+  {% if lanes|length > 1 %}<div class="tabs lane-tabs">{% for l in lanes %}<a target="_self" href="?os={{ l.pk }}&amp;dzien={{ week_start|date:'Y-m-d' }}&amp;motyw={% if theme == 'dark' %}ciemny{% else %}jasny{% endif %}" class="{% if l.pk == lane.pk %}active{% endif %}">{{ l.name }}</a>{% endfor %}</div>{% endif %}
+  <div class="widget-nav"><a target="_self" href="?os={{ lane.pk }}&amp;dzien={{ prev|date:'Y-m-d' }}&amp;motyw={% if theme == 'dark' %}ciemny{% else %}jasny{% endif %}">← poprzedni tydzień</a>
+    <a target="_self" href="?os={{ lane.pk }}&amp;dzien={{ next|date:'Y-m-d' }}&amp;motyw={% if theme == 'dark' %}ciemny{% else %}jasny{% endif %}">następny →</a></div>
+  {% include "bookings/_week_grid.html" with can_book=True %}
+  <p class="small"><a href="{{ site }}{% url 'bookings:new' %}?os={{ lane.pk }}">Zarezerwuj termin →</a></p>
+{% elif kind == 'teraz' %}
+  <div class="widget-head"><strong>Teraz na strzelnicy</strong><span class="small muted">{{ now|time:"H:i" }}</span></div>
+  <div class="now-grid">{% for row in now_lanes %}<div class="card now-lane {{ row.state }}"><div class="now-head"><strong>{{ row.lane.name }}</strong>
+    <span class="badge {% if row.state == 'wolna' %}ok{% elif row.state == 'zajeta' %}bad{% elif row.state == 'blokada' %}warn{% endif %}">{% if row.state == 'wolna' %}wolna{% elif row.state == 'zajeta' %}zajęta{% elif row.state == 'blokada' %}niedostępna{% else %}nieczynna{% endif %}</span></div>
+    <div class="small">{% if row.until %}{% if row.state == 'wolna' %}wolna {% endif %}do {{ row.until|time:"H:i" }}{% endif %}</div></div>{% endfor %}</div>
+  <p class="small"><a href="{{ site }}{% url 'bookings:new' %}">Zarezerwuj →</a></p>
+{% else %}
+  <div class="widget-head"><strong>Najbliższe wydarzenia</strong></div>
+  {% for e in events %}<a class="card event-card" href="{{ site }}{% url 'events:detail' e.pk %}">
+    <div class="event-date"><span class="d">{{ e.starts_at|date:"j" }}</span><span class="m">{{ e.starts_at|date:"M" }}</span></div>
+    <div class="event-info"><strong>{{ e.title }}</strong><span class="small muted">{{ e.starts_at|time:"H:i" }}–{{ e.ends_at|time:"H:i" }}{% if e.fee %} · {{ e.fee|pln }}{% endif %}</span></div></a>
+  {% empty %}<p class="muted small">Brak zaplanowanych wydarzeń.</p>{% endfor %}
+{% endif %}
+<p class="widget-foot small muted"><a href="{{ site }}/">Strzelnica Sątok</a> · system rezerwacji</p>
+</div>
+<script src="{% static 'js/widget-frame.js' %}" defer></script>
+</body></html>

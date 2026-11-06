@@ -1,0 +1,21 @@
+{% extends "panel/base_panel.html" %}{% load static %}
+{% block title %}Widżet na stronę{% endblock %}
+{% block panel %}
+<h1>Widżet na stronę internetową</h1>
+<div class="card" data-widget-builder data-site="{{ site }}">
+  <p class="small muted" style="margin-top:0">Wstaw na stronę stowarzyszenia (np. WordPress — blok „Własny HTML”) zajętość osi, stan „teraz” albo listę wydarzeń. Widżet pokazuje tylko dane publiczne; kliknięcie otwiera rezerwację w nowej karcie.</p>
+  <div class="field-row">
+    <div class="field"><label for="w-kind">Rodzaj</label><select id="w-kind">{% for k, l in kinds.items %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="w-theme">Motyw</label><select id="w-theme"><option value="jasny">jasny</option><option value="ciemny">ciemny</option></select></div>
+    <div class="field" data-w-lane-field><label for="w-lane">Oś na start</label><select id="w-lane">{% for l in lanes %}<option value="{{ l.pk }}">{{ l.name }}</option>{% endfor %}</select></div>
+    <div class="field" data-w-count-field hidden><label for="w-count">Liczba wydarzeń</label><input id="w-count" type="number" min="1" max="20" value="5"></div>
+  </div>
+  <h2 class="step-title">Kod do wklejenia (polecany — sam dopasowuje wysokość)</h2>
+  <pre class="code-box" data-w-code></pre>
+  <div class="actions"><button type="button" class="btn" data-w-copy="code">Kopiuj kod</button></div>
+  <details><summary class="small">Zwykła ramka iframe (gdy strona nie pozwala na skrypty)</summary>
+    <pre class="code-box" data-w-iframe></pre><button type="button" class="btn secondary small-btn" data-w-copy="iframe">Kopiuj</button></details>
+</div>
+<div class="card"><h2 class="step-title">Podgląd</h2><iframe data-w-preview title="Podgląd widżetu" style="width:100%;border:1px solid var(--border);border-radius:8px;height:520px"></iframe></div>
+<script src="{% static 'js/widget-builder.js' %}" defer></script>
+{% endblock %}

@@ -55,6 +55,7 @@ urlpatterns = [
     path("ogloszenia/", views.panel_announcements, name="announcements"),
     path("kopie/", views.panel_backups, name="backups"),
     path("pomoc/", views.panel_help, name="help"),
+    path("widzet/", views.panel_widget, name="widget"),
     path("rodo/", views.panel_gdpr, name="gdpr"),
     path("rodo/<int:pk>/", views.panel_gdpr, name="gdpr_user"),
     path("wydarzenia/", events_views.panel_list, name="events"),

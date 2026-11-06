@@ -613,6 +613,66 @@ def change_persons(reservation, persons, by):
     return reservation
 
 
+def change_term(reservation, lane, day, start_hour, end_hour, by, refund_difference=False, now=None):
+    """Zmiana osi i/lub terminu przez obsługę. Należność wg cennika nowej osi i dnia: wyższa — dopłata (do zapłaty),
+    niższa — różnica wraca (na rachunek/kartę przez Tpay przy `refund_difference`, inaczej jako nadpłata).
+    Zwolniony dotychczasowy termin trafia do listy oczekujących."""
+    now = now or timezone.now()
+    with transaction.atomic():
+        r = Reservation.objects.select_for_update(of=("self",)).select_related("lane", "client_pass").get(pk=reservation.pk)
+        if r.status not in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL):
+            raise ValidationError("Można zmieniać tylko aktywne rezerwacje.")
+        starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, r.persons, now)
+        clash = (Reservation.objects.filter(lane=lane, starts_at__lt=ends_at, ends_at__gt=starts_at)
+                 .exclude(pk=r.pk).exclude(status__in=[Reservation.Status.CANCELLED, Reservation.Status.NO_SHOW]).first())
+        if clash:
+            raise ValidationError(f"Nowy termin jest zajęty (rezerwacja {clash.number}).")
+        hours = end_hour - start_hour
+        if r.client_pass_id:
+            p = r.client_pass
+            if (p.lanes.exists() and not p.lanes.filter(pk=lane.pk).exists()) or (p.max_hours and hours > p.max_hours):
+                raise ValidationError("Kod wejścia nie obejmuje nowej osi lub długości — anuluj i zarezerwuj ponownie.")
+        old = {"oś": str(r.lane), "od": timezone.localtime(r.starts_at).strftime("%d.%m.%Y %H:%M"),
+               "do": timezone.localtime(r.ends_at).strftime("%H:%M"), "kwota_gr": r.amount}
+        freed = (r.lane, r.starts_at, r.ends_at)
+        paid_before = r.paid_amount
+        r.lane, r.starts_at, r.ends_at = lane, starts_at, ends_at
+        if r.access_code_id is None and r.client_pass_id is None:
+            r.price_rule = rule
+            r.hourly_amount = rule.hourly_amount(r.persons)
+            r.amount = r.hourly_amount * hours
+        elif r.access_code_id:
+            r.hourly_amount = r.access_code.contract_hourly or 0
+            r.amount = r.hourly_amount * hours
+        r.reminder_sent_at = None
+        try:
+            with transaction.atomic():
+                r.save()
+        except IntegrityError as e:
+            raise ValidationError("Nowy termin został właśnie zajęty. Wybierz inny.") from e
+        if r.access_code_id is None and r.client_pass_id is None:
+            r = reconcile_reservation(r, by=by)
+        log_event("rezerwacja.zmiana_terminu", r, str(r), actor=by,
+                  changes={"przed": old, "po": {"oś": str(lane), "od": timezone.localtime(starts_at).strftime("%d.%m.%Y %H:%M"),
+                                                "do": timezone.localtime(ends_at).strftime("%H:%M"), "kwota_gr": r.amount}})
+
+        def _offer():
+            from .waitlist import offer_freed
+
+            offer_freed(*freed)
+
+        transaction.on_commit(_offer)
+    excess = max(paid_before - r.amount, 0) if r.access_code_id is None and r.client_pass_id is None else 0
+    refunded = manual = 0
+    if excess and refund_difference:
+        refunded, manual = refund_paid_to_payer(r, excess, by, f"Zmiana rezerwacji {r.number} — zwrot różnicy")
+    r.refresh_from_db()
+    notify_user(r.user, f"Zmiana rezerwacji {r.number}", "emails/reservation_changed.txt", reservation=r, old=old,
+                surcharge=max(r.amount - r.paid_amount, 0) if r.payment_status == Reservation.Payment.DUE else 0,
+                refunded=refunded, manual=manual, overpaid=0 if refund_difference else excess, options=payment_options(r))
+    return r
+
+
 PAYMENT_TRANSITIONS = {
     "waive": (Reservation.Payment.WAIVED, {Reservation.Payment.DUE}),
     "unwaive": (Reservation.Payment.DUE, {Reservation.Payment.WAIVED}),

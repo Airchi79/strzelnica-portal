@@ -75,6 +75,17 @@
     {% include "partials/form.html" with form=persons_form %}
     <button class="btn secondary" type="submit">Zmień liczbę osób i przelicz</button></form>
 </div>
+{% if r.status == 'potwierdzona' or r.status == 'do_zatwierdzenia' %}
+<details class="card">
+  <summary><strong>Zmień oś lub termin</strong> <span class="small muted">— należność przeliczy się według cennika nowej osi</span></summary>
+  <form method="post" novalidate style="margin-top:10px" data-confirm="Zmienić termin rezerwacji {{ r.number }}? Klient dostanie e-mail.">{% csrf_token %}<input type="hidden" name="action" value="change_term">
+    <div class="field-row">{% include "partials/field.html" with field=term_form.lane %}{% include "partials/field.html" with field=term_form.day %}</div>
+    <div class="field-row">{% include "partials/field.html" with field=term_form.start_hour %}{% include "partials/field.html" with field=term_form.end_hour %}</div>
+    {% if r.paid_amount %}{% include "partials/field.html" with field=term_form.refund_difference %}{% endif %}
+    <button class="btn secondary" type="submit">Zmień termin</button>
+  </form>
+</details>
+{% endif %}
 {% if started %}
 <div class="card"><form method="post">{% csrf_token %}<button class="btn secondary" name="action" value="no_show">Oznacz jako nieodbytą</button></form></div>
 {% endif %}

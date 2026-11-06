@@ -28,6 +28,7 @@ from . import services
 from .forms import (
     BlockForm,
     BoardCancelForm,
+    ChangeTermForm,
     BoardReservationForm,
     BookingSettingsForm,
     GroupRuleForm,
@@ -334,6 +335,9 @@ def panel_list(request):
 def panel_detail(request, pk):
     r = get_object_or_404(Reservation.objects.select_related("lane", "user", "cancelled_by", "payment_marked_by"), pk=pk)
     cancel_form = BoardCancelForm(prefix="c", initial={"refund_to_payer": True})
+    lt = timezone.localtime(r.starts_at)
+    term_form = ChangeTermForm(prefix="t", initial={"lane": r.lane_id, "day": lt.date(), "start_hour": lt.hour,
+                                                    "end_hour": timezone.localtime(r.ends_at).hour or 24, "refund_difference": True})
     persons_form = PersonsForm(prefix="p", initial={"persons": r.persons})
     if request.method == "POST":
         action = request.POST.get("action")
@@ -348,6 +352,20 @@ def panel_detail(request, pk):
                     messages.success(request, "Rezerwacja anulowana" + (" z zachowaniem należności" if keep else "")
                                      + (" — zlecono zwrot wpłaty" if refund and paid and not keep else "") + ". Klient otrzyma e-mail.")
                     return redirect("panel:reservation", pk=r.pk)
+            elif action == "change_term":
+                term_form = ChangeTermForm(request.POST, prefix="t")
+                if term_form.is_valid():
+                    d = term_form.cleaned_data
+                    before = r.amount
+                    r2 = services.change_term(r, d["lane"], d["day"], d["start_hour"], d["end_hour"], request.user,
+                                              refund_difference=d["refund_difference"])
+                    diff = r2.amount - before
+                    messages.success(request, f"Zmieniono termin: {r2.lane}, {timezone.localtime(r2.starts_at):%d.%m %H:%M}–{timezone.localtime(r2.ends_at):%H:%M}"
+                                     + (f" · dopłata {diff / 100:.2f} zł" if diff > 0 else f" · różnica {-diff / 100:.2f} zł do zwrotu" if diff < 0 else "")
+                                     + ". Klient dostanie e-mail.")
+                    return redirect("panel:reservation", pk=r.pk)
+                messages.error(request, "Popraw dane nowego terminu.")
+                return redirect("panel:reservation", pk=r.pk)
             elif action == "pay_from_balance":
                 if not request.user.has_perm("payments.manage_payments"):
                     raise PermissionDenied
@@ -401,6 +419,7 @@ def panel_detail(request, pk):
         {
             "r": r,
             "cancel_form": cancel_form,
+            "term_form": term_form,
             "persons_form": persons_form,
             "started": r.starts_at <= timezone.now(),
             "now": timezone.now(),

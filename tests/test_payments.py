@@ -743,3 +743,60 @@ def test_board_cancel_keep_fee_never_refunds(client, owner, ps, tpay_keys, monke
 def test_panel_cancel_form_has_refund_checkbox(owner_client, ps):
     r = book(ps)
     assert "Zwróć wpłatę na rachunek / kartę klienta" in owner_client.get(f"/panel/rezerwacje/{r.pk}/").content.decode()
+
+
+def test_change_term_surcharge_and_partial_refund(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)  # Oś 100 m, 10–12
+    paid = r.paid_amount
+    day = timezone.localtime(r.starts_at).date()
+    # dłużej → dopłata
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        r2 = booking_services.change_term(r, r.lane, day, 10, 13, owner)
+    assert r2.amount > paid and r2.payment_status == Reservation.Payment.DUE and r2.paid_amount == paid
+    assert "Do dopłaty" in [m for m in mail.outbox if m.to == [ps.email]][0].body
+    # krócej niż zapłacono → częściowy zwrot przez Tpay
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append((tid, amount)) or {"result": "success"})
+    with django_capture_on_commit_callbacks(execute=True):
+        r3 = booking_services.change_term(r2, r.lane, day, 10, 11, owner, refund_difference=True)
+    assert r3.payment_status == Reservation.Payment.PAID and calls and calls[0][1] == paid - r3.amount
+    assert balance_of(ps) == 0
+
+
+def test_change_term_rejects_taken_slot_and_frees_old_for_waitlist(owner, ps, django_capture_on_commit_callbacks):
+    from django.core.exceptions import ValidationError
+
+    from apps.bookings import waitlist
+    from apps.bookings.models import WaitlistEntry
+
+    r = book(ps, start=10, end=12)
+    other = make_user("inny-ct@example.com")
+    add_credential(other)
+    approve(other)
+    taken = book(other, start=14, end=15)
+    day = timezone.localtime(r.starts_at).date()
+    with pytest.raises(ValidationError, match="zajęty"):
+        booking_services.change_term(r, r.lane, day, 14, 16, owner)
+    waiting = make_user("czeka-ct@example.com")
+    add_credential(waiting)
+    approve(waiting)
+    entry = waitlist.join(waiting, r.lane, day, 10, 11)
+    with django_capture_on_commit_callbacks(execute=True):
+        booking_services.change_term(r, r.lane, day, 16, 17, owner)
+    entry.refresh_from_db()
+    assert entry.status == WaitlistEntry.Status.OFFERED  # zwolniony stary termin poszedł do oczekującego
+    taken.refresh_from_db()
+    assert taken.status == Reservation.Status.CONFIRMED
+
+
+def test_panel_change_term_form(owner_client, ps):
+    r = book(ps, start=10, end=12)
+    page = owner_client.get(f"/panel/rezerwacje/{r.pk}/").content.decode()
+    assert "Zmień oś lub termin" in page
+    day = timezone.localtime(r.starts_at).date().isoformat()
+    owner_client.post(f"/panel/rezerwacje/{r.pk}/", {"action": "change_term", "t-lane": r.lane_id, "t-day": day, "t-start_hour": 12, "t-end_hour": 14})
+    r.refresh_from_db()
+    assert timezone.localtime(r.starts_at).hour == 12

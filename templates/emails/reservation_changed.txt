@@ -1,8 +1,14 @@
-{% autoescape off %}Dzień dobry {{ user.first_name }},
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
 
-zarząd zmienił Twoją rezerwację. Aktualne dane:
+obsługa strzelnicy zmieniła Twoją rezerwację.{% if old %}
+Było: {{ old.oś }}, {{ old.od }}–{{ old.do }}{% endif %}
 
-{% include "emails/_reservation_summary.txt" %}
+Aktualne dane:
+{% include "emails/_reservation_summary.txt" %}{% if surcharge %}
+Do dopłaty: {{ surcharge|pln }}{% if options.online %} — możesz zapłacić online na stronie rezerwacji{% endif %}.{% endif %}{% if refunded %}
+Zwrot różnicy {{ refunded|pln }} został zlecony na rachunek / kartę, z której płaciłeś (Tpay).{% endif %}{% if manual %}
+Różnicę {{ manual|pln }} zwrócimy ręcznie.{% endif %}{% if overpaid %}
+Różnica {{ overpaid|pln }} została zapisana na Twoim koncie jako nadpłata.{% endif %}
 Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
 
 Stowarzyszenie STRZELNICA SĄTOK

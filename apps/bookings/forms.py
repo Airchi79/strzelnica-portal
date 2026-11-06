@@ -180,3 +180,24 @@ class WaitlistForm(forms.Form):
         if data.get("start_hour") is not None and data.get("end_hour") is not None and data["end_hour"] <= data["start_hour"]:
             self.add_error("end_hour", "Koniec musi być później niż początek.")
         return data
+
+
+class ChangeTermForm(forms.Form):
+    lane = forms.ModelChoiceField(label="Oś", queryset=Lane.objects.none(), empty_label=None)
+    day = forms.DateField(label="Dzień", widget=DateInput())
+    start_hour = forms.TypedChoiceField(label="Od", choices=HOUR_START, coerce=int)
+    end_hour = forms.TypedChoiceField(label="Do", choices=HOUR_END, coerce=int)
+    refund_difference = forms.BooleanField(
+        label="Gdy nowa cena jest niższa — zwróć różnicę na rachunek / kartę klienta (Tpay)", required=False, initial=True,
+        help_text="Bez zaznaczenia różnica zostaje nadpłatą klienta. Wyższa cena zawsze oznacza dopłatę do zapłaty.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["lane"].queryset = active_lanes()
+
+    def clean(self):
+        data = super().clean()
+        if data.get("start_hour") is not None and data.get("end_hour") is not None and data["end_hour"] <= data["start_hour"]:
+            self.add_error("end_hour", "Koniec musi być później niż początek.")
+        return data

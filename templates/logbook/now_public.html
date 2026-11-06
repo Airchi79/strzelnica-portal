@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Teraz na strzelnicy{% endblock %}
+{% block extra_head %}<meta http-equiv="refresh" content="60">{% endblock %}
+{% block content %}
+<div class="today-head"><div><h1 style="margin-bottom:2px">Teraz na strzelnicy</h1><p class="daylabel week-label" style="margin:0">stan o {{ now|time:"H:i" }} · odświeża się co minutę</p></div>
+  {% if perms.logbook.view_logbook %}<a class="btn secondary small-btn" href="{% url 'panel:now' %}">Kto jest na terenie (zarząd)</a>{% endif %}</div>
+<div class="now-grid">
+  {% for row in lanes %}
+  <div class="card now-lane {{ row.state }}">
+    <div class="now-head"><strong>{{ row.lane.name }}</strong>
+      <span class="badge {% if row.state == 'wolna' %}ok{% elif row.state == 'zajeta' %}bad{% elif row.state == 'blokada' %}warn{% endif %}">{% if row.state == 'wolna' %}wolna{% elif row.state == 'zajeta' %}zajęta{% elif row.state == 'blokada' %}niedostępna{% else %}nieczynna{% endif %}</span></div>
+    <div class="now-big">{% if row.state == 'zajeta' or row.state == 'blokada' %}do {{ row.until|time:"H:i" }}{% elif row.state == 'wolna' %}wolna do {{ row.until|time:"H:i" }}{% elif row.hours %}czynna {{ row.hours.opens|time:"H:i" }}–{{ row.hours.closes|time:"H:i" }}{% else %}dziś nieczynna{% endif %}</div>
+    {% if row.later %}<div class="small muted">Dziś później: {% for r in row.later %}{{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+    {% if row.state == 'wolna' %}<a class="small" href="{% url 'bookings:new' %}?os={{ row.lane.pk }}">Zarezerwuj</a>{% endif %}
+  </div>
+  {% empty %}<div class="card muted">Brak czynnych osi.</div>{% endfor %}
+</div>
+<p class="small muted">Dodaj tę stronę do ekranu telefonu: w zainstalowanej aplikacji przytrzymaj jej ikonę → „Teraz na strzelnicy” (Android: można przeciągnąć na ekran), na iPhonie: Safari → Udostępnij → Do ekranu początkowego.</p>
+{% endblock %}

@@ -473,3 +473,23 @@ def my_diary(request):
                         r["purpose"], r["lane"], r["officer"], r["source"]])
         return response
     return render(request, "logbook/my_diary.html", {**data, "years": list(range(this_year, max(this_year - 6, 2015) - 1, -1))})
+
+
+def now_public(request):
+    """Teraz na strzelnicy — stan osi dla każdego (bez danych osobowych). Odświeża się co minutę."""
+    from . import now
+
+    return render(request, "logbook/now_public.html", {"lanes": now.lanes_now(), "now": timezone.now()})
+
+
+@panel_required(("logbook.view_logbook", "bookings.manage_reservations"))
+def panel_now(request):
+    """Teraz na strzelnicy — dla zarządu: kto jest na terenie i czy ma rezerwację."""
+    from . import now
+
+    data = now.summary()
+    if request.user.has_perm("logbook.view_logbook"):
+        log_sensitive_access(None, "ksiazka:teraz", "podgląd osób na strzelnicy (imiona i nazwiska)")
+    else:
+        data["people"] = []  # bez uprawnienia do książki — tylko stan osi
+    return render(request, "panel/now.html", data)

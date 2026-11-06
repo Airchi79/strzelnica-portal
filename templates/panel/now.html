@@ -1,0 +1,37 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Teraz na strzelnicy{% endblock %}
+{% block extra_head %}<meta http-equiv="refresh" content="60">{% endblock %}
+{% block panel %}
+<div class="today-head"><div><h1 style="margin-bottom:2px">Teraz na strzelnicy</h1><p class="daylabel week-label" style="margin:0">stan o {{ now|time:"H:i" }} · odświeża się co minutę</p></div></div>
+{% if alarms %}<div class="res-banner bad-banner"><strong>✕ {{ alarms }} os. na terenie bez rezerwacji</strong><span>Nikt nie ma teraz rezerwacji — sprawdź, kto i dlaczego przebywa na strzelnicy.</span></div>
+{% elif warnings %}<div class="res-banner warn"><strong>⚠ Do sprawdzenia: {{ warnings }}</strong><span>Rezerwacja po czasie albo oś z rezerwacją bez wpisów w książce.</span></div>
+{% elif people %}<div class="res-banner ok"><strong>✓ Wszyscy na terenie mają podstawę pobytu</strong></div>{% endif %}
+
+{% if perms.logbook.view_logbook %}
+<div class="card table-wrap">
+  <h2 class="step-title">Na terenie ({{ people|length }})</h2>
+  <table>
+    {% for p in people %}<tr class="now-{{ p.verdict }}">
+      <td class="nowrap"><span class="now-mark" aria-hidden="true">{% if p.verdict == 'ok' or p.verdict == 'prace' %}✓{% elif p.verdict == 'bez_rezerwacji' %}✕{% elif p.verdict == 'po_czasie' %}⚠{% else %}•{% endif %}</span></td>
+      <td><a href="{% url 'panel:logbook_entry' p.entry.pk %}"><strong>{{ p.entry.full_name }}</strong></a><div class="small muted">{{ p.entry.get_purpose_display }} · od {{ p.entry.entered_at|time:"H:i" }}</div></td>
+      <td class="small">{{ p.note }}{% if p.entry.reservation %}<div class="muted">PS: {{ p.entry.reservation.user.full_name }}</div>{% endif %}</td>
+    </tr>{% empty %}<tr><td class="muted">Nikt nie jest wpisany jako przebywający na strzelnicy.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endif %}
+
+<div class="card table-wrap">
+  <h2 class="step-title">Osie</h2>
+  <table>
+    {% for row in lanes %}<tr>
+      <td><strong>{{ row.lane.name }}</strong></td>
+      <td class="small">{% if row.state == 'zajeta' %}<a href="{% url 'panel:reservation' row.current.pk %}">{{ row.current.user.full_name }}</a> · {{ row.current.persons }} os. · do {{ row.until|time:"H:i" }}
+          {% if row.nobody %}<div><span class="badge warn">⚠ nikt nie wpisał się do książki</span></div>{% elif row.shooters %}<div class="muted">w książce: {{ row.shooters }}</div>{% endif %}
+        {% elif row.state == 'blokada' %}<span class="badge warn">blokada</span> {{ row.block.title }} do {{ row.until|time:"H:i" }}
+        {% elif row.state == 'wolna' %}<span class="badge ok">wolna</span> do {{ row.until|time:"H:i" }}{% else %}<span class="muted">nieczynna</span>{% endif %}</td>
+      <td class="small muted">{% for r in row.later %}{{ r.starts_at|time:"H:i" }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+    </tr>{% endfor %}
+  </table>
+</div>
+<p class="small muted">Na telefonie: przytrzymaj ikonę aplikacji → „Kto strzela — zarząd” (Android pozwala przeciągnąć skrót na ekran). Strona wymaga zalogowania do panelu.</p>
+{% endblock %}

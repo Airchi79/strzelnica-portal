@@ -561,3 +561,14 @@ main:focus { outline: none; }
 .skip-link:focus { top: 8px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; scroll-behavior: auto !important; } }
 .inline-reveal { display: inline; margin-left: 6px; }
+
+/* --- teraz na strzelnicy --- */
+.now-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.now-lane { border-left: 5px solid var(--border); margin: 0; }
+.now-lane.wolna { border-left-color: var(--ok); } .now-lane.zajeta { border-left-color: var(--bad); } .now-lane.blokada { border-left-color: var(--warn); }
+.now-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.now-big { font-size: 1.25rem; font-weight: 700; margin: 6px 0 4px; }
+.now-mark { font-weight: 800; font-size: 1.1rem; }
+tr.now-ok .now-mark, tr.now-prace .now-mark { color: var(--ok); } tr.now-bez_rezerwacji .now-mark { color: var(--bad); } tr.now-po_czasie .now-mark { color: var(--warn); }
+tr.now-bez_rezerwacji td { background: var(--bad-bg); }
+.res-banner.bad-banner { background: var(--bad-bg); border-left-color: var(--bad); color: var(--text); }

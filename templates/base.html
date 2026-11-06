@@ -10,6 +10,7 @@
   <link rel="apple-touch-icon" href="{{ BRAND.icon_maskable }}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="{% static 'js/theme.js' %}"></script>
+  {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
 <a class="skip-link" href="#tresc">Przejdź do treści</a>
@@ -18,6 +19,7 @@
   <div class="wrap">
     <a class="brand" href="{% url 'core:home' %}"><img class="brand-logo" src="{{ BRAND.logo_small }}" alt="" width="34" height="34">{{ SITE_NAME }}</a>
     <nav class="nav">
+      <a href="{% url 'core:now' %}">Teraz</a>
       <a href="{% url 'bookings:calendar' %}">Zajętość osi</a>
       <a href="{% url 'core:lanes' %}">Cennik</a>
       <a href="{% url 'events:list' %}">Wydarzenia</a>

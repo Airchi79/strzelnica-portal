@@ -7,6 +7,14 @@
   "display": "standalone",
   "background_color": "#f6f5f1",
   "theme_color": "#2f5d3a",
+  "shortcuts": [
+    {"name": "Teraz na strzelnicy", "short_name": "Teraz", "description": "Które osie są teraz zajęte", "url": "{% url 'core:now' %}",
+     "icons": [{"src": "{{ BRAND.icon_192 }}", "sizes": "192x192", "type": "image/png"}]},
+    {"name": "Kto strzela — zarząd", "short_name": "Kto strzela", "description": "Osoby na terenie i ich rezerwacje", "url": "{% url 'panel:now' %}",
+     "icons": [{"src": "{{ BRAND.icon_192 }}", "sizes": "192x192", "type": "image/png"}]},
+    {"name": "Zarezerwuj", "short_name": "Rezerwuj", "url": "{% url 'bookings:new' %}",
+     "icons": [{"src": "{{ BRAND.icon_192 }}", "sizes": "192x192", "type": "image/png"}]}
+  ],
   "icons": [
     {"src": "{{ BRAND.icon_192 }}", "sizes": "192x192", "type": "image/png"},
     {"src": "{{ BRAND.icon_512 }}", "sizes": "512x512", "type": "image/png"},

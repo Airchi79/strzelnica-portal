@@ -43,11 +43,21 @@ def visit_days(user_ids, now=None):
     return {uid: sorted(d) for uid, d in days.items()}
 
 
+def _vetted_user_ids(user_ids):
+    """Klienci, którym obsługa zatwierdziła już rezerwację (nadal potwierdzoną) — zostali sprawdzeni, nawet jeśli
+    termin jeszcze się nie odbył."""
+    from apps.bookings.models import Reservation
+
+    return set(Reservation.objects.filter(user_id__in=user_ids, status=Reservation.Status.CONFIRMED, approved_at__isnull=False)
+               .values_list("user_id", flat=True))
+
+
 def annotate_clients(users, now=None):
     """Uzupełnia obiekty User o: client_type, client_type_label, visits, last_visit, active_passes, profile."""
     users = list(users)
     ids = [u.pk for u in users]
     members = _member_user_ids(ids)
+    vetted = _vetted_user_ids(ids)
     visits = visit_days(ids, now)
     profiles = {p.user_id: p for p in ClientProfile.objects.filter(user_id__in=ids).prefetch_related("tags")}
     today = timezone.localdate()
@@ -62,7 +72,7 @@ def annotate_clients(users, now=None):
         u.last_visit = visits[u.pk][-1] if visits[u.pk] else None
         if u.pk in members:
             u.client_type = TYPE_MEMBER
-        elif u.visits or (u.profile and u.profile.approved_at):
+        elif u.visits or u.pk in vetted or (u.profile and u.profile.approved_at):
             u.client_type = TYPE_RETURNING
         else:
             u.client_type = TYPE_NEW

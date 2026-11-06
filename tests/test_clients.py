@@ -313,3 +313,18 @@ def test_persons_import_ignores_wrong_sheet_dimension(owner_client):
 
     owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": _broken_dimension(_gt_xlsx(GT_ROWS)), "tryb": "importuj"})
     assert Person.objects.count() == 3
+
+
+def test_approved_future_reservation_makes_client_returning(ps):
+    newbie = make_user("nowy2@example.com")
+    lane = Lane.objects.get(name=LANE)
+    start = timezone.now() + timedelta(days=4)
+    rule = lane.price_rule_for(start.date())
+    r = Reservation.objects.create(number="SATOK-R-T-2", lane=lane, user=newbie, starts_at=start, ends_at=start + timedelta(hours=1),
+                                   persons=1, price_rule=rule, hourly_amount=100, amount=100,
+                                   status=Reservation.Status.PENDING_APPROVAL)
+    assert services.client_type(newbie) == "nowy"  # czeka na zatwierdzenie — jeszcze niesprawdzony
+    Reservation.objects.filter(pk=r.pk).update(status=Reservation.Status.CONFIRMED, approved_at=timezone.now())
+    assert services.client_type(newbie) == "powracajacy"
+    Reservation.objects.filter(pk=r.pk).update(status=Reservation.Status.CANCELLED)
+    assert services.client_type(newbie) == "nowy"  # anulowana (np. odrzucona) nie liczy się

@@ -84,10 +84,14 @@ def tpay_start(request):
     elif request.POST.get("reservation"):
         reservation = get_object_or_404(
             Reservation, pk=request.POST["reservation"], user=request.user, payment_status=Reservation.Payment.DUE,
-            status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL],  # nowy klient może zapłacić od razu
+            status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL],  # nowy klient może zapłacić od razu (jeśli włączone)
         )
+        from apps.bookings.models import BookingSettings
         from apps.bookings.services import payment_options
 
+        if reservation.status == Reservation.Status.PENDING_APPROVAL and not BookingSettings.load().prepay_before_approval:
+            messages.error(request, "Za tę rezerwację zapłacisz po zatwierdzeniu przez obsługę — dostaniesz e-mail.")
+            return redirect("bookings:detail", pk=reservation.pk)
         if not payment_options(reservation)["online"]:
             messages.error(request, "Dla tej rezerwacji płatność online nie jest dostępna — skorzystaj z instrukcji płatności.")
             return redirect("bookings:detail", pk=reservation.pk)

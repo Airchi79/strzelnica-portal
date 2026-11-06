@@ -88,6 +88,16 @@ class CancelForm(forms.Form):
 class BoardCancelForm(forms.Form):
     reason = forms.CharField(label="Powód (klient zobaczy go w e-mailu)", max_length=255)
     keep_fee = forms.BooleanField(label="Zachowaj należność (późne odwołanie)", required=False)
+    refund_to_payer = forms.BooleanField(
+        label="Zwróć wpłatę na rachunek / kartę klienta (Tpay)", required=False, initial=True,
+        help_text="Wpłaty online wrócą automatycznie. Bez zaznaczenia (albo przy wpłacie gotówką / przelewem) kwota zostaje nadpłatą klienta.",
+    )
+
+    def clean(self):
+        data = super().clean()
+        if data.get("keep_fee") and data.get("refund_to_payer"):
+            data["refund_to_payer"] = False  # należność zostaje — nie ma czego zwracać
+        return data
 
 
 class PersonsForm(forms.Form):
@@ -131,7 +141,7 @@ class BlockForm(forms.Form):
 class BookingSettingsForm(forms.ModelForm):
     class Meta:
         model = BookingSettings
-        fields = ["free_cancel_hours", "online_payment_minutes", "approval_payment_hours", "offline_instructions", "min_lead_hours", "waitlist_hold_minutes", "max_advance_days", "max_persons"]
+        fields = ["free_cancel_hours", "online_payment_minutes", "approval_payment_hours", "offline_instructions", "prepay_before_approval", "min_lead_hours", "waitlist_hold_minutes", "max_advance_days", "max_persons"]
         widgets = {"offline_instructions": forms.Textarea(attrs={"rows": 3})}
 
     def clean_max_persons(self):

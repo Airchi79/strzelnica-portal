@@ -294,7 +294,7 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
         return reservation
     if pending:
         notify_user(user, f"Rezerwacja {reservation.number} czeka na zatwierdzenie", "emails/reservation_pending.txt", reservation=reservation,
-                    options=payment_options(reservation), tpay=dj_settings.TPAY_ENABLED)
+                    options=payment_options(reservation), tpay=dj_settings.TPAY_ENABLED and BookingSettings.load().prepay_before_approval)
     else:
         notify_user(user, f"Rezerwacja {reservation.number} potwierdzona", "emails/reservation_created.txt", reservation=reservation,
                     options=payment_options(reservation))
@@ -451,38 +451,55 @@ def approve_reservation(reservation, by, now=None):
     return r
 
 
-def reject_reservation(reservation, by, reason=""):
-    """Odrzucenie rezerwacji czekającej na zatwierdzenie. Wpłata online (Tpay) wraca automatycznie na rachunek/kartę
-    płacącego; inne wpłaty (gotówka, przelew) zostają jako nadpłata, a zarząd dostaje informację o zwrocie ręcznym."""
+def refund_paid_to_payer(r, amount, by, reason):
+    """Zwraca `amount` z wpłat za rezerwację na rachunek/kartę płacącego (Tpay). Kwota, której nie da się zwrócić
+    automatycznie (wpłata poza Tpay, błąd Tpay), zostaje nadpłatą — zarząd dostaje przypomnienie o zwrocie ręcznym.
+    Zwraca (zwrócono_automatycznie, do_zwrotu_ręcznie)."""
     from apps.payments.models import Payment
     from apps.payments.services import refund_to_payer
 
+    refunded, remaining = 0, amount
+    for p in Payment.objects.filter(reservation=r, status=Payment.Status.COMPLETED).order_by("completed_at"):
+        if remaining <= 0:
+            break
+        part = min(p.amount, remaining)
+        if refund_to_payer(p, part, by=by, reason=reason):
+            refunded += part
+            remaining -= part
+    manual = max(remaining, 0)
+    if manual:
+        url = reverse("panel:wallet", args=[r.user_id])
+        notify_board(f"Zwrot do wykonania ręcznie: {r.number}", "emails/board_generic.txt", "payments.manage_payments", url=url,
+                     body=f"{r.user.full_name}: {manual / 100:.2f} zł (wpłata poza Tpay albo zwrot Tpay nie powiódł się).",
+                     event=f"Zwrot do wykonania ręcznie: {r.number}",
+                     text=f"{r.user.full_name}: {manual / 100:.2f} zł — zwróć przelewem/gotówką albo w panelu Tpay.", url_path=url)
+    return refunded, manual
+
+
+def reject_reservation(reservation, by, reason=""):
+    """Odrzucenie rezerwacji czekającej na zatwierdzenie. Wpłata online (Tpay) wraca automatycznie na rachunek/kartę
+    płacącego; inne wpłaty (gotówka, przelew) zostają jako nadpłata, a zarząd dostaje informację o zwrocie ręcznym."""
     r = Reservation.objects.get(pk=reservation.pk)
     if r.status != Reservation.Status.PENDING_APPROVAL:
         raise ValidationError("Ta rezerwacja nie czeka na zatwierdzenie.")
     paid = r.paid_amount
     r = cancel_reservation(r, by, reason or "Rezerwacja nie została zatwierdzona", as_board=True, notify=False)
-    refunded, manual = 0, 0
-    remaining = paid
-    for p in Payment.objects.filter(reservation=r, status=Payment.Status.COMPLETED).order_by("completed_at"):
-        if remaining <= 0:
-            break
-        part = min(p.amount, remaining)
-        if refund_to_payer(p, part, by=by, reason=f"Rezerwacja {r.number} nie została zatwierdzona"):
-            refunded += part
-        else:
-            manual += part
-        remaining -= part
-    manual += max(remaining, 0)
+    refunded, manual = refund_paid_to_payer(r, paid, by, f"Rezerwacja {r.number} nie została zatwierdzona") if paid else (0, 0)
     notify_user(r.user, f"Rezerwacja {r.number} nie została zatwierdzona", "emails/reservation_rejected.txt", reservation=r,
                 refunded=refunded, manual=manual)
-    if manual:
-        notify_board(f"Zwrot do wykonania ręcznie: {r.number}", "emails/board_generic.txt", "payments.manage_payments",
-                     url=reverse("panel:wallet", args=[r.user_id]),
-                     body=f"{r.user.full_name}: {manual / 100:.2f} zł (wpłata poza Tpay albo zwrot Tpay nie powiódł się).",
-                     event=f"Zwrot do wykonania ręcznie: {r.number}",
-                     text=f"{r.user.full_name}: {manual / 100:.2f} zł — zwróć przelewem/gotówką albo w panelu Tpay.",
-                     url_path=reverse("panel:wallet", args=[r.user_id]))
+    return r
+
+
+def cancel_by_board(reservation, by, reason, keep_fee=False, refund=False):
+    """Anulowanie przez obsługę. `refund` (bez zachowania należności): wpłata wraca na rachunek/kartę płacącego (Tpay);
+    bez zaznaczenia zostaje nadpłatą klienta do decyzji zarządu (jak dotąd)."""
+    r = Reservation.objects.get(pk=reservation.pk)
+    paid = r.paid_amount
+    r = cancel_reservation(r, by, reason, as_board=True, keep_fee=keep_fee, notify=False)
+    refunded = manual = 0
+    if refund and not r.late_cancellation and paid:
+        refunded, manual = refund_paid_to_payer(r, paid, by, f"Anulowano rezerwację {r.number}")
+    _notify_cancelled(r, refunded=refunded, manual=manual, overpaid=0 if refund or r.late_cancellation else paid)
     return r
 
 
@@ -547,17 +564,24 @@ def cancel_reservation(reservation, by, reason="", as_board=False, now=None, kee
     )
     if not notify:
         return reservation
-    notify_user(reservation.user, f"Rezerwacja {reservation.number} anulowana", "emails/reservation_cancelled.txt", reservation=reservation)
+    _notify_cancelled(reservation, expired=expired)
+    return reservation
+
+
+def _notify_cancelled(reservation, expired=False, refunded=0, manual=0, overpaid=0):
+    late = reservation.late_cancellation
+    notify_user(reservation.user, f"Rezerwacja {reservation.number} anulowana", "emails/reservation_cancelled.txt", reservation=reservation,
+                refunded=refunded, manual=manual, overpaid=overpaid)
     notify_board(
         f"Anulowano rezerwację: {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m %H:%M}",
         "emails/reservation_board.txt",
         PERM,
         url=reverse("panel:reservation", args=[reservation.pk]),
-        body=f"{reservation.user.full_name}" + (" — z zachowaniem należności" if late else "") + (" — nieopłacona w terminie" if expired else ""),
+        body=f"{reservation.user.full_name}" + (" — z zachowaniem należności" if late else "") + (" — nieopłacona w terminie" if expired else "")
+        + (f" — zwrot {refunded / 100:.2f} zł przez Tpay" if refunded else ""),
         reservation=reservation,
         event="Anulowanie rezerwacji",
     )
-    return reservation
 
 
 @transaction.atomic

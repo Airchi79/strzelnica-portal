@@ -675,3 +675,71 @@ def test_reject_refund_failure_notifies_board(client, owner, tpay_keys, monkeypa
     assert balance_of(u) == r.amount  # zostaje jako nadpłata do ręcznego zwrotu
     assert any("Zwrot do wykonania ręcznie" in m.subject for m in mail.outbox)
     assert "zwrócimy ręcznie" in [m for m in mail.outbox if m.to == [u.email]][0].body
+
+
+def test_prepay_setting_off_hides_and_refuses_payment(client, tpay_keys, monkeypatch):
+    from apps.bookings.models import BookingSettings
+
+    cfg = BookingSettings.load()
+    cfg.prepay_before_approval = False
+    cfg.save()
+    u = _newbie("nowy-off@example.com")
+    r = book(u)
+    client.force_login(u)
+    assert "Zapłać online" not in client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    client.post("/platnosci/tpay/start/", {"reservation": r.pk})
+    assert not Payment.objects.filter(reservation=r).exists()
+
+
+def _confirmed_paid_online(client, ps, tpay_keys, monkeypatch):
+    r = book(ps)
+    monkeypatch.setattr(tpay, "create_transaction", lambda **kw: {"transaction_id": "01CANC", "title": "TR-TEST-1", "payment_url": "https://secure.sandbox.tpay.com/?t=1"})
+    client.force_login(ps)
+    client.post("/platnosci/tpay/start/", {"reservation": r.pk})
+    payment = Payment.objects.get(reservation=r)
+    _post(client, tpay_keys, _notification(payment))
+    r.refresh_from_db()
+    assert r.payment_status == Reservation.Payment.PAID
+    return r, payment
+
+
+def test_board_cancel_with_refund_checkbox(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append(tid) or {"result": "success"})
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        booking_services.cancel_by_board(r, owner, "Awaria osi", refund=True)
+    assert calls == ["01CANC"] and balance_of(ps) == 0
+    assert "Zwrot" in [m for m in mail.outbox if m.to == [ps.email]][0].body
+
+
+def test_board_cancel_without_refund_keeps_overpayment(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    r, _ = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    monkeypatch.setattr(tpay, "refund_transaction", lambda *a, **k: pytest.fail("nie powinno być zwrotu"))
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        booking_services.cancel_by_board(r, owner, "Na prośbę klienta", refund=False)
+    assert balance_of(ps) == r.amount
+    assert "nadpłata" in [m for m in mail.outbox if m.to == [ps.email]][0].body
+
+
+def test_board_cancel_keep_fee_never_refunds(client, owner, ps, tpay_keys, monkeypatch):
+    from apps.bookings.forms import BoardCancelForm
+
+    form = BoardCancelForm({"c-reason": "późno", "c-keep_fee": "on", "c-refund_to_payer": "on"}, prefix="c")
+    assert form.is_valid() and form.cleaned_data["refund_to_payer"] is False
+    r, _ = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    monkeypatch.setattr(tpay, "refund_transaction", lambda *a, **k: pytest.fail("nie powinno być zwrotu"))
+    booking_services.cancel_by_board(r, owner, "późno", keep_fee=True, refund=True)
+    r.refresh_from_db()
+    assert r.late_cancellation
+
+
+def test_panel_cancel_form_has_refund_checkbox(owner_client, ps):
+    r = book(ps)
+    assert "Zwróć wpłatę na rachunek / kartę klienta" in owner_client.get(f"/panel/rezerwacje/{r.pk}/").content.decode()

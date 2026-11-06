@@ -225,6 +225,7 @@ def detail(request, pk):
             "cancel_hours": BookingSettings.load().free_cancel_hours,
             "log_entries": reservation.log_entries.order_by("entered_at"),
             "tpay_enabled": settings.TPAY_ENABLED,
+            "prepay": BookingSettings.load().prepay_before_approval,
             **reservation_qr_context(request, reservation),
         },
     )
@@ -332,7 +333,7 @@ def panel_list(request):
 @panel_required(PERM)
 def panel_detail(request, pk):
     r = get_object_or_404(Reservation.objects.select_related("lane", "user", "cancelled_by", "payment_marked_by"), pk=pk)
-    cancel_form = BoardCancelForm(prefix="c")
+    cancel_form = BoardCancelForm(prefix="c", initial={"refund_to_payer": True})
     persons_form = PersonsForm(prefix="p", initial={"persons": r.persons})
     if request.method == "POST":
         action = request.POST.get("action")
@@ -341,8 +342,11 @@ def panel_detail(request, pk):
                 cancel_form = BoardCancelForm(request.POST, prefix="c")
                 if cancel_form.is_valid():
                     keep = cancel_form.cleaned_data["keep_fee"]
-                    services.cancel_reservation(r, request.user, cancel_form.cleaned_data["reason"], as_board=True, keep_fee=keep)
-                    messages.success(request, "Rezerwacja anulowana" + (" z zachowaniem należności" if keep else "") + ". Klient otrzyma e-mail.")
+                    refund = cancel_form.cleaned_data["refund_to_payer"]
+                    paid = r.paid_amount
+                    services.cancel_by_board(r, request.user, cancel_form.cleaned_data["reason"], keep_fee=keep, refund=refund)
+                    messages.success(request, "Rezerwacja anulowana" + (" z zachowaniem należności" if keep else "")
+                                     + (" — zlecono zwrot wpłaty" if refund and paid and not keep else "") + ". Klient otrzyma e-mail.")
                     return redirect("panel:reservation", pk=r.pk)
             elif action == "pay_from_balance":
                 if not request.user.has_perm("payments.manage_payments"):

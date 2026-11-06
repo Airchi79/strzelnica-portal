@@ -41,6 +41,10 @@ class BookingSettings(models.Model):
         help_text="Np. 2 — klient nie zarezerwuje sam terminu zaczynającego się za mniej niż 2 h. "
                   "0 — można rezerwować do rozpoczęcia godziny. Obsługa w panelu rezerwuje bez tego ograniczenia.",
     )
+    prepay_before_approval = models.BooleanField(
+        "nowy klient może zapłacić online przed zatwierdzeniem", default=True,
+        help_text="Po odrzuceniu wpłata wraca automatycznie na rachunek / kartę klienta (Tpay). Wyłączone: płatność dopiero po zatwierdzeniu.",
+    )
     waitlist_hold_minutes = models.PositiveIntegerField(
         "lista oczekujących: termin trzymany [min]", default=30,
         help_text="Po zwolnieniu terminu pierwsza osoba z listy dostaje e-mail; przez ten czas tylko ona może go zarezerwować.",

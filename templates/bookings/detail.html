@@ -9,7 +9,7 @@
 {% elif r.status == 'do_zatwierdzenia' %}
   <div class="res-banner warn"><strong>Czeka na zatwierdzenie przez obsługę</strong><span>Termin jest już zablokowany dla Ciebie.
     {% if r.payment_status == 'oplacona' %}Rezerwacja jest opłacona — po zatwierdzeniu dostaniesz potwierdzenie, a jeśli nie zostanie zatwierdzona, pieniądze wrócą automatycznie.
-    {% elif tpay_enabled and pay_options.online %}Możesz zapłacić od razu poniżej — jeśli rezerwacja nie zostanie zatwierdzona, pieniądze wrócą automatycznie na Twoje konto lub kartę.
+    {% elif prepay and tpay_enabled and pay_options.online %}Możesz zapłacić od razu poniżej — jeśli rezerwacja nie zostanie zatwierdzona, pieniądze wrócą automatycznie na Twoje konto lub kartę.
     {% else %}Po zatwierdzeniu dostaniesz e-mail z informacją o płatności.{% endif %}</span></div>
 {% elif r.is_finished %}
   <div class="res-banner gray"><strong>Rezerwacja zakończona</strong><span>Dziękujemy za wizytę.</span></div>
@@ -46,7 +46,7 @@
 </div>
 
 {# --- płatność --- #}
-{% if r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' or r.payment_status == 'do_zaplaty' and r.status == 'do_zatwierdzenia' and tpay_enabled and pay_options.online %}
+{% if r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' or r.payment_status == 'do_zaplaty' and r.status == 'do_zatwierdzenia' and prepay and tpay_enabled and pay_options.online %}
 <div class="card res-pay">
   <h2 style="margin-top:0">Płatność: {{ r.amount|sub:r.paid_amount|pln }}</h2>
   {% if r.status == 'do_zatwierdzenia' %}<p class="small">Płatność przed zatwierdzeniem jest bezpieczna: jeśli obsługa nie zatwierdzi rezerwacji, pieniądze wrócą automatycznie na Twoje konto lub kartę.</p>{% endif %}

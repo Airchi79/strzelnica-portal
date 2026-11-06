@@ -4,13 +4,15 @@
 <h1>{% if person %}Dopisz osobę do książki pobytu{% else %}Wpis do książki pobytu{% endif %}</h1>
 {% if reservation %}<div class="card"><strong>{{ reservation.lane }}</strong> · {{ reservation.starts_at|date:"j.m.Y" }}, {{ reservation.starts_at|time:"H:i" }}–{{ reservation.ends_at|time:"H:i" }}
   <div class="small muted">Prowadzący strzelanie: {{ reservation.user.full_name }}</div></div>{% endif %}
+{% if companion_of %}<div class="card">Dopisujesz się jako <strong>osoba towarzysząca</strong>: {{ companion_of.full_name }} (wejście {{ companion_of.entered_at|time:"H:i" }}).
+  <div class="small muted">Strzelać można tylko w ramach rezerwacji — wpisz się wtedy kodem rezerwacji od prowadzącego.</div></div>{% endif %}
 {% if person %}<div class="msg">Dane z konta: <strong>{{ person.full_name }}</strong>. Poproś tę osobę o sprawdzenie danych i podpis.</div>{% endif %}
 {% if user.is_authenticated and not person %}<p class="small muted">Dane uzupełniliśmy z Twojego konta — sprawdź je.</p>
 {% elif not user.is_authenticated %}<p class="small muted">Masz konto? <a href="{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}">Zaloguj się</a>, a dane uzupełnią się same. Możesz też wpisać się bez konta.</p>{% endif %}
 <form method="post" novalidate data-entry-form class="card">{% csrf_token %}
   {% if form.non_field_errors %}<div class="msg error">{% for e in form.non_field_errors %}{{ e }}<br>{% endfor %}</div>{% endif %}
   {% with f=form.purpose %}{% include "logbook/_field.html" with field=f %}{% endwith %}
-  {% if form.reservation %}{% with f=form.reservation %}{% include "logbook/_field.html" with field=f %}{% endwith %}{% endif %}
+  {% if form.reservation and not companion_of %}{% with f=form.reservation %}{% include "logbook/_field.html" with field=f %}{% endwith %}{% endif %}
   {% with f=form.purpose_note %}{% include "logbook/_field.html" with field=f %}{% endwith %}
   {% with f=form.first_name %}{% include "logbook/_field.html" with field=f %}{% endwith %}
   {% with f=form.last_name %}{% include "logbook/_field.html" with field=f %}{% endwith %}

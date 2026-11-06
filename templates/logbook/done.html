@@ -1,11 +1,22 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load static %}
 {% block title %}Wpisano{% endblock %}
 {% block content %}
-<h1>Wpis zapisany</h1>
+<h1>Wpis zapisany ✓</h1>
 <div class="card">
-  <p class="stat">{{ entry.number }}</p>
-  <p>{{ entry.full_name }} · {{ entry.get_purpose_display }} · wejście {{ entry.entered_at|time:"H:i" }}</p>
-  <p class="small muted">Przy wyjściu możesz zapisać godzinę wyjścia (nieobowiązkowe). Zachowaj tę stronę lub dodaj ją do zakładek.</p>
+  <p class="stat" style="margin:0">{{ entry.number }}</p>
+  <p>{{ entry.full_name }} · {{ entry.get_purpose_display }}{% if entry.reservation %} · {{ entry.reservation.lane }}{% endif %} · wejście {{ entry.entered_at|time:"H:i" }}</p>
+  {% if close_at %}<p class="small">Pobyt zamknie się automatycznie o <strong>{{ close_at|time:"H:i" }}</strong> <span class="countdown" data-countdown="{{ close_at|date:'c' }}"></span>.</p>{% endif %}
   <div class="actions"><a class="btn secondary" href="{% url 'logbook:exit' exit_token %}">Wychodzę — zapisz wyjście</a></div>
+  <p class="small muted">Zachowaj tę stronę (lub dodaj do zakładek), żeby zapisać wyjście.</p>
 </div>
+<div class="card res-qr">
+  <h2 style="margin-top:0">Ktoś jest z Tobą?</h2>
+  <p class="small">Każda osoba przebywająca na strzelnicy wpisuje się sama. Pokaż ten kod osobom, które przyjechały z Tobą, albo wyślij im link{% if not entry.reservation %} — wpiszą się jako osoby towarzyszące{% endif %}.</p>
+  <div class="qr res-qr-img"><img src="{{ share_qr }}" alt="Kod QR do wpisu dla osób towarzyszących"></div>
+  <div class="actions" style="justify-content:center">
+    <button type="button" class="btn" data-share="{{ share_url }}" data-share-title="Wpis do książki pobytu{% if entry.reservation %} — {{ entry.reservation.lane }}{% endif %}">Udostępnij link</button>
+    <button type="button" class="btn secondary" data-copy="{{ share_url }}">Kopiuj link</button>
+  </div>
+</div>
+<script src="{% static 'js/reservation.js' %}" defer></script>
 {% endblock %}

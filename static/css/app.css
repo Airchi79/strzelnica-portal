@@ -560,3 +560,4 @@ main:focus { outline: none; }
 .skip-link { position: absolute; left: 8px; top: -60px; z-index: 1000; padding: 8px 14px; border-radius: 8px; background: var(--surface); color: var(--text); border: 2px solid var(--focus); font-weight: 700; text-decoration: none; }
 .skip-link:focus { top: 8px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; scroll-behavior: auto !important; } }
+.inline-reveal { display: inline; margin-left: 6px; }

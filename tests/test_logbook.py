@@ -484,3 +484,47 @@ def test_my_diary_shows_own_visits_and_matched_archive_only(client):
     assert response.context["days"] == 1
     csv = client.get(f"/ksiazka/dziennik/?rok={now.year}&format=csv").content.decode("utf-8-sig")
     assert "Oś 25 m" in csv and "Oś 100 m" not in csv
+
+
+def test_logbook_list_reveal_single_row(owner_client, running, sig):
+    a = _entry(running, sig, permit_number="AA 111111")
+    b = _entry(running, sig, permit_number="BB 222222", first_name="Ewa")
+    before = SensitiveAccessLog.objects.count()
+    body = owner_client.post(f"/panel/ksiazka/?grupuj=0", {"pokaz": f"w{a.pk}"}).content.decode()
+    assert "AA 111111" in body and "BB 222222" not in body  # odkryty tylko jeden wiersz
+    assert SensitiveAccessLog.objects.count() == before + 1
+    assert SensitiveAccessLog.objects.filter(resource=f"ksiazka:wpis:{a.number}").exists()
+
+
+def test_done_page_share_link_and_companion_entry(client, running, sig):
+    from apps.logbook.models import Entry
+
+    # wpis bez rezerwacji (z plakatu): link dla towarzyszy prowadzi do wpisu „osoba towarzysząca”
+    data = {**permit_data(), "purpose": "obserwator", "has_permit": True}
+    host = services.create_entry(data=data, signature_png=services.decode_signature(sig), source="qr_wejscia")
+    session = client.session
+    session["logbook_recent_entries"] = [host.pk]
+    session.save()
+    page = client.get(f"/ksiazka/wpisano/{host.pk}/")
+    assert page.status_code == 200
+    url = page.context["share_url"]
+    assert "/ksiazka/dolacz/" in url and page.context["close_at"]
+    path = url.split("testserver")[-1] if "testserver" in url else "/" + url.split("/", 3)[3]
+    form = client.get(path)
+    assert form.status_code == 200 and "osoba towarzysząca" in form.content.decode()
+    post = {**permit_data(first_name="Ola"), "purpose": "obserwator", "signature": sig, "statement": "on"}
+    client.post(path, post)
+    comp = Entry.objects.filter(first_name="Ola").first()
+    assert comp and host.number in comp.purpose_note
+    # po wyjściu gospodarza link przestaje działać
+    services.register_exit(host)
+    assert client.get(path).status_code == 410
+
+
+def test_done_page_with_reservation_shares_reservation_link(client, running, sig):
+    e = _entry(running, sig)
+    session = client.session
+    session["logbook_recent_entries"] = [e.pk]
+    session.save()
+    url = client.get(f"/ksiazka/wpisano/{e.pk}/").context["share_url"]
+    assert "/ksiazka/wpis/r/" in url

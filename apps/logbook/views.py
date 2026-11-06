@@ -101,8 +101,31 @@ def entry_by_gate(request, token):
 def done(request, pk):
     if pk not in request.session.get(SESSION_RECENT, []):
         raise Http404
-    entry = get_object_or_404(Entry, pk=pk)
-    return render(request, "logbook/done.html", {"entry": entry, "exit_token": services.exit_token(entry)})
+    entry = get_object_or_404(Entry.objects.select_related("reservation__lane"), pk=pk)
+    if entry.reservation_id and services.reservation_open_for_entry(entry.reservation):
+        share = _absolute(request, reverse("logbook:by_reservation", args=[services.reservation_token(entry.reservation)]))
+    else:
+        share = _absolute(request, reverse("logbook:companion", args=[services.companion_token(entry)]))
+    return render(request, "logbook/done.html", {
+        "entry": entry, "exit_token": services.exit_token(entry), "share_url": share,
+        "share_qr": qr_svg_data_uri(share, box_size=6), "close_at": services.auto_close_at(entry),
+    })
+
+
+def entry_by_companion(request, token):
+    """Osoba towarzysząca dopisuje się do pobytu kogoś, kto już się wpisał (link / QR z jego ekranu po wpisie)."""
+    host = services.entry_from_companion_token(token)
+    if host is None:
+        return render(request, "logbook/closed.html", {"companion_closed": True}, status=410)
+    if host.reservation_id and services.reservation_open_for_entry(host.reservation):
+        return redirect("logbook:by_reservation", token=services.reservation_token(host.reservation))
+    note = f"osoba towarzysząca: {host.full_name} ({host.number})"[:160]
+    initial = {"purpose": Entry.Purpose.OBSERVER, "purpose_note": note, **_initial(request)}
+    form = EntryForm(request.POST or None, initial=initial, reservations=Reservation.objects.none(),
+                     purposes=[Entry.Purpose.OBSERVER, Entry.Purpose.OTHER])
+    if request.method == "POST" and form.is_valid() and not form.cleaned_data.get("purpose_note"):
+        form.cleaned_data["purpose_note"] = note
+    return _handle_entry(request, form=form, source=Entry.Source.GATE_QR, template_ctx={"gate": True, "companion_of": host})
 
 
 def exit_view(request, token):
@@ -212,16 +235,23 @@ def _group(entries):
 
 @panel_required("logbook.view_logbook")
 def panel_list(request):
-    params = request.POST if request.method == "POST" else request.GET
+    params = request.GET.copy()
+    if request.method == "POST":  # filtry z adresu (przycisk „Pokaż” w wierszu) albo z ukrytych pól formularza
+        for k, v in request.POST.lists():
+            params.setlist(k, v)
     qs, f = _filtered(params)
     page = Paginator(qs, 50).get_page(params.get("page"))
-    reveal = request.method == "POST" and request.POST.get("pokaz") == "1"
+    pokaz = request.POST.get("pokaz", "") if request.method == "POST" else ""
+    reveal = pokaz == "1"  # cała strona
+    one = int(pokaz[1:]) if pokaz.startswith("w") and pokaz[1:].isdigit() else None  # jeden wpis („Pokaż” w wierszu)
     entries = list(page)
     for e in entries:
         e.identity_masked = services.masked_identity(e)
-    if reveal:
+        e.revealed = reveal or e.pk == one
+    if reveal or one:
         for e in entries:
-            log_sensitive_access(e.user, f"ksiazka:wpis:{e.number}", "odkrycie danych na liście książki pobytu")
+            if e.revealed:
+                log_sensitive_access(e.user, f"ksiazka:wpis:{e.number}", "odkrycie danych na liście książki pobytu")
     else:
         log_sensitive_access(None, f"ksiazka:lista:{f['od']}..{f['do']}", "przegląd książki pobytu (dane ukryte)")
     query = params.copy()

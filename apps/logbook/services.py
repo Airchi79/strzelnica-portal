@@ -27,6 +27,7 @@ from .models import STATEMENT_TEXT, Entry, EntrySequence, LogbookSettings
 RESERVATION_SALT = "satok.logbook.reservation-qr"
 PERSONAL_SALT = "satok.logbook.personal-qr"
 EXIT_SALT = "satok.logbook.exit"
+COMPANION_SALT = "satok.logbook.companion"
 MAX_SIGNATURE_BYTES = 300 * 1024
 
 
@@ -257,6 +258,36 @@ def register_exit(entry, now=None):
     Entry.objects.filter(pk=entry.pk, exited_at__isnull=True).update(exited_at=now)
     entry.exited_at = now
     log_event("ksiazka.wypis", entry, entry.number)
+    return entry
+
+
+def auto_close_at(entry):
+    """Kiedy pobyt zamknie się sam (ta sama zasada co close_stale_entries): koniec rezerwacji albo N godzin od wejścia."""
+    hours = LogbookSettings.load().auto_exit_hours
+    if not hours or entry.exited_at:
+        return None
+    at = entry.entered_at + timedelta(hours=hours)
+    if entry.reservation_id and entry.entered_at <= entry.reservation.ends_at < at:
+        at = entry.reservation.ends_at
+    return at
+
+
+def companion_token(entry):
+    return signing.dumps({"e": entry.pk}, salt=COMPANION_SALT, compress=True)
+
+
+def entry_from_companion_token(token):
+    """Wpis osoby, do której dopisują się towarzysze — tylko gdy jej pobyt trwa."""
+    try:
+        data = signing.loads(token, salt=COMPANION_SALT, max_age=36 * 3600)
+        entry = Entry.objects.select_related("reservation__lane").get(pk=data["e"])
+    except (signing.BadSignature, KeyError, TypeError, Entry.DoesNotExist):
+        return None
+    if entry.exited_at:
+        return None
+    close = auto_close_at(entry)
+    if close and close <= timezone.now():
+        return None
     return entry
 
 

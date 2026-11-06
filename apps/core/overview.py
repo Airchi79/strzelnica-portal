@@ -154,5 +154,10 @@ def attention(user, now=None):
         tiles.append(("Kopia zapasowa", "Kopia odtworzona i sprawdzona" if st["state"] == "ok" else st["message"][:80],
                       0 if st["state"] == "ok" else 1, reverse("panel:backups")))
     if user.has_perm("payments.manage_payments"):
+        from apps.payments.services import online_fee_missing_in_rules
+
+        if online_fee_missing_in_rules():
+            tiles.append(("Regulamin a opłata online", "Opłata za płatność online jest włączona, a regulamin o niej nie wspomina", 1,
+                          reverse("panel:payment_settings")))
         tiles.append(("Wpłaty do przypisania", "Przelewy bez rozpoznanego tytułu", Payment.objects.filter(status=Payment.Status.UNMATCHED).count(), reverse("panel:payments") + "?status=nieprzypisana"))
     return tiles

@@ -383,7 +383,10 @@ def panel_settings(request):
         messages.success(request, msg)
         return redirect("panel:payment_settings")
     overpaid = Wallet.objects.filter(balance__gt=0).count()
-    return render(request, "panel/payment_settings.html", {"form": form, "overpaid": overpaid})
+    return render(request, "panel/payment_settings.html", {
+        "form": form, "overpaid": overpaid,
+        "fee_missing_in_rules": services.online_fee_missing_in_rules(obj), "fee_rule_text": services.online_fee_rule_text(obj),
+    })
 
 
 def _receipt_response(payment):

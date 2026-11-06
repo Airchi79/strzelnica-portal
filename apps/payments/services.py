@@ -109,6 +109,41 @@ def online_fee(amount, cfg=None):
     return int((Decimal(amount) * pct / 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) + (cfg.online_fee_fixed or 0)
 
 
+_FEE_IN_RULES = re.compile(r"opłat\w*[^.]{0,80}płatno\w*\s+online|płatno\w*\s+online[^.]{0,80}opłat\w*", re.I)
+
+
+def online_fee_rule_text(cfg=None):
+    """Proponowany zapis do regulaminu z aktualną wysokością opłaty za płatność online ('' — opłata wyłączona)."""
+    from apps.facilities.models import format_pln
+
+    cfg = cfg or PaymentSettings.load()
+    parts = []
+    if cfg.online_fee_percent:
+        parts.append(f"{cfg.online_fee_percent.normalize():f}".replace(".", ",") + "% kwoty")
+    if cfg.online_fee_fixed:
+        parts.append(format_pln(cfg.online_fee_fixed))
+    if not parts:
+        return ""
+    return ("Do płatności online (Tpay: BLIK, przelew online, karta) doliczana jest opłata za obsługę płatności w wysokości "
+            f"{' + '.join(parts)}, widoczna przed zapłatą. Opłata ta nie podlega zwrotowi przy anulowaniu, wycofaniu lub odrzuceniu "
+            "rezerwacji albo zapisu — zwracana jest cena rezerwacji lub opłaty startowej. Płatność przelewem tradycyjnym "
+            "lub na miejscu jest wolna od tej opłaty.")
+
+
+def online_fee_missing_in_rules(cfg=None):
+    """True, gdy opłata za płatność online jest włączona, a żaden obowiązujący regulamin o niej nie wspomina."""
+    from apps.regulations.models import RegulationDocument
+
+    cfg = cfg or PaymentSettings.load()
+    if not (cfg.online_fee_percent or cfg.online_fee_fixed):
+        return False
+    for doc in RegulationDocument.objects.all():
+        version = doc.current_version()
+        if version and _FEE_IN_RULES.search(version.content or ""):
+            return False
+    return True
+
+
 def _due_items(user):
     """Należności użytkownika (rezerwacje i składki) w kolejności terminów."""
     from apps.association.models import Fee

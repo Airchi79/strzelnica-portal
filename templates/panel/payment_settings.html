@@ -3,6 +3,13 @@
 {% block panel %}
 <h1>Ustawienia płatności</h1>
 {% include "panel/_payments_tabs.html" %}
+{% if fee_missing_in_rules %}<div class="card">
+  <div class="msg warning"><strong>Regulamin nie wspomina o opłacie za płatność online.</strong> Opłata jest włączona — dopisz ją do regulaminu
+    (Panel → <a href="{% url 'panel:regulations' %}">Regulaminy</a> → nowa wersja), żeby potrącenie przy zwrocie było zgodne z zasadami, które klient zaakceptował.</div>
+  <p class="small">Proponowany zapis (z aktualną wysokością opłaty):</p>
+  <blockquote class="small" style="margin:0 0 8px;padding:8px 12px;border-left:3px solid var(--border)" data-copy-text>{{ fee_rule_text }}</blockquote>
+  <button type="button" class="btn secondary small-btn" data-copy="{{ fee_rule_text }}">Kopiuj tekst</button>
+</div>{% endif %}
 <div class="card">
   <form method="post" novalidate data-confirm="Zapisać ustawienia płatności? Włączenie automatycznego rozliczania od razu opłaci nieopłacone rezerwacje z istniejących nadpłat.">{% csrf_token %}
     {% include "partials/form.html" %}

@@ -1021,3 +1021,22 @@ def test_sales_report_online_fees(ps, owner, monkeypatch):
     report = SalesReport(number="RS/T/1", kind=SalesReport.Kind.DAILY, period_start=timezone.localdate(), period_end=timezone.localdate(),
                          data={"rows": [], "summary": s})
     assert "opłaty za płatność online (bezzwrotne);1,50" in to_csv(report)
+
+
+def test_online_fee_regulation_reminder(owner_client, owner):
+    from apps.regulations.models import RegulationDocument, RegulationVersion
+
+    assert not services.online_fee_missing_in_rules()  # opłata wyłączona — bez ostrzeżenia
+    _fee_on(percent="1.59", fixed=30)
+    assert services.online_fee_missing_in_rules()
+    text = services.online_fee_rule_text()
+    assert "1,59% kwoty + 0,30\xa0zł" in text
+    page = owner_client.get("/panel/platnosci/ustawienia/").content.decode()
+    assert "Regulamin nie wspomina o opłacie za płatność online" in page
+    assert "Regulamin a opłata online" in owner_client.get("/panel/").content.decode()
+    doc = RegulationDocument.objects.get(slug="regulamin-rezerwacji")
+    last = doc.versions.order_by("-number").first()
+    RegulationVersion.objects.create(document=doc, number=(last.number if last else 0) + 1, content="§ 9. " + text,
+                                     effective_from=timezone.now() - timedelta(minutes=1), published_at=timezone.now())
+    assert not services.online_fee_missing_in_rules()
+    assert "Regulamin nie wspomina" not in owner_client.get("/panel/platnosci/ustawienia/").content.decode()

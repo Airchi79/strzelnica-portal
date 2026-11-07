@@ -214,14 +214,32 @@ Kopie zawierają dane osobowe — **zawsze z szyfrowaniem** (hasło szyfrowania 
    można użyć tego samego konta co aplikacja: serwer LH, port 465, SSL).
 10. **Utwórz** → **Uruchom teraz** → status „Ukończono”.
 
-### B. Chmura (zalecana druga kopia)
-Danych jest bardzo mało, więc koszt jest pomijalny. Do wyboru:
-- **Google Drive / OneDrive** — jeśli już masz konto (wystarczy darmowe miejsce);
-- **Backblaze B2** — płatność za GB, przy tej ilości danych grosze miesięcznie.
+### B. Chmura — Dysk Google (zalecana druga kopia, bez kosztów)
+Danych jest kilkanaście MB, więc wystarczy darmowe 15 GB konta Google. Najlepiej **osobne konto Google stowarzyszenia**
+(np. `kopia.strzelnicasatok@gmail.com`) zamiast prywatnego — dostęp nie zależy wtedy od jednej osoby. Hasło do konta
+i hasło szyfrowania kopii zapisz w menedżerze haseł zarządu.
 
-W HBS 3: **Kopia zapasowa i przywracanie → Utwórz → Nowe zadanie kopii zapasowej** → to samo źródło → **Miejsce docelowe:**
-usługa w chmurze → **Dodaj konto** (logowanie do Google/Microsoft albo klucze B2) → folder `strzelnica-kopia` →
-harmonogram **05:00** → **szyfrowanie po stronie klienta: obowiązkowo** → wersjonowanie → powiadomienia jak wyżej.
+1. **Konto Google:** zaloguj się (albo załóż konto) i włącz weryfikację dwuetapową (*Konto Google → Bezpieczeństwo*).
+2. QNAP → *App Center* → **Hybrid Backup Sync 3** (zainstaluj, jeśli go nie ma) → otwórz.
+3. **Dodaj miejsce docelowe:** w HBS 3 *Pamięć masowa* (lub *Miejsca docelowe*) → **Dodaj / Utwórz** → **Google Drive** →
+   **Dodaj konto / Uwierzytelnij** → otworzy się logowanie Google → zaloguj się kontem z punktu 1 → **Zezwól** na dostęp HBS 3.
+4. **Kopia zapasowa i przywracanie → Utwórz → Nowe zadanie kopii zapasowej**.
+5. **Źródło:** zaznacz `strzelnica/backups` i `strzelnica/data/private` (to samo co w punkcie A; **bez** `data/postgres`).
+6. **Miejsce docelowe:** konto Google Drive z punktu 3 → **Utwórz folder** `strzelnica-kopia` → wybierz go.
+7. **Harmonogram:** codziennie **05:00** (po nocnej kopii bazy i po kopii na USB).
+8. **Zasady / opcje:**
+   - **Szyfrowanie po stronie klienta — obowiązkowo** (kopie zawierają dane osobowe; Google widzi tylko zaszyfrowane pliki).
+     Ustaw długie hasło i od razu zapisz je w menedżerze haseł — **bez niego kopii nie odtworzysz**.
+   - **Wersjonowanie:** „Inteligentne wersjonowanie” albo 30 wersji (pozwala wrócić do kopii sprzed kilku tygodni).
+9. **Powiadomienia:** e-mail przy błędzie zadania (jak w punkcie A.9).
+10. **Utwórz** → **Uruchom teraz** → status „Ukończono”.
+11. **Sprawdź na Dysku Google** (drive.google.com, konto z punktu 1): jest folder `strzelnica-kopia` z plikami — ich nazwy
+    i treść są nieczytelne (zaszyfrowane), tak ma być.
+12. Wykonaj próbę odtworzenia z punktu C, wybierając zadanie z Dysku Google.
+
+Nazwy przycisków w HBS 3 mogą się nieznacznie różnić zależnie od wersji — szukaj odpowiedników „Miejsce docelowe / Google Drive /
+Nowe zadanie kopii zapasowej”. Inne chmury działają tak samo: **OneDrive** albo **Backblaze B2** (płatność za GB — przy tej
+ilości danych grosze miesięcznie).
 
 ### C. Próba odtworzenia (raz, potem co kilka miesięcy)
 W HBS 3 → zadanie → **Przywróć** → wybierz najnowszą wersję → przywróć jeden plik `.dump` do **innego** folderu

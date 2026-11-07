@@ -908,7 +908,9 @@ def _fee_on(percent="1.59", fixed=30, wallet=False):
 def test_online_fee_calculation(db):
     assert services.online_fee(24000) == 0  # domyślnie bez opłaty
     _fee_on()
-    assert services.online_fee(24000) == 382 + 30  # 1,59% z 240 zł = 3,816 → 3,82 zł + 0,30 zł
+    # gross-up: najmniejsza płatność T, przy której T − (1,59% z T w górę + 0,30 zł) ≥ 240 zł → T = 244,19 zł
+    assert services.online_fee(24000) == 419
+    assert 24419 - services.operator_commission(24419) == 24000 and 24418 - services.operator_commission(24418) < 24000
     assert services.online_fee(0) == 0
 
 
@@ -922,14 +924,14 @@ def test_online_fee_charged_booked_and_not_refunded(client, owner, ps, tpay_keys
                                                                                       "payment_url": "https://secure.sandbox.tpay.com/?t=1"})
     client.force_login(ps)
     page = client.get(f"/rezerwacje/{r.pk}/").content.decode()
-    assert "opłata za płatność online 4,12\xa0zł" in page and "244,12\xa0zł" in page
+    assert "opłata za płatność online 4,19\xa0zł" in page and "244,19\xa0zł" in page
     client.post("/platnosci/tpay/start/", {"reservation": r.pk})
     payment = Payment.objects.get(reservation=r)
-    assert sent["amount_grosze"] == 24412 and payment.amount == 24412 and payment.surcharge == 412
+    assert sent["amount_grosze"] == 24419 and payment.amount == 24419 and payment.surcharge == 419
     _post(client, tpay_keys, _notification(payment))
     r.refresh_from_db()
     assert r.payment_status == Reservation.Payment.PAID and r.paid_amount == 24000 and balance_of(ps) == 0
-    assert LedgerEntry.objects.filter(user=ps, kind=LedgerEntry.Kind.ONLINE_FEE, amount=-412).exists()
+    assert LedgerEntry.objects.filter(user=ps, kind=LedgerEntry.Kind.ONLINE_FEE, amount=-419).exists()
     assert services.ledger_consistent(ps)
     calls = []
     monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append((tid, amount)) or {"result": "success"})
@@ -940,7 +942,7 @@ def test_online_fee_charged_booked_and_not_refunded(client, owner, ps, tpay_keys
     assert (refunded, manual) == (24000, 0) and balance_of(ps) == 0 and services.ledger_consistent(ps)
     assert services.refundable_overpayments(ps) == []
     body = [m for m in mail.outbox if m.to == [ps.email]][0].body
-    assert "Zwrot 240\xa0zł" in body and "Opłata za płatność online (4,12\xa0zł) nie podlega zwrotowi" in body
+    assert "Zwrot 240\xa0zł" in body and "Opłata za płatność online (4,19\xa0zł) nie podlega zwrotowi" in body
 
 
 def test_online_fee_not_refunded_on_reject(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
@@ -1030,7 +1032,7 @@ def test_online_fee_regulation_reminder(owner_client, owner):
     _fee_on(percent="1.59", fixed=30)
     assert services.online_fee_missing_in_rules()
     text = services.online_fee_rule_text()
-    assert "1,59% kwoty + 0,30\xa0zł" in text
+    assert "1,59% kwoty płatności + 0,30\xa0zł" in text
     page = owner_client.get("/panel/platnosci/ustawienia/").content.decode()
     assert "Regulamin nie wspomina o opłacie za płatność online" in page
     assert "Regulamin a opłata online" in owner_client.get("/panel/").content.decode()
@@ -1040,3 +1042,18 @@ def test_online_fee_regulation_reminder(owner_client, owner):
                                      effective_from=timezone.now() - timedelta(minutes=1), published_at=timezone.now())
     assert not services.online_fee_missing_in_rules()
     assert "Regulamin nie wspomina" not in owner_client.get("/panel/platnosci/ustawienia/").content.decode()
+
+
+
+@pytest.mark.parametrize("pct,fixed", [("0.99", 0), ("1.59", 30), ("2.50", 0), ("0.19", 0)])
+def test_online_fee_always_covers_refund(db, pct, fixed):
+    """Po potrąceniu prowizji operatora (od całej płatności, w górę) zawsze zostaje pełna cena — zwrot ma pokrycie;
+    i nie pobieramy ani grosza więcej, niż trzeba."""
+    from decimal import Decimal
+
+    cfg = PaymentSettings(online_fee_percent=Decimal(pct), online_fee_fixed=fixed)
+    for amount in list(range(100, 50001, 37)) + [10000, 24000, 30000]:
+        total = amount + services.online_fee(amount, cfg)
+        assert total - services.operator_commission(total, cfg) >= amount
+        assert (total - 1) - services.operator_commission(total - 1, cfg) < amount
+    assert services.online_fee(10000, PaymentSettings(online_fee_percent=Decimal("0.99"))) == 100  # 100 zł → 1,00 zł

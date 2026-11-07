@@ -8,7 +8,7 @@ import hashlib
 import io
 import re
 from datetime import date, datetime
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -100,13 +100,30 @@ def wallet_enabled():
     return PaymentSettings.load().wallet_enabled
 
 
+def operator_commission(total, cfg=None):
+    """Prowizja operatora (Tpay) od całej płatności `total` [gr]: procent zaokrąglany w górę do grosza + kwota stała."""
+    cfg = cfg or PaymentSettings.load()
+    pct = Decimal(cfg.online_fee_percent or 0) / 100
+    return int((Decimal(total) * pct).to_integral_value(rounding=ROUND_CEILING)) + (cfg.online_fee_fixed or 0)
+
+
 def online_fee(amount, cfg=None):
-    """Opłata za płatność online (Tpay) doliczana do kwoty `amount` [gr] — wg ustawień płatności. Bezzwrotna."""
+    """Opłata za płatność online doliczana do kwoty `amount` [gr] — bezzwrotna.
+
+    Prowizję Tpay pobiera od CAŁEJ płatności (kwota + opłata), więc opłata jest wyliczana „w górę” (gross-up): najmniejsza
+    kwota płatności T, przy której po potrąceniu prowizji (od T, zaokrąglonej w górę) zostaje co najmniej `amount`.
+    Dzięki temu zwrot ceny rezerwacji zawsze ma pokrycie w środkach z tej płatności."""
     if not amount or amount <= 0:
         return 0
     cfg = cfg or PaymentSettings.load()
-    pct = Decimal(cfg.online_fee_percent or 0)
-    return int((Decimal(amount) * pct / 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) + (cfg.online_fee_fixed or 0)
+    pct = Decimal(cfg.online_fee_percent or 0) / 100
+    fixed = cfg.online_fee_fixed or 0
+    if not pct and not fixed:
+        return 0
+    total = int(((Decimal(amount) + fixed) / (1 - pct)).to_integral_value(rounding=ROUND_CEILING))
+    while total - operator_commission(total, cfg) < amount:  # zaokrąglenie prowizji w górę — dobijamy po groszu
+        total += 1
+    return total - amount
 
 
 _FEE_IN_RULES = re.compile(r"opłat\w*[^.]{0,80}płatno\w*\s+online|płatno\w*\s+online[^.]{0,80}opłat\w*", re.I)
@@ -119,13 +136,13 @@ def online_fee_rule_text(cfg=None):
     cfg = cfg or PaymentSettings.load()
     parts = []
     if cfg.online_fee_percent:
-        parts.append(f"{cfg.online_fee_percent.normalize():f}".replace(".", ",") + "% kwoty")
+        parts.append(f"{cfg.online_fee_percent.normalize():f}".replace(".", ",") + "% kwoty płatności")
     if cfg.online_fee_fixed:
         parts.append(format_pln(cfg.online_fee_fixed))
     if not parts:
         return ""
-    return ("Do płatności online (Tpay: BLIK, przelew online, karta) doliczana jest opłata za obsługę płatności w wysokości "
-            f"{' + '.join(parts)}, widoczna przed zapłatą. Opłata ta nie podlega zwrotowi przy anulowaniu, wycofaniu lub odrzuceniu "
+    return ("Do płatności online (Tpay: BLIK, przelew online, karta) doliczana jest opłata za obsługę płatności odpowiadająca "
+            f"prowizji operatora płatności (obecnie {' + '.join(parts)}), widoczna przed zapłatą. Opłata ta nie podlega zwrotowi przy anulowaniu, wycofaniu lub odrzuceniu "
             "rezerwacji albo zapisu — zwracana jest opłata za rezerwację lub opłata startowa. Płatność przelewem tradycyjnym "
             "lub na miejscu jest wolna od tej opłaty.")
 

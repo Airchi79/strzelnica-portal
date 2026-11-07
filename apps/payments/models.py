@@ -14,12 +14,13 @@ class PaymentSettings(models.Model):
         help_text="Wyłączone: wpłata opłaca tylko wskazaną rezerwację lub składkę; nadpłaty widzi zarząd jako kwoty do zwrotu.",
     )
     online_fee_percent = models.DecimalField(
-        "opłata za płatność online — procent", max_digits=4, decimal_places=2, default=0,
+        "opłata za płatność online — prowizja operatora [%]", max_digits=4, decimal_places=2, default=0,
         validators=[MinValueValidator(0), MaxValueValidator(10)],
-        help_text="Doliczana do każdej płatności przez Tpay (np. 1,59). Nie wraca przy anulowaniu — strzelec może zapłacić przelewem "
-                  "lub na miejscu bez opłaty. 0 = bez opłaty.",
+        help_text="Wpisz prowizję Tpay z umowy (np. 0,99). Opłata jest wyliczana tak, żeby po potrąceniu prowizji od całej płatności "
+                  "stowarzyszeniu została pełna cena — wtedy zwrot zawsze ma pokrycie. Nie wraca przy anulowaniu; przelewem lub "
+                  "na miejscu bez opłaty. 0 = bez opłaty.",
     )
-    online_fee_fixed = models.PositiveIntegerField("opłata za płatność online — kwota stała [gr]", default=0)
+    online_fee_fixed = models.PositiveIntegerField("opłata za płatność online — stała część prowizji operatora [gr]", default=0)
     overpayment_pays_reservations = models.BooleanField(
         "nadpłata opłaca kolejne rezerwacje", default=False,
         help_text="Przy wyłączonym saldzie: nadpłata strzelca (np. zwrot za anulowaną rezerwację) sama opłaca jego "

@@ -23,9 +23,24 @@ class BookingSettings(models.Model):
         "strzelec może sam anulować do [h] przed terminem", default=24,
         help_text="Później anulować może tylko obsługa.",
     )
+    hold_minutes = models.PositiveIntegerField(
+        "czas na wybór płatności [min]", default=5,
+        help_text="Po kliknięciu „Rezerwuję” termin jest trzymany dla strzelca przez ten czas (inni widzą go jako zajęty). "
+                  "Bez wyboru płatności — termin wraca do puli.",
+    )
+    transfer_days = models.PositiveIntegerField(
+        "przelew tradycyjny: czas na zaksięgowanie [dni]", default=3,
+        help_text="Rezerwacja „oczekuje na przelew” najwyżej tyle dni; potem termin się zwalnia.",
+    )
+    transfer_cutoff_hours = models.PositiveIntegerField(
+        "przelew tradycyjny: najpóźniej [h] przed terminem", default=24,
+        help_text="Termin zaksięgowania przelewu nie później niż tyle godzin przed strzelaniem. Przelew jest dostępny tylko, "
+                  "gdy do terminu zostało co najmniej „dni na zaksięgowanie” + te godziny.",
+    )
     online_payment_minutes = models.PositiveIntegerField(
         "czas na płatność online [min]", default=15,
-        help_text="Dla grup, które mogą płacić tylko online: nieopłacona rezerwacja zwalnia się po tym czasie. 0 — bez limitu.",
+        help_text="Po wejściu do płatności online termin jest trzymany tyle minut od jej rozpoczęcia (BLIK, logowanie do banku). "
+                  "Także: rezerwacje grup „tylko online” utworzone przez obsługę zwalniają się po tym czasie. 0 — bez limitu.",
     )
     approval_payment_hours = models.PositiveIntegerField(
         "czas na płatność po zatwierdzeniu [h]", default=24,
@@ -83,14 +98,16 @@ class GroupRule(models.Model):
     group = models.CharField("grupa", max_length=12, choices=Group.choices, unique=True)
     requires_approval = models.BooleanField("rezerwacja wymaga zatwierdzenia przez obsługę", default=False)
     pay_online = models.BooleanField("płatność online (Tpay)", default=True)
-    pay_offline = models.BooleanField("płatność offline (przelew, gotówka na miejscu)", default=True)
+    pay_transfer = models.BooleanField("przelew tradycyjny", default=True)
+    pay_cash = models.BooleanField("gotówka na miejscu", default=True)
     pay_pass = models.BooleanField("kody wejścia (karnety, abonamenty)", default=False)
 
     class Meta:
         ordering = ["id"]
         verbose_name = "zasady grupy strzelców"
         verbose_name_plural = "zasady grup strzelców"
-        constraints = [models.CheckConstraint(condition=Q(pay_online=True) | Q(pay_offline=True) | Q(pay_pass=True), name="group_some_payment")]
+        constraints = [models.CheckConstraint(condition=Q(pay_online=True) | Q(pay_transfer=True) | Q(pay_cash=True) | Q(pay_pass=True),
+                                              name="group_some_payment")]
 
     def __str__(self):
         return self.get_group_display()
@@ -98,6 +115,11 @@ class GroupRule(models.Model):
     @property
     def online_only(self):
         return self.pay_online and not self.pay_offline
+
+    @property
+    def pay_offline(self):
+        """Przelew tradycyjny albo gotówka na miejscu."""
+        return self.pay_transfer or self.pay_cash
 
     @classmethod
     def for_group(cls, group):
@@ -107,9 +129,9 @@ class GroupRule(models.Model):
 
 
 DEFAULT_GROUP_RULES = {
-    "czlonek": {"requires_approval": False, "pay_online": True, "pay_offline": True, "pay_pass": True},
-    "powracajacy": {"requires_approval": False, "pay_online": True, "pay_offline": True, "pay_pass": False},
-    "nowy": {"requires_approval": True, "pay_online": True, "pay_offline": False, "pay_pass": False},
+    "czlonek": {"requires_approval": False, "pay_online": True, "pay_transfer": True, "pay_cash": True, "pay_pass": True},
+    "powracajacy": {"requires_approval": False, "pay_online": True, "pay_transfer": True, "pay_cash": True, "pay_pass": False},
+    "nowy": {"requires_approval": True, "pay_online": True, "pay_transfer": False, "pay_cash": False, "pay_pass": False},
 }
 
 
@@ -122,6 +144,7 @@ class NumberSequence(models.Model):
 
 class Reservation(models.Model):
     class Status(models.TextChoices):
+        HOLD = "oczekuje", "Oczekuje na płatność"
         PENDING_APPROVAL = "do_zatwierdzenia", "Czeka na zatwierdzenie"
         CONFIRMED = "potwierdzona", "Potwierdzona"
         CANCELLED = "anulowana", "Anulowana"
@@ -179,6 +202,14 @@ class Reservation(models.Model):
     approved_at = models.DateTimeField("zatwierdzono", null=True, blank=True)
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     pay_by = models.DateTimeField("opłać do (inaczej rezerwacja się zwalnia)", null=True, blank=True)
+
+    class PayMethod(models.TextChoices):
+        ONLINE = "online", "Online (Tpay)"
+        TRANSFER = "przelew", "Przelew tradycyjny"
+        CASH = "gotowka", "Gotówka na miejscu"
+
+    pay_method = models.CharField("wybrany sposób płatności", max_length=10, choices=PayMethod.choices, blank=True)
+    needs_approval = models.BooleanField("po opłaceniu czeka na zatwierdzenie", default=False)
     # Rozliczenie po zakończeniu: dopłata, gdy w książce pobytu było więcej strzelających niż zadeklarowano.
     settled_at = models.DateTimeField("rozliczono po terminie", null=True, blank=True)
     declared_persons = models.PositiveIntegerField("zadeklarowana liczba osób", null=True, blank=True)
@@ -241,8 +272,10 @@ class Reservation(models.Model):
 
     @property
     def display_status(self):
-        if self.is_finished:
+        if self.is_finished and self.status != self.Status.HOLD:
             return "Zakończona"
+        if self.status == self.Status.HOLD and self.pay_method == self.PayMethod.TRANSFER:
+            return "Oczekuje na przelew"
         return self.get_status_display()
 
     @property
@@ -253,7 +286,7 @@ class Reservation(models.Model):
         """Strzelec anuluje sam do terminu z ustawień (domyślnie 24 h przed); później tylko obsługa.
         Rezerwację czekającą na zatwierdzenie można wycofać do jej początku."""
         now = now or timezone.now()
-        if self.status == self.Status.PENDING_APPROVAL:
+        if self.status in (self.Status.PENDING_APPROVAL, self.Status.HOLD):
             return self.starts_at > now
         return self.status == self.Status.CONFIRMED and now <= self.free_cancel_deadline
 

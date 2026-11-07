@@ -106,6 +106,7 @@ def test_panel_assign_officer_and_logbook(owner_client, guest, officer, lane):
 def test_settings_form_and_public_page(owner_client, client):
     response = owner_client.post("/panel/rezerwacje/ustawienia/", {
         **{f: getattr(BookingSettings.load(), f) for f in ["free_cancel_hours", "online_payment_minutes", "approval_payment_hours",
+                                                           "hold_minutes", "transfer_days", "transfer_cutoff_hours",
                                                            "offline_instructions", "min_lead_hours", "waitlist_hold_minutes",
                                                            "max_advance_days", "max_persons"]},
         "prepay_before_approval": "on", "officer_service": "on", "officer_fee_pln": "25,50",

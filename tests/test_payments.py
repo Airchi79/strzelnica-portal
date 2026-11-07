@@ -1151,3 +1151,134 @@ def test_use_wallet_button_for_existing_reservation(client, owner, ps):
     r.refresh_from_db()
     assert r.paid_amount == 7000 and balance_of(ps) == 0 and r.payment_status == Reservation.Payment.DUE
     assert "Użyj salda" not in client.get(f"/rezerwacje/{r.pk}/").content.decode()
+
+
+# --- rezerwacja ze strony: blokada terminu, wybór płatności, potwierdzenie po zapłacie -----------------------------
+
+
+def _checkout(user, days=7, start=10, end=12, lane_name="Oś 100 m"):
+    return booking_services.create_reservation(user, Lane.objects.get(name=lane_name), timezone.localdate() + timedelta(days=days),
+                                               start, end, 2, checkout=True)
+
+
+def test_checkout_hold_then_cash(ps, owner, django_capture_on_commit_callbacks, client):
+    from django.core import mail
+
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        r = _checkout(ps)
+    assert r.status == Reservation.Status.HOLD and r.payment_status == Reservation.Payment.DUE
+    assert timedelta(minutes=4) < r.pay_by - timezone.now() <= timedelta(minutes=5)
+    assert not [m for m in mail.outbox if m.to == [ps.email]]  # bez „potwierdzona” przed wyborem płatności
+    client.force_login(ps)
+    page = client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    assert "wybierz sposób płatności" in page and "Zapłacę gotówką na miejscu" in page and "Zapłacę przelewem tradycyjnym" in page
+    with django_capture_on_commit_callbacks(execute=True):
+        client.post(f"/rezerwacje/{r.pk}/", {"action": "choose_cash"})
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CONFIRMED and r.pay_method == "gotowka" and r.pay_by is None
+    body = [m for m in mail.outbox if m.to == [ps.email]][0].body
+    assert "potwierdzamy rezerwację" in body and "gotówką na miejscu" in body
+
+
+def test_checkout_transfer_waits_for_booking(ps, owner, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r = _checkout(ps, days=10)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        r = booking_services.choose_payment(r, ps, Reservation.PayMethod.TRANSFER)
+    assert r.status == Reservation.Status.HOLD and r.pay_method == "przelew"
+    assert abs(r.pay_by - (timezone.now() + timedelta(days=3))) < timedelta(minutes=1)
+    assert "oczekuje na przelew" in mail.outbox[0].subject and r.number in mail.outbox[0].body
+    # zaksięgowany przelew → potwierdzona
+    with django_capture_on_commit_callbacks(execute=True):
+        services.register_manual_payment(ps, r.amount, Payment.Method.TRANSFER, owner, reservation=r)
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CONFIRMED and r.payment_status == Reservation.Payment.PAID
+    assert any("potwierdzona" in m.subject for m in mail.outbox if m.to == [ps.email])
+
+
+def test_transfer_unavailable_close_to_date_and_expiry(ps):
+    r = _checkout(ps, days=2)
+    assert booking_services.payment_options(r)["transfer_deadline"] is None
+    with pytest.raises(ValidationError, match="za późno"):
+        booking_services.choose_payment(r, ps, Reservation.PayMethod.TRANSFER)
+    # transfer nieopłacony do terminu → anulowana z powiadomieniem
+    r2 = _checkout(ps, days=10, start=13, end=14)
+    r2 = booking_services.choose_payment(r2, ps, Reservation.PayMethod.TRANSFER)
+    assert booking_services.expire_unpaid(now=r2.pay_by + timedelta(minutes=1)) >= 1
+    r2.refresh_from_db()
+    assert r2.status == Reservation.Status.CANCELLED
+
+
+def test_checkout_online_confirms_after_payment(client, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r = _checkout(ps)
+    monkeypatch.setattr(tpay, "create_transaction", lambda **kw: {"transaction_id": "01HOLD", "title": "TR-TEST-1",
+                                                                   "payment_url": "https://secure.sandbox.tpay.com/?t=1"})
+    client.force_login(ps)
+    client.post("/platnosci/tpay/start/", {"reservation": r.pk})
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.HOLD and r.pay_method == "online"
+    assert r.pay_by - timezone.now() > timedelta(minutes=14)  # termin trzymany na czas płatności
+    payment = Payment.objects.get(reservation=r)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        _post(client, tpay_keys, _notification(payment))
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CONFIRMED and r.payment_status == Reservation.Payment.PAID and r.pay_by is None
+    assert any("potwierdzona" in m.subject for m in mail.outbox if m.to == [ps.email])
+
+
+def test_abandoned_hold_released_silently_and_slot_free(ps, owner, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r = _checkout(ps)
+    other = make_user("drugi@example.com")
+    add_credential(other)
+    approve(other)
+    with pytest.raises(ValidationError, match="zajęty"):
+        _checkout(other)  # termin trzymany dla pierwszego strzelca
+    Reservation.objects.filter(pk=r.pk).update(pay_by=timezone.now() - timedelta(seconds=1))
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        r2 = _checkout(other)  # wygasła blokada zwolniona przy zapisie — bez czekania na zadanie okresowe
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CANCELLED and r2.status == Reservation.Status.HOLD
+    assert not [m for m in mail.outbox if m.to == [ps.email]]  # porzucony wybór płatności — bez e-maila
+
+
+def test_new_shooter_prepays_then_waits_for_approval(client, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    newbie = make_user("nowy3@example.com")
+    add_credential(newbie)  # PS, ale bez wizyt — grupa „nowy”
+    r = _checkout(newbie)
+    assert r.status == Reservation.Status.HOLD and r.needs_approval
+    opts = booking_services.payment_options(r)
+    assert opts["online"] and not opts["cash"] and not opts["transfer"]
+    monkeypatch.setattr(tpay, "create_transaction", lambda **kw: {"transaction_id": "01NEW", "title": "TR-TEST-1",
+                                                                   "payment_url": "https://secure.sandbox.tpay.com/?t=1"})
+    client.force_login(newbie)
+    client.post("/platnosci/tpay/start/", {"reservation": r.pk})
+    with django_capture_on_commit_callbacks(execute=True):
+        _post(client, tpay_keys, _notification(Payment.objects.get(reservation=r)))
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.PENDING_APPROVAL and r.payment_status == Reservation.Payment.PAID
+
+
+def test_wallet_covers_all_confirmed_immediately_and_partial_hold_refunded_on_expiry(ps, owner):
+    services.register_manual_payment(ps, 50000, Payment.Method.CASH, owner)  # saldo 500 zł (saldo włączone)
+    r = _checkout(ps)
+    assert r.status == Reservation.Status.CONFIRMED and r.payment_status == Reservation.Payment.PAID
+    services.correction(ps, -(services.balance_of(ps) - 7000), "test", owner)  # zostaje 70 zł
+    r2 = _checkout(ps, start=13, end=15)
+    assert r2.status == Reservation.Status.HOLD and r2.paid_amount == 7000 and services.balance_of(ps) == 0
+    booking_services.expire_unpaid(now=r2.pay_by + timedelta(minutes=1))
+    r2.refresh_from_db()
+    assert r2.status == Reservation.Status.CANCELLED and services.balance_of(ps) == 7000  # saldo wróciło

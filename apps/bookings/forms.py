@@ -145,7 +145,7 @@ class BookingSettingsForm(forms.ModelForm):
 
     class Meta:
         model = BookingSettings
-        fields = ["free_cancel_hours", "online_payment_minutes", "approval_payment_hours", "offline_instructions", "prepay_before_approval", "min_lead_hours", "waitlist_hold_minutes", "max_advance_days", "max_persons", "officer_service"]
+        fields = ["free_cancel_hours", "hold_minutes", "online_payment_minutes", "transfer_days", "transfer_cutoff_hours", "approval_payment_hours", "offline_instructions", "prepay_before_approval", "min_lead_hours", "waitlist_hold_minutes", "max_advance_days", "max_persons", "officer_service"]
         widgets = {"offline_instructions": forms.Textarea(attrs={"rows": 3})}
 
     def __init__(self, *args, **kwargs):
@@ -172,11 +172,11 @@ class BookingSettingsForm(forms.ModelForm):
 class GroupRuleForm(forms.ModelForm):
     class Meta:
         model = GroupRule
-        fields = ["requires_approval", "pay_online", "pay_offline", "pay_pass"]
+        fields = ["requires_approval", "pay_online", "pay_transfer", "pay_cash", "pay_pass"]
 
     def clean(self):
         d = super().clean()
-        if not (d.get("pay_online") or d.get("pay_offline") or d.get("pay_pass")):
+        if not (d.get("pay_online") or d.get("pay_transfer") or d.get("pay_cash") or d.get("pay_pass")):
             raise forms.ValidationError("Każda grupa musi mieć co najmniej jeden sposób płatności.")
         return d
 

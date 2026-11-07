@@ -160,9 +160,13 @@ def new(request):
             if request.POST.get("action") == "confirm":
                 reservation = services.create_reservation(
                     request.user, d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"], d["notes"],
-                    access_code=d["access_code"],
+                    access_code=d["access_code"], checkout=True,
                 )
-                messages.success(request, f"Zarezerwowano: {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m.%Y %H:%M}. Potwierdzenie wysłaliśmy e-mailem.")
+                if reservation.status == Reservation.Status.HOLD:
+                    messages.success(request, f"Termin {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m.%Y %H:%M} "
+                                              f"jest zarezerwowany dla Ciebie do {timezone.localtime(reservation.pay_by):%H:%M} — wybierz sposób płatności.")
+                else:
+                    messages.success(request, f"Zarezerwowano: {reservation.lane}, {timezone.localtime(reservation.starts_at):%d.%m.%Y %H:%M}. Potwierdzenie wysłaliśmy e-mailem.")
                 return redirect("bookings:detail", pk=reservation.pk)
             preview = services.quote(
                 d["lane"], d["day"], d["start_hour"], d["end_hour"], d["persons"], access_code=d["access_code"], user=request.user,
@@ -200,7 +204,8 @@ def new(request):
 def my_list(request):
     now = timezone.now()
     qs = request.user.reservations.select_related("lane")
-    upcoming = qs.filter(ends_at__gt=now, status=Reservation.Status.CONFIRMED).order_by("starts_at")
+    upcoming = qs.filter(ends_at__gt=now, status__in=[Reservation.Status.CONFIRMED, Reservation.Status.HOLD,
+                                                       Reservation.Status.PENDING_APPROVAL]).order_by("starts_at")
     past = qs.exclude(pk__in=upcoming.values("pk")).order_by("-starts_at")
     page = Paginator(past, 20).get_page(request.GET.get("page"))
     return render(request, "bookings/my_list.html", {"upcoming": upcoming, "page": page})
@@ -227,6 +232,19 @@ def _payment_context(reservation):
 @login_required
 def detail(request, pk):
     reservation = get_object_or_404(Reservation.objects.select_related("lane"), pk=pk, user=request.user)
+    if request.method == "POST" and request.POST.get("action") in ("choose_cash", "choose_transfer"):
+        method = Reservation.PayMethod.CASH if request.POST["action"] == "choose_cash" else Reservation.PayMethod.TRANSFER
+        try:
+            reservation = services.choose_payment(reservation, request.user, method)
+        except ValidationError as e:
+            messages.error(request, _messages_from(e)[0])
+        else:
+            if method == Reservation.PayMethod.CASH:
+                messages.success(request, "Rezerwacja potwierdzona — zapłacisz gotówką na miejscu. Potwierdzenie wysłaliśmy e-mailem.")
+            else:
+                messages.success(request, f"Rezerwacja czeka na przelew do {timezone.localtime(reservation.pay_by):%d.%m.%Y %H:%M}. "
+                                          "Dane do przelewu wysłaliśmy e-mailem.")
+        return redirect("bookings:detail", pk=reservation.pk)
     if request.method == "POST" and request.POST.get("action") == "use_wallet":
         from apps.payments.services import use_wallet_for_reservation
 

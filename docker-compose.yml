@@ -45,8 +45,9 @@ services:
       retries: 3
       start_period: 40s
 
-  # Zadania okresowe: co 5 minut zwalnianie nieopłaconych rezerwacji i wysyłka ogłoszeń; co godzinę przypomnienia, rozliczenia rezerwacji,
-  # wygaszanie dokumentów, zamykanie pobytów i czyszczenie książki pobytu, zadania stowarzyszenia.
+  # Zadania okresowe: co minutę zwalnianie wygasłych blokad terminów i nieopłaconych rezerwacji oraz lista oczekujących;
+  # co 5 minut wysyłka ogłoszeń; co godzinę przypomnienia, rozliczenia rezerwacji, wygaszanie dokumentów, zamykanie pobytów
+  # i czyszczenie książki pobytu, zadania stowarzyszenia, raporty, kontrola kopii zapasowych.
   cron:
     <<: *app
     depends_on:
@@ -55,9 +56,11 @@ services:
     command: >
       sh -c 'n=0; while true; do
         python manage.py expire_reservations;
-        python manage.py send_announcements;
         python manage.py process_waitlist;
-        if [ $$((n % 12)) -eq 0 ]; then
+        if [ $$((n % 5)) -eq 0 ]; then
+          python manage.py send_announcements;
+        fi;
+        if [ $$((n % 60)) -eq 0 ]; then
           python manage.py send_reminders;
           python manage.py settle_reservations;
           python manage.py expire_credentials;
@@ -67,7 +70,7 @@ services:
           python manage.py check_backups;
         fi;
         n=$$((n + 1));
-        sleep 300;
+        sleep 60;
       done'
 
   # Tunel Cloudflare jako kontener (opcjonalnie — uruchamiany z profilem „tunel”):

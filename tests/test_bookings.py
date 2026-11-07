@@ -412,6 +412,7 @@ def test_notifications_panel(owner_client, owner, ps, lane, django_capture_on_co
 def test_booking_settings_panel(owner_client):
     owner_client.post("/panel/rezerwacje/ustawienia/", {
         "free_cancel_hours": 12, "min_lead_hours": 0, "waitlist_hold_minutes": 30, "max_advance_days": 60, "max_persons": 20, "online_payment_minutes": 20, "approval_payment_hours": 12,
+        "hold_minutes": 5, "transfer_days": 3, "transfer_cutoff_hours": 24,
         "offline_instructions": "Przelew na konto.",
         **{f"{g}-{k}": "on" for g in ("czlonek", "powracajacy", "nowy") for k in ("pay_online",)},
         "czlonek-pay_pass": "on", "nowy-requires_approval": "on",
@@ -424,6 +425,7 @@ def test_booking_settings_panel(owner_client):
     # Grupa bez żadnego sposobu płatności jest odrzucana.
     response = owner_client.post("/panel/rezerwacje/ustawienia/", {
         "free_cancel_hours": 12, "max_advance_days": 60, "max_persons": 20, "online_payment_minutes": 20, "approval_payment_hours": 12,
+        "hold_minutes": 5, "transfer_days": 3, "transfer_cutoff_hours": 24,
         "czlonek-pay_online": "on", "powracajacy-pay_online": "on",
     })
     assert response.status_code == 200 and "co najmniej jeden sposób" in response.content.decode()
@@ -500,7 +502,8 @@ def test_panel_approve_sets_payment_deadline_for_online_only(newbie, lane, owner
     assert r.status == Reservation.Status.CONFIRMED and r.approved_at and r.approved_by.is_superuser
     hours = BookingSettings.load().approval_payment_hours
     assert r.pay_by is not None and abs((r.pay_by - r.approved_at) - timedelta(hours=hours)) < timedelta(seconds=5)
-    assert services.payment_options(r) == {"online": True, "offline": False, "instructions": BookingSettings.load().offline_instructions}
+    opts = services.payment_options(r)
+    assert opts["online"] and not opts["offline"] and not opts["cash"] and not opts["transfer"]
 
 
 def test_panel_reject(newbie, lane, owner_client):

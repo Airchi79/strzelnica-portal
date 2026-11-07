@@ -173,9 +173,15 @@ class Migration(migrations.Migration):
     ]
 
 
-def seed(apps, schema_editor):
-    from apps.bookings.models import DEFAULT_GROUP_RULES
+# Wartości zamrożone na stan tej migracji (pole „pay_offline”; późniejsza migracja dzieli je na przelew i gotówkę).
+DEFAULT_GROUP_RULES = {
+    "czlonek": {"requires_approval": False, "pay_online": True, "pay_offline": True, "pay_pass": True},
+    "powracajacy": {"requires_approval": False, "pay_online": True, "pay_offline": True, "pay_pass": False},
+    "nowy": {"requires_approval": True, "pay_online": True, "pay_offline": False, "pay_pass": False},
+}
 
+
+def seed(apps, schema_editor):
     GroupRule = apps.get_model("bookings", "GroupRule")
     for group, values in DEFAULT_GROUP_RULES.items():
         GroupRule.objects.get_or_create(group=group, defaults=values)

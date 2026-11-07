@@ -6,6 +6,14 @@
   <div class="res-banner gray"><strong>Rezerwacja anulowana</strong>{% if r.cancel_reason %}<span>{{ r.cancel_reason }}</span>{% endif %}</div>
 {% elif r.status == 'nieodbyta' %}
   <div class="res-banner gray"><strong>Rezerwacja nieodbyta</strong></div>
+{% elif r.status == 'oczekuje' and r.pay_method == 'przelew' %}
+  <div class="res-banner warn"><strong>Oczekuje na przelew — {{ remaining|pln }}</strong>
+    <span>Termin jest trzymany dla Ciebie do zaksięgowania przelewu, najpóźniej do {{ r.pay_by|date:"j.m.Y H:i" }}. Potem rezerwacja zostanie potwierdzona e-mailem
+      — a bez wpłaty termin wróci do puli.</span></div>
+{% elif r.status == 'oczekuje' %}
+  <div class="res-banner warn"><strong>Termin zarezerwowany dla Ciebie — wybierz sposób płatności</strong>
+    <span>{% if r.pay_method == 'online' %}Płatność online w toku — termin trzymany do {{ r.pay_by|date:"H:i" }}.{% else %}Masz czas do {{ r.pay_by|date:"H:i" }}{% endif %}
+      <span class="countdown" data-countdown="{{ r.pay_by|date:'c' }}"></span>. Rezerwacja zostanie potwierdzona po zapłacie online{% if pay_options.cash %} albo po wyborze gotówki na miejscu{% endif %}.</span></div>
 {% elif r.status == 'do_zatwierdzenia' %}
   <div class="res-banner warn"><strong>Czeka na zatwierdzenie przez obsługę</strong><span>Termin jest już zablokowany dla Ciebie.
     {% if r.payment_status == 'oplacona' %}Rezerwacja jest opłacona — po zatwierdzeniu dostaniesz potwierdzenie, a jeśli nie zostanie zatwierdzona, pieniądze wrócą automatycznie.
@@ -13,6 +21,8 @@
     {% else %}Po zatwierdzeniu dostaniesz e-mail z informacją o płatności.{% endif %}</span></div>
 {% elif r.is_finished %}
   <div class="res-banner gray"><strong>Rezerwacja zakończona</strong><span>Dziękujemy za wizytę.</span></div>
+{% elif r.payment_status == 'do_zaplaty' and r.pay_method == 'gotowka' %}
+  <div class="res-banner ok"><strong>Rezerwacja potwierdzona ✓</strong><span>Płatność gotówką na miejscu: {{ remaining|pln }} — przed strzelaniem, u obsługi.</span></div>
 {% elif r.payment_status == 'do_zaplaty' %}
   <div class="res-banner warn"><strong>Rezerwacja potwierdzona — do zapłaty {{ r.amount|sub:r.paid_amount|pln }}</strong>
     {% if r.pay_by %}<span>Opłać do {{ r.pay_by|date:"j.m H:i" }} <span class="countdown" data-countdown="{{ r.pay_by|date:'c' }}"></span> — inaczej termin zostanie zwolniony.</span>{% endif %}</div>
@@ -47,7 +57,7 @@
 </div>
 
 {# --- płatność --- #}
-{% if r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' or r.payment_status == 'do_zaplaty' and r.status == 'do_zatwierdzenia' and prepay and tpay_enabled and pay_options.online %}
+{% if r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' or r.payment_status == 'do_zaplaty' and r.status == 'oczekuje' or r.payment_status == 'do_zaplaty' and r.status == 'do_zatwierdzenia' and prepay and tpay_enabled and pay_options.online %}
 <div class="card res-pay">
   <h2 style="margin-top:0">Do zapłaty: {{ remaining|pln }}</h2>
   {% if r.paid_amount %}<p class="small">Należność {{ r.amount|pln }} · zapłacono już {{ r.paid_amount|pln }}.</p>{% endif %}
@@ -62,9 +72,17 @@
       <button class="btn {% if wallet_available %}secondary {% endif %}res-pay-btn" type="submit">Zapłać online {{ online_due|pln }}{% if wallet_available %} (po użyciu salda){% endif %} — BLIK, przelew, karta</button></form>
     {% include "partials/online_fee_note.html" with base=online_due offline=pay_options.offline %}
   {% endif %}
-  {% if pay_options.offline and r.status == 'potwierdzona' %}
-    <div class="res-offline"><strong>{% if tpay_enabled and pay_options.online %}Albo offline{% else %}Jak zapłacić{% endif %}</strong>
-      <p class="small">{{ pay_options.instructions }}</p>
+  {% if r.status == 'oczekuje' and r.pay_method != 'przelew' %}
+    {% if pay_options.cash %}<form method="post" class="res-choice">{% csrf_token %}<input type="hidden" name="action" value="choose_cash">
+      <button class="btn secondary res-pay-btn" type="submit">Zapłacę gotówką na miejscu</button>
+      <p class="small muted" style="margin:6px 0 0">Rezerwacja zostanie potwierdzona od razu, {{ remaining|pln }} płacisz przy przyjeździe.</p></form>{% endif %}
+    {% if pay_options.transfer %}{% if pay_options.transfer_deadline %}<form method="post" class="res-choice">{% csrf_token %}<input type="hidden" name="action" value="choose_transfer">
+      <button class="btn secondary res-pay-btn" type="submit">Zapłacę przelewem tradycyjnym</button>
+      <p class="small muted" style="margin:6px 0 0">Termin trzymany do zaksięgowania przelewu, najpóźniej do {{ pay_options.transfer_deadline|date:"j.m.Y H:i" }}; potwierdzenie po wpłacie.</p></form>
+    {% else %}<p class="small muted">Przelew tradycyjny niedostępny — do terminu zostało za mało czasu na zaksięgowanie.</p>{% endif %}{% endif %}
+  {% elif r.status == 'oczekuje' and r.pay_method == 'przelew' or pay_options.transfer and r.status == 'potwierdzona' and r.pay_method != 'gotowka' %}
+    <div class="res-offline"><strong>{% if tpay_enabled and pay_options.online %}Przelew tradycyjny{% else %}Jak zapłacić{% endif %}</strong>
+      <p class="small">Kwota: <strong>{{ remaining|pln }}</strong>{% if r.pay_by %} · zaksięguj do {{ r.pay_by|date:"j.m.Y H:i" }}{% endif %}</p>
       <p class="small">Tytuł przelewu: <strong class="code" data-copy-text>{{ r.number }}</strong> <button type="button" class="link-btn" data-copy="{{ r.number }}">kopiuj</button>
       {% if association.bank_account %}<br>Rachunek: <strong class="code">{{ association.bank_account }}</strong> <button type="button" class="link-btn" data-copy="{{ association.bank_account }}">kopiuj</button>{% endif %}</p>
     </div>

@@ -192,6 +192,10 @@ def _pay_item(user, item, by):
         r.payment_marked_by = by
         r.save(update_fields=["paid_amount", "payment_status", "payment_marked_at", "payment_marked_by", "updated_at"])
         log_event("rezerwacja.oplacona", r, f"{r.number}: {remaining / 100:.2f} zł", actor=by)
+        if r.status == Reservation.Status.HOLD:  # rezerwacja ze strony czekała na płatność → potwierdzona
+            from apps.bookings.services import confirm_after_payment
+
+            confirm_after_payment(r, by=by)
         return True
     from apps.events.models import Registration
 
@@ -229,7 +233,8 @@ def use_wallet_for_reservation(reservation, by=None):
     if not wallet_enabled():
         return 0
     r = Reservation.objects.select_for_update().get(pk=reservation.pk)
-    if r.payment_status != Reservation.Payment.DUE or r.status not in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL):
+    if r.payment_status != Reservation.Payment.DUE or r.status not in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL,
+                                                                         Reservation.Status.HOLD):
         return 0
     wallet = _locked_wallet(r.user)
     part = min(max(wallet.balance, 0), r.amount - r.paid_amount)
@@ -244,6 +249,10 @@ def use_wallet_for_reservation(reservation, by=None):
         fields += ["payment_status", "payment_marked_at", "payment_marked_by"]
     r.save(update_fields=fields)
     log_event("rezerwacja.z_salda", r, f"{r.number}: z salda {part / 100:.2f} zł", actor=by)
+    if r.payment_status == Reservation.Payment.PAID and r.status == Reservation.Status.HOLD:
+        from apps.bookings.services import confirm_after_payment
+
+        confirm_after_payment(r, by=by)
     return part
 
 

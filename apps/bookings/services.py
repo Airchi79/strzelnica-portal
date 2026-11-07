@@ -252,9 +252,12 @@ CHANNEL_ONLINE, CHANNEL_ONSITE = "online", "na_miejscu"
 
 
 def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="", created_by=None, now=None, access_code="",
-                       series=None, notify=True, channel=CHANNEL_ONLINE):
+                       series=None, notify=True, channel=CHANNEL_ONLINE, checkout=False):
     """Rezerwacja. `channel`: "online" (strona — limit czasu przed terminem z ustawień) albo "na_miejscu" (panel na
-    strzelnicy — bez limitu czasu, po okazaniu dokumentów). Obsługa w panelu (`created_by` ≠ `user`) — bez limitu."""
+    strzelnicy — bez limitu czasu, po okazaniu dokumentów). Obsługa w panelu (`created_by` ≠ `user`) — bez limitu.
+
+    `checkout` (rezerwacja przez strzelca na stronie): termin jest trzymany („oczekuje na płatność”) przez czas na wybór
+    płatności; potwierdzenie dopiero po zapłacie online, wyborze gotówki na miejscu albo zaksięgowaniu przelewu."""
     reasons = check_can_book(user)
     if reasons:
         raise ValidationError(reasons)
@@ -276,6 +279,14 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
             raise ValidationError("Kody wejścia nie są dostępne dla Twojej grupy strzelców. Zarezerwuj bez kodu.")
     # prowadzący od strzelnicy: zawsze do zatwierdzenia (obsługa przydziela prowadzącego)
     pending = bool(q["with_officer"] or (rule and rule.requires_approval and code is None and client_pass is None))
+    cfg = BookingSettings.load()
+    hold = bool(checkout and not by_staff and code is None and client_pass is None and q["amount"] > 0
+                and (not pending or cfg.prepay_before_approval))
+    if hold:
+        status = Reservation.Status.HOLD
+    else:
+        status = Reservation.Status.PENDING_APPROVAL if pending else Reservation.Status.CONFIRMED
+    release_expired_holds(lane, q["starts_at"], q["ends_at"], now)  # wygasłe blokady innych strzelców nie trzymają terminu
     try:
         with transaction.atomic():
             if client_pass is not None:
@@ -302,11 +313,13 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
                 payment_status=(
                     Reservation.Payment.CONTRACT if code else Reservation.Payment.PASS if client_pass else Reservation.Payment.DUE
                 ),
-                status=Reservation.Status.PENDING_APPROVAL if pending else Reservation.Status.CONFIRMED,
+                status=status,
+                needs_approval=pending,
+                pay_by=min(now + timedelta(minutes=cfg.hold_minutes or 5), q["starts_at"]) if hold else None,
                 client_group=group or "",
                 series=series,
             )
-            if not pending:
+            if not pending and not hold:
                 reservation.pay_by = payment_deadline(reservation, now)
                 if reservation.pay_by:
                     reservation.save(update_fields=["pay_by"])
@@ -328,8 +341,17 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     from .waitlist import mark_booked
 
     mark_booked(reservation)
+    if reservation.status == Reservation.Status.HOLD:
+        return reservation  # potwierdzenie i powiadomienia — po zapłacie / wyborze gotówki / zaksięgowaniu przelewu
     if not notify:  # rezerwacje cykliczne: jedno zbiorcze powiadomienie dla całej serii
         return reservation
+    _notify_created(reservation, pending)
+    return reservation
+
+
+def _notify_created(reservation, pending):
+    """E-mail do strzelca i powiadomienie zarządu o nowej (potwierdzonej albo czekającej na zatwierdzenie) rezerwacji."""
+    user, persons = reservation.user, reservation.persons
     if pending:
         notify_user(user, f"Rezerwacja {reservation.number} czeka na zatwierdzenie", "emails/reservation_pending.txt", reservation=reservation,
                     options=payment_options(reservation), tpay=dj_settings.TPAY_ENABLED and BookingSettings.load().prepay_before_approval)
@@ -345,7 +367,6 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
         reservation=reservation,
         event="Rezerwacja do zatwierdzenia" if pending else "Nowa rezerwacja",
     )
-    return reservation
 
 
 # --- rezerwacje cykliczne (tworzy obsługa w panelu) -------------------------------------------
@@ -445,11 +466,17 @@ def group_rule(reservation):
     return GroupRule.for_group(reservation.client_group)
 
 
-def payment_options(reservation):
+def payment_options(reservation, now=None):
+    """Dostępne sposoby płatności (wg zasad grupy strzelca; rezerwacja obsługi — wszystkie)."""
     rule = group_rule(reservation)
+    transfer = rule is None or rule.pay_transfer
+    cash = (rule is None or rule.pay_cash) and not reservation.needs_approval
     return {
         "online": rule is None or rule.pay_online,
-        "offline": rule is None or rule.pay_offline,
+        "transfer": transfer,
+        "cash": cash,
+        "offline": transfer or cash,
+        "transfer_deadline": transfer_deadline(reservation, now) if transfer else None,
         "instructions": BookingSettings.load().offline_instructions,
     }
 
@@ -571,6 +598,108 @@ def cancel_by_client(reservation, by, reason="", now=None):
     return r, refunded, manual, to_wallet
 
 
+# --- rezerwacja z blokadą terminu: wybór płatności, potwierdzenie, zwolnienie ---------------------------------------
+
+
+def transfer_deadline(reservation, now=None):
+    """Termin zaksięgowania przelewu tradycyjnego albo None, gdy na przelew jest za późno."""
+    now = now or timezone.now()
+    cfg = BookingSettings.load()
+    days, cutoff = timedelta(days=cfg.transfer_days), timedelta(hours=cfg.transfer_cutoff_hours)
+    if not cfg.transfer_days or reservation.starts_at - now < days + cutoff:
+        return None
+    return min(now + days, reservation.starts_at - cutoff)
+
+
+@transaction.atomic
+def choose_payment(reservation, user, method, now=None):
+    """Strzelec wybiera sposób płatności dla rezerwacji „oczekuje na płatność”: gotówka na miejscu (potwierdzona od razu)
+    albo przelew tradycyjny (oczekuje na przelew do terminu zaksięgowania)."""
+    now = now or timezone.now()
+    r = Reservation.objects.select_for_update().get(pk=reservation.pk)
+    if r.user_id != user.pk:
+        raise ValidationError("To nie jest Twoja rezerwacja.")
+    if r.status != Reservation.Status.HOLD or r.payment_status != Reservation.Payment.DUE:
+        raise ValidationError("Ta rezerwacja nie czeka na wybór płatności.")
+    if r.pay_by and r.pay_by < now and r.pay_method != Reservation.PayMethod.TRANSFER:
+        raise ValidationError("Czas na wybór płatności minął — termin wrócił do puli. Zarezerwuj ponownie.")
+    options = payment_options(r, now)
+    if method == Reservation.PayMethod.CASH:
+        if not options["cash"]:
+            raise ValidationError("Gotówka na miejscu nie jest dostępna dla tej rezerwacji.")
+        r.pay_method, r.status, r.pay_by = method, Reservation.Status.CONFIRMED, None
+        r.save(update_fields=["pay_method", "status", "pay_by", "updated_at"])
+        log_event("rezerwacja.gotowka", r, f"{r.number}: płatność gotówką na miejscu", actor=user)
+        _notify_created(r, False)
+        return r
+    if method == Reservation.PayMethod.TRANSFER:
+        if not options["transfer"]:
+            raise ValidationError("Przelew tradycyjny nie jest dostępny dla tej rezerwacji.")
+        if not options["transfer_deadline"]:
+            raise ValidationError("Na przelew tradycyjny jest za późno — zapłać online" + (" albo gotówką na miejscu." if options["cash"] else "."))
+        r.pay_method, r.pay_by = method, options["transfer_deadline"]
+        r.save(update_fields=["pay_method", "pay_by", "updated_at"])
+        log_event("rezerwacja.przelew", r, f"{r.number}: przelew do {timezone.localtime(r.pay_by):%d.%m %H:%M}", actor=user)
+        from apps.core.models import AssociationSettings
+
+        notify_user(r.user, f"Rezerwacja {r.number} oczekuje na przelew", "emails/reservation_transfer.txt", reservation=r,
+                    options=options, association=AssociationSettings.load())
+        return r
+    raise ValidationError("Nieznany sposób płatności.")
+
+
+def start_online_payment(reservation, now=None):
+    """Wejście do płatności online: termin trzymany dodatkowe minuty (BLIK, logowanie do banku)."""
+    now = now or timezone.now()
+    r = Reservation.objects.get(pk=reservation.pk)
+    if r.status != Reservation.Status.HOLD:
+        return r
+    cfg = BookingSettings.load()
+    until = min(now + timedelta(minutes=cfg.online_payment_minutes or 15), r.starts_at)
+    Reservation.objects.filter(pk=r.pk).update(pay_method=Reservation.PayMethod.ONLINE,
+                                               pay_by=max(r.pay_by, until) if r.pay_by else until)
+    r.refresh_from_db()
+    return r
+
+
+@transaction.atomic
+def confirm_after_payment(reservation, by=None):
+    """Rezerwacja „oczekuje na płatność” opłacona w całości (online, z salda, zaksięgowany przelew) → potwierdzona
+    (albo czeka na zatwierdzenie, gdy grupa tego wymaga) + powiadomienia."""
+    r = Reservation.objects.select_for_update().get(pk=reservation.pk)
+    if r.status != Reservation.Status.HOLD or r.payment_status != Reservation.Payment.PAID:
+        return r
+    r.status = Reservation.Status.PENDING_APPROVAL if r.needs_approval else Reservation.Status.CONFIRMED
+    r.pay_by = None
+    r.save(update_fields=["status", "pay_by", "updated_at"])
+    log_event("rezerwacja.potwierdzenie_po_platnosci", r, str(r), actor=by)
+    _notify_created(r, r.needs_approval)
+    return r
+
+
+def _expire_hold(r, now):
+    """Wygasła blokada terminu: anulowanie (wpłata z salda wraca na saldo). Bez trwającej płatności Tpay.
+    Porzucony wybór płatności — bez e-maili; nieopłacony przelew / płatność online — z powiadomieniem."""
+    from apps.payments.models import Payment
+
+    if Payment.objects.filter(reservation=r, status=Payment.Status.PENDING, created_at__gte=now - timedelta(minutes=30)).exists():
+        return False
+    abandoned = not r.pay_method
+    cancel_reservation(r, None, "Czas na wybór płatności minął" if abandoned else "Nieopłacona w wyznaczonym terminie",
+                       as_board=True, now=now, expired=True, notify=not abandoned)
+    return True
+
+
+def release_expired_holds(lane, starts_at, ends_at, now=None):
+    """Zwalnia wygasłe blokady nakładające się na podany termin (przed zapisem nowej rezerwacji)."""
+    now = now or timezone.now()
+    count = 0
+    for r in Reservation.objects.filter(lane=lane, status=Reservation.Status.HOLD, pay_by__lt=now,
+                                        starts_at__lt=ends_at, ends_at__gt=starts_at):
+        count += _expire_hold(r, now)
+    return count
+
+
 def expire_unpaid(now=None):
     """Zwalnia rezerwacje nieopłacone w terminie (grupy „tylko online”). Pomija trwające płatności Tpay."""
     from apps.payments.models import Payment
@@ -587,6 +716,8 @@ def expire_unpaid(now=None):
             continue  # częściowo opłacona — decyzja obsługi
         cancel_reservation(r, None, "Nieopłacona w wyznaczonym terminie", as_board=True, now=now, expired=True)
         count += 1
+    for r in Reservation.objects.filter(status=Reservation.Status.HOLD, pay_by__isnull=False, pay_by__lt=now):
+        count += _expire_hold(r, now)
     return count
 
 
@@ -596,7 +727,7 @@ def cancel_reservation(reservation, by, reason="", as_board=False, now=None, kee
     Obsługa: bez opłaty albo — przy późnym odwołaniu — z zachowaniem należności (`keep_fee`)."""
     now = now or timezone.now()
     reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
-    if reservation.status not in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL):
+    if reservation.status not in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL, Reservation.Status.HOLD):
         raise ValidationError("Tej rezerwacji nie można już anulować.")
     if not as_board:
         if reservation.user_id != by.pk:

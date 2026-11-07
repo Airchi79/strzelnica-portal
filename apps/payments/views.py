@@ -95,7 +95,7 @@ def tpay_start(request):
     elif request.POST.get("reservation"):
         reservation = get_object_or_404(
             Reservation, pk=request.POST["reservation"], user=request.user, payment_status=Reservation.Payment.DUE,
-            status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL],  # nowy strzelec może zapłacić od razu (jeśli włączone)
+            status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL, Reservation.Status.HOLD],
         )
         from apps.bookings.models import BookingSettings
         from apps.bookings.services import payment_options
@@ -108,6 +108,13 @@ def tpay_start(request):
             return redirect("bookings:detail", pk=reservation.pk)
         services.use_wallet_for_reservation(reservation, by=request.user)  # saldo najpierw (gdy włączone)
         reservation.refresh_from_db()
+        if reservation.status == Reservation.Status.HOLD:
+            from apps.bookings.services import start_online_payment
+
+            if reservation.pay_by and reservation.pay_by < timezone.now() and reservation.pay_method != Reservation.PayMethod.TRANSFER:
+                messages.error(request, "Czas na wybór płatności minął — termin wrócił do puli. Zarezerwuj ponownie.")
+                return redirect("bookings:detail", pk=reservation.pk)
+            reservation = start_online_payment(reservation)  # termin trzymany na czas płatności w Tpay
         amount = max(reservation.amount - reservation.paid_amount - max(services.balance_of(request.user), 0), 0)
         if amount == 0:
             services.apply_wallet(request.user, targets=[reservation])

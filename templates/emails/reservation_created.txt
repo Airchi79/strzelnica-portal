@@ -4,7 +4,8 @@
 
 {% include "emails/_reservation_summary.txt" %}
 Samodzielne anulowanie możliwe do: {{ reservation.free_cancel_deadline|date:"j.m.Y H:i" }} (później tylko przez obsługę strzelnicy).
-{% if reservation.payment_status == 'do_zaplaty' %}{% if reservation.pay_by %}
+{% if reservation.payment_status == 'do_zaplaty' and reservation.pay_method == 'gotowka' %}Płatność gotówką na miejscu: {{ reservation.amount|sub:reservation.paid_amount|pln }} — przed strzelaniem, u obsługi.
+{% elif reservation.payment_status == 'do_zaplaty' %}{% if reservation.pay_by %}
 WAŻNE: opłać rezerwację online do {{ reservation.pay_by|date:"j.m.Y H:i" }} — inaczej termin zostanie zwolniony.
 {% endif %}Płatność ({{ reservation.amount|pln }}):{% if options.online %} online na stronie rezerwacji{% endif %}{% if options.online and options.offline %} albo{% endif %}{% if options.offline %} offline — {{ options.instructions }}{% endif %}
 {% elif reservation.payment_status == 'oplacona' %}Rezerwacja opłacona — dziękujemy.

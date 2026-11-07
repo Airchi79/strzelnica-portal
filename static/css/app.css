@@ -623,3 +623,4 @@ tr.now-bez_rezerwacji td { background: var(--bad-bg); }
 .doc-state.bad { color: var(--bad); font-weight: 600; }
 .doc-actions { display: flex; gap: 8px; flex-wrap: wrap; flex: none; }
 @media (max-width: 640px) { .doc-item { flex-wrap: wrap; } .doc-actions { width: 100%; } }
+.res-choice { margin-top: 10px; }

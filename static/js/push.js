@@ -1,4 +1,7 @@
-// Powiadomienia push na tym urządzeniu: włączanie / wyłączanie (pole [data-push] w szablonie).
+// Powiadomienia push na tym urządzeniu: włączanie / wyłączanie / test (pole [data-push] w szablonie).
+// Stan zgody czytamy z usługi push (pushManager.permissionState) — w zainstalowanej aplikacji Android przekazuje tam
+// zgodę z „Ustawienia → Aplikacje → … → Powiadomienia”. Rejestracja (subscribe) sama pokazuje pytanie o zgodę, gdy jej brak;
+// nie używamy Notification.requestPermission, które w części przeglądarek w trybie aplikacji nigdy nie odpowiada.
 (() => {
   const box = document.querySelector("[data-push]");
   if (!box) return;
@@ -6,11 +9,23 @@
   const offBtn = box.querySelector("[data-push-off]");
   const testBtn = box.querySelector("[data-push-test]");
   const status = box.querySelector("[data-push-status]");
+  const diag = box.querySelector("[data-push-diag]");
   const url = box.dataset.push;
   const csrf = box.dataset.csrf;
-  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const ua = navigator.userAgent;
+  const ios = /iphone|ipad|ipod/i.test(ua);
   const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const browser = /SamsungBrowser\/[\d.]+/.exec(ua)?.[0] || /EdgA?\/[\d.]+/.exec(ua)?.[0] || /OPR\/[\d.]+/.exec(ua)?.[0]
+    || /Firefox\/[\d.]+/.exec(ua)?.[0] || /Chrome\/[\d.]+/.exec(ua)?.[0] || (/Safari/.test(ua) ? "Safari" : "inna");
+  const settingsHint = "Sprawdź: Ustawienia telefonu → Aplikacje → Sątok (albo przeglądarka, w której otwierasz stronę) → Powiadomienia → Dozwolone. "
+    + "W przeglądarce: ⋮ → Informacje o stronie / Ustawienia strony → Powiadomienia → Zezwalaj. Potem spróbuj ponownie.";
 
+  const setDiag = (extra) => {
+    if (!diag) return;
+    let perm = "brak";
+    try { perm = Notification.permission; } catch (e) { /* brak API */ }
+    diag.textContent = `Przeglądarka: ${browser} · tryb aplikacji: ${standalone ? "tak" : "nie"} · zgoda strony: ${perm}${extra ? " · " + extra : ""}`;
+  };
   const show = (text, on) => {
     status.textContent = text;
     onBtn.hidden = on !== false;
@@ -21,56 +36,62 @@
   const post = (data) => fetch(url, {
     method: "POST", credentials: "same-origin",
     headers: { "Content-Type": "application/json", "X-CSRFToken": csrf }, body: JSON.stringify(data),
-  }).then((r) => r.json().catch(() => ({ ok: false })));
+  }).then((r) => r.json().catch(() => ({ ok: false, error: "serwer odpowiedział błędem " + r.status })));
   const keyBytes = (b64) => {
     const s = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
     return Uint8Array.from(s, (c) => c.charCodeAt(0));
   };
+  const withTimeout = (promise, ms, message) => {
+    let timer;
+    const t = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); });
+    return Promise.race([promise, t]).finally(() => clearTimeout(timer));
+  };
 
-  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+  setDiag();
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     show(ios && !standalone
       ? "Na iPhonie: w Safari stuknij „Udostępnij” → „Do ekranu początkowego”, otwórz aplikację z ikony i włącz powiadomienia tutaj."
       : "Ta przeglądarka nie obsługuje powiadomień push — dostaniesz je e-mailem.", null);
     return;
   }
-  const ready = navigator.serviceWorker.register("/sw.js").then(() => navigator.serviceWorker.ready);
+  let reg = null;
+  let serverKey = null;
+  const ready = navigator.serviceWorker.register("/sw.js").then(() => navigator.serviceWorker.ready).then((r) => { reg = r; return r; });
+  // klucz serwera pobrany zawczasu — po stuknięciu przycisku rejestracja rusza od razu (pytanie o zgodę wymaga „świeżego” stuknięcia)
+  fetch(url, { credentials: "same-origin" }).then((r) => r.json()).then((d) => { serverKey = d.key; }).catch(() => {});
+  const permState = () => ready.then((r) => (r.pushManager.permissionState
+    ? r.pushManager.permissionState({ userVisibleOnly: true }) : Promise.resolve(Notification.permission))).catch(() => "nieznany");
 
-  const refresh = () => ready.then((reg) => reg.pushManager.getSubscription()).then((sub) => {
+  const refresh = () => ready.then((r) => Promise.all([r.pushManager.getSubscription(), permState()])).then(([sub, state]) => {
+    setDiag(`zgoda usługi push: ${state}`);
     if (sub) {
       post(sub.toJSON()); // przypisanie urządzenia do zalogowanego konta (np. po zmianie konta na tym telefonie)
       show("Powiadomienia na tym urządzeniu są włączone.", true);
-    } else if (Notification.permission === "denied") {
-      show("Powiadomienia są zablokowane w ustawieniach przeglądarki lub telefonu — odblokuj je dla tej strony.", null);
+    } else if (state === "denied") {
+      show("Powiadomienia są zablokowane dla tej strony. " + settingsHint, false);
+    } else if (state === "granted") {
+      show("Zgoda na powiadomienia jest udzielona — stuknij, aby zarejestrować to urządzenie.", false);
     } else {
-      show("Włącz przyciskiem poniżej — albo jak w zwykłej aplikacji: zainstaluj stronę (Chrome → ⋮ → „Zainstaluj aplikację”), "
-        + "a potem Ustawienia telefonu → Aplikacje → Strzelnica → Powiadomienia → włącz. Po otwarciu aplikacji powiadomienia włączą się same.", false);
+      show("Włącz przyciskiem poniżej — albo jak w zwykłej aplikacji: Ustawienia telefonu → Aplikacje → Sątok → Powiadomienia → "
+        + "Dozwolone; po otwarciu aplikacji powiadomienia włączą się same.", false);
     }
-  }).catch(() => show("Nie udało się sprawdzić powiadomień na tym urządzeniu.", null));
+  }).catch((e) => { setDiag("błąd: " + (e && e.message)); show("Nie udało się sprawdzić powiadomień na tym urządzeniu.", null); });
 
-  // Krok z limitem czasu: gdy przeglądarka nie odpowiada (np. „ciche” pytanie o zgodę), pokazujemy, gdzie szukać przyczyny.
-  const step = (text, promise, hint) => {
-    status.textContent = text;
-    let timer;
-    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(hint)), 20000); });
-    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  const subscribe = (r) => {
+    const doIt = (key) => r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+    if (serverKey) return doIt(serverKey); // bez czekania — w tej samej chwili co stuknięcie
+    return fetch(url, { credentials: "same-origin" }).then((x) => {
+      if (!x.ok) throw new Error("serwer odpowiedział błędem " + x.status);
+      return x.json();
+    }).then((d) => { serverKey = d.key; return doIt(d.key); });
   };
-  const permissionHint = "Przeglądarka nie pokazała pytania o zgodę. Sprawdź: Ustawienia telefonu → Aplikacje → Chrome (lub aplikacja Strzelnica) → "
-    + "Powiadomienia — muszą być włączone; w Chrome: ⋮ → Informacje o stronie → Uprawnienia → Powiadomienia → Zezwalaj. Potem spróbuj ponownie.";
 
   onBtn.addEventListener("click", () => {
     onBtn.disabled = true;
-    step("Krok 1/3: czekam na Twoją zgodę na powiadomienia…", Notification.requestPermission(), permissionHint)
-      .then((perm) => {
-        if (perm !== "granted") throw new Error(perm === "denied"
-          ? "Powiadomienia są zablokowane dla tej strony. " + permissionHint : "Nie udzielono zgody na powiadomienia.");
-        return step("Krok 2/3: rejestruję telefon w usłudze powiadomień…",
-          Promise.all([ready, fetch(url, { credentials: "same-origin" }).then((r) => {
-            if (!r.ok) throw new Error("serwer odpowiedział błędem " + r.status);
-            return r.json();
-          })]).then(([reg, data]) => reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(data.key) })),
-          "Usługa powiadomień telefonu nie odpowiada (na Androidzie wymagane są usługi Google Play). Spróbuj ponownie za chwilę albo w Chrome.");
-      })
-      .then((sub) => step("Krok 3/3: zapisuję urządzenie…", post(sub.toJSON()), "Serwer nie odpowiada — spróbuj ponownie."))
+    status.textContent = "Rejestruję telefon w usłudze powiadomień… (jeśli pojawi się pytanie o zgodę — wybierz „Zezwalaj”)";
+    const start = reg ? Promise.resolve(reg) : ready;
+    withTimeout(start.then(subscribe), 30000, "telefon nie odpowiedział w ciągu 30 s. " + settingsHint)
+      .then((sub) => withTimeout(post(sub.toJSON()), 15000, "serwer nie odpowiada — spróbuj ponownie."))
       .then((res) => {
         if (!res.ok) throw new Error(res.error || "serwer nie zapisał urządzenia");
         try { localStorage.removeItem("satok-push-off"); localStorage.setItem("satok-push-sync", String(Date.now())); } catch (e) { /* bez pamięci */ }
@@ -78,10 +99,12 @@
       })
       .catch((e) => {
         let msg = e && e.message ? e.message : String(e);
-        if (/permission denied|not allowed|NotAllowedError/i.test(msg) || (e && e.name === "NotAllowedError")) msg = permissionHint;
-        else if (/push service|AbortError|gcm|fcm/i.test(msg) || (e && e.name === "AbortError")) {
-          msg = "usługa powiadomień telefonu odrzuciła rejestrację (" + msg + "). Na Androidzie potrzebne są aktualne usługi Google Play; spróbuj w Chrome.";
+        const name = e && e.name ? e.name : "";
+        if (name === "NotAllowedError" || /permission denied|not allowed/i.test(msg)) msg = "nie ma zgody na powiadomienia. " + settingsHint;
+        else if (name === "AbortError" || /push service|gcm|fcm/i.test(msg)) {
+          msg = "usługa powiadomień telefonu odrzuciła rejestrację (" + msg + "). Na Androidzie potrzebne są aktualne usługi Google Play.";
         }
+        setDiag("błąd: " + (name ? name + ": " : "") + (e && e.message ? e.message : e));
         show("Nie udało się włączyć powiadomień: " + msg, false);
       })
       .finally(() => { onBtn.disabled = false; });
@@ -97,7 +120,7 @@
   });
 
   offBtn.addEventListener("click", () => {
-    ready.then((reg) => reg.pushManager.getSubscription()).then((sub) => {
+    ready.then((r) => r.pushManager.getSubscription()).then((sub) => {
       try { localStorage.setItem("satok-push-off", "1"); } catch (e) { /* bez pamięci */ }
       if (!sub) return null;
       const endpoint = sub.endpoint;

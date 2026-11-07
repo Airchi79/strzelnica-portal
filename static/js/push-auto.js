@@ -4,8 +4,7 @@
 (() => {
   const url = document.body.dataset.pushUrl;
   if (!url || document.querySelector("[data-push]")) return; // strona Powiadomień ma własną obsługę (push.js)
-  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
-  if (Notification.permission !== "granted") return;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } return null; };
   if (store("satok-push-off")) return;
   const csrf = document.querySelector("[name=csrfmiddlewaretoken]");
@@ -14,10 +13,15 @@
     return Uint8Array.from(s, (c) => c.charCodeAt(0));
   };
   navigator.serviceWorker.register("/sw.js").then(() => navigator.serviceWorker.ready).then((reg) =>
-    reg.pushManager.getSubscription().then((sub) => {
+    // zgoda z usługi push — w zainstalowanej aplikacji odzwierciedla ustawienie powiadomień w telefonie
+    (reg.pushManager.permissionState ? reg.pushManager.permissionState({ userVisibleOnly: true })
+      : Promise.resolve(window.Notification ? Notification.permission : "denied")).then((state) => {
+      if (state !== "granted") return null;
+      return reg.pushManager.getSubscription().then((sub) => {
       if (sub) return Date.now() - Number(store("satok-push-sync") || 0) < 864e5 ? null : sub; // potwierdzenie raz na dobę
       return fetch(url, { credentials: "same-origin" }).then((r) => r.json())
         .then((d) => reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(d.key) }));
+      });
     })
   ).then((sub) => {
     if (!sub) return null;

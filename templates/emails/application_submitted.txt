@@ -1,7 +1,7 @@
 {% autoescape off %}Dzień dobry {{ user.first_name }},
 
-przyjęliśmy Twoją deklarację członkowską do Stowarzyszenia „Strzelnica Sątok”.
+przyjęliśmy Twoją deklarację członkowską do Stowarzyszenia „STRZELNICA SĄTOK”.
 Zarząd podejmie uchwałę najpóźniej do {{ application.deadline|date:"j.m.Y" }} (§ 32 Regulaminu) — poinformujemy Cię e-mailem.
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

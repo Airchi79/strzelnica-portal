@@ -14,5 +14,5 @@ Pominięte terminy (zajęte lub niedostępne):
 Wszystkie rezerwacje: {{ site_url }}{% url 'bookings:my_list' %}
 Pojedynczy termin możesz anulować sam na stronie rezerwacji (na zasadach jak zwykłą rezerwację); całą serię odwołuje obsługa strzelnicy.
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

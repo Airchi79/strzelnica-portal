@@ -6,5 +6,5 @@ zwolnił się termin, na który czekasz:
 Termin jest trzymany dla Ciebie do {{ entry.hold_until|time:"H:i" }} ({{ entry.hold_until|date:"j.m" }}). Później zaproponujemy go kolejnej osobie.
 Zarezerwuj: {{ site_url }}{{ link }}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

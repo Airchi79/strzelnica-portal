@@ -11,5 +11,5 @@ Różnicę {{ manual|pln }} zwrócimy ręcznie.{% endif %}{% if overpaid %}
 Różnica {{ overpaid|pln }} została zapisana na Twoim koncie jako nadpłata.{% endif %}
 Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

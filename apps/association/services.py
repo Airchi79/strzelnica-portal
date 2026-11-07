@@ -33,7 +33,7 @@ PERM_MEMBERS = "association.manage_members"
 PERM_RESOLUTIONS = "association.manage_resolutions"
 
 APPLICATION_STATEMENT = (
-    "Oświadczam, że chcę przystąpić do Stowarzyszenia „Strzelnica Sątok”, zapoznałem(-am) się z jego Regulaminem, "
+    "Oświadczam, że chcę przystąpić do Stowarzyszenia „STRZELNICA SĄTOK”, zapoznałem(-am) się z jego Regulaminem, "
     "akceptuję go i zobowiązuję się przestrzegać Regulaminu oraz uchwał władz Stowarzyszenia, terminowo opłacać "
     "składki członkowskie i jednorazową opłatę wpisową."
 )
@@ -513,7 +513,7 @@ def apply_action(res, by):
             app.save()
             charge_admission_fees(member, adopted_on)
             log_event("czlonek.przyjety", member, str(member), changes={"uchwala": str(res)}, actor=by)
-            notify_user(app.user, "Witamy w Stowarzyszeniu „Strzelnica Sątok”", "emails/member_admitted.txt", member=member, resolution=res)
+            notify_user(app.user, "Witamy w Stowarzyszeniu „STRZELNICA SĄTOK”", "emails/member_admitted.txt", member=member, resolution=res)
     elif res.action == A.REJECT_APPLICATIONS:
         for app in res.target_applications.filter(status=MembershipApplication.Status.PENDING).select_related("user"):
             app.status, app.decided_at, app.resolution = MembershipApplication.Status.REJECTED, timezone.now(), res

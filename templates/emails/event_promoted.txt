@@ -4,5 +4,5 @@ zwolniło się miejsce — jesteś zapisany na „{{ reg.event.title }}” ({{ r
 {% if reg.payment_status == 'do_zaplaty' %}Opłata startowa: {{ reg.amount|pln }} — zapłać na stronie wydarzenia albo na miejscu.
 {% endif %}Nie możesz przyjechać? Zrezygnuj, żeby miejsce dostała kolejna osoba: {{ site_url }}{% url 'events:detail' reg.event_id %}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

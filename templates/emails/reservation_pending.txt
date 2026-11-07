@@ -10,5 +10,5 @@ Po zatwierdzeniu dostaniesz e-mail z informacją o płatności.
 {% include "emails/_reservation_summary.txt" %}
 Szczegóły{% if tpay and options.online %}, płatność{% endif %} i wycofanie rezerwacji: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

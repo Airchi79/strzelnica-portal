@@ -9,5 +9,5 @@ Zapłacisz online w systemie albo przelewem z tytułem {{ code }}:
 
 Zgodnie z § 37 Regulaminu zaległość powyżej miesiąca może skutkować zawieszeniem w prawach członka.
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

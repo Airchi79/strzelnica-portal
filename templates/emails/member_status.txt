@@ -4,5 +4,5 @@
 Twój status członkowski: {{ member.get_status_display }}.
 {% if member.appeal_until %}Od uchwały przysługuje odwołanie do Walnego Zebrania Członków w terminie 7 dni, tj. do {{ member.appeal_until|date:"j.m.Y" }} (§ 38 Regulaminu).
 {% endif %}
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

@@ -1,11 +1,11 @@
 {% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
 
-{{ resolution.display_number }} z dnia {{ resolution.adopted_on|date:"j.m.Y" }} Zarząd przyjął Cię w poczet członków Stowarzyszenia „Strzelnica Sątok”.
+{{ resolution.display_number }} z dnia {{ resolution.adopted_on|date:"j.m.Y" }} Zarząd przyjął Cię w poczet członków Stowarzyszenia „STRZELNICA SĄTOK”.
 Twój numer członkowski: {{ member.number }}.
 
 Należności: wpisowe i składka roczna — szczegóły i płatność:
 {{ site_url }}{% url 'association:membership' %}
 
 Witamy!
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

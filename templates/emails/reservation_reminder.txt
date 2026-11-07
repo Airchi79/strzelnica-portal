@@ -6,5 +6,5 @@ przypominamy o rezerwacji:
 Pamiętaj o dokumentach i zasadach regulaminu strzelnicy.
 Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

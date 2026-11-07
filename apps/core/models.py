@@ -5,7 +5,7 @@ from django.db import models
 class AssociationSettings(models.Model):
     """Dane stowarzyszenia (jeden rekord)."""
 
-    name = models.CharField("nazwa", max_length=160, default="Stowarzyszenie STRZELNICA SĄTOK")
+    name = models.CharField("nazwa", max_length=160, default="Stowarzyszenie „STRZELNICA SĄTOK”")
     address = models.CharField("adres", max_length=255, blank=True)
     nip = models.CharField("NIP", max_length=13, blank=True)
     regon = models.CharField("REGON", max_length=14, blank=True)

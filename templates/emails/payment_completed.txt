@@ -5,5 +5,5 @@ Saldo po rozliczeniu należności: {{ balance|pln }}.
 
 Szczegóły: {{ site_url }}{% url 'payments:wallet' %}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

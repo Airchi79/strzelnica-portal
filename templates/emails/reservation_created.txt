@@ -12,5 +12,5 @@ WAŻNE: opłać rezerwację online do {{ reservation.pay_by|date:"j.m.Y H:i" }} 
 {% endif %}
 Szczegóły i anulowanie: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

@@ -1,6 +1,6 @@
 # Strzelnica Sątok — system rezerwacji i obsługi stowarzyszenia
 
-System dla Stowarzyszenia STRZELNICA SĄTOK: konta strzelców, weryfikacja uprawnień, regulaminy,
+System dla Stowarzyszenia „STRZELNICA SĄTOK”: konta strzelców, weryfikacja uprawnień, regulaminy,
 osie i cennik, a w kolejnych etapach rezerwacje, elektroniczna książka pobytu, płatności i obsługa stowarzyszenia.
 Specyfikacja: [`docs/SPEC-etap-1-2.md`](docs/SPEC-etap-1-2.md), kolejne etapy w `docs/SPEC-etap-*.md` (panel obsługi, kiosk: [`docs/SPEC-etap-6-panel.md`](docs/SPEC-etap-6-panel.md)).
 Kiosk na Raspberry Pi: [`deploy/raspberry-pi/README.md`](deploy/raspberry-pi/README.md).

@@ -11,5 +11,5 @@ Opłata za płatność online ({{ fee_kept|pln }}) nie podlega zwrotowi — to k
 
 W razie pytań odpowiedz na tę wiadomość albo skontaktuj się z obsługą strzelnicy.
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

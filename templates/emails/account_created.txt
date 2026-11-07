@@ -1,10 +1,10 @@
 {% autoescape off %}Dzień dobry {{ user.first_name }},
 
-Zarząd Stowarzyszenia „Strzelnica Sątok” utworzył dla Ciebie konto w systemie strzelnicy.
+Zarząd Stowarzyszenia „STRZELNICA SĄTOK” utworzył dla Ciebie konto w systemie strzelnicy.
 Ustaw hasło, klikając w link (ważny 1 godzinę; potem użyj „Nie pamiętam hasła”):
 {{ site_url }}{% url 'accounts:password_reset_confirm' uidb64=uid token=token %}
 
 Login: {{ user.email }}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

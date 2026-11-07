@@ -35,7 +35,7 @@ def test_audit_log_is_append_only():
 
 
 def test_settings_validation(owner_client):
-    base = {"name": "Stowarzyszenie STRZELNICA SĄTOK", "address": "", "regon": "", "contact_email": "", "contact_phone": "", "notify_email": ""}
+    base = {"name": "Stowarzyszenie „STRZELNICA SĄTOK”", "address": "", "regon": "", "contact_email": "", "contact_phone": "", "notify_email": ""}
     response = owner_client.post("/panel/ustawienia/", {**base, "nip": "1234567890", "bank_account": ""})
     assert "nip" in response.context["form"].errors
     response = owner_client.post("/panel/ustawienia/", {**base, "nip": "", "bank_account": "12 1020 1026 0000 0000 0000 0000"})

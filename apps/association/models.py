@@ -1,6 +1,6 @@
 """Stowarzyszenie: członkowie, deklaracje, składki, uchwały, Walne Zebranie, kluby i kody dostępu.
 
-Zasady wg Regulaminu Stowarzyszenia „Strzelnica Sątok” (wersja z 20.04.2026):
+Zasady wg Regulaminu Stowarzyszenia „STRZELNICA SĄTOK” (wersja z 20.04.2026):
 - władze: Walne Zebranie Członków i Zarząd (2 osoby: Prezes, Wiceprezes) — § 12–13;
 - uchwały Zarządu: zwykła większość w obecności całego Zarządu, przy równości decyduje Prezes — § 25;
 - uchwały WZC: jawnie, ważoną większością (zwyczajny 1, nadzwyczajny 50), przy obecności Prezesa — § 19;

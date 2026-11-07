@@ -3,5 +3,5 @@
 {% if by_self %}wycofałeś zapis{% else %}organizator wycofał Twój zapis{% endif %} na „{{ reg.event.title }}” ({{ reg.event.starts_at|date:"j.m.Y H:i" }}).{% if reason %}
 Powód: {{ reason }}{% endif %}
 {% include "emails/_refund_lines.txt" %}
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

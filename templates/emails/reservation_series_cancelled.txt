@@ -9,5 +9,5 @@ Anulowanie jest bez opłat; ewentualne wpłaty za te terminy zostały zwrócone 
 
 Moje rezerwacje: {{ site_url }}{% url 'bookings:my_list' %}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

@@ -9,5 +9,5 @@ Termin: {{ reg.event.starts_at|date:"l, j E Y" }}, {{ reg.event.starts_at|time:"
 {% endif %}
 Szczegóły i rezygnacja (do {{ reg.event.registration_until|date:"j.m.Y H:i" }}): {{ site_url }}{% url 'events:detail' reg.event_id %}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

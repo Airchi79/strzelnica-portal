@@ -5,5 +5,5 @@ Powód: {{ reason }}
 {% include "emails/_refund_lines.txt" %}
 W razie pytań odpowiedz na tę wiadomość albo skontaktuj się z zarządem.
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

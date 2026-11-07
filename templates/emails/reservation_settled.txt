@@ -6,5 +6,5 @@ po zakończeniu rezerwacji rozliczyliśmy ją według książki pobytu: strzela�
 {% include "emails/_reservation_summary.txt" %}
 Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

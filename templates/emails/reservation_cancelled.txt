@@ -12,5 +12,5 @@ Wpłata {{ overpaid|pln }} została zapisana na Twoim koncie jako nadpłata — 
 
 Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

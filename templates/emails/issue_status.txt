@@ -8,5 +8,5 @@ Dziękujemy za zgłoszenie — dzięki temu strzelnica jest bezpieczniejsza.
 
 Moje zgłoszenia: {{ site_url }}{% url 'core:issues' %}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

@@ -7,5 +7,5 @@
 Wiadomość dotyczy korzystania ze strzelnicy — wysyłamy ją osobom z kontem w systemie rezerwacji.
 {{ site_url }}
 
-Stowarzyszenie STRZELNICA SĄTOK
+Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

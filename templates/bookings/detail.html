@@ -49,13 +49,18 @@
 {# --- płatność --- #}
 {% if r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' or r.payment_status == 'do_zaplaty' and r.status == 'do_zatwierdzenia' and prepay and tpay_enabled and pay_options.online %}
 <div class="card res-pay">
-  <h2 style="margin-top:0">Płatność: {{ r.amount|sub:r.paid_amount|pln }}</h2>
+  <h2 style="margin-top:0">Do zapłaty: {{ remaining|pln }}</h2>
+  {% if r.paid_amount %}<p class="small">Należność {{ r.amount|pln }} · zapłacono już {{ r.paid_amount|pln }}.</p>{% endif %}
   {% if r.status == 'do_zatwierdzenia' %}<p class="small">Płatność przed zatwierdzeniem jest bezpieczna: jeśli obsługa nie zatwierdzi rezerwacji, pieniądze wrócą automatycznie na Twoje konto lub kartę.</p>{% endif %}
-  {% if WALLET_ENABLED %}<p class="small">Opłata zostanie pobrana automatycznie z Twojego salda, gdy będzie na nim wystarczająco środków.</p>{% endif %}
-  {% if tpay_enabled and pay_options.online %}
+  {% if wallet_available %}
+    <form method="post" class="res-wallet">{% csrf_token %}<input type="hidden" name="action" value="use_wallet">
+      <button class="btn res-pay-btn" type="submit">Użyj salda ({{ wallet_available|pln }})</button>
+      <p class="small muted" style="margin:6px 0 0">{% if online_due %}Pozostanie do zapłaty {{ online_due|pln }} — online albo offline.{% else %}Saldo pokryje całą należność.{% endif %}</p></form>
+  {% endif %}
+  {% if tpay_enabled and pay_options.online and online_due %}
     <form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="reservation" value="{{ r.pk }}">
-      <button class="btn res-pay-btn" type="submit">Zapłać online — BLIK, przelew, karta</button></form>
-    {% include "partials/online_fee_note.html" with base=r.amount|sub:r.paid_amount offline=pay_options.offline %}
+      <button class="btn {% if wallet_available %}secondary {% endif %}res-pay-btn" type="submit">Zapłać online {{ online_due|pln }}{% if wallet_available %} (po użyciu salda){% endif %} — BLIK, przelew, karta</button></form>
+    {% include "partials/online_fee_note.html" with base=online_due offline=pay_options.offline %}
   {% endif %}
   {% if pay_options.offline and r.status == 'potwierdzona' %}
     <div class="res-offline"><strong>{% if tpay_enabled and pay_options.online %}Albo offline{% else %}Jak zapłacić{% endif %}</strong>

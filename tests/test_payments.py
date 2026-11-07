@@ -511,6 +511,7 @@ def test_overpayment_pays_reservations_setting(owner_client, django_capture_on_c
 
     from .conftest import add_credential, approve, make_user
 
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)  # tryb „nadpłata opłaca…” — przy wyłączonym saldzie
     shooter = make_user("nadplata@example.com")
     add_credential(shooter)
     approve(shooter)
@@ -1104,3 +1105,49 @@ def test_failed_tpay_refund_without_wallet_single_reminder(client, owner, ps, tp
     titles = list(Notification.objects.filter(recipient=owner, channel="panel").values_list("title", flat=True))
     assert any(t.startswith("Zwrot do wykonania ręcznie") for t in titles)
     assert not any(t.startswith("Zwrot Tpay nie powiódł się") for t in titles)  # bez podwójnego powiadomienia
+
+
+def test_wallet_first_partial_then_online_and_refund_split(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    """Saldo 70 zł, rezerwacja 240 zł: z salda 70 zł od razu, online tylko 170 zł (+ opłata od 170 zł);
+    przy anulowaniu 170 zł wraca przez Tpay, 70 zł na saldo."""
+    _fee_on(percent="0.99", fixed=0, wallet=True)
+    services.register_manual_payment(ps, 7000, Payment.Method.CASH, owner)  # saldo 70 zł
+    client.force_login(ps)
+    page = client.post("/rezerwacje/nowa/", {"lane": Lane.objects.get(name="Oś 100 m").pk,
+                                             "day": (timezone.localdate() + timedelta(days=7)).isoformat(),
+                                             "start_hour": 10, "end_hour": 12, "persons": 2}).content.decode()
+    assert "Z Twojego salda" in page and "70\xa0zł" in page and "170\xa0zł" in page
+    r = book(ps)
+    assert r.paid_amount == 7000 and r.payment_status == Reservation.Payment.DUE and balance_of(ps) == 0
+    detail = client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    assert "Do zapłaty: 170\xa0zł" in detail and "Zapłać online 170\xa0zł" in detail
+    fee = services.online_fee(17000)
+    assert f"opłata za płatność online {fee // 100},{fee % 100:02d}\xa0zł" in detail
+    sent = {}
+    monkeypatch.setattr(tpay, "create_transaction", lambda **kw: sent.update(kw) or {"transaction_id": "01MIX", "title": "TR-TEST-1",
+                                                                                      "payment_url": "https://secure.sandbox.tpay.com/?t=1"})
+    client.post("/platnosci/tpay/start/", {"reservation": r.pk})
+    payment = Payment.objects.get(reservation=r)
+    assert sent["amount_grosze"] == 17000 + fee
+    _post(client, tpay_keys, _notification(payment))
+    r.refresh_from_db()
+    assert r.payment_status == Reservation.Payment.PAID and r.paid_amount == 24000 and balance_of(ps) == 0
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append((tid, amount)) or {"result": "success"})
+    with django_capture_on_commit_callbacks(execute=True):
+        r, refunded, manual, to_wallet = booking_services.cancel_by_client(r, ps)
+    assert calls == [("01MIX", 17000)] and (refunded, to_wallet) == (17000, 7000) and balance_of(ps) == 7000
+    assert services.ledger_consistent(ps)
+
+
+def test_use_wallet_button_for_existing_reservation(client, owner, ps):
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r = book(ps)  # saldo wyłączone przy rezerwacji — nic nie pobrano
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=True)
+    services.post(ps, 7000, LedgerEntry.Kind.CORRECTION, "test")
+    client.force_login(ps)
+    assert "Użyj salda (70\xa0zł)" in client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    client.post(f"/rezerwacje/{r.pk}/", {"action": "use_wallet"})
+    r.refresh_from_db()
+    assert r.paid_amount == 7000 and balance_of(ps) == 0 and r.payment_status == Reservation.Payment.DUE
+    assert "Użyj salda" not in client.get(f"/rezerwacje/{r.pk}/").content.decode()

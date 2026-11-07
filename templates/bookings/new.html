@@ -17,6 +17,8 @@
     <tr><th>Opłata za godzinę</th><td>{{ preview.hourly|pln }} / h</td></tr>
     {% if preview.with_officer %}<tr><th>Prowadzący od strzelnicy</th><td>{% if preview.officer_hourly %}{{ preview.officer_hourly|pln }} / h — razem {{ preview.officer_amount|pln }}{% else %}bez dopłaty{% endif %}</td></tr>{% endif %}
     <tr><th>Należność</th><td><strong>{{ preview.amount|pln }}</strong></td></tr>
+    {% if preview.wallet_use %}<tr><th>Z Twojego salda</th><td>− {{ preview.wallet_use|pln }}</td></tr>
+    <tr><th>Do zapłaty</th><td><strong>{{ preview.to_pay|pln }}</strong>{% if not preview.to_pay %} <span class="badge ok">opłacona z salda</span>{% endif %}</td></tr>{% endif %}
     {% endif %}
   </table>
   {% if preview.with_officer %}
@@ -28,7 +30,7 @@
     <li>Rezerwacja obejmuje <strong>całą oś</strong>.</li>
     {% if not preview.code and not preview.client_pass %}<li>Płatność:
       {% if preview.rule.pay_online %}online{% endif %}{% if preview.rule.pay_online and preview.rule.pay_offline %} albo {% endif %}{% if preview.rule.pay_offline %}przelewem z numerem rezerwacji w tytule lub na miejscu{% endif %}.
-      {% if preview.rule.pay_online %}{% with fee=preview.amount|online_fee %}{% if fee %}Przy płatności online doliczamy {{ fee|pln }} opłaty za płatność online (bezzwrotnej){% if preview.rule.pay_offline %}; przelew i płatność na miejscu bez opłaty{% endif %}.{% endif %}{% endwith %}{% endif %}
+      {% if preview.rule.pay_online and preview.to_pay %}{% with fee=preview.to_pay|online_fee %}{% if fee %}Przy płatności online doliczamy {{ fee|pln }} opłaty za płatność online (bezzwrotnej){% if preview.rule.pay_offline %}; przelew i płatność na miejscu bez opłaty{% endif %}.{% endif %}{% endwith %}{% endif %}
       {% if preview.rule.pay_online and not preview.rule.pay_offline %}Nieopłacona rezerwacja może zostać zwolniona — termin płatności zobaczysz po zarezerwowaniu.{% endif %}</li>{% endif %}
     <li>Samodzielnie anulujesz bez opłat do <strong>{{ preview.free_cancel_until|date:"j.m.Y H:i" }}</strong>; później anulować może tylko obsługa strzelnicy.</li>
     <li>Na miejscu każdy uczestnik wpisuje się do książki pobytu kodem QR tej rezerwacji.</li>

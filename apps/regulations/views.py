@@ -17,8 +17,25 @@ from .models import Acceptance, RegulationDocument, RegulationVersion, pending_a
 
 
 def public_list(request):
+    """Lista dokumentów; zalogowany strzelec widzi przy każdym stan: zaakceptowano (✓), do akceptacji (✕),
+    do zapoznania (dokumenty bez akceptacji) albo „w przygotowaniu”."""
     docs = [(d, d.current_version()) for d in RegulationDocument.objects.all()]
-    return render(request, "regulations/public_list.html", {"docs": docs})
+    accepted = {}
+    if request.user.is_authenticated:
+        accepted = dict(Acceptance.objects.filter(user=request.user, version__in=[v for _, v in docs if v])
+                        .values_list("version_id", "accepted_at"))
+    rows = []
+    for doc, version in docs:
+        if version is None:
+            state = "draft"
+        elif not request.user.is_authenticated:
+            state = ""
+        elif not doc.requires_acceptance:
+            state = "info"
+        else:
+            state = "done" if version.pk in accepted else "missing"
+        rows.append({"doc": doc, "version": version, "state": state, "accepted_at": accepted.get(version.pk) if version else None})
+    return render(request, "regulations/public_list.html", {"rows": rows})
 
 
 def version_detail(request, pk):

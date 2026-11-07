@@ -221,6 +221,33 @@ def _pay_item(user, item, by):
 
 
 @transaction.atomic
+def use_wallet_for_reservation(reservation, by=None):
+    """Saldo najpierw: pobiera z salda strzelca tyle, ile się da (także część należności). Reszta zostaje do zapłaty
+    online / przelewem / na miejscu. Tylko przy włączonym saldzie strzelca. Zwraca pobraną kwotę [gr]."""
+    from apps.bookings.models import Reservation
+
+    if not wallet_enabled():
+        return 0
+    r = Reservation.objects.select_for_update().get(pk=reservation.pk)
+    if r.payment_status != Reservation.Payment.DUE or r.status not in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL):
+        return 0
+    wallet = _locked_wallet(r.user)
+    part = min(max(wallet.balance, 0), r.amount - r.paid_amount)
+    if part <= 0:
+        return 0
+    post(r.user, -part, LedgerEntry.Kind.RESERVATION_FEE, f"Opłata za rezerwację {r.number} (z salda)", reservation=r, by=by)
+    r.paid_amount += part
+    fields = ["paid_amount", "updated_at"]
+    if r.paid_amount >= r.amount:
+        r.payment_status = Reservation.Payment.PAID
+        r.payment_marked_at, r.payment_marked_by = timezone.now(), by
+        fields += ["payment_status", "payment_marked_at", "payment_marked_by"]
+    r.save(update_fields=fields)
+    log_event("rezerwacja.z_salda", r, f"{r.number}: z salda {part / 100:.2f} zł", actor=by)
+    return part
+
+
+@transaction.atomic
 def apply_wallet(user, by=None, targets=None):
     """Opłaca należności ze środków na saldzie.
 

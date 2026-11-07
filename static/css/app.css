@@ -613,3 +613,13 @@ tr.now-bez_rezerwacji td { background: var(--bad-bg); }
 .faq-item > summary { padding: 14px var(--gap); cursor: pointer; list-style-position: inside; }
 .faq-item > summary:hover { background: var(--row-hover); }
 .faq-answer { padding: 0 var(--gap) 6px; }
+/* regulaminy: stan akceptacji przy dokumencie */
+.doc-list { margin: 0; }
+.doc-item { padding: var(--gap); margin-bottom: var(--gap); border-bottom: 1px solid var(--border); align-items: center; }
+.doc-item:last-child { border-bottom: 1px solid var(--border); }
+.doc-item.info .step-ico { background: color-mix(in srgb, var(--text) 8%, var(--surface)); color: var(--muted); font-style: italic; }
+.doc-item.draft .step-ico { background: var(--border); color: var(--muted); }
+.doc-state.ok { color: var(--ok); font-weight: 600; }
+.doc-state.bad { color: var(--bad); font-weight: 600; }
+.doc-actions { display: flex; gap: 8px; flex-wrap: wrap; flex: none; }
+@media (max-width: 640px) { .doc-item { flex-wrap: wrap; } .doc-actions { width: 100%; } }

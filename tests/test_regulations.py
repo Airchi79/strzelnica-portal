@@ -91,3 +91,22 @@ def test_regulation_text_links_only_https_and_stays_escaped():
     assert "</a>." in html  # kropka kończąca zdanie poza linkiem
     assert 'onmouseover=alert(1)' not in html.replace("&quot;onmouseover=alert(1", "")  # cudzysłów zamieniony na encję
     assert 'href="http://a.pl' not in html and 'href="javascript' not in html and "<b>" not in html
+
+
+def test_public_list_shows_acceptance_state(client):
+    from .conftest import make_user
+
+    doc = RegulationDocument.objects.get(slug="regulamin-strzelnicy")
+    v = RegulationVersion.objects.create(document=doc, number=99, content="§ 1. Test", effective_from=timezone.now() - datetime.timedelta(minutes=1),
+                                         published_at=timezone.now())
+    anon = client.get("/regulamin/").content.decode()
+    assert "Do akceptacji" not in anon and "Zaakceptowano" not in anon  # niezalogowany — bez stanów
+    u = make_user("akcept@example.com")
+    Acceptance.objects.filter(user=u).delete()
+    client.force_login(u)
+    body = client.get("/regulamin/").content.decode()
+    assert "Do akceptacji" in body and "Przeczytaj i zaakceptuj" in body
+    assert "Dokument w przygotowaniu." in body or "Do zapoznania" in body
+    Acceptance.objects.create(user=u, version=v)
+    body = client.get("/regulamin/").content.decode()
+    assert "Zaakceptowano" in body

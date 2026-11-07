@@ -2,12 +2,21 @@
 {% block title %}Regulaminy{% endblock %}
 {% block content %}
 <h1>Regulaminy i dokumenty</h1>
-{% for doc, version in docs %}
-<div class="card">
-  <strong>{{ doc.title }}</strong>
-  {% if version %}<div class="small muted">Wersja {{ version.number }}, obowiązuje od {{ version.effective_from|date:"d.m.Y" }}</div>
-  <div class="actions"><a class="btn secondary" href="{% url 'regulations:version' version.pk %}">Czytaj</a></div>
-  {% else %}<div class="small muted">Dokument w przygotowaniu.</div>{% endif %}
-</div>
+<ul class="steps doc-list">
+{% for x in rows %}
+<li class="card step doc-item{% if x.state %} {{ x.state }}{% endif %}">
+  {% if x.state %}<span class="step-ico" aria-hidden="true">{% if x.state == 'done' %}✓{% elif x.state == 'missing' %}✕{% elif x.state == 'info' %}i{% else %}…{% endif %}</span>{% endif %}
+  <div class="step-body">
+    <strong>{{ x.doc.title }}</strong>
+    {% if x.version %}<div class="small muted">Wersja {{ x.version.number }}, obowiązuje od {{ x.version.effective_from|date:"d.m.Y" }}</div>{% else %}<div class="small muted">Dokument w przygotowaniu.</div>{% endif %}
+    {% if x.state == 'done' %}<div class="small doc-state ok">Zaakceptowano {{ x.accepted_at|date:"j.m.Y" }}</div>
+    {% elif x.state == 'missing' %}<div class="small doc-state bad">Do akceptacji</div>
+    {% elif x.state == 'info' %}<div class="small muted">Do zapoznania — nie wymaga akceptacji</div>{% endif %}
+  </div>
+  {% if x.version %}<div class="doc-actions">
+    {% if x.state == 'missing' %}<a class="btn" href="{% url 'regulations:accept' %}">Przeczytaj i zaakceptuj</a>{% endif %}
+    <a class="btn secondary" href="{% url 'regulations:version' x.version.pk %}">Czytaj</a></div>{% endif %}
+</li>
 {% endfor %}
+</ul>
 {% endblock %}

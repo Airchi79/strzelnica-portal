@@ -106,6 +106,8 @@ def tpay_start(request):
         if not payment_options(reservation)["online"]:
             messages.error(request, "Dla tej rezerwacji płatność online nie jest dostępna — skorzystaj z instrukcji płatności.")
             return redirect("bookings:detail", pk=reservation.pk)
+        services.use_wallet_for_reservation(reservation, by=request.user)  # saldo najpierw (gdy włączone)
+        reservation.refresh_from_db()
         amount = max(reservation.amount - reservation.paid_amount - max(services.balance_of(request.user), 0), 0)
         if amount == 0:
             services.apply_wallet(request.user, targets=[reservation])

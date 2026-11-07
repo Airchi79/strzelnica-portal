@@ -169,6 +169,12 @@ def new(request):
                 enforce_lead=True,
             )
             preview["hours"] = d["end_hour"] - d["start_hour"]
+            from apps.payments.services import balance_of, wallet_enabled
+
+            # saldo najpierw: ile pokryje saldo, ile zostanie do zapłaty online / offline
+            on_wallet = max(balance_of(request.user), 0) if wallet_enabled() and not preview["code"] and not preview["client_pass"] else 0
+            preview["wallet_use"] = min(on_wallet, preview["amount"])
+            preview["to_pay"] = preview["amount"] - preview["wallet_use"]
             preview["free_cancel_until"] = preview["starts_at"] - timedelta(hours=BookingSettings.load().free_cancel_hours)
             from apps.clients.services import TYPE_LABELS, client_type
 
@@ -200,9 +206,30 @@ def my_list(request):
     return render(request, "bookings/my_list.html", {"upcoming": upcoming, "page": page})
 
 
+def _payment_context(reservation):
+    """Kwoty do karty płatności: zapłacono, do zapłaty, dostępne saldo, kwota płatności online (po saldzie)."""
+    from apps.payments.services import balance_of, wallet_enabled
+
+    remaining = max(reservation.amount - reservation.paid_amount, 0)
+    balance = max(balance_of(reservation.user), 0) if wallet_enabled() else 0
+    return {"remaining": remaining, "wallet_available": min(balance, remaining),
+            "online_due": max(remaining - min(balance, remaining), 0)}
+
+
 @login_required
 def detail(request, pk):
     reservation = get_object_or_404(Reservation.objects.select_related("lane"), pk=pk, user=request.user)
+    if request.method == "POST" and request.POST.get("action") == "use_wallet":
+        from apps.payments.services import use_wallet_for_reservation
+
+        used = use_wallet_for_reservation(reservation, by=request.user)
+        if used:
+            reservation.refresh_from_db()
+            messages.success(request, f"Pobrano {used / 100:.2f} zł z salda."
+                             + (" Rezerwacja opłacona." if reservation.payment_status == Reservation.Payment.PAID else " Resztę możesz zapłacić online lub offline."))
+        else:
+            messages.error(request, "Na saldzie nie ma środków albo rezerwacja nie wymaga już płatności.")
+        return redirect("bookings:detail", pk=reservation.pk)
     form = CancelForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
@@ -235,6 +262,7 @@ def detail(request, pk):
             "log_entries": reservation.log_entries.order_by("entered_at"),
             "tpay_enabled": settings.TPAY_ENABLED,
             "prepay": BookingSettings.load().prepay_before_approval,
+            **_payment_context(reservation),
             **reservation_qr_context(request, reservation),
         },
     )

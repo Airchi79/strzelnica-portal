@@ -16,7 +16,7 @@ from apps.core.notifications import notify_board, notify_user
 from apps.credentials.models import is_range_officer
 from apps.regulations.models import pending_acceptances
 
-from apps.payments.services import apply_wallet, reconcile_reservation, refund_reservation
+from apps.payments.services import apply_wallet, reconcile_reservation, refund_reservation, use_wallet_for_reservation
 
 from .models import Block, BookingSettings, GroupRule, NumberSequence, Reservation
 
@@ -323,6 +323,7 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     )
     # Opłata pobierana od razu z salda, jeśli wystarcza środków (w przeciwnym razie należność „do zapłaty”).
     apply_wallet(user, by=created_by)
+    use_wallet_for_reservation(reservation, by=created_by)  # saldo najpierw — także częściowo (gdy saldo włączone)
     reservation.refresh_from_db()
     from .waitlist import mark_booked
 

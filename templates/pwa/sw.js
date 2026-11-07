@@ -45,3 +45,33 @@ self.addEventListener("fetch", (event) => {
     })));
   }
 });
+
+// --- powiadomienia push (treść szyfrowana przez serwer, odszyfrowuje przeglądarka) ---
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = { title: event.data ? event.data.text() : "" }; }
+  const title = data.title || "Strzelnica Sątok";
+  const tasks = [self.registration.showNotification(title, {
+    body: data.body || "",
+    icon: "{{ BRAND.icon_192 }}",
+    badge: "{{ BRAND.icon_192 }}",
+    tag: (data.tag || "satok") + ":" + (data.url || "/") + ":" + Date.now(),
+    data: { url: data.url || "/" },
+  })];
+  if (typeof data.badge === "number" && self.navigator && "setAppBadge" in self.navigator) {
+    tasks.push((data.badge ? self.navigator.setAppBadge(data.badge) : self.navigator.clearAppBadge()).catch(() => {}));
+  }
+  event.waitUntil(Promise.all(tasks));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin);
+  if (target.origin !== self.location.origin) return;
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+    for (const w of wins) {
+      if (new URL(w.url).origin === self.location.origin && "focus" in w) return w.navigate(target.href).then((c) => (c || w).focus());
+    }
+    return self.clients.openWindow(target.href);
+  }));
+});

@@ -13,3 +13,4 @@ STORAGES = {
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
 SITE_URL = "http://testserver"
+WEBPUSH_ASYNC = False

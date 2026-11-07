@@ -30,6 +30,9 @@ CSRF_TRUSTED_ORIGINS = [o.strip() for o in env("DJANGO_CSRF_TRUSTED_ORIGINS", ""
 # Włączać tylko, gdy aplikacja stoi za własnym reverse proxy, które ustawia X-Forwarded-For.
 TRUST_X_FORWARDED_FOR = env_bool("TRUST_X_FORWARDED_FOR", False)
 SITE_URL = env("SITE_URL", "http://localhost:8000").rstrip("/")
+# Powiadomienia push: kontakt dla operatorów push (mailto: albo https:), domyślnie adres strony; wysyłka w tle.
+WEBPUSH_CONTACT = env("WEBPUSH_CONTACT", "")
+WEBPUSH_ASYNC = True
 
 INSTALLED_APPS = [
     "django.contrib.admin",

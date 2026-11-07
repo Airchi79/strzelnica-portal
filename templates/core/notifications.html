@@ -2,6 +2,7 @@
 {% block title %}Powiadomienia{% endblock %}
 {% block content %}
 <h1>Powiadomienia</h1>
+{% include "partials/push_box.html" %}
 {% if page.paginator.count %}
 <form method="post" style="margin-bottom:12px">{% csrf_token %}<button class="btn secondary" type="submit">Oznacz wszystkie jako przeczytane</button></form>
 {% endif %}

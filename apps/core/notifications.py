@@ -58,8 +58,12 @@ def notify_user(user, subject, template, portal=True, **context):
     if portal and user.pk and user.is_active:
         from apps.core.models import Notification
 
+        from . import webpush
+
+        link = _portal_link(template, context)[:255]
         Notification.objects.create(recipient=user, channel=Notification.Channel.PORTAL,
-                                    title=" ".join(str(subject).split())[:160], url=_portal_link(template, context)[:255])
+                                    title=" ".join(str(subject).split())[:160], url=link)
+        webpush.send([user], subject, url=link, channel="portal")
 
 
 def board_users(permission_codename=None):
@@ -89,11 +93,15 @@ def notify_board(subject, template, permission_codename=None, url="", body="", *
     from apps.core.models import Notification
 
     if url or body:
+        from . import webpush
+
         subject = " ".join(str(subject).split())
+        users = list(board_users(permission_codename))
         Notification.objects.bulk_create(
             Notification(recipient=u, channel=Notification.Channel.PANEL, title=subject[:160], body=body[:500], url=url[:255])
-            for u in board_users(permission_codename)
+            for u in users
         )
+        webpush.send(users, subject, body=body, url=url, channel="panel")
     _send(subject, template, context, board_recipients(permission_codename))
 
 

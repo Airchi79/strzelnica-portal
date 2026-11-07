@@ -32,6 +32,43 @@ def home(request):
 
 
 @login_required
+def push_subscribe(request):
+    """Zapis / usunięcie subskrypcji push tego urządzenia (JSON z przeglądarki: endpoint, keys.p256dh, keys.auth)."""
+    import json
+
+    from django.http import JsonResponse
+
+    from . import webpush
+    from .models import PushSubscription
+
+    if request.method != "POST":
+        return JsonResponse({"key": webpush.public_key_b64()})
+    try:
+        data = json.loads(request.body.decode() or "{}")
+        endpoint = str(data.get("endpoint", ""))[:1000]
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "Nieprawidłowe dane."}, status=400)
+    if data.get("action") == "remove":
+        PushSubscription.objects.filter(user=request.user, endpoint=endpoint).delete()
+        return JsonResponse({"ok": True})
+    keys = data.get("keys") or {}
+    p256dh, auth = str(keys.get("p256dh", ""))[:200], str(keys.get("auth", ""))[:60]
+    if not webpush.endpoint_allowed(endpoint):
+        return JsonResponse({"ok": False, "error": "Ta przeglądarka używa nieobsługiwanej usługi powiadomień."}, status=400)
+    try:
+        webpush.encrypt(b"test", p256dh, auth)  # sprawdzenie kluczy
+    except Exception:  # noqa: BLE001
+        return JsonResponse({"ok": False, "error": "Nieprawidłowe klucze powiadomień."}, status=400)
+    device = request.headers.get("User-Agent", "")[:120]
+    PushSubscription.objects.update_or_create(endpoint=endpoint, defaults={"user": request.user, "p256dh": p256dh, "auth": auth,
+                                                                          "device": device})
+    extra = PushSubscription.objects.filter(user=request.user).order_by("-created_at").values_list("pk", flat=True)[webpush.MAX_PER_USER:]
+    PushSubscription.objects.filter(pk__in=list(extra)).delete()
+    log_event("push.wlaczenie", None, f"Powiadomienia push na urządzeniu: {device[:60]}")
+    return JsonResponse({"ok": True})
+
+
+@login_required
 def my_notifications(request):
     """Powiadomienia klienta (dzwonek w nagłówku): lista, oznaczanie jako przeczytane."""
     from .models import Notification

@@ -2,6 +2,7 @@
 {% block title %}Powiadomienia{% endblock %}
 {% block panel %}
 <h1>Powiadomienia</h1>
+{% include "partials/push_box.html" %}
 <form method="post" style="margin-bottom:12px">{% csrf_token %}<button class="btn secondary" type="submit">Oznacz wszystkie jako przeczytane</button></form>
 <div class="card table-wrap"><table>
   {% for n in page %}<tr class="{% if not n.read_at %}unread{% endif %}"><td>{{ n.created_at|date:"j.m.Y H:i" }}</td>

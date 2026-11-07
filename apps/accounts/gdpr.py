@@ -100,7 +100,7 @@ def anonymize(user, by):
     from apps.association.models import Member
     from apps.bookings.models import CalendarFeed, WaitlistEntry
     from apps.clients.models import ClientProfile, Person
-    from apps.core.models import Notification
+    from apps.core.models import Notification, PushSubscription
     from apps.credentials.models import Credential
     from apps.credentials.services import delete_scan
     from apps.facilities.models import Issue
@@ -118,6 +118,7 @@ def anonymize(user, by):
     WaitlistEntry.objects.filter(user=user).delete()
     CalendarFeed.objects.filter(user=user).delete()
     Notification.objects.filter(recipient=user).delete()
+    PushSubscription.objects.filter(user=user).delete()
     TOTPDevice.objects.filter(user=user).delete()
     Issue.objects.filter(reported_by=user).update(reported_by=None)
     Member.objects.filter(user=user).update(email="")  # ewidencja członków zostaje, bez danych kontaktowych

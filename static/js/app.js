@@ -72,3 +72,23 @@ document.querySelectorAll("img[data-hide-broken]").forEach((img) => {
   const count = Number(n) || 0;
   (count ? navigator.setAppBadge(count) : navigator.clearAppBadge()).catch(() => {});
 })();
+
+// Wylogowanie: to urządzenie przestaje dostawać powiadomienia push tego konta (np. wspólny telefon).
+document.addEventListener("submit", (e) => {
+  const form = e.target.closest("form[data-push-logout]");
+  if (!form || form.dataset.pushDone || !("serviceWorker" in navigator) || !navigator.serviceWorker.controller) return;
+  e.preventDefault();
+  form.dataset.pushDone = "1";
+  const csrf = form.querySelector("[name=csrfmiddlewaretoken]");
+  const finish = () => form.submit();
+  const timer = setTimeout(finish, 1500); // wylogowanie nie może czekać dłużej
+  navigator.serviceWorker.ready.then((reg) => reg.pushManager && reg.pushManager.getSubscription()).then((sub) => {
+    if (!sub) return null;
+    const endpoint = sub.endpoint;
+    return fetch(form.dataset.pushLogout, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf ? csrf.value : "" },
+      body: JSON.stringify({ action: "remove", endpoint }),
+    }).then(() => sub.unsubscribe());
+  }).catch(() => {}).finally(() => { clearTimeout(timer); finish(); });
+});

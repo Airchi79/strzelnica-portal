@@ -11,6 +11,7 @@ urlpatterns = [
     path("", views.home, name="home"),
     path("pulpit/", views.dashboard, name="dashboard"),
     path("powiadomienia/", views.my_notifications, name="notifications"),
+    path("powiadomienia/push/", views.push_subscribe, name="push_subscribe"),
     path("powiadomienia/<int:pk>/", views.notification_open, name="notification"),
     path("osie/", facilities_views.public_lanes, name="lanes"),
     path("offline/", views.offline, name="offline"),

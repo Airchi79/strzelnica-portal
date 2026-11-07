@@ -119,3 +119,28 @@ class AnnouncementDelivery(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["announcement", "user"], name="announcement_delivery_unique")]
+
+
+class PushConfig(models.Model):
+    """Klucz VAPID serwera do powiadomień push (generowany automatycznie przy pierwszym użyciu)."""
+
+    vapid_private_pem = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "konfiguracja powiadomień push"
+
+
+class PushSubscription(models.Model):
+    """Urządzenie (przeglądarka / aplikacja na telefonie), na które użytkownik włączył powiadomienia push."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="push_subscriptions")
+    endpoint = models.TextField(unique=True)
+    p256dh = models.CharField(max_length=200)
+    auth = models.CharField(max_length=60)
+    device = models.CharField("urządzenie", max_length=120, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "subskrypcja push"
+        verbose_name_plural = "subskrypcje push"

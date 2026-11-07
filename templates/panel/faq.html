@@ -1,0 +1,14 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Częste pytania{% endblock %}
+{% block panel %}
+<h1>Częste pytania</h1>
+<div class="actions" style="margin-top:0;margin-bottom:12px"><a class="btn" href="{% url 'panel:faq_new' %}">+ Nowe pytanie</a>
+  <a class="btn secondary" href="{% url 'core:faq' %}" target="_blank" rel="noopener">Zobacz stronę</a></div>
+<div class="card table-wrap"><table>
+  <tr><th>Kolejność</th><th>Pytanie</th><th>Na stronie</th></tr>
+  {% for q in items %}<tr><td>{{ q.order }}</td><td><a href="{% url 'panel:faq_item' q.pk %}"><strong>{{ q.question }}</strong></a></td>
+    <td>{% if q.is_published %}<span class="badge ok">tak</span>{% else %}<span class="badge">ukryte</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="3" class="muted">Brak pytań.</td></tr>{% endfor %}
+</table></div>
+<p class="small muted">Odpowiedzi to zwykły tekst: akapity oddziel pustą linią, punkty możesz zacząć od „1.” w osobnych liniach.</p>
+{% endblock %}

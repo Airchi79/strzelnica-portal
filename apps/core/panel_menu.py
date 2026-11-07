@@ -30,6 +30,7 @@ SECTIONS = [
         ("Usterki", "panel:issues", "alert", "facilities.manage_facilities", ["issue*"]),
         ("Regulaminy", "panel:regulations", "file", "regulations.publish_regulation", ["regulation*"]),
         ("Ogłoszenia", "panel:announcements", "bell", "core.publish_announcement", ["announcement*"]),
+        ("Częste pytania", "panel:faq", "list", "core.publish_announcement", ["faq*"]),
     ]),
     ("Strzelcy", [
         ("Strzelcy z kontem", "panel:users", "users", "accounts.view_users", ["users", "user", "client_*"]),

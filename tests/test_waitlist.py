@@ -86,3 +86,26 @@ def test_staff_can_book_over_hold(slot, owner, django_capture_on_commit_callback
     with django_capture_on_commit_callbacks(execute=True):
         services.cancel_reservation(r, x)
     assert services.create_reservation(x, lane, day, h, h + 1, 1, created_by=owner).pk  # obsługa decyduje sama
+
+
+def test_onsite_channel_no_lead_limit_but_respects_holds(slot, django_capture_on_commit_callbacks):
+    """Rezerwacja na miejscu (panel na strzelnicy): bez limitu czasu przed terminem, ale z terminami listy oczekujących."""
+    from apps.bookings.models import BookingSettings
+
+    lane, day, h = slot
+    cfg = BookingSettings.load()
+    cfg.min_lead_hours = 24 * 30  # online: najpóźniej 30 dni wcześniej — termin za kilka dni jest za blisko
+    cfg.save()
+    u = ps("miejsce@example.com")
+    with pytest.raises(ValidationError, match="najpóźniej"):
+        services.create_reservation(u, lane, day, h, h + 1, 1)
+    r = services.create_reservation(u, lane, day, h, h + 1, 1, channel=services.CHANNEL_ONSITE)
+    assert r.pk
+    a = ps("czeka@example.com")
+    waitlist.join(a, lane, day, h, h + 1)
+    with django_capture_on_commit_callbacks(execute=True):
+        services.cancel_reservation(r, u)
+    with pytest.raises(ValidationError, match="listy oczekujących"):
+        services.create_reservation(ps("inny@example.com"), lane, day, h, h + 1, 1, channel=services.CHANNEL_ONSITE)
+    with pytest.raises(ValueError):
+        services.create_reservation(u, lane, day, h + 1, h + 2, 1, channel="sms")

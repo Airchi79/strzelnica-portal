@@ -144,3 +144,22 @@ class PushSubscription(models.Model):
     class Meta:
         verbose_name = "subskrypcja push"
         verbose_name_plural = "subskrypcje push"
+
+
+class FaqItem(models.Model):
+    """Pytanie i odpowiedź na publicznej stronie „Częste pytania” (edytowane w panelu)."""
+
+    question = models.CharField("pytanie", max_length=200)
+    answer = models.TextField("odpowiedź", max_length=4000,
+                              help_text="Akapity oddziel pustą linią. Bez HTML — tekst jest wyświetlany tak, jak go wpiszesz.")
+    order = models.PositiveSmallIntegerField("kolejność", default=100, help_text="Mniejsza liczba — wyżej na liście.")
+    is_published = models.BooleanField("widoczne na stronie", default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "pk"]
+        verbose_name = "częste pytanie"
+        verbose_name_plural = "częste pytania"
+
+    def __str__(self):
+        return self.question

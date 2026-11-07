@@ -158,9 +158,14 @@ def booking_readiness(user):
     return {"steps": steps, "ready": not blocking, "done": done, "total": len(steps)}
 
 
-def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: int, now=None, enforce_lead=False, user=None):
+def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: int, now=None, enforce_lead=False, user=None,
+                     respect_holds=None):
     """Sprawdza termin i liczbę osób. Zwraca (starts_at, ends_at, price_rule).
-    `enforce_lead` — rezerwacja przez strzelca: obowiązuje minimalny czas przed terminem z ustawień."""
+    `enforce_lead` — rezerwacja online przez strzelca: obowiązuje minimalny czas przed terminem z ustawień.
+    `respect_holds` — terminy trzymane dla listy oczekujących (domyślnie jak `enforce_lead`; rezerwacja na miejscu: tak,
+    bez limitu czasu)."""
+    if respect_holds is None:
+        respect_holds = enforce_lead
     now = now or timezone.now()
     cfg = BookingSettings.load()
     if not lane.is_active or not lane.facility.is_active:
@@ -187,7 +192,7 @@ def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: i
         raise ValidationError(f"Rezerwować można najwyżej {cfg.max_advance_days} dni naprzód.")
     if Block.objects.filter(lanes=lane, starts_at__lt=ends_at, ends_at__gt=starts_at).exists():
         raise ValidationError("W wybranym czasie oś jest zablokowana przez zarząd.")
-    if enforce_lead:  # strzelec: termin trzymany dla osoby z listy oczekujących
+    if respect_holds:  # strzelec: termin trzymany dla osoby z listy oczekujących
         from .waitlist import active_holds
 
         hold = active_holds(lane, starts_at, ends_at, now, exclude_user=user).order_by("hold_until").first()
@@ -205,8 +210,9 @@ def needs_officer(user):
     return bool(user) and not is_range_officer(user) and BookingSettings.load().officer_service
 
 
-def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", user=None, enforce_lead=False):
-    starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, persons, now, enforce_lead=enforce_lead, user=user)
+def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", user=None, enforce_lead=False, respect_holds=None):
+    starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, persons, now, enforce_lead=enforce_lead, user=user,
+                                                respect_holds=respect_holds)
     hours = end_hour - start_hour
     base = {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "code": None, "client_pass": None,
             "with_officer": False, "officer_hourly": 0, "officer_amount": 0}
@@ -242,13 +248,21 @@ def _next_number(year):
     return f"SATOK-R-{year}-{seq.last:04d}"
 
 
+CHANNEL_ONLINE, CHANNEL_ONSITE = "online", "na_miejscu"
+
+
 def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="", created_by=None, now=None, access_code="",
-                       series=None, notify=True):
+                       series=None, notify=True, channel=CHANNEL_ONLINE):
+    """Rezerwacja. `channel`: "online" (strona — limit czasu przed terminem z ustawień) albo "na_miejscu" (panel na
+    strzelnicy — bez limitu czasu, po okazaniu dokumentów). Obsługa w panelu (`created_by` ≠ `user`) — bez limitu."""
     reasons = check_can_book(user)
     if reasons:
         raise ValidationError(reasons)
     by_staff = created_by is not None and created_by != user
-    q = quote(lane, day, start_hour, end_hour, persons, now, access_code=access_code, user=user, enforce_lead=not by_staff)
+    if channel not in (CHANNEL_ONLINE, CHANNEL_ONSITE):
+        raise ValueError(f"Nieznany kanał rezerwacji: {channel}")
+    q = quote(lane, day, start_hour, end_hour, persons, now, access_code=access_code, user=user,
+              enforce_lead=not by_staff and channel == CHANNEL_ONLINE, respect_holds=not by_staff)
     code, client_pass = q["code"], q["client_pass"]
     now = now or timezone.now()
     group = rule = None

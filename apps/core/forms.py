@@ -3,7 +3,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from . import branding
-from .models import Announcement, AssociationSettings
+from .models import Announcement, AssociationSettings, FaqItem
 from .permissions import PANEL_PERMISSIONS
 
 
@@ -123,3 +123,10 @@ class AnnouncementForm(forms.ModelForm):
             elif t < f:
                 self.add_error("booked_to", "Data końcowa nie może być wcześniejsza.")
         return data
+
+
+class FaqItemForm(forms.ModelForm):
+    class Meta:
+        model = FaqItem
+        fields = ["question", "answer", "order", "is_published"]
+        widgets = {"answer": forms.Textarea(attrs={"rows": 8})}

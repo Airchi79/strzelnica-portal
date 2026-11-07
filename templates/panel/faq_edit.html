@@ -1,0 +1,8 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{% if obj.pk %}Edycja pytania{% else %}Nowe pytanie{% endif %}{% endblock %}
+{% block panel %}
+<h1>{% if obj.pk %}Edycja pytania{% else %}Nowe pytanie{% endif %}</h1>
+<div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
+  <div class="actions"><button class="btn" type="submit">Zapisz</button><a class="btn secondary" href="{% url 'panel:faq' %}">Anuluj</a></div></form></div>
+{% if obj.pk %}<form method="post" data-confirm="Usunąć to pytanie?">{% csrf_token %}<button class="btn danger" name="action" value="delete">Usuń pytanie</button></form>{% endif %}
+{% endblock %}

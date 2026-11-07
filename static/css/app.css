@@ -592,9 +592,15 @@ tr.now-bez_rezerwacji td { background: var(--bad-bg); }
 .notif.unread .notif-dot { background: var(--bad); }
 .notif:not(.unread) strong { font-weight: 500; }
 .topbar .top-icons { display: flex; align-items: center; gap: 2px; }
-@media (min-width: 1150px) {  /* szeroki ekran: saldo i dzwonek na końcu menu; węższy — w pierwszej linii obok logo */
-  .topbar .wrap { max-width: 1200px; }
-  .topbar .top-icons { order: 3; }
+/* szeroki ekran: saldo i dzwonek na końcu menu; węższy — w pierwszej linii obok logo, menu pod spodem.
+   Członek zarządu ma dłuższe menu („Panel zarządu”) — próg i szerokość nagłówka większe. */
+@media (min-width: 1150px) {
+  .topbar:not(.has-panel) .wrap { max-width: 1200px; }
+  .topbar:not(.has-panel) .top-icons { order: 3; }
+}
+@media (min-width: 1400px) {
+  .topbar.has-panel .wrap { max-width: 1400px; }
+  .topbar.has-panel .top-icons { order: 3; }
 }
 /* saldo klienta w nagłówku (gdy saldo strzelca jest włączone) */
 .topbar .balance-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border-radius: 8px;
@@ -602,3 +608,8 @@ tr.now-bez_rezerwacji td { background: var(--bad-bg); }
 .topbar .balance-chip:hover { background: rgba(255,255,255,.15); }
 .topbar .balance-chip.neg span { text-decoration: underline; text-decoration-style: dotted; }
 .heatmap td.hm-closed { width: 30px; height: 26px; border-radius: 4px; background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--text) 7%, transparent) 4px 5px); }
+/* częste pytania */
+.faq-item { padding: 0; }
+.faq-item > summary { padding: 14px var(--gap); cursor: pointer; list-style-position: inside; }
+.faq-item > summary:hover { background: var(--row-hover); }
+.faq-answer { padding: 0 var(--gap) 6px; }

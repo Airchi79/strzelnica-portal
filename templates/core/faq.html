@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% load satok %}
+{% block title %}Częste pytania{% endblock %}
+{% block content %}
+<h1>Częste pytania</h1>
+{% for q in items %}
+<details class="card faq-item" id="pytanie-{{ q.pk }}"{% if forloop.first %} open{% endif %}>
+  <summary><strong>{{ q.question }}</strong></summary>
+  <div class="regulation faq-answer">{{ q.answer|regulation_text }}</div>
+</details>
+{% empty %}<p class="muted">Brak pytań.</p>{% endfor %}
+<p class="small muted">Nie ma tu odpowiedzi? Napisz do nas{% if contact_email %}: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% endif %}. Zasady szczegółowo opisują <a href="{% url 'regulations:list' %}">regulaminy</a>.</p>
+{% endblock %}

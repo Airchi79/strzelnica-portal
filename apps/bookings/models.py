@@ -37,9 +37,9 @@ class BookingSettings(models.Model):
         help_text="Pokazywana strzelcom, którzy mogą płacić offline (przelew, gotówka na miejscu).",
     )
     min_lead_hours = models.PositiveIntegerField(
-        "rezerwacja online najpóźniej [h] przed terminem", default=0,
-        help_text="Np. 2 — strzelec nie zarezerwuje sam terminu zaczynającego się za mniej niż 2 h. "
-                  "0 — można rezerwować do rozpoczęcia godziny. Obsługa w panelu rezerwuje bez tego ograniczenia.",
+        "rezerwacja online najpóźniej [h] przed rozpoczęciem", default=0,
+        help_text="Dotyczy tylko rezerwacji przez stronę / aplikację. Np. 2 = dwie godziny, 24 = dzień, 48 = dwa dni wcześniej; "
+                  "0 — do rozpoczęcia godziny. Bez limitu: obsługa w panelu oraz rezerwacja na miejscu w panelu na strzelnicy.",
     )
     prepay_before_approval = models.BooleanField(
         "nowy strzelec może zapłacić online przed zatwierdzeniem", default=True,

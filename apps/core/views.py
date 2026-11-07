@@ -31,6 +31,41 @@ def home(request):
     return render(request, "core/home.html", {"lanes": lanes, "association": AssociationSettings.load()})
 
 
+def faq(request):
+    """Publiczna strona „Częste pytania”."""
+    from .models import FaqItem
+
+    return render(request, "core/faq.html", {"items": FaqItem.objects.filter(is_published=True),
+                                             "contact_email": AssociationSettings.load().contact_email})
+
+
+@panel_required("core.publish_announcement")
+def panel_faq(request):
+    from .models import FaqItem
+
+    return render(request, "panel/faq.html", {"items": FaqItem.objects.all()})
+
+
+@panel_required("core.publish_announcement")
+def panel_faq_item(request, pk=None):
+    from .forms import FaqItemForm
+    from .models import FaqItem
+
+    obj = get_object_or_404(FaqItem, pk=pk) if pk else FaqItem()
+    if request.method == "POST" and request.POST.get("action") == "delete" and obj.pk:
+        log_event("faq.usuniecie", None, obj.question)
+        obj.delete()
+        messages.success(request, "Usunięto pytanie.")
+        return redirect("panel:faq")
+    form = FaqItemForm(request.POST or None, instance=obj)
+    if request.method == "POST" and form.is_valid():
+        item = form.save()
+        log_event("faq.zapis", item, item.question)
+        messages.success(request, "Zapisano pytanie.")
+        return redirect("panel:faq")
+    return render(request, "panel/faq_edit.html", {"form": form, "obj": obj})
+
+
 @login_required
 def push_subscribe(request):
     """Zapis / usunięcie subskrypcji push tego urządzenia (JSON z przeglądarki: endpoint, keys.p256dh, keys.auth)."""

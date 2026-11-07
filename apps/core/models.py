@@ -6,7 +6,16 @@ class AssociationSettings(models.Model):
     """Dane stowarzyszenia (jeden rekord)."""
 
     name = models.CharField("nazwa", max_length=160, default="Stowarzyszenie „STRZELNICA SĄTOK”")
-    address = models.CharField("adres", max_length=255, blank=True)
+    address = models.CharField("adres siedziby", max_length=255, blank=True,
+                               help_text="Adres z rejestru — na dokumentach (potwierdzenia wpłat, raporty, uchwały).")
+    range_place = models.CharField(
+        "lokalizacja strzelnicy (dojazd)", max_length=160, blank=True, default="Sątok, 56-420 Bierutów",
+        help_text="Opis miejsca strzelnicy dla dojazdu (e-maile, kalendarz). Może się różnić od adresu siedziby.",
+    )
+    range_lat = models.DecimalField("szerokość geograficzna strzelnicy", max_digits=9, decimal_places=6, null=True, blank=True,
+                                    default=51.085222, help_text="Np. 51.085222 — przycisk „Dojazd (mapa)” prowadzi dokładnie w to miejsce.")
+    range_lon = models.DecimalField("długość geograficzna strzelnicy", max_digits=9, decimal_places=6, null=True, blank=True,
+                                    default=17.448874)
     nip = models.CharField("NIP", max_length=13, blank=True)
     regon = models.CharField("REGON", max_length=14, blank=True)
     bank_account = models.CharField("numer rachunku", max_length=40, blank=True)
@@ -21,6 +30,21 @@ class AssociationSettings(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def map_url(self):
+        """Link do mapy z dojazdem: współrzędne strzelnicy, a gdy ich brak — opis miejsca albo adres siedziby."""
+        from urllib.parse import quote
+
+        if self.range_lat is not None and self.range_lon is not None:
+            return f"https://www.google.com/maps/search/?api=1&query={self.range_lat},{self.range_lon}"
+        place = self.range_place or self.address
+        return f"https://www.google.com/maps/search/?api=1&query={quote(place)}" if place else ""
+
+    @property
+    def directions(self):
+        """Tekst „dojazd” — opis miejsca strzelnicy (albo adres siedziby, gdy brak)."""
+        return self.range_place or self.address
 
     def save(self, *args, **kwargs):
         self.pk = 1

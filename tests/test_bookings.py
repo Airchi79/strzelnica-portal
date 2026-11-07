@@ -621,6 +621,8 @@ def test_reservation_page_calendar_and_share(client, ps, lane):
     text = ics.content.decode()
     assert ics["Content-Type"].startswith("text/calendar") and "BEGIN:VEVENT" in text and r.number in text
     assert f"DTSTART:{r.starts_at.astimezone(datetime.timezone.utc):%Y%m%dT%H%M%SZ}" in text and "\r\n" in text
+    assert "GEO:51.085222;17.448874" in text and "LOCATION:Sątok\\, 56-420 Bierutów (51.085222\\, 17.448874)" in text
+    assert "maps/search/?api=1&amp;query=51.085222,17.448874" in body  # przycisk „Dojazd (mapa)”
     other = make_user("obcy@example.com")
     client.force_login(other)
     assert client.get(f"/rezerwacje/{r.pk}/kalendarz.ics").status_code == 404

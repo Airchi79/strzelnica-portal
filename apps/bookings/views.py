@@ -131,7 +131,7 @@ def _google_calendar_url(r, request):
     dates = f"{r.starts_at.astimezone(dt_timezone.utc).strftime(fmt)}/{r.ends_at.astimezone(dt_timezone.utc).strftime(fmt)}"
     link = settings.SITE_URL + reverse("bookings:detail", args=[r.pk])
     params = {"action": "TEMPLATE", "text": f"Strzelnica — {r.lane}", "dates": dates,
-              "details": f"Rezerwacja {r.number}, {r.persons} os. {link}", "location": AssociationSettings.load().address}
+              "details": f"Rezerwacja {r.number}, {r.persons} os. {link}", "location": _location_text(AssociationSettings.load())}
     return "https://calendar.google.com/calendar/render?" + urlencode(params)
 
 
@@ -206,6 +206,14 @@ def my_list(request):
     return render(request, "bookings/my_list.html", {"upcoming": upcoming, "page": page})
 
 
+def _location_text(association):
+    """Miejsce strzelnicy dla kalendarzy: opis + współrzędne (nawigacja trafia na strzelnicę, nie do biura)."""
+    place = association.directions or ""
+    if association.range_lat is not None and association.range_lon is not None:
+        place = f"{place} ({association.range_lat}, {association.range_lon})".strip()
+    return place
+
+
 def _payment_context(reservation):
     """Kwoty do karty płatności: zapłacono, do zapłaty, dostępne saldo, kwota płatności online (po saldzie)."""
     from apps.payments.services import balance_of, wallet_enabled
@@ -256,8 +264,7 @@ def detail(request, pk):
             "pay_options": services.payment_options(reservation),
             "receipts": list(reservation.payments.filter(status="zaksiegowana").order_by("completed_at")) if reservation.user_id == request.user.pk else [],
             "gcal_url": _google_calendar_url(reservation, request),
-            "map_url": ("https://www.google.com/maps/search/?api=1&query=" + quote(AssociationSettings.load().address))
-            if AssociationSettings.load().address else "",
+            "map_url": AssociationSettings.load().map_url,
             "cancel_hours": BookingSettings.load().free_cancel_hours,
             "log_entries": reservation.log_entries.order_by("entered_at"),
             "tpay_enabled": settings.TPAY_ENABLED,
@@ -285,7 +292,8 @@ def ics(request, pk):
         "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Strzelnica Satok//Rezerwacje//PL", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
         "BEGIN:VEVENT", f"UID:{r.number}@{host}", f"DTSTAMP:{utc(timezone.now())}", f"DTSTART:{utc(r.starts_at)}", f"DTEND:{utc(r.ends_at)}",
         f"SUMMARY:{_ics_escape(f'Strzelnica — {r.lane}')}",
-        f"LOCATION:{_ics_escape(association.address or association.name)}",
+        f"LOCATION:{_ics_escape(_location_text(association) or association.name)}",
+        *([f"GEO:{association.range_lat};{association.range_lon}"] if association.range_lat is not None and association.range_lon is not None else []),
         f"DESCRIPTION:{_ics_escape(f'Rezerwacja {r.number}, {r.persons} os. Kod QR do książki pobytu: {link}')}",
         f"URL:{link}",
         "STATUS:CANCELLED" if r.status == Reservation.Status.CANCELLED else "STATUS:CONFIRMED",

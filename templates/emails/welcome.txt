@@ -17,8 +17,8 @@ Postęp widzisz też na swoim pulpicie: {{ site_url }}{% url 'core:dashboard' %}
 Przydatne:
 • Zajętość osi (dzień / tydzień): {{ site_url }}{% url 'bookings:calendar' %}
 • Częste pytania: {{ site_url }}{% url 'core:faq' %}
-• Opłaty: {{ site_url }}{% url 'core:lanes' %}{% if association.address %}
-• Dojazd: {{ association.address }}{% endif %}{% if association.contact_phone %}
+• Opłaty: {{ site_url }}{% url 'core:lanes' %}{% if association.directions %}
+• Dojazd: {{ association.directions }}{% if association.map_url %} — mapa: {{ association.map_url }}{% endif %}{% endif %}{% if association.contact_phone %}
 • Kontakt: tel. {{ association.contact_phone }}{% endif %}{% if association.contact_email %}{% if association.contact_phone %}, {% else %}
 • Kontakt: {% endif %}{{ association.contact_email }}{% endif %}
 

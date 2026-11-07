@@ -51,3 +51,16 @@ def test_security_headers(client):
     response = client.get("/")
     assert response["X-Frame-Options"] == "DENY"
     assert response["X-Content-Type-Options"] == "nosniff"
+
+
+def test_range_location_used_for_directions(client, db):
+    from apps.core.models import AssociationSettings
+
+    a = AssociationSettings.load()
+    assert a.map_url == "https://www.google.com/maps/search/?api=1&query=51.085222,17.448874"
+    assert a.directions == "Sątok, 56-420 Bierutów"
+    body = client.get("/").content.decode()
+    assert "51.085222,17.448874" in body and "Dojazd: Sątok, 56-420 Bierutów" in body
+    a.range_lat = a.range_lon = None
+    a.save()
+    assert "query=S%C4%85tok" in a.map_url  # bez współrzędnych — opis miejsca

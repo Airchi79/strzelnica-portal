@@ -10,7 +10,8 @@ from .permissions import PANEL_PERMISSIONS
 class AssociationSettingsForm(forms.ModelForm):
     class Meta:
         model = AssociationSettings
-        fields = ["name", "address", "nip", "regon", "bank_account", "contact_email", "contact_phone", "notify_email"]
+        fields = ["name", "address", "range_place", "range_lat", "range_lon", "nip", "regon", "bank_account", "contact_email",
+                  "contact_phone", "notify_email"]
 
     def clean_nip(self):
         nip = "".join(ch for ch in self.cleaned_data["nip"] if ch.isdigit())

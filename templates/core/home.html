@@ -17,4 +17,5 @@
   {% endfor %}
 </div>
 <p><a href="{% url 'bookings:calendar' %}">Sprawdź zajętość osi →</a> · <a href="{% url 'core:lanes' %}">Godziny otwarcia i opłaty →</a></p>
+{% if association.map_url %}<p class="small muted">Dojazd: {{ association.directions }} · <a href="{{ association.map_url }}" target="_blank" rel="noopener">mapa →</a></p>{% endif %}
 {% endblock %}

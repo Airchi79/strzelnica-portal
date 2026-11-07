@@ -124,8 +124,8 @@ def encrypt(payload: bytes, p256dh: str, auth: str, salt: bytes | None = None, a
 # --- wysyłka --------------------------------------------------------------------------------
 
 
-def _post(sub, body, key):
-    """Zwraca: 'ok', 'gone' (subskrypcja wygasła) albo 'error'."""
+def _post(sub, body, key, details=None):
+    """Zwraca: 'ok', 'gone' (subskrypcja wygasła) albo 'error'. `details` (lista) — opis odpowiedzi usługi do diagnostyki."""
     if not endpoint_allowed(sub.endpoint):
         return "gone"
     req = urllib.request.Request(sub.endpoint, data=body, method="POST", headers={
@@ -138,10 +138,37 @@ def _post(sub, body, key):
     except urllib.error.HTTPError as e:
         if e.code in (404, 410):
             return "gone"
-        logger.warning("Push %s → %s %s", urlsplit(sub.endpoint).hostname, e.code, e.read()[:200])
+        text = e.read()[:200]
+        logger.warning("Push %s → %s %s", urlsplit(sub.endpoint).hostname, e.code, text)
+        if details is not None:
+            details.append(f"{urlsplit(sub.endpoint).hostname}: błąd {e.code}")
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         logger.warning("Push %s — brak połączenia: %s", urlsplit(sub.endpoint).hostname, e)
+        if details is not None:
+            details.append(f"{urlsplit(sub.endpoint).hostname}: brak połączenia ({e})")
     return "error"
+
+
+def send_test(user):
+    """Powiadomienie testowe wysłane od razu (bez kolejki) — zwraca (wysłano, wygasłe, błędy[opis])."""
+    from .models import PushSubscription
+
+    key = _private_key()
+    ok = gone = 0
+    errors = []
+    payload = json.dumps({"title": "Test powiadomień — Strzelnica Sątok", "body": "Powiadomienia na tym urządzeniu działają.",
+                          "url": "/powiadomienia/", "tag": "test"}, ensure_ascii=False).encode()
+    for sub in PushSubscription.objects.filter(user=user):
+        try:
+            result = _post(sub, encrypt(payload, sub.p256dh, sub.auth), key, errors)
+        except ValueError:
+            result = "gone"
+        if result == "ok":
+            ok += 1
+        elif result == "gone":
+            gone += 1
+            sub.delete()
+    return ok, gone, errors
 
 
 def _deliver(user_ids, message):

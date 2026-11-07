@@ -163,3 +163,22 @@ def test_gdpr_anonymize_removes_subscriptions(owner):
     u.save(update_fields=["is_active"])
     anonymize(u, owner)
     assert not PushSubscription.objects.exists()
+
+
+def test_send_test_action(client, monkeypatch):
+    u = make_user("testpush@example.com")
+    client.force_login(u)
+    _, p256dh, auth_b64, _ = _receiver()
+    PushSubscription.objects.create(user=u, endpoint=ENDPOINT, p256dh=p256dh, auth=auth_b64)
+    monkeypatch.setattr(webpush.urllib.request, "urlopen", lambda req, timeout=None: _Resp())
+    r = client.post("/powiadomienia/push/", json.dumps({"action": "test"}), content_type="application/json").json()
+    assert r == {"ok": True, "sent": 1, "gone": 0, "errors": []}
+
+    import urllib.error
+
+    def err(req, timeout=None):
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, None)
+
+    monkeypatch.setattr(webpush.urllib.request, "urlopen", err)
+    r = client.post("/powiadomienia/push/", json.dumps({"action": "test"}), content_type="application/json").json()
+    assert not r["ok"] and r["errors"] == ["fcm.googleapis.com: błąd 403"]

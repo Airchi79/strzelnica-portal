@@ -4,6 +4,7 @@
   if (!box) return;
   const onBtn = box.querySelector("[data-push-on]");
   const offBtn = box.querySelector("[data-push-off]");
+  const testBtn = box.querySelector("[data-push-test]");
   const status = box.querySelector("[data-push-status]");
   const url = box.dataset.push;
   const csrf = box.dataset.csrf;
@@ -14,6 +15,7 @@
     status.textContent = text;
     onBtn.hidden = on !== false;
     offBtn.hidden = on !== true;
+    testBtn.hidden = on !== true;
     box.hidden = false;
   };
   const post = (data) => fetch(url, {
@@ -44,16 +46,49 @@
     }
   }).catch(() => show("Nie udało się sprawdzić powiadomień na tym urządzeniu.", null));
 
+  // Krok z limitem czasu: gdy przeglądarka nie odpowiada (np. „ciche” pytanie o zgodę), pokazujemy, gdzie szukać przyczyny.
+  const step = (text, promise, hint) => {
+    status.textContent = text;
+    let timer;
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(hint)), 20000); });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  };
+  const permissionHint = "Przeglądarka nie pokazała pytania o zgodę. Sprawdź: Ustawienia telefonu → Aplikacje → Chrome (lub aplikacja Strzelnica) → "
+    + "Powiadomienia — muszą być włączone; w Chrome: ⋮ → Informacje o stronie → Uprawnienia → Powiadomienia → Zezwalaj. Potem spróbuj ponownie.";
+
   onBtn.addEventListener("click", () => {
     onBtn.disabled = true;
-    Notification.requestPermission().then((perm) => {
-      if (perm !== "granted") throw new Error("odmowa");
-      return Promise.all([ready, fetch(url, { credentials: "same-origin" }).then((r) => r.json())]);
-    }).then(([reg, data]) => reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(data.key) }))
-      .then((sub) => post(sub.toJSON()))
-      .then((res) => { if (!res.ok) throw new Error(res.error || "błąd"); return refresh(); })
-      .catch((e) => show(e.message === "odmowa" ? "Nie zezwolono na powiadomienia." : "Nie udało się włączyć powiadomień: " + e.message, false))
+    step("Krok 1/3: czekam na Twoją zgodę na powiadomienia…", Notification.requestPermission(), permissionHint)
+      .then((perm) => {
+        if (perm !== "granted") throw new Error(perm === "denied"
+          ? "Powiadomienia są zablokowane dla tej strony. " + permissionHint : "Nie udzielono zgody na powiadomienia.");
+        return step("Krok 2/3: rejestruję telefon w usłudze powiadomień…",
+          Promise.all([ready, fetch(url, { credentials: "same-origin" }).then((r) => {
+            if (!r.ok) throw new Error("serwer odpowiedział błędem " + r.status);
+            return r.json();
+          })]).then(([reg, data]) => reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(data.key) })),
+          "Usługa powiadomień telefonu nie odpowiada (na Androidzie wymagane są usługi Google Play). Spróbuj ponownie za chwilę albo w Chrome.");
+      })
+      .then((sub) => step("Krok 3/3: zapisuję urządzenie…", post(sub.toJSON()), "Serwer nie odpowiada — spróbuj ponownie."))
+      .then((res) => { if (!res.ok) throw new Error(res.error || "serwer nie zapisał urządzenia"); return refresh(); })
+      .catch((e) => {
+        let msg = e && e.message ? e.message : String(e);
+        if (/permission denied|not allowed|NotAllowedError/i.test(msg) || (e && e.name === "NotAllowedError")) msg = permissionHint;
+        else if (/push service|AbortError|gcm|fcm/i.test(msg) || (e && e.name === "AbortError")) {
+          msg = "usługa powiadomień telefonu odrzuciła rejestrację (" + msg + "). Na Androidzie potrzebne są aktualne usługi Google Play; spróbuj w Chrome.";
+        }
+        show("Nie udało się włączyć powiadomień: " + msg, false);
+      })
       .finally(() => { onBtn.disabled = false; });
+  });
+
+  testBtn.addEventListener("click", () => {
+    testBtn.disabled = true;
+    status.textContent = "Wysyłam powiadomienie testowe…";
+    post({ action: "test" }).then((res) => {
+      if (res.ok) status.textContent = `Wysłano na ${res.sent} urządzeń(e). Powinno pojawić się za kilka sekund — jeśli nie, sprawdź, czy telefon nie wycisza powiadomień tej aplikacji.`;
+      else status.textContent = "Nie udało się wysłać: " + (res.error || (res.errors && res.errors.join("; ")) || (res.gone ? "subskrypcja wygasła — włącz powiadomienia ponownie" : "brak włączonych urządzeń"));
+    }).catch(() => { status.textContent = "Brak połączenia z serwerem."; }).finally(() => { testBtn.disabled = false; });
   });
 
   offBtn.addEventListener("click", () => {

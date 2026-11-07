@@ -51,6 +51,13 @@ def push_subscribe(request):
     if data.get("action") == "remove":
         PushSubscription.objects.filter(user=request.user, endpoint=endpoint).delete()
         return JsonResponse({"ok": True})
+    if data.get("action") == "test":
+        from apps.accounts import ratelimit
+
+        if not ratelimit.allow("push-test", str(request.user.pk), 5, 600):
+            return JsonResponse({"ok": False, "error": "Za dużo prób — odczekaj kilka minut."}, status=429)
+        ok, gone, errors = webpush.send_test(request.user)
+        return JsonResponse({"ok": ok > 0, "sent": ok, "gone": gone, "errors": errors})
     keys = data.get("keys") or {}
     p256dh, auth = str(keys.get("p256dh", ""))[:200], str(keys.get("auth", ""))[:60]
     if not webpush.endpoint_allowed(endpoint):

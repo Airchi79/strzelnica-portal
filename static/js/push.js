@@ -42,7 +42,8 @@
     } else if (Notification.permission === "denied") {
       show("Powiadomienia są zablokowane w ustawieniach przeglądarki lub telefonu — odblokuj je dla tej strony.", null);
     } else {
-      show("Włącz, aby dostawać powiadomienia na telefon, także gdy aplikacja jest zamknięta.", false);
+      show("Włącz przyciskiem poniżej — albo jak w zwykłej aplikacji: zainstaluj stronę (Chrome → ⋮ → „Zainstaluj aplikację”), "
+        + "a potem Ustawienia telefonu → Aplikacje → Strzelnica → Powiadomienia → włącz. Po otwarciu aplikacji powiadomienia włączą się same.", false);
     }
   }).catch(() => show("Nie udało się sprawdzić powiadomień na tym urządzeniu.", null));
 
@@ -70,7 +71,11 @@
           "Usługa powiadomień telefonu nie odpowiada (na Androidzie wymagane są usługi Google Play). Spróbuj ponownie za chwilę albo w Chrome.");
       })
       .then((sub) => step("Krok 3/3: zapisuję urządzenie…", post(sub.toJSON()), "Serwer nie odpowiada — spróbuj ponownie."))
-      .then((res) => { if (!res.ok) throw new Error(res.error || "serwer nie zapisał urządzenia"); return refresh(); })
+      .then((res) => {
+        if (!res.ok) throw new Error(res.error || "serwer nie zapisał urządzenia");
+        try { localStorage.removeItem("satok-push-off"); localStorage.setItem("satok-push-sync", String(Date.now())); } catch (e) { /* bez pamięci */ }
+        return refresh();
+      })
       .catch((e) => {
         let msg = e && e.message ? e.message : String(e);
         if (/permission denied|not allowed|NotAllowedError/i.test(msg) || (e && e.name === "NotAllowedError")) msg = permissionHint;
@@ -93,6 +98,7 @@
 
   offBtn.addEventListener("click", () => {
     ready.then((reg) => reg.pushManager.getSubscription()).then((sub) => {
+      try { localStorage.setItem("satok-push-off", "1"); } catch (e) { /* bez pamięci */ }
       if (!sub) return null;
       const endpoint = sub.endpoint;
       return sub.unsubscribe().then(() => post({ action: "remove", endpoint }));

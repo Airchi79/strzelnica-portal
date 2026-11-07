@@ -23,7 +23,7 @@ Przed publikacją uzupełnij lub potwierdź punkty z notatki na końcu pliku.
 § 3. Komu przekazujemy dane
 
 1. Krajowy Integrator Płatności S.A. (operator płatności Tpay) — w zakresie płatności online i zwrotów. Operator przetwarza dane płatności jako odrębny administrator, na zasadach swojej polityki prywatności.
-2. Dostawca poczty elektronicznej — wysyłka wiadomości e-mail, na zlecenie Stowarzyszenia.
+2. LH.pl sp. z o.o. z siedzibą w Poznaniu (Pl. Wolności 6/4, 61-738 Poznań) — hosting poczty elektronicznej i stron internetowych Stowarzyszenia (w tym wysyłka wiadomości e-mail z systemu rezerwacji). LH.pl przetwarza dane na zlecenie Stowarzyszenia na podstawie umowy powierzenia przetwarzania danych osobowych; dane przechowywane są na serwerach w Polsce.
 3. Cloudflare, Inc. z siedzibą w USA — w celu zapewnienia bezpieczeństwa oraz optymalizacji wydajności strony korzystamy z usług Cloudflare. Serwery Cloudflare automatycznie przetwarzają zapytania sieciowe, w tym adresy IP odwiedzających. Cloudflare przetwarza dane na zlecenie Stowarzyszenia na podstawie umowy powierzenia (Data Processing Addendum): https://www.cloudflare.com/cloudflare-customer-dpa/
 4. Operatorzy usług powiadomień push (Google, Apple, Mozilla, Microsoft — zależnie od telefonu i przeglądarki) przekazują powiadomienie na urządzenie. Treść powiadomienia jest zaszyfrowana i może ją odczytać tylko urządzenie strzelca.
 5. Organy publiczne (np. Policja), jeżeli obowiązek udostępnienia danych wynika z przepisów prawa.
@@ -68,7 +68,7 @@ System używa wyłącznie plików cookies niezbędnych do działania (sesja logo
 NOTATKA DLA ZARZĄDU (nie wklejać):
 - § 2 ust. 3: podstawa prawna książki pobytu przejęta z informacji RODO GunTrackera (ustawa o broni i amunicji + rozporządzenie MSWiA z 15.03.2000).
 - Jeśli w okresie przejściowym nadal korzystacie z GunTrackera, dopisz w § 3 jako kolejny punkt: „Soft Bakery Piotr Bernad (GunTracker) — podmiot przetwarzający dane na zlecenie Stowarzyszenia”. Po zakończeniu korzystania z GunTrackera usuń ten wpis.
-- § 3 ust. 2: wpisz nazwę dostawcy poczty e-mail (np. firma hostingowa domeny strzelnicasatok.pl) i sprawdź, czy jego regulamin zawiera umowę powierzenia.
+- § 3 ust. 2: umowa powierzenia z LH.pl zawarta 7.11.2026 (serwer455592: poczta i strony WWW) — PDF w dokumentacji RODO zarządu. Zdanie „serwery w Polsce” sprawdź w umowie (miejsce przetwarzania); jeśli umowa mówi inaczej, usuń je.
 - § 3 ust. 3: umowa DPA Cloudflare (wersja 6.4 z 3.04.2026) jest pod stałym adresem z tekstu — link prowadzi zawsze do aktualnej wersji, więc nie trzeba trzymać kopii PDF na serwerze. Według DPA obowiązuje ona jako część umowy z Cloudflare (także planu bezpłatnego, Self-Serve Subscription Agreement); jeśli chcesz mieć potwierdzenie na piśmie, pobierz PDF ze strony DPA i dołącz do dokumentacji RODO stowarzyszenia.
 - § 3 ust. 1: dane operatora Tpay — sprawdź aktualną nazwę i adres w umowie z Tpay.
 - Jeśli korzystacie z biura rachunkowego, dopisz je w § 3 jako podmiot przetwarzający dane na zlecenie.

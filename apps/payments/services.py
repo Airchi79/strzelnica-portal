@@ -575,6 +575,10 @@ def refund_to_payer(payment, amount, by=None, reason="Zwrot"):
             resp = tpay.refund_transaction(p.external_id.split(":", 1)[1], None if amount >= p.amount else amount) or {}
         except tpay.TpayError as e:
             log_event("platnosc.zwrot_nieudany", p, f"{p}: {e}", actor=by)
+            if wallet_enabled():
+                # Przy włączonym saldzie kwota trafia na saldo strzelca bez przypomnienia o zwrocie ręcznym (to wysyłane jest
+                # tylko przy wyłączonym saldzie) — zarząd musi wiedzieć, że strzelec czeka na zwrot na kartę / rachunek.
+                _notify_tpay_refund_failed(p, amount, str(e))
             return False
         p.raw = {**(p.raw or {}), "zwrot_api": {"kwota_gr": amount, "kiedy": timezone.now().isoformat(), "powod": reason[:120],
                                      "odpowiedz": {k: resp.get(k) for k in ("result", "requestId", "status", "transactionId") if k in resp}}}
@@ -582,6 +586,18 @@ def refund_to_payer(payment, amount, by=None, reason="Zwrot"):
         post(p.user, -amount, LedgerEntry.Kind.CHARGEBACK, f"{reason} — zwrot na rachunek płacącego (Tpay)", payment=p, by=by)
         log_event("platnosc.zwrot_tpay", p, f"{p}: zwrot {amount / 100:.2f} zł", actor=by)
     return True
+
+
+def _notify_tpay_refund_failed(payment, amount, error):
+    user = payment.user
+    url = reverse("panel:wallet", args=[user.pk])
+    what = f"{user.full_name}: {amount / 100:.2f} zł"
+    notify_board(f"Zwrot Tpay nie powiódł się — {user.full_name}", "emails/board_generic.txt", "payments.manage_payments", url=url,
+                 body=f"{what} wróciło na saldo strzelca zamiast na kartę / rachunek ({error}). Ponów: Salda → „Zwróć przez Tpay”.",
+                 event=f"Zwrot Tpay nie powiódł się — {user.full_name}",
+                 text=f"{what} — Tpay odrzucił zwrot ({error}). Kwota jest na saldzie strzelca. Ponów zwrot w panelu: "
+                      f"Płatności → Salda → strzelec → „Zwróć przez Tpay” (np. po uzupełnieniu środków na koncie Tpay).",
+                 url_path=url)
 
 
 def refund_to_payers(payments, amount, by, reason):

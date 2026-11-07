@@ -1057,3 +1057,50 @@ def test_online_fee_always_covers_refund(db, pct, fixed):
         assert total - services.operator_commission(total, cfg) >= amount
         assert (total - 1) - services.operator_commission(total - 1, cfg) < amount
     assert services.online_fee(10000, PaymentSettings(online_fee_percent=Decimal("0.99"))) == 100  # 100 zł → 1,00 zł
+
+
+def test_failed_tpay_refund_with_wallet_notifies_board_and_can_be_retried(client, owner, ps, tpay_keys, monkeypatch,
+                                                                         django_capture_on_commit_callbacks):
+    """Saldo włączone: Tpay odrzuca zwrot → kwota na saldzie + powiadomienie zarządu; ponowienie z panelu zeruje saldo."""
+    from django.core import mail
+
+    from apps.core.models import Notification
+
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)  # saldo włączone (autouse w tym pliku)
+
+    def reject(tid, amount=None):
+        raise tpay.TpayError("Tpay odpowiedział błędem 400")
+
+    monkeypatch.setattr(tpay, "refund_transaction", reject)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        r, refunded, manual, to_wallet = booking_services.cancel_by_client(r, ps)
+    assert (refunded, manual, to_wallet) == (0, 0, 24000) and balance_of(ps) == 24000
+    n = Notification.objects.get(recipient=owner, channel="panel", title__startswith="Zwrot Tpay nie powiódł się")
+    assert n.url == f"/panel/salda/{ps.pk}/" and "Ponów" in n.body
+    assert any("Zwrot Tpay nie powiódł się" in m.subject for m in mail.outbox)
+    # ponowienie z panelu — Tpay już przyjmuje
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append(tid) or {"result": "success"})
+    client.logout()
+    login_with_otp(client, owner)
+    client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})
+    assert calls == ["01CANC"] and balance_of(ps) == 0
+
+
+def test_failed_tpay_refund_without_wallet_single_reminder(client, owner, ps, tpay_keys, monkeypatch,
+                                                           django_capture_on_commit_callbacks):
+    from apps.core.models import Notification
+
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+
+    def reject(tid, amount=None):
+        raise tpay.TpayError("Brak połączenia z Tpay")
+
+    monkeypatch.setattr(tpay, "refund_transaction", reject)
+    with django_capture_on_commit_callbacks(execute=True):
+        booking_services.cancel_by_client(r, ps)
+    titles = list(Notification.objects.filter(recipient=owner, channel="panel").values_list("title", flat=True))
+    assert any(t.startswith("Zwrot do wykonania ręcznie") for t in titles)
+    assert not any(t.startswith("Zwrot Tpay nie powiódł się") for t in titles)  # bez podwójnego powiadomienia

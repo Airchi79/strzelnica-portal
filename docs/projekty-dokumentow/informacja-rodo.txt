@@ -1,0 +1,73 @@
+PROJEKT — Informacja o przetwarzaniu danych osobowych (RODO) (wersja robocza do akceptacji Zarządu)
+Wklej tekst spod linii „=====” w panelu: Regulaminy → „Informacja o przetwarzaniu danych osobowych (RODO)” → Nowa wersja.
+Przed publikacją uzupełnij lub potwierdź punkty z notatki na końcu pliku.
+
+=====
+
+§ 1. Administrator danych
+
+1. Administratorem danych osobowych jest Stowarzyszenie „Strzelnica Sątok”, Sątok 4, 56-420 Bierutów, NIP 9112058972, REGON 542298913 (dalej: Stowarzyszenie).
+2. Kontakt w sprawach danych osobowych: biuro@strzelnicasatok.pl, tel. 500 017 071 albo pisemnie na adres siedziby. Stowarzyszenie nie wyznaczyło inspektora ochrony danych.
+
+§ 2. Jakie dane, w jakim celu i na jakiej podstawie
+
+1. Konto w systemie rezerwacji, rezerwacje, płatności za rezerwacje, zapisy na wydarzenia i powiadomienia o nich — imię, nazwisko, adres e-mail, telefon, adres, historia rezerwacji i wpłat. Podstawa: wykonanie umowy o korzystanie ze strzelnicy i podjęcie działań przed jej zawarciem (art. 6 ust. 1 lit. b RODO).
+2. Weryfikacja uprawnień prowadzącego strzelanie i pozwoleń na broń — rodzaj i numer dokumentu, organ wydający, daty wydania i ważności. Zdjęcie dokumentu służy wyłącznie do weryfikacji i jest usuwane po decyzji obsługi. Podstawa: wykonanie umowy (art. 6 ust. 1 lit. b RODO) oraz prawnie uzasadniony interes Stowarzyszenia — zapewnienie, że strzelanie prowadzi osoba uprawniona (art. 6 ust. 1 lit. f RODO).
+3. Książka pobytu na strzelnicy — imię, nazwisko, adres, informacja o posiadaniu pozwolenia na broń, jego numer i organ wydający, czas wejścia i wyjścia, cel pobytu, rezerwacja i prowadzący, podpis oraz oświadczenie o zapoznaniu się z regulaminem. Podstawa: obowiązek prowadzenia książki pobytu wynikający z regulaminu strzelnicy wydanego na podstawie przepisów o broni i amunicji (art. 6 ust. 1 lit. c RODO) oraz prawnie uzasadniony interes Stowarzyszenia — bezpieczeństwo osób przebywających na strzelnicy (art. 6 ust. 1 lit. f RODO).
+4. Rozliczenia i dokumentacja księgowa — dane z wpłat i zwrotów. Podstawa: obowiązki wynikające z przepisów o rachunkowości i podatkowych (art. 6 ust. 1 lit. c RODO).
+5. Członkostwo w Stowarzyszeniu — dane z deklaracji członkowskiej, ewidencja członków, składki. Podstawa: realizacja stosunku członkostwa na podstawie Regulaminu Stowarzyszenia (art. 6 ust. 1 lit. b RODO) oraz obowiązki wynikające z ustawy Prawo o stowarzyszeniach (art. 6 ust. 1 lit. c RODO).
+6. Bezpieczeństwo systemu i rozliczalność — dziennik zdarzeń (kto i kiedy wykonał operację w systemie), adresy IP przy logowaniu, wpisach i akceptacji regulaminów, zapis dostępu obsługi do danych osobowych. Podstawa: prawnie uzasadniony interes Stowarzyszenia — ochrona systemu i danych (art. 6 ust. 1 lit. f RODO).
+7. Ustalenie, dochodzenie i obrona roszczeń. Podstawa: prawnie uzasadniony interes Stowarzyszenia (art. 6 ust. 1 lit. f RODO).
+8. Powiadomienia na telefonie (push) — włączane przez strzelca na wybranym urządzeniu. Podstawa: zgoda (art. 6 ust. 1 lit. a RODO), którą można w każdej chwili wycofać, wyłączając powiadomienia w systemie lub w ustawieniach telefonu.
+
+§ 3. Komu przekazujemy dane
+
+1. Krajowy Integrator Płatności S.A. (operator płatności Tpay) — w zakresie płatności online i zwrotów. Operator przetwarza dane płatności jako odrębny administrator, na zasadach swojej polityki prywatności.
+2. Dostawcy usług technicznych przetwarzający dane na zlecenie Stowarzyszenia: dostawca poczty elektronicznej (wysyłka wiadomości e-mail) oraz Cloudflare, Inc. (bezpieczne połączenie z serwerem systemu).
+3. Operatorzy usług powiadomień push (Google, Apple, Mozilla, Microsoft — zależnie od telefonu i przeglądarki) przekazują powiadomienie na urządzenie. Treść powiadomienia jest zaszyfrowana i może ją odczytać tylko urządzenie strzelca.
+4. Organy publiczne (np. Policja), jeżeli obowiązek udostępnienia danych wynika z przepisów prawa.
+5. Członkowie Zarządu i osoby upoważnione przez Zarząd mają dostęp do danych w zakresie potrzebnym do wykonywania swoich zadań. Dostęp do danych w książce pobytu jest rejestrowany.
+
+§ 4. Przekazywanie danych poza Europejski Obszar Gospodarczy
+
+Cloudflare, Inc. oraz część operatorów usług push mają siedziby w Stanach Zjednoczonych. Przekazanie danych odbywa się na podstawie decyzji Komisji Europejskiej o odpowiednim stopniu ochrony (EU-US Data Privacy Framework) lub standardowych klauzul umownych zatwierdzonych przez Komisję Europejską. Kopię zabezpieczeń można otrzymać, kontaktując się ze Stowarzyszeniem.
+
+§ 5. Jak długo przechowujemy dane
+
+1. Dane konta — do czasu zamknięcia konta. Po zamknięciu konta dane osobowe są usuwane lub anonimizowane, z wyjątkiem danych, które Stowarzyszenie musi przechowywać dłużej zgodnie z kolejnymi ustępami.
+2. Książka pobytu — 5 lat od dnia wpisu; po tym czasie wpisy są usuwane automatycznie.
+3. Dokumentacja wpłat i zwrotów — 5 lat, licząc od początku roku następującego po roku obrotowym, w którym operacja została zaksięgowana.
+4. Zdjęcia dokumentów do weryfikacji — do czasu decyzji obsługi (usuwane automatycznie po weryfikacji).
+5. Powiadomienia w systemie — 1 rok.
+6. Kopie zapasowe bazy danych — do 7 dni (kopie są nadpisywane automatycznie).
+7. Ewidencja członków i dokumenty Stowarzyszenia — przez okres członkostwa, a po jego ustaniu przez okres wymagany przepisami i potrzebny do udokumentowania działalności Stowarzyszenia.
+8. Dziennik zdarzeń i dane potrzebne do obrony przed roszczeniami — do upływu terminów przedawnienia roszczeń.
+
+§ 6. Prawa osoby, której dane dotyczą
+
+1. Każdej osobie przysługuje prawo dostępu do swoich danych, ich sprostowania, usunięcia lub ograniczenia przetwarzania, prawo do przenoszenia danych oraz prawo wniesienia sprzeciwu wobec przetwarzania opartego na prawnie uzasadnionym interesie.
+2. Zgodę można wycofać w każdej chwili; wycofanie zgody nie wpływa na zgodność z prawem przetwarzania przed jej wycofaniem.
+3. Swoje dane można pobrać i zamknąć konto samodzielnie w zakładce „Moje dane”. Pozostałe żądania prosimy kierować na adres z § 1 ust. 2.
+4. Przysługuje prawo wniesienia skargi do Prezesa Urzędu Ochrony Danych Osobowych (ul. Stawki 2, 00-193 Warszawa).
+
+§ 7. Czy podanie danych jest obowiązkowe
+
+1. Podanie danych potrzebnych do założenia konta i rezerwacji jest dobrowolne, ale bez nich nie można korzystać z systemu rezerwacji.
+2. Wpis do książki pobytu jest warunkiem przebywania na strzelnicy.
+
+§ 8. Zautomatyzowane decyzje
+
+Stowarzyszenie nie podejmuje decyzji wywołujących wobec strzelców skutki prawne wyłącznie w sposób zautomatyzowany ani nie profiluje strzelców w celach marketingowych. System automatycznie przypisuje strzelca do grupy (np. „nowy”), co może oznaczać, że rezerwacja czeka na zatwierdzenie — decyzję podejmuje wówczas obsługa.
+
+§ 9. Pliki cookies i pamięć przeglądarki
+
+System używa wyłącznie plików cookies niezbędnych do działania (sesja logowania, ochrona formularzy) oraz pamięci przeglądarki do zapamiętania ustawień, takich jak motyw jasny lub ciemny. System nie używa cookies analitycznych ani reklamowych.
+
+=====
+NOTATKA DLA ZARZĄDU (nie wklejać):
+- § 2 ust. 3: podstawa prawna książki pobytu — potwierdź z prawnikiem właściwy przepis (regulamin strzelnicy zatwierdzony zgodnie z przepisami o broni i amunicji / wzorcowy regulamin strzelnicy).
+- § 3 ust. 2: wpisz nazwę dostawcy poczty e-mail (np. firma hostingowa domeny strzelnicasatok.pl) i zawrzyj z nim oraz z Cloudflare umowy powierzenia (zwykle są w regulaminach usług / DPA do zaakceptowania online).
+- § 3 ust. 1: dane operatora Tpay — sprawdź aktualną nazwę i adres w umowie z Tpay.
+- Jeśli korzystacie z biura rachunkowego, dopisz je w § 3 jako podmiot przetwarzający dane na zlecenie.
+- § 5 ust. 2: 5 lat to ustawienie w panelu (Książka pobytu → Ustawienia) — jeśli zmienisz, popraw tutaj.
+- Projekt przygotowany na podstawie działania Systemu; nie jest opinią prawną.

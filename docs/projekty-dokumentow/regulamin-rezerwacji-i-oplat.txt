@@ -1,0 +1,96 @@
+PROJEKT — Regulamin rezerwacji i opłat (wersja robocza do akceptacji Zarządu)
+Wklej tekst spod linii „=====” w panelu: Regulaminy → „Regulamin rezerwacji i opłat” → Nowa wersja.
+Przed publikacją sprawdź liczby z ustawień (Rezerwacje → Ustawienia rezerwacji) i fragmenty opisane w notatce na końcu pliku.
+Publikacja nowej wersji wymaga ponownej akceptacji przez wszystkich strzelców przy następnym logowaniu.
+
+=====
+
+§ 1. Postanowienia ogólne
+
+1. Regulamin określa zasady rezerwowania osi strzeleckich, wnoszenia opłat, anulowania rezerwacji i zwrotu wpłat na strzelnicy prowadzonej przez Stowarzyszenie „Strzelnica Sątok” z siedzibą w Sątoku 4, 56-420 Bierutów, wpisane do ewidencji stowarzyszeń zwykłych prowadzonej przez Starostę Powiatu Oleśnickiego pod numerem 82, NIP 9112058972, REGON 542298913 (dalej: Stowarzyszenie).
+2. Rezerwacje przyjmowane są przez system rezerwacji dostępny pod adresem rezerwacje.strzelnicasatok.pl (dalej: System) oraz przez obsługę strzelnicy.
+3. Pobyt na strzelnicy i strzelanie odbywają się na zasadach Regulaminu strzelnicy. W sprawach bezpieczeństwa Regulamin strzelnicy i polecenia prowadzącego strzelanie mają pierwszeństwo przed niniejszym Regulaminem.
+4. Opłaty za korzystanie z osi pokrywają koszty utrzymania strzelnicy i realizacji celów statutowych Stowarzyszenia. Wysokość opłat jest jednakowa dla członków Stowarzyszenia i osób spoza Stowarzyszenia.
+5. Użyte określenia: strzelec — osoba korzystająca z Systemu; prowadzący — osoba posiadająca uprawnienia prowadzącego strzelanie (PS); obsługa — członkowie Zarządu i osoby upoważnione przez Zarząd.
+
+§ 2. Konto w Systemie
+
+1. Do rezerwacji potrzebne jest konto w Systemie. Zakładając konto, strzelec podaje prawdziwe dane, potwierdza adres e-mail i akceptuje obowiązujące regulaminy.
+2. Jedna osoba może mieć jedno konto. Strzelec dba o poufność hasła i niezwłocznie zawiadamia obsługę o podejrzeniu użycia konta przez osobę nieuprawnioną.
+3. Strzelec może w każdej chwili pobrać swoje dane i zażądać zamknięcia konta (zakładka „Moje dane”). Dane, które Stowarzyszenie musi przechowywać na podstawie przepisów, są przechowywane przez wymagany okres zgodnie z Informacją o przetwarzaniu danych osobowych.
+
+§ 3. Kto może rezerwować
+
+1. Rezerwować oś może osoba posiadająca uprawnienia prowadzącego strzelanie, zweryfikowane przez obsługę w Systemie. Strzelec dodaje numer uprawnień i zdjęcie dokumentu; zdjęcie służy wyłącznie do weryfikacji i jest usuwane po decyzji obsługi.
+2. Osoba bez uprawnień prowadzącego może strzelać pod nadzorem prowadzącego, który ma rezerwację — wpisuje się wówczas do książki pobytu kodem QR tej rezerwacji.
+3. Jeżeli Stowarzyszenie udostępnia taką możliwość, osoba bez uprawnień prowadzącego może zarezerwować oś z prowadzącym zapewnionym przez strzelnicę. Rezerwacja taka wymaga zatwierdzenia przez obsługę, która wyznacza prowadzącego, a należność obejmuje dopłatę za prowadzącego podaną w zakładce „Opłaty”.
+4. Rezerwacje osób korzystających z Systemu po raz pierwszy mogą wymagać zatwierdzenia przez obsługę. Do czasu decyzji termin jest zablokowany dla strzelca.
+
+§ 4. Rezerwacja
+
+1. Rezerwacja obejmuje całą oś w wybranych pełnych godzinach, w granicach godzin otwarcia osi. Godziny otwarcia i opłaty są podane w zakładce „Opłaty”.
+2. Rezerwować można z wyprzedzeniem nie większym niż określone w Systemie. Obsługa może ustalić minimalny czas między rezerwacją online a rozpoczęciem strzelania.
+3. Przy rezerwacji strzelec podaje przewidywaną liczbę osób. Rezerwacja jest potwierdzana w Systemie i wiadomością e-mail.
+4. Rezerwujący odpowiada za to, aby każdy uczestnik przed rozpoczęciem strzelania wpisał się do książki pobytu (kodem QR rezerwacji, w kiosku lub u obsługi).
+5. Oś może zostać zablokowana przez Stowarzyszenie (zawody, prace, względy bezpieczeństwa). W takim przypadku obsługa może anulować kolidujące rezerwacje — zasady zwrotu określa § 7 ust. 5.
+6. Gdy termin jest zajęty, strzelec może zapisać się na listę oczekujących. Po zwolnieniu terminu pierwsza osoba z listy dostaje wiadomość, a termin jest dla niej zatrzymany przez czas podany w wiadomości.
+
+§ 5. Opłaty
+
+1. Opłata za godzinę korzystania z osi jest mniejszą z kwot: liczba osób pomnożona przez opłatę za osobę albo ryczałt za oś. Należność to opłata za godzinę pomnożona przez liczbę godzin rezerwacji.
+2. Należność ustalana jest według opłat obowiązujących w chwili dokonania rezerwacji. Późniejsza zmiana wysokości opłat nie dotyczy rezerwacji już dokonanych.
+3. Jeżeli na strzelnicy, według książki pobytu, strzela więcej osób niż zadeklarowano, należność zostaje powiększona według opłat z chwili rezerwacji, nie więcej jednak niż do wysokości ryczałtu za oś.
+4. Rezerwacje z kodem klubu rozliczane są według umowy Stowarzyszenia z klubem. Rezerwacja z kodem wejścia (karnet, abonament) wykorzystuje wejście z kodu bez osobnej należności.
+5. Obsługa może zmienić liczbę osób, oś lub termin rezerwacji na prośbę strzelca. Należność zostaje wówczas przeliczona: wyższa kwota oznacza dopłatę, a nadwyżkę zwraca się zgodnie z § 7.
+
+§ 6. Płatności
+
+1. Należność można zapłacić:
+a) online przez operatora płatności Tpay (BLIK, szybki przelew, karta),
+b) przelewem tradycyjnym na rachunek Stowarzyszenia, z numerem rezerwacji w tytule,
+c) gotówką na miejscu u obsługi.
+Dostępne sposoby płatności mogą zależeć od grupy strzelca i są pokazywane przy rezerwacji.
+2. Jeżeli dla danej grupy dostępna jest wyłącznie płatność online, rezerwację należy opłacić w ciągu 15 minut od jej dokonania, a po zatwierdzeniu przez obsługę — w ciągu 24 godzin od zatwierdzenia, nie później niż do rozpoczęcia strzelania. Nieopłacona w tym czasie rezerwacja zwalnia się automatycznie.
+3. Rezerwację wymagającą zatwierdzenia można opłacić online przed decyzją obsługi. Jeżeli rezerwacja nie zostanie zatwierdzona, wpłata wraca zgodnie z § 7 ust. 4.
+4. Do płatności online może być doliczana opłata za obsługę płatności. Jej wysokość jest widoczna przed zapłatą. Opłata ta pokrywa koszt operatora płatności i nie podlega zwrotowi. Płatność przelewem tradycyjnym lub gotówką na miejscu jest wolna od tej opłaty.
+5. Po zaksięgowaniu wpłaty strzelec może pobrać w Systemie potwierdzenie wpłaty. Potwierdzenie nie jest fakturą ani rachunkiem.
+
+§ 7. Anulowanie rezerwacji i zwroty
+
+1. Strzelec może samodzielnie anulować rezerwację bez opłat najpóźniej 24 godziny przed jej rozpoczęciem. Później rezerwację może anulować wyłącznie obsługa.
+2. W przypadku anulowania później niż w terminie z ust. 1 albo niestawienia się na strzelnicy obsługa może zachować należność w całości.
+3. Przy anulowaniu bez opłat wpłata online wraca automatycznie na rachunek lub kartę, z których dokonano płatności, za pośrednictwem Tpay — zwykle w ciągu kilku dni roboczych. Wpłaty gotówką i przelewem tradycyjnym zwraca obsługa w uzgodniony sposób.
+4. Jeżeli rezerwacja nie zostanie zatwierdzona, wpłata wraca na zasadach z ust. 3.
+5. Jeżeli rezerwację anuluje Stowarzyszenie z przyczyn niezależnych od strzelca (w szczególności blokada osi, awaria, względy bezpieczeństwa), strzelec otrzymuje zwrot całej wpłaty za rezerwację na zasadach z ust. 3.
+6. Zwrot nie obejmuje opłaty za obsługę płatności online, o której mowa w § 6 ust. 4.
+7. Jeżeli w Systemie włączone jest saldo strzelca, wpłaty, których nie można zwrócić automatycznie (gotówka, przelew tradycyjny), wracają na saldo strzelca i mogą zostać wykorzystane na kolejne opłaty. Na życzenie strzelca obsługa zwraca środki z salda w uzgodniony sposób.
+
+§ 8. Wydarzenia i zawody
+
+1. Zapisy na wydarzenia i zawody organizowane przez Stowarzyszenie odbywają się w Systemie do terminu zamknięcia zapisów. Po wyczerpaniu miejsc można zapisać się na listę rezerwową.
+2. Uczestnik może wycofać zapis do zamknięcia zapisów — opłata startowa wraca na zasadach § 7 ust. 3 i 6.
+3. W przypadku odwołania wydarzenia przez Stowarzyszenie uczestnicy otrzymują zwrot opłat startowych na zasadach § 7 ust. 3 i 6.
+
+§ 9. Powiadomienia
+
+1. Informacje o rezerwacjach, płatnościach, zwrotach i dokumentach Stowarzyszenie wysyła na adres e-mail strzelca i pokazuje w Systemie (dzwonek z powiadomieniami).
+2. Strzelec może dodatkowo włączyć powiadomienia na telefonie (push) i w każdej chwili je wyłączyć.
+
+§ 10. Reklamacje
+
+1. Reklamacje dotyczące rezerwacji i płatności można zgłaszać na adres biuro@strzelnicasatok.pl lub pisemnie na adres siedziby Stowarzyszenia, podając numer rezerwacji.
+2. Stowarzyszenie rozpatruje reklamację w terminie 14 dni od jej otrzymania i informuje o wyniku na adres e-mail strzelca.
+
+§ 11. Postanowienia końcowe
+
+1. Zmiany Regulaminu ogłaszane są w Systemie. Do dokonania kolejnej rezerwacji wymagana jest akceptacja aktualnej wersji.
+2. Rezerwacje dokonane przed zmianą Regulaminu rozliczane są według zasad obowiązujących w chwili ich dokonania.
+3. W sprawach nieuregulowanych stosuje się Regulamin strzelnicy, Regulamin Stowarzyszenia oraz przepisy prawa powszechnie obowiązującego.
+
+=====
+NOTATKA DLA ZARZĄDU (nie wklejać):
+- § 6 ust. 2 i § 7 ust. 1: liczby 15 minut, 24 godziny i 24 godziny to wartości domyślne Systemu — porównaj z Rezerwacje → Ustawienia rezerwacji i popraw, jeśli są inne.
+- § 6 ust. 4 i § 7 ust. 6 (opłata za płatność online): zostaw, jeśli planujesz ją włączyć — wtedy przypomnienie w panelu zniknie. Jeśli opłaty nie będzie, możesz te ustępy usunąć.
+- § 3 ust. 3 (prowadzący od strzelnicy) jest sformułowany warunkowo („jeżeli Stowarzyszenie udostępnia”), więc może zostać, nawet gdy opcja jest wyłączona.
+- § 1 ust. 4 i charakter opłat przy stowarzyszeniu zwykłym — do potwierdzenia z księgową / prawnikiem.
+- Projekt przygotowany na podstawie działania Systemu; nie jest opinią prawną.

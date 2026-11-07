@@ -220,7 +220,7 @@ def create_entry(
         purpose=purpose,
         purpose_note=data.get("purpose_note", "").strip()[:160],
         reservation=reservation,
-        range_officer=reservation.user if reservation else None,
+        range_officer=reservation.range_officer_user if reservation else None,
         user=user,
         created_by=created_by,
         first_name=data["first_name"].strip(),
@@ -358,7 +358,7 @@ def settle_finished_reservations(now=None):
                         r.declared_persons = r.persons
                         r.persons = shooters
                         r.hourly_amount = new_hourly
-                        r.amount = new_hourly * r.hours
+                        r.recompute_amount()
                         r.save()
                         log_event(
                             "rezerwacja.rozliczenie_ksiazka",

@@ -8,6 +8,7 @@ from apps.credentials.models import Credential
 from apps.facilities.models import Lane
 
 from .models import BookingSettings, GroupRule
+from apps.facilities.forms import PLNField
 
 HOUR_START = [(h, f"{h:02d}:00") for h in range(0, 24)]
 HOUR_END = [(h, f"{h:02d}:00") for h in range(1, 25)]
@@ -139,10 +140,27 @@ class BlockForm(forms.Form):
 
 
 class BookingSettingsForm(forms.ModelForm):
+    officer_fee_pln = PLNField(label="Dopłata za prowadzącego od strzelnicy [zł / h]", required=False,
+                               help_text="Doliczana do rezerwacji z prowadzącym od strzelnicy. Puste = 0.")
+
     class Meta:
         model = BookingSettings
-        fields = ["free_cancel_hours", "online_payment_minutes", "approval_payment_hours", "offline_instructions", "prepay_before_approval", "min_lead_hours", "waitlist_hold_minutes", "max_advance_days", "max_persons"]
+        fields = ["free_cancel_hours", "online_payment_minutes", "approval_payment_hours", "offline_instructions", "prepay_before_approval", "min_lead_hours", "waitlist_hold_minutes", "max_advance_days", "max_persons", "officer_service"]
         widgets = {"offline_instructions": forms.Textarea(attrs={"rows": 3})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.officer_fee_hourly:
+            from decimal import Decimal
+
+            self.initial["officer_fee_pln"] = Decimal(self.instance.officer_fee_hourly) / 100
+
+    def clean_officer_fee_pln(self):
+        return self.fields["officer_fee_pln"].to_grosze(self.cleaned_data.get("officer_fee_pln")) or 0
+
+    def save(self, commit=True):
+        self.instance.officer_fee_hourly = self.cleaned_data.get("officer_fee_pln") or 0
+        return super().save(commit)
 
     def clean_max_persons(self):
         value = self.cleaned_data["max_persons"]

@@ -3,7 +3,7 @@
 {% block content %}
 <h1>{% if person %}Dopisz osobę do książki pobytu{% else %}Wpis do książki pobytu{% endif %}</h1>
 {% if reservation %}<div class="card"><strong>{{ reservation.lane }}</strong> · {{ reservation.starts_at|date:"j.m.Y" }}, {{ reservation.starts_at|time:"H:i" }}–{{ reservation.ends_at|time:"H:i" }}
-  <div class="small muted">Prowadzący strzelanie: {{ reservation.user.full_name }}</div></div>{% endif %}
+  <div class="small muted">Prowadzący strzelanie: {% if reservation.range_officer_user %}{{ reservation.range_officer_user.full_name }}{% else %}wyznaczy strzelnica{% endif %}</div></div>{% endif %}
 {% if companion_of %}<div class="card">Dopisujesz się jako <strong>osoba towarzysząca</strong>: {{ companion_of.full_name }} (wejście {{ companion_of.entered_at|time:"H:i" }}).
   <div class="small muted">Strzelać można tylko w ramach rezerwacji — wpisz się wtedy kodem rezerwacji od prowadzącego.</div></div>{% endif %}
 {% if person %}<div class="msg">Dane z konta: <strong>{{ person.full_name }}</strong>. Poproś tę osobę o sprawdzenie danych i podpis.</div>{% endif %}

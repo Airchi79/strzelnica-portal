@@ -51,7 +51,7 @@ def present(now=None):
     active_res = list(Reservation.objects.filter(status=Reservation.Status.CONFIRMED, starts_at__lte=now + ENTRY_MARGIN, ends_at__gt=now)
                       .select_related("lane", "user"))
     out = []
-    for e in Entry.objects.filter(exited_at__isnull=True).select_related("reservation__lane", "reservation__user", "range_officer").order_by("entered_at"):
+    for e in Entry.objects.filter(exited_at__isnull=True).select_related("reservation__lane", "reservation__user", "reservation__officer", "range_officer").order_by("entered_at"):
         close = auto_close_at(e)
         if close and close <= now:
             continue  # zamknie go najbliższe automatyczne wypisanie

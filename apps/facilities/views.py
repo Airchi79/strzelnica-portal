@@ -16,7 +16,9 @@ def public_lanes(request):
     today = timezone.localdate()
     lanes = [(lane, lane.price_rule_for(today)) for lane in Lane.objects.filter(is_active=True, facility__is_active=True)
              .select_related("facility").prefetch_related("opening_hours")]
-    return render(request, "facilities/public_lanes.html", {"lanes": lanes})
+    from apps.bookings.models import BookingSettings
+
+    return render(request, "facilities/public_lanes.html", {"lanes": lanes, "booking_cfg": BookingSettings.load()})
 
 
 @panel_required("facilities.manage_facilities")

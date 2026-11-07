@@ -14,7 +14,7 @@
     {% for p in people %}<tr class="now-{{ p.verdict }}">
       <td class="nowrap"><span class="now-mark" aria-hidden="true">{% if p.verdict == 'ok' or p.verdict == 'prace' %}✓{% elif p.verdict == 'bez_rezerwacji' %}✕{% elif p.verdict == 'po_czasie' %}⚠{% else %}•{% endif %}</span></td>
       <td><a href="{% url 'panel:logbook_entry' p.entry.pk %}"><strong>{{ p.entry.full_name }}</strong></a><div class="small muted">{{ p.entry.get_purpose_display }} · od {{ p.entry.entered_at|time:"H:i" }}</div></td>
-      <td class="small">{{ p.note }}{% if p.entry.reservation %}<div class="muted">PS: {{ p.entry.reservation.user.full_name }}</div>{% endif %}</td>
+      <td class="small">{{ p.note }}{% if p.entry.reservation %}<div class="muted">PS: {% if p.entry.reservation.range_officer_user %}{{ p.entry.reservation.range_officer_user.full_name }}{% else %}do przydzielenia{% endif %}</div>{% endif %}</td>
     </tr>{% empty %}<tr><td class="muted">Nikt nie jest wpisany jako przebywający na strzelnicy.</td></tr>{% endfor %}
   </table>
 </div>

@@ -26,6 +26,7 @@ from apps.payments.services import balance_of
 
 from . import services
 from .forms import (
+    range_officers,
     BlockForm,
     BoardCancelForm,
     ChangeTermForm,
@@ -391,6 +392,11 @@ def panel_detail(request, pk):
                 cancelled = services.cancel_series(r, request.user, reason)
                 messages.success(request, f"Anulowano {len(cancelled)} przyszłych terminów serii. Strzelec otrzyma jeden e-mail.")
                 return redirect("panel:reservation", pk=r.pk)
+            elif action == "assign_officer":
+                officer = range_officers().exclude(pk=r.user_id).filter(pk=request.POST.get("officer") or 0).first()
+                services.assign_officer(r, officer, request.user)
+                messages.success(request, f"Przydzielono prowadzącego: {officer.full_name}.")
+                return redirect("panel:reservation", pk=r.pk)
             elif action == "approve":
                 services.approve_reservation(r, request.user)
                 messages.success(request, "Rezerwacja zatwierdzona. Klient otrzyma e-mail z informacją o płatności.")
@@ -435,6 +441,7 @@ def panel_detail(request, pk):
             "remaining": r.amount - r.paid_amount,
             "log_entries": list(r.log_entries.order_by("entered_at")) if request.user.has_perm("logbook.view_logbook") else None,
             "series": _series_info(r),
+            "officers": list(range_officers().exclude(pk=r.user_id)) if r.with_officer else [],
         },
     )
 
@@ -535,7 +542,7 @@ def panel_block_delete(request, pk):
 @panel_required("bookings.manage_booking_settings")
 def panel_settings(request):
     obj = BookingSettings.load()
-    before = {f: getattr(obj, f) for f in BookingSettingsForm.Meta.fields}
+    before = {f: getattr(obj, f) for f in BookingSettingsForm.Meta.fields + ["officer_fee_hourly"]}
     post = request.POST if request.method == "POST" else None
     form = BookingSettingsForm(post, instance=obj)
     rules = [GroupRule.for_group(g) for g in GroupRule.Group.values]

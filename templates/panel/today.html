@@ -44,6 +44,7 @@
       <td class="nowrap"><a href="{% url 'panel:reservation' r.pk %}">{{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</a></td>
       <td class="nowrap">{{ r.lane }}</td>
       <td><strong>{{ r.user.full_name }}</strong>{% if r.user.phone %}<div class="small"><a href="tel:{{ r.user.phone }}">{{ r.user.phone }}</a></div>{% endif %}
+        {% if r.with_officer %}<div class="small">prowadzący od strzelnicy: <strong>{% if r.officer %}{{ r.officer.full_name }}{% else %}do przydzielenia{% endif %}</strong></div>{% endif %}
         {% if r.notes %}<div class="small muted">{{ r.notes }}</div>{% endif %}
         {% if r.status != 'potwierdzona' %}<span class="badge {% if r.status == 'do_zatwierdzenia' %}warn{% endif %}">{{ r.get_status_display }}</span>{% endif %}</td>
       <td>{{ r.persons }}</td>

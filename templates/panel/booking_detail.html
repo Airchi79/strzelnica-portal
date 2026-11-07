@@ -6,9 +6,19 @@
 <div class="card"><table>
   <tr><th>Oś</th><td>{{ r.lane }}</td></tr>
   <tr><th>Termin</th><td>{{ r.starts_at|date:"l, j E Y" }}, {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }} ({{ r.hours }} h){% if r.series %} <span class="badge">cykliczna</span>{% endif %}</td></tr>
-  <tr><th>Rezerwujący (PS)</th><td>{{ r.user.full_name }} · {{ r.user.email }}{% if r.user.phone %} · {{ r.user.phone }}{% endif %}</td></tr>
+  <tr><th>{% if r.with_officer %}Rezerwujący{% else %}Rezerwujący (PS){% endif %}</th><td>{{ r.user.full_name }} · {{ r.user.email }}{% if r.user.phone %} · {{ r.user.phone }}{% endif %}</td></tr>
+  {% if r.with_officer %}<tr><th>Prowadzący od strzelnicy</th><td>{% if r.officer %}<strong>{{ r.officer.full_name }}</strong>{% if r.officer.phone %} · {{ r.officer.phone }}{% endif %}{% else %}<span class="badge warn">do przydzielenia</span>{% endif %}
+    <div class="small muted">rezerwujący nie ma uprawnień PS · dopłata {{ r.officer_hourly|pln }} / h ({{ r.officer_amount|pln }})</div>
+    {% if r.status == 'do_zatwierdzenia' or r.status == 'potwierdzona' %}
+    <form method="post" class="inline-actions" style="margin-top:6px">{% csrf_token %}<input type="hidden" name="action" value="assign_officer">
+      <label for="officer" class="sr-only">Prowadzący</label>
+      <select id="officer" name="officer" required><option value="">— wybierz osobę ze zweryfikowanym PS —</option>
+        {% for o in officers %}<option value="{{ o.pk }}"{% if o.pk == r.officer_id %} selected{% endif %}>{{ o.full_name }}</option>{% endfor %}</select>
+      <button class="btn secondary small-btn" type="submit">{% if r.officer %}Zmień{% else %}Przydziel{% endif %}</button></form>
+    {% if not officers %}<div class="small muted">Brak innych osób ze zweryfikowanym, ważnym PS — dodaj uprawnienia w kartotece.</div>{% endif %}
+    {% endif %}</td></tr>{% endif %}
   <tr><th>Liczba osób</th><td>{{ r.persons }}</td></tr>
-  <tr><th>Należność</th><td><strong>{{ r.amount|pln }}</strong> ({{ r.hourly_amount|pln }} / h, tabela opłat od {{ r.price_rule.valid_from|date:"j.m.Y" }})</td></tr>
+  <tr><th>Należność</th><td><strong>{{ r.amount|pln }}</strong> ({{ r.hourly_amount|pln }} / h{% if r.officer_hourly %} + prowadzący {{ r.officer_hourly|pln }} / h{% endif %}, tabela opłat od {{ r.price_rule.valid_from|date:"j.m.Y" }})</td></tr>
   <tr><th>Status</th><td>{{ r.display_status }}{% if r.late_cancellation %} <span class="badge warn">anulowana z zachowaniem należności</span>{% endif %}
     {% if r.cancelled_at %}<div class="small muted">{{ r.cancelled_at|date:"j.m.Y H:i" }}, {{ r.cancelled_by.full_name }}{% if r.cancel_reason %} — {{ r.cancel_reason }}{% endif %}</div>{% endif %}</td></tr>
   <tr><th>Płatność</th><td>{{ r.get_payment_status_display }}{% if r.payment_marked_by %}<div class="small muted">{{ r.payment_marked_by.full_name }}, {{ r.payment_marked_at|date:"j.m.Y H:i" }}</div>{% endif %}</td></tr>
@@ -38,10 +48,10 @@
 {% if r.status == 'do_zatwierdzenia' %}
 <h2>Zatwierdzenie</h2>
 <div class="card">
-  <p>Nowy klient — <a href="{% url 'panel:user' r.user_id %}">karta klienta</a>.
+  <p>{% if r.with_officer %}Rezerwacja z prowadzącym od strzelnicy — {% if r.officer %}prowadzący przydzielony, możesz zatwierdzić{% else %}<strong>najpierw przydziel prowadzącego</strong> (wyżej){% endif %}. {% else %}Nowy klient — {% endif %}<a href="{% url 'panel:user' r.user_id %}">karta klienta</a>.
     {% if r.paid_amount %}<span class="badge ok">opłacona z góry: {{ r.paid_amount|pln }}</span> Po zatwierdzeniu klient dostanie potwierdzenie; po odrzuceniu wpłata Tpay <strong>wróci automatycznie</strong> na jego rachunek / kartę (inne wpłaty — zwrot ręczny, dostaniesz przypomnienie).
     {% else %}Klient jeszcze nie zapłacił. Po zatwierdzeniu dostanie e-mail z informacją o płatności.{% endif %}</p>
-  <form method="post" class="actions" style="margin-top:0">{% csrf_token %}<button class="btn" name="action" value="approve">Zatwierdź rezerwację</button></form>
+  <form method="post" class="actions" style="margin-top:0">{% csrf_token %}<button class="btn" name="action" value="approve"{% if r.with_officer and not r.officer %} disabled{% endif %}>Zatwierdź rezerwację</button></form>
   <form method="post" data-confirm="Odrzucić rezerwację {{ r.number }}? Klient otrzyma e-mail z powodem{% if r.paid_amount %}, a wpłata {{ r.paid_amount|pln }} zostanie zwrócona{% endif %}.">{% csrf_token %}<input type="hidden" name="action" value="reject">
     {% include "partials/form.html" with form=cancel_form %}
     <button class="btn danger" type="submit">Odrzuć</button></form>

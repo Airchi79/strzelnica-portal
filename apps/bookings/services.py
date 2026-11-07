@@ -95,7 +95,7 @@ def check_can_book(user):
         return ["Zaloguj się."]
     if not user.email_verified:
         reasons.append("Potwierdź adres e-mail.")
-    if not is_range_officer(user):
+    if not is_range_officer(user) and not BookingSettings.load().officer_service:
         reasons.append("Rezerwować może tylko osoba ze zweryfikowanymi uprawnieniami prowadzącego strzelanie.")
     if pending_acceptances(user):
         reasons.append("Zaakceptuj aktualne regulaminy.")
@@ -136,6 +136,13 @@ def booking_readiness(user):
         state, detail = "missing", ("Rezerwować oś może prowadzący strzelanie (PS). Dodaj numer i zdjęcie legitymacji — obsługa je sprawdzi. "
                                     "Nie masz uprawnień PS? Możesz strzelać z prowadzącym, który ma rezerwację — wpiszesz się do książki pobytu kodem QR.")
         url, action = reverse("credentials:my_add") + "?rodzaj=ps", "Dodaj uprawnienia PS"
+    cfg = BookingSettings.load()
+    if state != "done" and cfg.officer_service:
+        # bez PS można zarezerwować z prowadzącym od strzelnicy — krok nie blokuje rezerwacji
+        fee = f" (dopłata {cfg.officer_fee_hourly / 100:.2f} zł / h)".replace(".", ",") if cfg.officer_fee_hourly else ""
+        state = "tip"
+        detail = (f"Bez uprawnień PS zarezerwujesz oś z prowadzącym zapewnionym przez strzelnicę{fee} — rezerwacja czeka na "
+                  "zatwierdzenie przez obsługę. " + detail)
     steps.append({"key": "ps", "title": "Uprawnienia prowadzącego strzelanie (PS)", "state": state, "detail": detail, "url": url, "action": action})
     missing_profile = [label for field, label in (("phone", "telefon"), ("street", "ulica"), ("postal_code", "kod pocztowy"), ("city", "miejscowość"))
                        if not getattr(user, field)]
@@ -193,10 +200,23 @@ def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: i
     return starts_at, ends_at, rule
 
 
+def needs_officer(user):
+    """Rezerwacja z prowadzącym od strzelnicy: rezerwujący nie ma ważnych uprawnień PS, a usługa jest włączona."""
+    return bool(user) and not is_range_officer(user) and BookingSettings.load().officer_service
+
+
 def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", user=None, enforce_lead=False):
     starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, persons, now, enforce_lead=enforce_lead, user=user)
     hours = end_hour - start_hour
-    base = {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "code": None, "client_pass": None}
+    base = {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "code": None, "client_pass": None,
+            "with_officer": False, "officer_hourly": 0, "officer_amount": 0}
+    if user is not None and needs_officer(user):
+        if access_code:
+            raise ValidationError("Rezerwacja z prowadzącym od strzelnicy jest bez kodu klubu i kodu wejścia — usuń kod.")
+        officer_hourly = BookingSettings.load().officer_fee_hourly
+        hourly = rule.hourly_amount(persons)
+        return {**base, "hourly": hourly, "amount": (hourly + officer_hourly) * hours, "with_officer": True,
+                "officer_hourly": officer_hourly, "officer_amount": officer_hourly * hours}
     if access_code:
         # Kod wejścia klienta (przedpłacony karnet/abonament): rezerwacja bez osobnej należności.
         from apps.clients.services import find_client_pass
@@ -240,7 +260,8 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
         rule = GroupRule.for_group(group)
         if client_pass is not None and not rule.pay_pass:
             raise ValidationError("Kody wejścia nie są dostępne dla Twojej grupy klientów. Zarezerwuj bez kodu.")
-    pending = bool(rule and rule.requires_approval and code is None and client_pass is None)
+    # prowadzący od strzelnicy: zawsze do zatwierdzenia (obsługa przydziela prowadzącego)
+    pending = bool(q["with_officer"] or (rule and rule.requires_approval and code is None and client_pass is None))
     try:
         with transaction.atomic():
             if client_pass is not None:
@@ -259,6 +280,8 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
                 price_rule=q["rule"],
                 hourly_amount=q["hourly"],
                 amount=q["amount"],
+                with_officer=q["with_officer"],
+                officer_hourly=q["officer_hourly"],
                 created_by=created_by or user,
                 access_code=code,
                 client_pass=client_pass,
@@ -433,6 +456,25 @@ def payment_deadline(reservation, start, after_approval=False):
 
 
 @transaction.atomic
+def assign_officer(reservation, officer, by):
+    """Przydział prowadzącego od strzelnicy (osoba ze zweryfikowanym PS) do rezerwacji."""
+    r = Reservation.objects.select_for_update().get(pk=reservation.pk)
+    if not r.with_officer:
+        raise ValidationError("Ta rezerwacja nie wymaga prowadzącego od strzelnicy.")
+    if r.status not in (Reservation.Status.PENDING_APPROVAL, Reservation.Status.CONFIRMED):
+        raise ValidationError("Nie można zmienić prowadzącego w anulowanej rezerwacji.")
+    if officer is None or not is_range_officer(officer):
+        raise ValidationError("Prowadzący musi mieć zweryfikowane, ważne uprawnienia PS.")
+    before = r.officer_id
+    r.officer = officer
+    r.save(update_fields=["officer", "updated_at"])
+    log_event("rezerwacja.prowadzacy", r, f"{r.number}: {officer.full_name}", changes={"bylo": before, "jest": officer.pk}, actor=by)
+    if r.status == Reservation.Status.CONFIRMED and before != officer.pk:
+        notify_user(r.user, f"Prowadzący dla rezerwacji {r.number}", "emails/reservation_officer.txt", reservation=r)
+    return r
+
+
+@transaction.atomic
 def approve_reservation(reservation, by, now=None):
     now = now or timezone.now()
     r = Reservation.objects.select_for_update().get(pk=reservation.pk)
@@ -440,6 +482,8 @@ def approve_reservation(reservation, by, now=None):
         raise ValidationError("Ta rezerwacja nie czeka na zatwierdzenie.")
     if r.starts_at <= now:
         raise ValidationError("Termin rezerwacji już minął — nie można jej zatwierdzić.")
+    if r.with_officer and not r.officer_id:
+        raise ValidationError("Najpierw przydziel prowadzącego od strzelnicy.")
     r.status = Reservation.Status.CONFIRMED
     r.approved_at, r.approved_by = now, by
     r.pay_by = payment_deadline(r, now, after_approval=True)
@@ -616,7 +660,7 @@ def change_persons(reservation, persons, by):
     reservation.persons = persons
     if reservation.access_code_id is None and reservation.client_pass_id is None:
         reservation.hourly_amount = reservation.price_rule.hourly_amount(persons)
-        reservation.amount = reservation.hourly_amount * reservation.hours
+        reservation.recompute_amount()
     reservation.save()
     if reservation.access_code_id is None and reservation.client_pass_id is None:
         reservation = reconcile_reservation(reservation, by=by)
@@ -658,7 +702,7 @@ def change_term(reservation, lane, day, start_hour, end_hour, by, refund_differe
         if r.access_code_id is None and r.client_pass_id is None:
             r.price_rule = rule
             r.hourly_amount = rule.hourly_amount(r.persons)
-            r.amount = r.hourly_amount * hours
+            r.amount = (r.hourly_amount + r.officer_hourly) * hours
         elif r.access_code_id:
             r.hourly_amount = r.access_code.contract_hourly or 0
             r.amount = r.hourly_amount * hours

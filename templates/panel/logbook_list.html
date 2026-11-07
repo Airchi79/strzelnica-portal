@@ -34,7 +34,7 @@
   <section class="day">
     <header class="day-head">
       {% if g.reservation %}<strong><a href="{% url 'panel:reservation' g.reservation.pk %}">{{ g.reservation.number }}</a> · {{ g.reservation.lane }} · {{ g.reservation.starts_at|date:"j.m" }} {{ g.reservation.starts_at|time:"H:i" }}–{{ g.reservation.ends_at|time:"H:i" }}</strong>
-        <span class="muted small">prowadzący: {{ g.reservation.user.full_name }}</span>
+        <span class="muted small">prowadzący: {% if g.reservation.range_officer_user %}{{ g.reservation.range_officer_user.full_name }}{% else %}do przydzielenia{% endif %}</span>
         {% if perms.logbook.staff_entry %}<a class="btn secondary small-btn" href="{% url 'panel:logbook_add' %}?rezerwacja={{ g.reservation.pk }}">+ Dopisz</a>{% endif %}
       {% else %}<strong>{{ g.day|date:"l, j E Y" }} · bez rezerwacji</strong>{% endif %}
       <span class="muted small">{{ g.entries|length }} os.</span>

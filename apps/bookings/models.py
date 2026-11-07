@@ -49,6 +49,12 @@ class BookingSettings(models.Model):
         "lista oczekujących: termin trzymany [min]", default=30,
         help_text="Po zwolnieniu terminu pierwsza osoba z listy dostaje e-mail; przez ten czas tylko ona może go zarezerwować.",
     )
+    officer_service = models.BooleanField(
+        "prowadzący od strzelnicy dla osób bez uprawnień PS", default=False,
+        help_text="Osoba bez zweryfikowanych uprawnień PS może zarezerwować oś z prowadzącym zapewnionym przez strzelnicę. "
+                  "Taka rezerwacja zawsze czeka na zatwierdzenie — obsługa przydziela prowadzącego.",
+    )
+    officer_fee_hourly = models.PositiveIntegerField("dopłata za prowadzącego od strzelnicy [gr / h]", default=0)
     max_advance_days = models.PositiveIntegerField("rezerwacja najwyżej [dni] naprzód", default=180)
     max_persons = models.PositiveIntegerField("maksymalna liczba osób w rezerwacji", default=50)
 
@@ -141,6 +147,10 @@ class Reservation(models.Model):
 
     price_rule = models.ForeignKey(PriceRule, verbose_name="tabela opłat", on_delete=models.PROTECT, related_name="+")
     hourly_amount = models.PositiveIntegerField("opłata za godzinę [gr]")
+    with_officer = models.BooleanField("prowadzący od strzelnicy", default=False)
+    officer_hourly = models.PositiveIntegerField("dopłata za prowadzącego [gr / h]", default=0)
+    officer = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="przydzielony prowadzący (PS)", null=True, blank=True,
+                                on_delete=models.SET_NULL, related_name="officer_reservations")
     amount = models.PositiveIntegerField("należność [gr]")
     paid_amount = models.PositiveIntegerField("zapłacono [gr]", default=0)
     access_code = models.ForeignKey(
@@ -206,6 +216,20 @@ class Reservation(models.Model):
     @property
     def hours(self):
         return int((self.ends_at - self.starts_at).total_seconds() // 3600)
+
+    @property
+    def officer_amount(self):
+        """Dopłata za prowadzącego od strzelnicy (wliczona w należność)."""
+        return self.officer_hourly * self.hours
+
+    def recompute_amount(self):
+        """Należność = opłata za oś × godziny + dopłata za prowadzącego × godziny."""
+        self.amount = (self.hourly_amount + self.officer_hourly) * self.hours
+
+    @property
+    def range_officer_user(self):
+        """Kto prowadzi strzelanie: przydzielony prowadzący od strzelnicy albo rezerwujący PS."""
+        return self.officer if self.with_officer else self.user
 
     @property
     def is_active(self):

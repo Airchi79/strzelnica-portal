@@ -15,10 +15,14 @@
     <tr><th>Rozliczenie</th><td><strong>kod wejścia {{ preview.client_pass.code }}</strong> — wykorzystuje 1 wejście, bez dopłaty</td></tr>
     {% else %}
     <tr><th>Opłata za godzinę</th><td>{{ preview.hourly|pln }} / h</td></tr>
+    {% if preview.with_officer %}<tr><th>Prowadzący od strzelnicy</th><td>{% if preview.officer_hourly %}{{ preview.officer_hourly|pln }} / h — razem {{ preview.officer_amount|pln }}{% else %}bez dopłaty{% endif %}</td></tr>{% endif %}
     <tr><th>Należność</th><td><strong>{{ preview.amount|pln }}</strong></td></tr>
     {% endif %}
   </table>
-  {% if preview.rule.requires_approval and not preview.code and not preview.client_pass %}
+  {% if preview.with_officer %}
+  <div class="msg warning">Nie masz zweryfikowanych uprawnień prowadzącego strzelanie — strzelanie poprowadzi osoba wyznaczona przez strzelnicę.
+    Rezerwacja zablokuje termin i będzie czekać na zatwierdzenie: obsługa przydzieli prowadzącego, a Ty dostaniesz e-mail.</div>
+  {% elif preview.rule.requires_approval and not preview.code and not preview.client_pass %}
   <div class="msg warning">Jesteś nowym klientem — rezerwacja zablokuje termin i będzie czekać na zatwierdzenie przez obsługę strzelnicy. Dostaniesz e-mail.</div>{% endif %}
   <ul class="small">
     <li>Rezerwacja obejmuje <strong>całą oś</strong>.</li>

@@ -3,6 +3,7 @@
 {% block content %}
 <h1>Osie, godziny otwarcia i opłaty</h1>
 <p class="muted">Rezerwacja obejmuje całą oś. Opłata za godzinę to mniejsza z kwot: liczba osób × opłata za osobę albo ryczałt za oś.</p>
+{% if booking_cfg.officer_service %}<p class="muted">Nie masz uprawnień prowadzącego strzelanie? Zarezerwujesz oś z prowadzącym zapewnionym przez strzelnicę{% if booking_cfg.officer_fee_hourly %} — dopłata {{ booking_cfg.officer_fee_hourly|pln }} za godzinę{% endif %}. Taka rezerwacja wymaga zatwierdzenia przez obsługę.</p>{% endif %}
 {% for lane, rule in lanes %}
 <div class="card">
   <h2 style="margin-top:0">{{ lane.name }}</h2>

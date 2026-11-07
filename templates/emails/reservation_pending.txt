@@ -1,6 +1,6 @@
 {% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
 
-dziękujemy za rezerwację. Jako nowy klient czekasz na zatwierdzenie przez obsługę strzelnicy — termin jest już dla Ciebie zablokowany.
+dziękujemy za rezerwację. {% if reservation.with_officer %}Rezerwacja z prowadzącym od strzelnicy czeka na zatwierdzenie — obsługa przydzieli prowadzącego{% else %}Jako nowy klient czekasz na zatwierdzenie przez obsługę strzelnicy{% endif %} — termin jest już dla Ciebie zablokowany.
 {% if tpay and options.online %}
 Możesz zapłacić od razu ({{ reservation.amount|pln }}) online na stronie rezerwacji. Po zatwierdzeniu dostaniesz potwierdzenie,
 a jeśli rezerwacja nie zostanie zatwierdzona — pieniądze wrócą automatycznie na Twoje konto lub kartę.

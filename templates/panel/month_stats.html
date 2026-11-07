@@ -16,7 +16,7 @@
   {% include "panel/_kpi.html" with label="obłożenie osi" value=kpi.occupancy suffix="%" delta=d.occupancy unit="p.p." %}
   {% include "panel/_kpi.html" with label="zarezerwowane godziny" value=kpi.hours delta=d.hours %}
   {% include "panel/_kpi.html" with label="rezerwacji" value=kpi.reservations delta=d.reservations %}
-  {% include "panel/_kpi.html" with label="przychód (zaksięgowany)" value=kpi.income money=True delta=d.income %}
+  {% include "panel/_kpi.html" with label="wpływy (zaksięgowane)" value=kpi.income money=True delta=d.income %}
   {% include "panel/_kpi.html" with label="wpisów w książce pobytu" value=kpi.entries delta=d.entries %}
   {% include "panel/_kpi.html" with label="różnych osób na strzelnicy" value=kpi.people delta=d.people %}
   {% include "panel/_kpi.html" with label="prowadzących (PS) z rezerwacją" value=kpi.officers delta=d.officers %}
@@ -50,7 +50,7 @@
 
 <div class="today-tiles two-col">
   <div class="card table-wrap">
-    <h2 class="step-title">Przychód według sposobu płatności</h2>
+    <h2 class="step-title">Wpływy według sposobu płatności</h2>
     <table>{% for label, amount in income %}<tr><td>{{ label }}</td><td class="nowrap" style="text-align:right"><strong>{{ amount|pln }}</strong></td></tr>
       {% empty %}<tr><td class="muted">Brak zaksięgowanych wpłat.</td></tr>{% endfor %}
       {% if income %}<tr><td><strong>Razem</strong></td><td class="nowrap" style="text-align:right"><strong>{{ kpi.income|pln }}</strong></td></tr>{% endif %}</table>

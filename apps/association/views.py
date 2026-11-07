@@ -1,5 +1,5 @@
 import csv
-from datetime import date
+from datetime import date, timedelta
 
 from django.conf import settings
 from django.contrib import messages
@@ -547,6 +547,22 @@ def panel_import_template(request):
     response = HttpResponse(template_xlsx(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = 'attachment; filename="wzor-importu-stowarzyszenie.xlsx"'
     return response
+
+
+@panel_required(PERM_REP)
+def panel_occupancy(request):
+    """Obłożenie osi w okresie: mapa dzień tygodnia × godzina, dni tygodnia, osie, najbardziej oblegane terminy."""
+    from . import stats
+
+    key = request.GET.get("okres", "90")
+    if key not in stats.OCCUPANCY_PERIODS:
+        key = "90"
+    label, days = stats.OCCUPANCY_PERIODS[key]
+    today = timezone.localdate()
+    first, nxt = (today + timedelta(days=days), today) if days < 0 else (today, today + timedelta(days=days))
+    data = stats.occupancy(first, nxt)
+    data.update({"period": key, "period_label": label, "periods": [(k, v[0]) for k, v in stats.OCCUPANCY_PERIODS.items()]})
+    return render(request, "panel/occupancy.html", data)
 
 
 @panel_required(PERM_REP)

@@ -1,0 +1,57 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Obłożenie godzinowe{% endblock %}
+{% block panel %}
+<div class="today-head">
+  <div><h1 style="margin-bottom:2px">Obłożenie godzinowe</h1>
+    <p class="daylabel week-label" style="margin:0">{{ period_label|capfirst }}: {{ first|date:"j.m.Y" }} – {{ last|date:"j.m.Y" }}</p></div>
+  <div class="actions no-print" style="margin:0"><button type="button" class="btn small-btn" data-print>Drukuj</button></div>
+</div>
+<div class="no-print">{% include "panel/_assoc_tabs.html" %}</div>
+<nav class="tabs no-print" aria-label="Okres">{% for k, l in periods %}<a href="?okres={{ k }}" class="{% if k == period %}active{% endif %}"{% if k == period %} aria-current="page"{% endif %}>{{ l|capfirst }}</a>{% endfor %}</nav>
+
+<div class="today-tiles kpi-tiles">
+  <div class="card tile kpi"><span class="tile-n">{% if pct is None %}—{% else %}{{ pct }}%{% endif %}</span><span class="tile-l">obłożenie osi</span></div>
+  <div class="card tile kpi"><span class="tile-n">{{ booked }}</span><span class="tile-l">zarezerwowanych godzin z {{ capacity }}</span></div>
+  <div class="card tile kpi"><span class="tile-n">{{ reservations }}</span><span class="tile-l">rezerwacji</span></div>
+  <div class="card tile kpi"><span class="tile-n">{% if busiest_day %}{{ busiest_day.name }}{% else %}—{% endif %}</span><span class="tile-l">{% if busiest_day %}najbardziej obłożony dzień ({{ busiest_day.pct }}%){% else %}najbardziej obłożony dzień — brak rezerwacji{% endif %}</span></div>
+</div>
+
+<div class="card table-wrap">
+  <h2 class="step-title">Dzień tygodnia × godzina</h2>
+  <p class="small muted" style="margin-top:0">Procent godzin osi zarezerwowanych w danym dniu tygodnia i godzinie, wobec godzin otwarcia (bez blokad). Ciemniej = więcej (najciemniejsze pole to najwyższe obłożenie w okresie). Pole kreskowane — oś zamknięta.</p>
+  <table class="heatmap" aria-label="Obłożenie: dzień tygodnia i godzina">
+    <tr><th scope="col"><span class="sr-only">Dzień</span></th>{% for h in heat_hours %}<th scope="col">{{ h }}</th>{% endfor %}</tr>
+    {% for short, full, cells in heat %}<tr><th scope="row" title="{{ full }}">{{ short }}</th>{% for h, b, c, p, v in cells %}{% if c %}<td class="hm{% if v > 55 %} dark{% endif %}" style="--v:{{ v }}" title="{{ full }}, {{ h }}:00–{{ h|add:1 }}:00 — {{ p }}% ({{ b }} z {{ c }} h osi)">{% if b %}{{ p }}{% endif %}</td>{% else %}<td class="hm-closed" title="{{ full }}, {{ h }}:00 — zamknięte"></td>{% endif %}{% endfor %}</tr>{% endfor %}
+  </table>
+</div>
+
+<div class="today-tiles two-col">
+  <div class="card">
+    <h2 class="step-title">Dni tygodnia</h2>
+    <div class="hbars" role="table" aria-label="Obłożenie według dni tygodnia">
+      {% for d in days %}<div class="hbar-row" role="row" title="{{ d.name }}: {{ d.booked }} z {{ d.capacity }} h">
+        <span class="hbar-label" role="rowheader">{{ d.name|capfirst }}</span>
+        <span class="hbar-track" role="cell"><span class="hbar-fill" style="width:{{ d.pct|default:0 }}%"></span></span>
+        <span class="hbar-value" role="cell"><strong>{% if d.pct is None %}zamknięte{% else %}{{ d.pct }}%{% endif %}</strong> <span class="muted">{{ d.booked }}/{{ d.capacity }} h</span></span>
+      </div>{% endfor %}
+    </div>
+  </div>
+  <div class="card table-wrap">
+    <h2 class="step-title">Najbardziej oblegane terminy</h2>
+    <table>{% for t in top %}<tr><td>{{ t.day|capfirst }}, {{ t.hour }}:00–{{ t.hour|add:1 }}:00</td><td class="nowrap" style="text-align:right"><strong>{{ t.pct }}%</strong> <span class="muted small">{{ t.booked }} h</span></td></tr>
+      {% empty %}<tr><td class="muted">Brak rezerwacji w tym okresie.</td></tr>{% endfor %}</table>
+    <p class="small muted">Pomaga ustawić godziny otwarcia i dyżury: tam, gdzie obłożenie jest wysokie, warto mieć obsługę na miejscu.</p>
+  </div>
+</div>
+
+<div class="card">
+  <h2 class="step-title">Osie</h2>
+  <div class="hbars" role="table" aria-label="Obłożenie osi">
+    {% for x in lanes %}<div class="hbar-row" role="row" title="{{ x.lane.name }}: {{ x.booked }} z {{ x.capacity }} h">
+      <span class="hbar-label" role="rowheader">{{ x.lane.name }}</span>
+      <span class="hbar-track" role="cell"><span class="hbar-fill" style="width:{{ x.pct|default:0 }}%"></span></span>
+      <span class="hbar-value" role="cell"><strong>{% if x.pct is None %}—{% else %}{{ x.pct }}%{% endif %}</strong> <span class="muted">{{ x.booked }}/{{ x.capacity }} h</span></span>
+    </div>{% empty %}<p class="muted">Brak czynnych osi.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

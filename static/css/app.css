@@ -601,3 +601,4 @@ tr.now-bez_rezerwacji td { background: var(--bad-bg); }
   font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .topbar .balance-chip:hover { background: rgba(255,255,255,.15); }
 .topbar .balance-chip.neg span { text-decoration: underline; text-decoration-style: dotted; }
+.heatmap td.hm-closed { width: 30px; height: 26px; border-radius: 4px; background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--text) 7%, transparent) 4px 5px); }

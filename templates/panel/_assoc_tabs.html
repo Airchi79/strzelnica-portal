@@ -10,6 +10,6 @@
   <a href="{% url 'panel:meetings' %}" class="{% if 'meeting' in u %}active{% endif %}">Zebrania</a>
   {% endif %}
   {% if perms.association.manage_clubs %}<a href="{% url 'panel:clubs' %}" class="{% if 'club' in u %}active{% endif %}">Kluby i kody</a>{% endif %}
-  {% if perms.association.view_reports %}<a href="{% url 'panel:reports' %}" class="{% if u == 'reports' %}active{% endif %}">Raport roczny</a><a href="{% url 'panel:month_stats' %}" class="{% if u == 'month_stats' %}active{% endif %}">Statystyki miesiąca</a>{% endif %}
+  {% if perms.association.view_reports %}<a href="{% url 'panel:reports' %}" class="{% if u == 'reports' %}active{% endif %}">Raport roczny</a><a href="{% url 'panel:month_stats' %}" class="{% if u == 'month_stats' %}active{% endif %}">Statystyki miesiąca</a><a href="{% url 'panel:occupancy' %}" class="{% if u == 'occupancy' %}active{% endif %}">Obłożenie godzinowe</a>{% endif %}
   {% endwith %}
 </div>

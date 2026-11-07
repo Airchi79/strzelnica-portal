@@ -125,6 +125,7 @@ urlpatterns = [
     path("kluby/<int:pk>/", association_views.panel_club, name="club"),
     path("raporty/", association_views.panel_reports, name="reports"),
     path("raporty/miesiac/", association_views.panel_month_stats, name="month_stats"),
+    path("raporty/oblozenie/", association_views.panel_occupancy, name="occupancy"),
     path("powiadomienia/", bookings_views.panel_notifications, name="notifications"),
     path("powiadomienia/<int:pk>/", bookings_views.panel_notification_open, name="notification"),
     path("dziennik/", views.panel_audit, name="audit"),

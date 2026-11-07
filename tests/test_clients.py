@@ -151,7 +151,7 @@ def test_client_types(ps):
 
 def test_panel_kartoteka_flow(owner_client, ps):
     body = owner_client.get("/panel/uzytkownicy/").content.decode()
-    assert "Klienci" in body and "Piotr Strzelec" in body and "ważne" in body
+    assert "Strzelcy" in body and "Piotr Strzelec" in body and "ważne" in body
     url = f"/panel/uzytkownicy/{ps.pk}/"
     owner_client.post(url + "kartoteka/", {"notes": "Lubi oś 100 m", "tags": "sędzia, VIP, sędzia"})
     profile = services.profile_for(ps)

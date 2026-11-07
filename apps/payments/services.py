@@ -306,7 +306,7 @@ def complete_payment(payment, user=None, by=None, note=""):
              f"Opłata za płatność online (bezzwrotna){': ' + payment.title if payment.title else ''}", payment=payment, by=by)
     log_event("platnosc.zaksiegowana", payment, str(payment), changes={"dla": payment.user.email}, actor=by)
     if payment.reservation_id and payment.reservation.status == payment.reservation.Status.CANCELLED:
-        # Wpłata dotarła po zwolnieniu/anulowaniu rezerwacji — środki zostają na koncie klienta, decyzję podejmuje obsługa.
+        # Wpłata dotarła po zwolnieniu/anulowaniu rezerwacji — środki zostają na koncie strzelca, decyzję podejmuje obsługa.
         notify_board(
             f"Wpłata za anulowaną rezerwację {payment.reservation.number}", "emails/reservation_board.txt", "payments.manage_payments",
             url=reverse("panel:payment", args=[payment.pk]), reservation=payment.reservation,
@@ -367,7 +367,7 @@ def manual_refund(user, amount, method, reason, by):
         raise ValidationError("Kwota musi być dodatnia.")
     _locked_wallet(user)
     if amount > balance_of(user):
-        raise ValidationError(f"Zwrot nie może przekroczyć nadpłaty klienta ({balance_of(user) / 100:.2f} zł).")
+        raise ValidationError(f"Zwrot nie może przekroczyć nadpłaty strzelca ({balance_of(user) / 100:.2f} zł).")
     entry = post(user, -amount, LedgerEntry.Kind.CHARGEBACK, f"Zwrot ręczny ({MANUAL_REFUND_METHODS[method]}): {reason.strip()}", by=by)
     log_event("platnosc.zwrot_reczny", entry, f"{user.full_name}: {amount / 100:.2f} zł ({MANUAL_REFUND_METHODS[method]})",
               changes={"kwota_gr": amount, "sposob": method, "powod": reason.strip()}, actor=by)
@@ -597,7 +597,7 @@ def surcharge_of(payments):
 
 def refundable_overpayments(user):
     """Wpłaty Tpay za anulowane (bez zachowania należności) rezerwacje, które nie zostały jeszcze zwrócone płacącemu —
-    nadpłata klienta, którą zarząd może zwrócić jednym kliknięciem. [(wpłata, kwota_do_zwrotu)]"""
+    nadpłata strzelca, którą zarząd może zwrócić jednym kliknięciem. [(wpłata, kwota_do_zwrotu)]"""
     balance = balance_of(user)
     out = []
     qs = (Payment.objects.filter(user=user, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED, external_id__startswith="tpay:",

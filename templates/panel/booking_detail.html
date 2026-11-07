@@ -48,11 +48,11 @@
 {% if r.status == 'do_zatwierdzenia' %}
 <h2>Zatwierdzenie</h2>
 <div class="card">
-  <p>{% if r.with_officer %}Rezerwacja z prowadzącym od strzelnicy — {% if r.officer %}prowadzący przydzielony, możesz zatwierdzić{% else %}<strong>najpierw przydziel prowadzącego</strong> (wyżej){% endif %}. {% else %}Nowy klient — {% endif %}<a href="{% url 'panel:user' r.user_id %}">karta klienta</a>.
-    {% if r.paid_amount %}<span class="badge ok">opłacona z góry: {{ r.paid_amount|pln }}</span> Po zatwierdzeniu klient dostanie potwierdzenie; po odrzuceniu wpłata Tpay <strong>wróci automatycznie</strong> na jego rachunek / kartę (inne wpłaty — zwrot ręczny, dostaniesz przypomnienie).
-    {% else %}Klient jeszcze nie zapłacił. Po zatwierdzeniu dostanie e-mail z informacją o płatności.{% endif %}</p>
+  <p>{% if r.with_officer %}Rezerwacja z prowadzącym od strzelnicy — {% if r.officer %}prowadzący przydzielony, możesz zatwierdzić{% else %}<strong>najpierw przydziel prowadzącego</strong> (wyżej){% endif %}. {% else %}Nowy strzelec — {% endif %}<a href="{% url 'panel:user' r.user_id %}">karta strzelca</a>.
+    {% if r.paid_amount %}<span class="badge ok">opłacona z góry: {{ r.paid_amount|pln }}</span> Po zatwierdzeniu strzelec dostanie potwierdzenie; po odrzuceniu wpłata Tpay <strong>wróci automatycznie</strong> na jego rachunek / kartę (inne wpłaty — zwrot ręczny, dostaniesz przypomnienie).
+    {% else %}Strzelec jeszcze nie zapłacił. Po zatwierdzeniu dostanie e-mail z informacją o płatności.{% endif %}</p>
   <form method="post" class="actions" style="margin-top:0">{% csrf_token %}<button class="btn" name="action" value="approve"{% if r.with_officer and not r.officer %} disabled{% endif %}>Zatwierdź rezerwację</button></form>
-  <form method="post" data-confirm="Odrzucić rezerwację {{ r.number }}? Klient otrzyma e-mail z powodem{% if r.paid_amount %}, a wpłata {{ r.paid_amount|pln }} zostanie zwrócona{% endif %}.">{% csrf_token %}<input type="hidden" name="action" value="reject">
+  <form method="post" data-confirm="Odrzucić rezerwację {{ r.number }}? Strzelec otrzyma e-mail z powodem{% if r.paid_amount %}, a wpłata {{ r.paid_amount|pln }} zostanie zwrócona{% endif %}.">{% csrf_token %}<input type="hidden" name="action" value="reject">
     {% include "partials/form.html" with form=cancel_form %}
     <button class="btn danger" type="submit">Odrzuć</button></form>
 </div>
@@ -64,7 +64,7 @@
 <h2>Rozliczenie</h2>
 <div class="card">
   {% if r.access_code %}<p>Rozliczenie wg umowy klubu <strong>{{ r.access_code.club }}</strong> (kod {{ r.access_code.code }}).</p>{% endif %}
-  {% if r.client_pass %}<p>Opłacona kodem wejścia <strong>{{ r.client_pass.code }}</strong> ({{ r.client_pass.get_kind_display|lower }}) — <a href="{% url 'panel:user' r.user_id %}">karta klienta</a>.</p>{% endif %}
+  {% if r.client_pass %}<p>Opłacona kodem wejścia <strong>{{ r.client_pass.code }}</strong> ({{ r.client_pass.get_kind_display|lower }}) — <a href="{% url 'panel:user' r.user_id %}">karta strzelca</a>.</p>{% endif %}
   <p>Zapłacono: <strong>{{ r.paid_amount|pln }}</strong> z {{ r.amount|pln }} · {% if WALLET_ENABLED %}saldo{% else %}nadpłata{% endif %} strzelca: {% if perms.payments.manage_payments %}<a href="{% url 'panel:wallet' r.user.pk %}">{{ wallet_balance|pln }}</a>{% else %}{{ wallet_balance|pln }}{% endif %}</p>
   <form method="post" class="actions" style="margin-top:0">{% csrf_token %}
   {% if r.payment_status == 'do_zaplaty' %}
@@ -88,7 +88,7 @@
 {% if r.status == 'potwierdzona' or r.status == 'do_zatwierdzenia' %}
 <details class="card">
   <summary><strong>Zmień oś lub termin</strong> <span class="small muted">— należność przeliczy się według opłat nowej osi</span></summary>
-  <form method="post" novalidate style="margin-top:10px" data-confirm="Zmienić termin rezerwacji {{ r.number }}? Klient dostanie e-mail.">{% csrf_token %}<input type="hidden" name="action" value="change_term">
+  <form method="post" novalidate style="margin-top:10px" data-confirm="Zmienić termin rezerwacji {{ r.number }}? Strzelec dostanie e-mail.">{% csrf_token %}<input type="hidden" name="action" value="change_term">
     <div class="field-row">{% include "partials/field.html" with field=term_form.lane %}{% include "partials/field.html" with field=term_form.day %}</div>
     <div class="field-row">{% include "partials/field.html" with field=term_form.start_hour %}{% include "partials/field.html" with field=term_form.end_hour %}</div>
     {% if r.paid_amount %}{% include "partials/field.html" with field=term_form.refund_difference %}{% endif %}
@@ -103,7 +103,7 @@
   <form method="post" data-confirm="Anulować rezerwację {{ r.number }}? Strzelec otrzyma e-mail.">{% csrf_token %}<input type="hidden" name="action" value="cancel">
     {% include "partials/form.html" with form=cancel_form %}
     <button class="btn danger" type="submit">Anuluj rezerwację</button></form>
-  <p class="small muted">Bez zaznaczenia „Zachowaj należność” anulowanie jest bez opłat, a wpłaty wracają do klienta.</p>
+  <p class="small muted">Bez zaznaczenia „Zachowaj należność” anulowanie jest bez opłat, a wpłaty wracają do strzelca.</p>
 </div>
 {% endif %}
 {% endblock %}

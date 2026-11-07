@@ -95,7 +95,7 @@ def tpay_start(request):
     elif request.POST.get("reservation"):
         reservation = get_object_or_404(
             Reservation, pk=request.POST["reservation"], user=request.user, payment_status=Reservation.Payment.DUE,
-            status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL],  # nowy klient może zapłacić od razu (jeśli włączone)
+            status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL],  # nowy strzelec może zapłacić od razu (jeśli włączone)
         )
         from apps.bookings.models import BookingSettings
         from apps.bookings.services import payment_options

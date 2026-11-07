@@ -16,7 +16,7 @@ from apps.facilities.models import Lane
 
 from .models import ArchivedReservation, Block
 
-REQUIRED = ["Godzina", "Numer", "Klient", "Oś / Instruktor"]
+REQUIRED = ["Godzina", "Numer", "Klient", "Oś / Instruktor"]  # kolumny eksportu GunTrackera
 TIME_RE = re.compile(r"^\s*(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?\s+(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})\s*$")
 LANE_RE = re.compile(r"oś\s*(\d+)\s*m(?:\s*\((\d+)\))?", re.IGNORECASE)
 
@@ -59,7 +59,7 @@ def format_phone(raw):
 
 
 def update_person_contacts(items):
-    """Uzupełnia pusty telefon osób z kartoteki (bez konta) na podstawie klienta rezerwacji („Imię Nazwisko”).
+    """Uzupełnia pusty telefon osób z kartoteki (bez konta) na podstawie strzelca rezerwacji („Imię Nazwisko”).
     Tylko jednoznaczne dopasowanie; istniejących telefonów nie nadpisuje. Zwraca (uzupełnione, bez_dopasowania)."""
     from apps.clients.models import Person
 
@@ -93,7 +93,7 @@ def parse(uploaded, year):
             "payment": text(r.get("płatność"), 80), "contact": contact,
         }
         if not item["number"] or not item["client"]:
-            raise ValidationError(f"Wiersz {row}: brak numeru lub klienta.")
+            raise ValidationError(f"Wiersz {row}: brak numeru lub strzelca.")
         item["lane"] = match_lane(item["lane_label"], lanes)
         key = {k: (v.isoformat() if hasattr(v, "isoformat") else (v.pk if isinstance(v, Lane) else v)) for k, v in item.items()}
         item["row_hash"] = hashlib.sha256(json.dumps(key, sort_keys=True, ensure_ascii=False).encode()).hexdigest()

@@ -3,8 +3,8 @@
 {% block panel %}
 <h1>Nowy kod wejścia</h1>
 <p>Dla: <a href="{% url 'panel:user' subject.pk %}">{{ subject.full_name }}</a> ({{ subject.email }})</p>
-{% if not pass_allowed %}<div class="msg warning">Klient jest w grupie „{{ group_label }}”, która według ustawień rezerwacji nie może płacić kodami wejścia. Kod zadziała dopiero po zmianie zasad grupy (Rezerwacje → Ustawienia) albo gdy klient przejdzie do grupy z kodami.</div>{% endif %}
+{% if not pass_allowed %}<div class="msg warning">Strzelec jest w grupie „{{ group_label }}”, która według ustawień rezerwacji nie może płacić kodami wejścia. Kod zadziała dopiero po zmianie zasad grupy (Rezerwacje → Ustawienia) albo gdy strzelec przejdzie do grupy z kodami.</div>{% endif %}
 <div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
-  <p class="small muted">Jedno wejście = jedna rezerwacja klienta (w granicach godzin i osób). Pojedyncze wejście ma zawsze 1 wejście, abonament — bez limitu. Rezerwacja anulowana bezpłatnie zwraca wejście.</p>
+  <p class="small muted">Jedno wejście = jedna rezerwacja strzelca (w granicach godzin i osób). Pojedyncze wejście ma zawsze 1 wejście, abonament — bez limitu. Rezerwacja anulowana bezpłatnie zwraca wejście.</p>
   <button class="btn" type="submit">Wydaj kod</button> <a class="btn secondary" href="{% url 'panel:user' subject.pk %}">Anuluj</a></form></div>
 {% endblock %}

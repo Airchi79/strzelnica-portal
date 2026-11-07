@@ -10,7 +10,7 @@ from .models import Event
 class EventForm(forms.ModelForm):
     fee_pln = PLNField(label="Opłata startowa [zł]", required=False, help_text="0 lub puste — bezpłatne.")
     cancel_conflicts = forms.BooleanField(
-        label="Anuluj kolidujące rezerwacje osi (bez opłat, wpłaty online wrócą przez Tpay, klienci dostaną e-mail)", required=False,
+        label="Anuluj kolidujące rezerwacje osi (bez opłat, wpłaty online wrócą przez Tpay, strzelcy dostaną e-mail)", required=False,
         help_text="Bez zaznaczenia rezerwacje zostają, a ich właściciele dostaną informację o blokadzie.",
     )
 

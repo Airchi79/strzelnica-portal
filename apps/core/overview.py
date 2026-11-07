@@ -13,7 +13,7 @@ FEED_GROUPS = {
     "rezerwacje": ("rezerwacja.", "blokada."),
     "platnosci": ("platnosc.", "platnosci.", "skladka.", "saldo.", "raport."),
     "ksiega": ("ksiazka.",),
-    "klienci": ("konto.rejestracja", "dokument.", "deklaracja.", "czlonek.", "klient.", "kod_wejscia."),
+    "strzelcy": ("konto.rejestracja", "dokument.", "deklaracja.", "czlonek.", "klient.", "kod_wejscia."),
 }
 
 FEED_LABELS = {
@@ -60,10 +60,10 @@ FEED_LABELS = {
     "ksiazka.ustawienia": "Zmiana ustawień książki",
     "ksiazka.eksport": "Eksport książki pobytu (XLSX)",
     "ksiazka.wypis_auto": "Automatyczne zamknięcie pobytów",
-    "klient.kartoteka": "Zmiana w kartotece klienta",
+    "klient.kartoteka": "Zmiana w kartotece strzelca",
     "kiosk.wpis_odrzucony": "Odrzucony wpis z kiosku",
-    "klient.zatwierdzenie": "Zatwierdzenie klienta",
-    "klient.cofniecie_zatwierdzenia": "Cofnięcie zatwierdzenia klienta",
+    "klient.zatwierdzenie": "Zatwierdzenie strzelca",
+    "klient.cofniecie_zatwierdzenia": "Cofnięcie zatwierdzenia strzelca",
     "kod_wejscia.wydanie": "Wydanie kodu wejścia",
     "kod_wejscia.zaplata": "Opłacenie kodu wejścia",
     "kod_wejscia.dezaktywacja": "Wyłączenie kodu wejścia",
@@ -122,7 +122,7 @@ def attention(user, now=None):
     tiles = []
     if user.has_perm("bookings.manage_reservations"):
         pending = Reservation.objects.filter(status=Reservation.Status.PENDING_APPROVAL).count()
-        tiles.append(("Czekają na zatwierdzenie", "Rezerwacje nowych klientów", pending, reverse("panel:reservations_days") + "?filtr=do_zatwierdzenia"))
+        tiles.append(("Czekają na zatwierdzenie", "Rezerwacje nowych strzelców", pending, reverse("panel:reservations_days") + "?filtr=do_zatwierdzenia"))
         due = Reservation.objects.filter(payment_status=Reservation.Payment.DUE).exclude(status=Reservation.Status.CANCELLED, late_cancellation=False).count()
         tiles.append(("Płatności", "Rezerwacje do zapłaty", due, reverse("panel:reservations_days") + "?filtr=do_zaplaty"))
         missing = (

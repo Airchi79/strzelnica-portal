@@ -1,4 +1,4 @@
-"""Kartoteka klientów: typ klienta, wizyty, zatwierdzanie; kody wejścia: wydawanie, sprawdzanie, wykorzystanie."""
+"""Kartoteka strzelców: typ strzelca, wizyty, zatwierdzanie; kody wejścia: wydawanie, sprawdzanie, wykorzystanie."""
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -18,7 +18,7 @@ def profile_for(user):
     return profile
 
 
-# --- typ klienta i wizyty -------------------------------------------------------------
+# --- typ strzelca i wizyty -------------------------------------------------------------
 
 
 def _member_user_ids(user_ids):
@@ -28,7 +28,7 @@ def _member_user_ids(user_ids):
 
 
 def visit_days(user_ids, now=None):
-    """{user_id: [daty wizyt rosnąco]} — dni z wpisem w książce pobytu na konto klienta albo z odbytą rezerwacją."""
+    """{user_id: [daty wizyt rosnąco]} — dni z wpisem w książce pobytu na konto strzelca albo z odbytą rezerwacją."""
     from apps.bookings.models import Reservation
     from apps.logbook.models import Entry
 
@@ -44,7 +44,7 @@ def visit_days(user_ids, now=None):
 
 
 def _vetted_user_ids(user_ids):
-    """Klienci, którym obsługa zatwierdziła już rezerwację (nadal potwierdzoną) — zostali sprawdzeni, nawet jeśli
+    """Strzelcy, którym obsługa zatwierdziła już rezerwację (nadal potwierdzoną) — zostali sprawdzeni, nawet jeśli
     termin jeszcze się nie odbył."""
     from apps.bookings.models import Reservation
 

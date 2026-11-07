@@ -70,7 +70,7 @@ def push_subscribe(request):
 
 @login_required
 def my_notifications(request):
-    """Powiadomienia klienta (dzwonek w nagłówku): lista, oznaczanie jako przeczytane."""
+    """Powiadomienia strzelca (dzwonek w nagłówku): lista, oznaczanie jako przeczytane."""
     from .models import Notification
 
     qs = request.user.notifications.filter(channel=Notification.Channel.PORTAL)
@@ -149,7 +149,7 @@ def panel_home(request):
         "tiles": attention(request.user),
         "feed": feed(group if group in FEED_GROUPS else ""),
         "group": group,
-        "groups": [("", "Wszystko"), ("rezerwacje", "Rezerwacje"), ("platnosci", "Płatności"), ("ksiega", "Księga"), ("klienci", "Klienci")],
+        "groups": [("", "Wszystko"), ("rezerwacje", "Rezerwacje"), ("platnosci", "Płatności"), ("ksiega", "Księga"), ("strzelcy", "Strzelcy")],
     })
 
 

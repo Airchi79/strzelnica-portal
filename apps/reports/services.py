@@ -187,7 +187,7 @@ def to_csv(report):
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
     w.writerow(["Raport", report.number, "Okres", report.period_start.isoformat(), report.period_end.isoformat()])
-    w.writerow(["Data i godzina", "Kategoria", "Sposób", "Dokument", "Klient", "Kwota [zł]"])
+    w.writerow(["Data i godzina", "Kategoria", "Sposób", "Dokument", "Strzelec", "Kwota [zł]"])
     for r in report.data["rows"]:
         w.writerow([r["at"], CATEGORY_LABELS.get(r["category"], r["category"]), METHOD_LABELS.get(r["method"], r["method"]),
                     _safe(r["doc"]), _safe(r["client"]), _pln(r["amount"])])
@@ -266,7 +266,7 @@ def to_pdf(report, association):
     if report.data.get("daily"):
         daily = [["Raport dzienny", "Dzień", "Netto [zł]"]] + [[d["number"], d["day"], _pln(d["net"])] for d in report.data["daily"]]
         story += [table(daily, [60 * mm, 50 * mm, 50 * mm]), Spacer(1, 6 * mm)]
-    rows = [["Data", "Kategoria", "Sposób", "Dokument", "Klient", "Kwota [zł]"]]
+    rows = [["Data", "Kategoria", "Sposób", "Dokument", "Strzelec", "Kwota [zł]"]]
     for r in report.data["rows"]:
         day_part, time_part = r["at"][:10], r["at"][11:16]
         rows.append([Paragraph(f"{day_part[8:10]}.{day_part[5:7]}.{day_part[:4]}<br/>{time_part}", base), Paragraph(escape(CATEGORY_LABELS.get(r["category"], r["category"])), base),

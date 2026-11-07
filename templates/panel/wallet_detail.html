@@ -14,7 +14,7 @@
     <input type="hidden" name="action" value="refund_tpay"><input type="hidden" name="payment" value="{{ p.pk }}">
     <span>Wpłata online {{ p.completed_at|date:"j.m.Y H:i" }} za anulowaną rezerwację <a href="{% url 'panel:reservation' p.reservation_id %}">{{ p.reservation.number }}</a> — <strong>{{ amount|pln }}</strong></span>
     <button class="btn secondary" type="submit">Zwróć przez Tpay</button></form>{% endfor %}
-  <p class="small muted">Pieniądze wracają na rachunek / kartę, z której klient płacił; operacja „zwrot do wpłacającego” zmniejszy saldo.</p></div>{% endif %}
+  <p class="small muted">Pieniądze wracają na rachunek / kartę, z której strzelec płacił; operacja „zwrot do wpłacającego” zmniejszy saldo.</p></div>{% endif %}
 <div class="actions" style="margin-top:0;margin-bottom:16px"><a class="btn" href="{% url 'panel:payment_manual' %}?user={{ subject.pk }}">Przyjmij wpłatę</a></div>
 <h2>Historia</h2>
 <div class="card table-wrap"><table>
@@ -24,8 +24,8 @@
   {% empty %}<tr><td colspan="4" class="muted">Brak operacji.</td></tr>{% endfor %}
 </table></div>
 {% include "partials/pagination.html" %}
-{% if balance > 0 %}<h2>Zwrot ręczny do klienta</h2>
-<div class="card"><form method="post" novalidate data-confirm="Zaksięgować zwrot ręczny? Zmniejszy nadpłatę klienta.">{% csrf_token %}<input type="hidden" name="action" value="manual_refund">
+{% if balance > 0 %}<h2>Zwrot ręczny do strzelca</h2>
+<div class="card"><form method="post" novalidate data-confirm="Zaksięgować zwrot ręczny? Zmniejszy nadpłatę strzelca.">{% csrf_token %}<input type="hidden" name="action" value="manual_refund">
   {% include "partials/form.html" with form=refund_form %}<button class="btn secondary" type="submit">Zaksięguj zwrot</button></form>
 <p class="small muted">Gdy oddałeś pieniądze poza systemem (przelewem, gotówką albo zwrotem w panelu Tpay). Zwrot trafi do raportu wpływów.
   Nie używaj go po „Zwróć przez Tpay” — tamten zwrot księguje się sam.</p></div>{% endif %}

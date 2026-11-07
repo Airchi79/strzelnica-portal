@@ -1,4 +1,4 @@
-"""Kartoteka klientów (notatki, tagi, zatwierdzenie) i kody wejścia klientów (karnety, abonamenty)."""
+"""Kartoteka strzelców (notatki, tagi, zatwierdzenie) i kody wejścia strzelców (karnety, abonamenty)."""
 
 import secrets
 
@@ -12,27 +12,27 @@ class ClientTag(models.Model):
 
     class Meta:
         ordering = ["name"]
-        verbose_name = "tag klienta"
-        verbose_name_plural = "tagi klientów"
+        verbose_name = "tag strzelca"
+        verbose_name_plural = "tagi strzelców"
 
     def __str__(self):
         return self.name
 
 
 class ClientProfile(models.Model):
-    """Dane kartoteki prowadzone przez obsługę — niewidoczne dla klienta."""
+    """Dane kartoteki prowadzone przez obsługę — niewidoczne dla strzelca."""
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="client_profile")
     notes = models.TextField("notatki obsługi", blank=True, max_length=4000)
     tags = models.ManyToManyField(ClientTag, verbose_name="tagi", blank=True, related_name="profiles")
-    approved_at = models.DateTimeField("zatwierdzony jako stały klient", null=True, blank=True)
+    approved_at = models.DateTimeField("zatwierdzony jako stały strzelec", null=True, blank=True)
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "kartoteka klienta"
-        verbose_name_plural = "kartoteka klientów"
-        permissions = [("manage_clients", "Może prowadzić kartotekę klientów i wydawać kody wejścia")]
+        verbose_name = "kartoteka strzelca"
+        verbose_name_plural = "kartoteka strzelców"
+        permissions = [("manage_clients", "Może prowadzić kartotekę strzelców i wydawać kody wejścia")]
 
     def __str__(self):
         return f"Kartoteka: {self.user}"
@@ -45,7 +45,7 @@ def new_pass_code():
 
 
 class ClientPass(models.Model):
-    """Kod wejścia klienta: przedpłacony karnet (N wejść) albo abonament (bez limitu wejść) ważny w okresie.
+    """Kod wejścia strzelca: przedpłacony karnet (N wejść) albo abonament (bez limitu wejść) ważny w okresie.
 
     Jedno wejście = jedna rezerwacja posiadacza kodu (w granicach limitu godzin i osób). Sprzedaż kodu jest
     przychodem w chwili zapłaty; rezerwacje z kodem nie mają już osobnej należności.
@@ -63,7 +63,7 @@ class ClientPass(models.Model):
         CARD = "karta", "Karta"
         FREE = "bezplatny", "Bezpłatny (np. nagroda)"
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="klient", on_delete=models.PROTECT, related_name="client_passes")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="strzelec", on_delete=models.PROTECT, related_name="client_passes")
     code = models.CharField("kod", max_length=16, unique=True, default=new_pass_code)
     kind = models.CharField("rodzaj", max_length=12, choices=Kind.choices, default=Kind.PACK)
     entries_limit = models.PositiveIntegerField("liczba wejść", null=True, blank=True, help_text="Puste = bez limitu (abonament).")
@@ -99,7 +99,7 @@ class ClientPass(models.Model):
 
 
 class Person(models.Model):
-    """Osoba z kartoteki bez konta w systemie (np. klienci przeniesieni z GunTrackera). Służy obsłudze do szybkiego
+    """Osoba z kartoteki bez konta w systemie (np. strzelcy przeniesieni z GunTrackera). Służy obsłudze do szybkiego
     uzupełnienia wpisu w książce pobytu; dane są widoczne tylko w panelu (z rejestrem wglądu)."""
 
     class Source(models.TextChoices):

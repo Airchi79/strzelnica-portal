@@ -72,7 +72,7 @@ class CorrectionForm(forms.Form):
 class ManualRefundForm(forms.Form):
     method = forms.ChoiceField(label="Sposób zwrotu", choices=[("przelew", "Przelew"), ("gotowka", "Gotówka"),
                                                                ("tpay_panel", "Zwrot ręczny w panelu Tpay"), ("blik", "BLIK na telefon")])
-    amount = PLNField(label="Kwota zwrócona klientowi [zł]")
+    amount = PLNField(label="Kwota zwrócona strzelcowi [zł]")
     reason = forms.CharField(label="Powód / numer rezerwacji", max_length=150)
 
     def clean(self):

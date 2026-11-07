@@ -20,7 +20,7 @@ class BookingSettings(models.Model):
     """Ustawienia rezerwacji (jeden rekord)."""
 
     free_cancel_hours = models.PositiveIntegerField(
-        "klient może sam anulować do [h] przed terminem", default=24,
+        "strzelec może sam anulować do [h] przed terminem", default=24,
         help_text="Później anulować może tylko obsługa.",
     )
     online_payment_minutes = models.PositiveIntegerField(
@@ -29,21 +29,21 @@ class BookingSettings(models.Model):
     )
     approval_payment_hours = models.PositiveIntegerField(
         "czas na płatność po zatwierdzeniu [h]", default=24,
-        help_text="Gdy rezerwację zatwierdziła obsługa — liczony od zatwierdzenia (klient dostaje e-mail).",
+        help_text="Gdy rezerwację zatwierdziła obsługa — liczony od zatwierdzenia (strzelec dostaje e-mail).",
     )
     offline_instructions = models.TextField(
         "instrukcja płatności offline", blank=True, max_length=2000,
         default="Zapłać przelewem na konto Stowarzyszenia, w tytule wpisz numer rezerwacji, albo gotówką na miejscu przed strzelaniem.",
-        help_text="Pokazywana klientom, którzy mogą płacić offline (przelew, gotówka na miejscu).",
+        help_text="Pokazywana strzelcom, którzy mogą płacić offline (przelew, gotówka na miejscu).",
     )
     min_lead_hours = models.PositiveIntegerField(
         "rezerwacja online najpóźniej [h] przed terminem", default=0,
-        help_text="Np. 2 — klient nie zarezerwuje sam terminu zaczynającego się za mniej niż 2 h. "
+        help_text="Np. 2 — strzelec nie zarezerwuje sam terminu zaczynającego się za mniej niż 2 h. "
                   "0 — można rezerwować do rozpoczęcia godziny. Obsługa w panelu rezerwuje bez tego ograniczenia.",
     )
     prepay_before_approval = models.BooleanField(
-        "nowy klient może zapłacić online przed zatwierdzeniem", default=True,
-        help_text="Po odrzuceniu wpłata wraca automatycznie na rachunek / kartę klienta (Tpay). Wyłączone: płatność dopiero po zatwierdzeniu.",
+        "nowy strzelec może zapłacić online przed zatwierdzeniem", default=True,
+        help_text="Po odrzuceniu wpłata wraca automatycznie na rachunek / kartę strzelca (Tpay). Wyłączone: płatność dopiero po zatwierdzeniu.",
     )
     waitlist_hold_minutes = models.PositiveIntegerField(
         "lista oczekujących: termin trzymany [min]", default=30,
@@ -73,12 +73,12 @@ class BookingSettings(models.Model):
 
 
 class GroupRule(models.Model):
-    """Zasady rezerwowania dla grupy klientów (członek, powracający, nowy)."""
+    """Zasady rezerwowania dla grupy strzelców (członek, powracający, nowy)."""
 
     class Group(models.TextChoices):
         MEMBER = "czlonek", "Członkowie stowarzyszenia"
-        RETURNING = "powracajacy", "Klienci powracający"
-        NEW = "nowy", "Nowi klienci"
+        RETURNING = "powracajacy", "Strzelcy powracający"
+        NEW = "nowy", "Nowi strzelcy"
 
     group = models.CharField("grupa", max_length=12, choices=Group.choices, unique=True)
     requires_approval = models.BooleanField("rezerwacja wymaga zatwierdzenia przez obsługę", default=False)
@@ -88,8 +88,8 @@ class GroupRule(models.Model):
 
     class Meta:
         ordering = ["id"]
-        verbose_name = "zasady grupy klientów"
-        verbose_name_plural = "zasady grup klientów"
+        verbose_name = "zasady grupy strzelców"
+        verbose_name_plural = "zasady grup strzelców"
         constraints = [models.CheckConstraint(condition=Q(pay_online=True) | Q(pay_offline=True) | Q(pay_pass=True), name="group_some_payment")]
 
     def __str__(self):
@@ -158,7 +158,7 @@ class Reservation(models.Model):
         on_delete=models.PROTECT, related_name="reservations",
     )
     client_pass = models.ForeignKey(
-        "clients.ClientPass", verbose_name="kod wejścia klienta", null=True, blank=True,
+        "clients.ClientPass", verbose_name="kod wejścia strzelca", null=True, blank=True,
         on_delete=models.PROTECT, related_name="reservations",
     )
 
@@ -175,7 +175,7 @@ class Reservation(models.Model):
     )
     payment_marked_at = models.DateTimeField(null=True, blank=True)
     reminder_sent_at = models.DateTimeField(null=True, blank=True)
-    client_group = models.CharField("grupa klienta przy rezerwacji", max_length=12, blank=True)
+    client_group = models.CharField("grupa strzelca przy rezerwacji", max_length=12, blank=True)
     approved_at = models.DateTimeField("zatwierdzono", null=True, blank=True)
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     pay_by = models.DateTimeField("opłać do (inaczej rezerwacja się zwalnia)", null=True, blank=True)
@@ -250,7 +250,7 @@ class Reservation(models.Model):
         return self.starts_at - timedelta(hours=BookingSettings.load().free_cancel_hours)
 
     def can_user_cancel(self, now=None):
-        """Klient anuluje sam do terminu z ustawień (domyślnie 24 h przed); później tylko obsługa.
+        """Strzelec anuluje sam do terminu z ustawień (domyślnie 24 h przed); później tylko obsługa.
         Rezerwację czekającą na zatwierdzenie można wycofać do jej początku."""
         now = now or timezone.now()
         if self.status == self.Status.PENDING_APPROVAL:
@@ -288,7 +288,7 @@ class ArchivedReservation(models.Model):
     number = models.CharField("numer w GunTrackerze", max_length=40, db_index=True)
     starts_at = models.DateTimeField("początek", db_index=True)
     ends_at = models.DateTimeField("koniec")
-    client = models.CharField("klient", max_length=160)
+    client = models.CharField("strzelec", max_length=160)
     lane_label = models.CharField("oś / instruktor (GunTracker)", max_length=80)
     lane = models.ForeignKey(Lane, verbose_name="oś", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     positions = models.CharField("stanowiska", max_length=40, blank=True)

@@ -31,8 +31,8 @@ SECTIONS = [
         ("Regulaminy", "panel:regulations", "file", "regulations.publish_regulation", ["regulation*"]),
         ("Ogłoszenia", "panel:announcements", "bell", "core.publish_announcement", ["announcement*"]),
     ]),
-    ("Klienci", [
-        ("Klienci z kontem", "panel:users", "users", "accounts.view_users", ["users", "user", "client_*"]),
+    ("Strzelcy", [
+        ("Strzelcy z kontem", "panel:users", "users", "accounts.view_users", ["users", "user", "client_*"]),
         ("Osoby bez konta", "panel:persons", "user", "accounts.view_users", ["person*"]),
         ("Weryfikacja dokumentów", "panel:credentials", "shield", "credentials.review_credential", ["credential*"]),
     ]),

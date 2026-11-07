@@ -742,7 +742,7 @@ def test_board_cancel_keep_fee_never_refunds(client, owner, ps, tpay_keys, monke
 
 def test_panel_cancel_form_has_refund_checkbox(owner_client, ps):
     r = book(ps)
-    assert "Zwróć wpłatę na rachunek / kartę klienta" in owner_client.get(f"/panel/rezerwacje/{r.pk}/").content.decode()
+    assert "Zwróć wpłatę na rachunek / kartę strzelca" in owner_client.get(f"/panel/rezerwacje/{r.pk}/").content.decode()
 
 
 def test_change_term_surcharge_and_partial_refund(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
@@ -993,7 +993,7 @@ def test_manual_refund_and_sales_report(owner_client, owner, ps):
     PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
     services.register_manual_payment(ps, 30000, Payment.Method.CASH, owner)  # nadpłata 300 zł
     url = f"/panel/salda/{ps.pk}/"
-    assert "Zwrot ręczny do klienta" in owner_client.get(url).content.decode()
+    assert "Zwrot ręczny do strzelca" in owner_client.get(url).content.decode()
     # ponad nadpłatę — odmowa
     owner_client.post(url, {"action": "manual_refund", "zwrot-method": "przelew", "zwrot-amount": "400", "zwrot-reason": "x"})
     assert balance_of(ps) == 30000

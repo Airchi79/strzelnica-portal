@@ -4,7 +4,7 @@
 <h1>Wszystkie rezerwacje</h1>
 {% include "panel/_bookings_tabs.html" %}
 <form method="get" class="card filters">
-  <div><label for="f-q">Szukaj</label><input type="search" id="f-q" name="q" value="{{ f.q }}" placeholder="klient, telefon, numer rezerwacji"></div>
+  <div><label for="f-q">Szukaj</label><input type="search" id="f-q" name="q" value="{{ f.q }}" placeholder="strzelec, telefon, numer rezerwacji"></div>
   <div><label for="f-os">Oś</label><select id="f-os" name="os"><option value="">wszystkie osie</option>{% for l in lanes %}<option value="{{ l.pk }}"{% if f.os == l.pk|stringformat:'d' %} selected{% endif %}>{{ l.name }}</option>{% endfor %}</select></div>
   <div><label for="f-f">Pokaż</label><select id="f-f" name="filtr">
     <option value="">dni od {{ start|date:"j.m" }}</option>
@@ -29,11 +29,11 @@
   </header>
   {% if rows %}
   <div class="table-wrap"><table class="days">
-    <tr class="head"><th>Godzina</th><th>Klient</th><th>Miejsce</th><th class="hide-sm">Prowadzący</th><th>Księga</th><th>Płatność</th></tr>
+    <tr class="head"><th>Godzina</th><th>Strzelec</th><th>Miejsce</th><th class="hide-sm">Prowadzący</th><th>Księga</th><th>Płatność</th></tr>
     {% for r in rows %}
     <tr class="{% if r.status == 'anulowana' %}cancelled{% endif %}">
       <td><a href="{% url 'panel:reservation' r.pk %}">{{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</a><div class="small muted">{{ r.display_status|lower }}</div></td>
-      <td data-label="Klient">{{ r.user.full_name }}<div class="small muted code">{{ r.number }}</div></td>
+      <td data-label="Strzelec">{{ r.user.full_name }}<div class="small muted code">{{ r.number }}</div></td>
       <td data-label="Miejsce">{{ r.lane }}<div class="small muted">{{ r.persons }} os.</div></td>
       <td class="hide-sm">{{ r.user.full_name }}<div class="small muted">PS</div></td>
       <td data-label="Księga">{% if r.entries %}<a class="badge {% if r.missing_entries %}bad{% else %}ok{% endif %}" href="{% url 'panel:logbook' %}?q={{ r.number }}&amp;od={{ r.starts_at|date:'Y-m-d' }}&amp;do={{ r.starts_at|date:'Y-m-d' }}">wpisy: {{ r.entries }}</a>

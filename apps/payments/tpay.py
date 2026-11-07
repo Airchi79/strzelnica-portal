@@ -25,7 +25,7 @@ from django.core.cache import cache
 logger = logging.getLogger(__name__)
 
 TIMEOUT = 20
-# Własny identyfikator klienta: Cloudflare przed API Tpay odrzuca domyślny „Python-urllib” (błąd 1010).
+# Własny identyfikator klienta HTTP: Cloudflare przed API Tpay odrzuca domyślny „Python-urllib” (błąd 1010).
 USER_AGENT = "StrzelnicaSatok-Rezerwacje/1.0 (+https://github.com/Airchi79/strzelnica-portal)"
 
 

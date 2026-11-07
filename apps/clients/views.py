@@ -63,7 +63,7 @@ def approve(request, pk):
     subject = get_object_or_404(User, pk=pk)
     approved = request.POST.get("approved") == "1"
     services.set_approved(subject, approved, request.user)
-    messages.success(request, "Klient zatwierdzony jako stały." if approved else "Cofnięto zatwierdzenie klienta.")
+    messages.success(request, "Strzelec zatwierdzony jako stały." if approved else "Cofnięto zatwierdzenie strzelca.")
     return _back(pk, "#kartoteka")
 
 
@@ -83,7 +83,7 @@ def pass_new(request, pk):
             for m in e.messages:
                 form.add_error(None, m)
         else:
-            messages.success(request, f"Wydano kod wejścia {p.code}. Przekaż go klientowi — zobaczy go też na swoim pulpicie.")
+            messages.success(request, f"Wydano kod wejścia {p.code}. Przekaż go strzelcowi — zobaczy go też na swoim pulpicie.")
             return _back(pk, "#kody")
     from apps.bookings.models import GroupRule
 

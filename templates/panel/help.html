@@ -28,9 +28,9 @@
   <li><strong>Na miejscu / dla kogoś:</strong> Wszystkie rezerwacje → zakładka <em>Nowa rezerwacja</em> → wybierz strzelca (musi mieć zweryfikowane PS). Obsługa rezerwuje bez limitów czasu i zatwierdzania.</li>
   <li><strong>Szybko z kalendarza:</strong> Kalendarz osi → kliknij wolną godzinę (dzień albo <em>Tydzień</em>).</li>
   <li><strong>Zmiana liczby osób:</strong> karta rezerwacji → <em>Zmiany</em> → należność przelicza się sama.</li>
-  <li><strong>Anulowanie:</strong> karta rezerwacji → podaj powód. Zaznacz <em>Zachowaj należność</em>, gdy klient odwołał za późno. Klient dostaje e-mail.</li>
+  <li><strong>Anulowanie:</strong> karta rezerwacji → podaj powód. Zaznacz <em>Zachowaj należność</em>, gdy strzelec odwołał za późno. Strzelec dostaje e-mail.</li>
   <li><strong>Nieodbyta:</strong> po rozpoczęciu — przycisk <em>Oznacz jako nieodbytą</em>.</li>
-  <li><strong>Nowy klient czeka na zatwierdzenie:</strong> karta rezerwacji → <em>Zatwierdź</em> albo <em>Odrzuć</em> (zasady grup klientów: Ustawienia rezerwacji).</li></ul></section>
+  <li><strong>Nowy strzelec czeka na zatwierdzenie:</strong> karta rezerwacji → <em>Zatwierdź</em> albo <em>Odrzuć</em> (zasady grup strzelców: Ustawienia rezerwacji).</li></ul></section>
 
 <section class="card help" id="cykliczne"><h2>Stały termin dla klubu</h2><ol>
   <li>Nowa rezerwacja → wypełnij jak zwykle, wpisz kod klubu (rozliczenie wg umowy) i <strong>Powtarzaj co tydzień do dnia</strong>.</li>
@@ -40,7 +40,7 @@
 
 <section class="card help" id="blokady"><h2>Awaria lub zawody — blokada osi</h2><ol>
   <li>Blokady osi → <em>Nowa blokada</em> → osie, dni, godziny (opcja: co tydzień).</li>
-  <li>Przed zapisem zobaczysz rezerwacje w tym czasie. Możesz je <strong>anulować bez opłat</strong> albo zostawić (klienci dostaną informację).</li>
+  <li>Przed zapisem zobaczysz rezerwacje w tym czasie. Możesz je <strong>anulować bez opłat</strong> albo zostawić (strzelcy dostaną informację).</li>
   <li>Z usterki: karta usterki → <em>Zablokuj oś</em> wypełnia formularz automatycznie.</li>
   <li>Zawody utworzone w <em>Wydarzeniach</em> blokują osie same.</li></ol></section>
 
@@ -53,7 +53,7 @@
   <li>Otwórz rezerwację (np. z <em>Dziś na strzelnicy</em> → <em>rozlicz</em>).</li>
   <li><strong>Przyjmij wpłatę (gotówka / BLIK)</strong> → kwota jest wpisana → zapisz.</li>
   <li>Opłata startowa na zawodach: Wydarzenia → lista startowa → <em>Gotówka</em> / <em>BLIK</em> przy uczestniku.</li>
-  <li>Wpłata trafia do raportu wpływów; klient może pobrać potwierdzenie PDF.</li></ol></section>
+  <li>Wpłata trafia do raportu wpływów; strzelec może pobrać potwierdzenie PDF.</li></ol></section>
 {% endif %}
 
 {% if perms.payments.manage_payments %}
@@ -106,7 +106,7 @@
 
 {% if perms.accounts.manage_permissions %}
 <section class="card help" id="uprawnienia"><h2>Uprawnienia i dyżurny</h2><ol>
-  <li>Klienci z kontem → osoba → <em>Uprawnienia w panelu zarządu</em>.</li>
+  <li>Strzelcy z kontem → osoba → <em>Uprawnienia w panelu zarządu</em>.</li>
   <li><strong>Gotowy zestaw: Dyżurny</strong> — jedno kliknięcie (rezerwacje, książka, gotówka; bez ustawień i członków).</li>
   <li>Osoba przy pierwszym wejściu do panelu ustawi logowanie dwuskładnikowe (aplikacja w telefonie).</li></ol></section>
 {% endif %}

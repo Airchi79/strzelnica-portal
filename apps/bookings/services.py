@@ -50,7 +50,7 @@ class Slot:
 
 def day_slots(lane, day: date, now=None, lead_hours=0, holds=False, viewer=None):
     """Godzinowe sloty osi w danym dniu, zgodnie z godzinami otwarcia osi.
-    `lead_hours` > 0 (widok klienta): wolne godziny zaczynające się wcześniej niż za tyle godzin mają stan „za_pozno”."""
+    `lead_hours` > 0 (widok strzelca): wolne godziny zaczynające się wcześniej niż za tyle godzin mają stan „za_pozno”."""
     now = now or timezone.now()
     lead_limit = now + timedelta(hours=lead_hours) if lead_hours else None
     hours = lane.hours_for(day)
@@ -64,7 +64,7 @@ def day_slots(lane, day: date, now=None, lead_hours=0, holds=False, viewer=None)
     )
     blocks = list(Block.objects.filter(lanes=lane, starts_at__lt=day_end, ends_at__gt=day_start))
     held = []
-    if holds:  # widok klienta: godziny trzymane dla kogoś z listy oczekujących są zajęte
+    if holds:  # widok strzelca: godziny trzymane dla kogoś z listy oczekujących są zajęte
         from .waitlist import held_ranges
 
         held = held_ranges(lane, day_start, day_end, now, exclude_user=viewer if viewer and viewer.is_authenticated else None)
@@ -160,7 +160,7 @@ def booking_readiness(user):
 
 def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: int, now=None, enforce_lead=False, user=None):
     """Sprawdza termin i liczbę osób. Zwraca (starts_at, ends_at, price_rule).
-    `enforce_lead` — rezerwacja przez klienta: obowiązuje minimalny czas przed terminem z ustawień."""
+    `enforce_lead` — rezerwacja przez strzelca: obowiązuje minimalny czas przed terminem z ustawień."""
     now = now or timezone.now()
     cfg = BookingSettings.load()
     if not lane.is_active or not lane.facility.is_active:
@@ -187,7 +187,7 @@ def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: i
         raise ValidationError(f"Rezerwować można najwyżej {cfg.max_advance_days} dni naprzód.")
     if Block.objects.filter(lanes=lane, starts_at__lt=ends_at, ends_at__gt=starts_at).exists():
         raise ValidationError("W wybranym czasie oś jest zablokowana przez zarząd.")
-    if enforce_lead:  # klient: termin trzymany dla osoby z listy oczekujących
+    if enforce_lead:  # strzelec: termin trzymany dla osoby z listy oczekujących
         from .waitlist import active_holds
 
         hold = active_holds(lane, starts_at, ends_at, now, exclude_user=user).order_by("hold_until").first()
@@ -218,7 +218,7 @@ def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", us
         return {**base, "hourly": hourly, "amount": (hourly + officer_hourly) * hours, "with_officer": True,
                 "officer_hourly": officer_hourly, "officer_amount": officer_hourly * hours}
     if access_code:
-        # Kod wejścia klienta (przedpłacony karnet/abonament): rezerwacja bez osobnej należności.
+        # Kod wejścia strzelca (przedpłacony karnet/abonament): rezerwacja bez osobnej należności.
         from apps.clients.services import find_client_pass
 
         client_pass = find_client_pass(access_code, user, lane, day, hours, persons)
@@ -253,13 +253,13 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     now = now or timezone.now()
     group = rule = None
     if not by_staff:
-        # Zasady grupy klienta (decyzje G2–G4) obowiązują przy rezerwacji przez klienta; obsługa rezerwuje bez ograniczeń.
+        # Zasady grupy strzelca (decyzje G2–G4) obowiązują przy rezerwacji przez strzelca; obsługa rezerwuje bez ograniczeń.
         from apps.clients.services import client_type
 
         group = client_type(user, now)
         rule = GroupRule.for_group(group)
         if client_pass is not None and not rule.pay_pass:
-            raise ValidationError("Kody wejścia nie są dostępne dla Twojej grupy klientów. Zarezerwuj bez kodu.")
+            raise ValidationError("Kody wejścia nie są dostępne dla Twojej grupy strzelców. Zarezerwuj bez kodu.")
     # prowadzący od strzelnicy: zawsze do zatwierdzenia (obsługa przydziela prowadzącego)
     pending = bool(q["with_officer"] or (rule and rule.requires_approval and code is None and client_pass is None))
     try:
@@ -326,7 +326,7 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
         "emails/reservation_board.txt",
         PERM,
         url=reverse("panel:reservation", args=[reservation.pk]),
-        body=f"{user.full_name}, {persons} os." + (" Nowy klient — rezerwacja czeka na zatwierdzenie." if pending else ""),
+        body=f"{user.full_name}, {persons} os." + (" Nowy strzelec — rezerwacja czeka na zatwierdzenie." if pending else ""),
         reservation=reservation,
         event="Rezerwacja do zatwierdzenia" if pending else "Nowa rezerwacja",
     )
@@ -367,7 +367,7 @@ def preview_series(user, lane, days, start_hour, end_hour, persons, access_code=
 
 def create_series(user, lane, days, start_hour, end_hour, persons, notes, by, access_code=""):
     """Tworzy rezerwacje cykliczne jako zwykłe rezerwacje ze wspólnym `series`. Terminy kolidujące są pomijane.
-    Zwraca (utworzone, pominięte [(dzień, powód)]). Klient i zarząd dostają po jednym zbiorczym powiadomieniu."""
+    Zwraca (utworzone, pominięte [(dzień, powód)]). Strzelec i zarząd dostają po jednym zbiorczym powiadomieniu."""
     series = uuid.uuid4()
     created, skipped = [], []
     for d in days:
@@ -420,7 +420,7 @@ def cancel_series(reservation, by, reason, now=None):
     return cancelled
 
 
-# --- zasady grup klientów: płatności, zatwierdzanie, wygasanie ------------------------------
+# --- zasady grup strzelców: płatności, zatwierdzanie, wygasanie ------------------------------
 
 
 def group_rule(reservation):
@@ -524,7 +524,7 @@ def reject_reservation(reservation, by, reason=""):
 
 def cancel_by_board(reservation, by, reason, keep_fee=False, refund=False):
     """Anulowanie przez obsługę. `refund` (bez zachowania należności): wpłata wraca na rachunek/kartę płacącego (Tpay);
-    bez zaznaczenia zostaje nadpłatą klienta do decyzji zarządu (jak dotąd)."""
+    bez zaznaczenia zostaje nadpłatą strzelca do decyzji zarządu (jak dotąd)."""
     r = Reservation.objects.get(pk=reservation.pk)
     paid = r.paid_amount
     r = cancel_reservation(r, by, reason, as_board=True, keep_fee=keep_fee, notify=False)
@@ -536,9 +536,9 @@ def cancel_by_board(reservation, by, reason, keep_fee=False, refund=False):
 
 
 def cancel_by_client(reservation, by, reason="", now=None):
-    """Anulowanie przez klienta w terminie bezpłatnym. Wpłata online (Tpay) za rezerwację wraca zawsze automatycznie
+    """Anulowanie przez strzelca w terminie bezpłatnym. Wpłata online (Tpay) za rezerwację wraca zawsze automatycznie
     na rachunek/kartę płacącego. Reszta (gotówka, przelew, błąd Tpay): przy włączonym saldzie zostaje na saldzie
-    klienta; przy wyłączonym — zarząd dostaje przypomnienie o zwrocie ręcznym.
+    strzelca; przy wyłączonym — zarząd dostaje przypomnienie o zwrocie ręcznym.
     Zwraca (rezerwacja, zwrócono_tpay, do_zwrotu_ręcznie, na_saldo)."""
     from apps.payments.services import wallet_enabled
 
@@ -577,7 +577,7 @@ def expire_unpaid(now=None):
 
 @transaction.atomic
 def cancel_reservation(reservation, by, reason="", as_board=False, now=None, keep_fee=False, expired=False, notify=True):
-    """Anulowanie. Klient: sam do terminu z ustawień (domyślnie 24 h przed), bez opłaty; później tylko obsługa.
+    """Anulowanie. Strzelec: sam do terminu z ustawień (domyślnie 24 h przed), bez opłaty; później tylko obsługa.
     Obsługa: bez opłaty albo — przy późnym odwołaniu — z zachowaniem należności (`keep_fee`)."""
     now = now or timezone.now()
     reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
@@ -818,7 +818,7 @@ def create_blocks(title, reason, lanes, occurrences, by, cancel_conflicts):
     cancelled = []
     if cancel_conflicts:
         for r in conflicts:
-            # klient nie zawinił — wpłata online wraca automatycznie przez Tpay (bez opłaty za płatność online)
+            # strzelec nie zawinił — wpłata online wraca automatycznie przez Tpay (bez opłaty za płatność online)
             cancelled.append(cancel_by_board(r, by, f"Blokada osi: {title}", refund=True))
     else:
         for r in conflicts:

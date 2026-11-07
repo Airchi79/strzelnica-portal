@@ -16,7 +16,7 @@ class PaymentSettings(models.Model):
     online_fee_percent = models.DecimalField(
         "opłata za płatność online — procent", max_digits=4, decimal_places=2, default=0,
         validators=[MinValueValidator(0), MaxValueValidator(10)],
-        help_text="Doliczana do każdej płatności przez Tpay (np. 1,59). Nie wraca przy anulowaniu — klient może zapłacić przelewem "
+        help_text="Doliczana do każdej płatności przez Tpay (np. 1,59). Nie wraca przy anulowaniu — strzelec może zapłacić przelewem "
                   "lub na miejscu bez opłaty. 0 = bez opłaty.",
     )
     online_fee_fixed = models.PositiveIntegerField("opłata za płatność online — kwota stała [gr]", default=0)

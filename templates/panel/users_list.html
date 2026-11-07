@@ -1,7 +1,7 @@
 {% extends "panel/base_panel.html" %}
-{% block title %}Klienci{% endblock %}
+{% block title %}Strzelcy{% endblock %}
 {% block panel %}
-<h1>Klienci</h1>
+<h1>Strzelcy</h1>
 {% include "panel/_clients_tabs.html" %}
 <form method="get" class="card filters">
   <div><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ f.q }}" placeholder="nazwisko, e-mail, telefon"></div>
@@ -11,9 +11,9 @@
   <div class="checkbox"><label><input type="checkbox" name="nieaktywne" value="1"{% if f.nieaktywne %} checked{% endif %}> także nieaktywne konta</label></div>
   <div class="actions"><button class="btn" type="submit">Pokaż</button><a class="btn secondary" href="{% url 'panel:users' %}">Wyczyść</a></div>
 </form>
-<p class="muted small">{{ page.paginator.count }} klientów</p>
+<p class="muted small">{{ page.paginator.count }} strzelców</p>
 <section class="day"><div class="table-wrap"><table class="days">
-  <tr class="head"><th>Klient</th><th>Typ</th><th>Uprawnienia PS</th><th>Wizyty</th><th>Ostatnia wizyta</th><th>Kody wejścia</th></tr>
+  <tr class="head"><th>Strzelec</th><th>Typ</th><th>Uprawnienia PS</th><th>Wizyty</th><th>Ostatnia wizyta</th><th>Kody wejścia</th></tr>
   {% for u in page %}
   <tr><td><a href="{% url 'panel:user' u.pk %}">{{ u.full_name|default:u.email }}</a>{% if u.is_superuser %} <span class="badge ok">właściciel</span>{% elif u.is_staff %} <span class="badge">obsługa</span>{% endif %}{% if not u.is_active %} <span class="badge bad">nieaktywne</span>{% endif %}
       <div class="small muted">{{ u.email }}{% if u.phone %} · {{ u.phone }}{% endif %}</div>

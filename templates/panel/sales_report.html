@@ -21,9 +21,9 @@
 </div>
 <h2>Operacje ({{ s.count }})</h2>
 <section class="day"><div class="table-wrap"><table class="days">
-  <tr class="head"><th>Data</th><th>Kategoria</th><th>Sposób</th><th>Dokument</th><th>Klient</th><th>Kwota</th></tr>
+  <tr class="head"><th>Data</th><th>Kategoria</th><th>Sposób</th><th>Dokument</th><th>Strzelec</th><th>Kwota</th></tr>
   {% for x in rows %}<tr><td>{{ x.at|slice:":10" }} {{ x.at|slice:"11:16" }}</td><td data-label="Kategoria">{{ x.category_label }}</td><td data-label="Sposób">{{ x.method_label }}</td>
-    <td data-label="Dokument">{{ x.doc }}</td><td data-label="Klient">{{ x.client }}</td><td data-label="Kwota">{{ x.amount|pln }}</td></tr>
+    <td data-label="Dokument">{{ x.doc }}</td><td data-label="Strzelec">{{ x.client }}</td><td data-label="Kwota">{{ x.amount|pln }}</td></tr>
   {% empty %}<tr><td colspan="6" class="muted">Brak operacji w okresie.</td></tr>{% endfor %}
 </table></div></section>
 {% endblock %}

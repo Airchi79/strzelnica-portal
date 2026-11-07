@@ -358,7 +358,7 @@ def panel_detail(request, pk):
                     paid = r.paid_amount
                     services.cancel_by_board(r, request.user, cancel_form.cleaned_data["reason"], keep_fee=keep, refund=refund)
                     messages.success(request, "Rezerwacja anulowana" + (" z zachowaniem należności" if keep else "")
-                                     + (" — zlecono zwrot wpłaty" if refund and paid and not keep else "") + ". Klient otrzyma e-mail.")
+                                     + (" — zlecono zwrot wpłaty" if refund and paid and not keep else "") + ". Strzelec otrzyma e-mail.")
                     return redirect("panel:reservation", pk=r.pk)
             elif action == "change_term":
                 term_form = ChangeTermForm(request.POST, prefix="t")
@@ -370,7 +370,7 @@ def panel_detail(request, pk):
                     diff = r2.amount - before
                     messages.success(request, f"Zmieniono termin: {r2.lane}, {timezone.localtime(r2.starts_at):%d.%m %H:%M}–{timezone.localtime(r2.ends_at):%H:%M}"
                                      + (f" · dopłata {diff / 100:.2f} zł" if diff > 0 else f" · różnica {-diff / 100:.2f} zł do zwrotu" if diff < 0 else "")
-                                     + ". Klient dostanie e-mail.")
+                                     + ". Strzelec dostanie e-mail.")
                     return redirect("panel:reservation", pk=r.pk)
                 messages.error(request, "Popraw dane nowego terminu.")
                 return redirect("panel:reservation", pk=r.pk)
@@ -399,13 +399,13 @@ def panel_detail(request, pk):
                 return redirect("panel:reservation", pk=r.pk)
             elif action == "approve":
                 services.approve_reservation(r, request.user)
-                messages.success(request, "Rezerwacja zatwierdzona. Klient otrzyma e-mail z informacją o płatności.")
+                messages.success(request, "Rezerwacja zatwierdzona. Strzelec otrzyma e-mail z informacją o płatności.")
                 return redirect("panel:reservation", pk=r.pk)
             elif action == "reject":
                 cancel_form = BoardCancelForm(request.POST, prefix="c")
                 if cancel_form.is_valid():
                     services.reject_reservation(r, request.user, cancel_form.cleaned_data["reason"])
-                    messages.success(request, "Rezerwacja odrzucona. Klient otrzyma e-mail.")
+                    messages.success(request, "Rezerwacja odrzucona. Strzelec otrzyma e-mail.")
                     return redirect("panel:reservation", pk=r.pk)
             elif action == "persons":
                 persons_form = PersonsForm(request.POST, prefix="p")
@@ -586,7 +586,7 @@ PAYMENT_LABELS = {"tpay": "Online", "gotowka": "Na miejscu", "blik": "BLIK", "pr
 
 @panel_required(PERM)
 def panel_days(request):
-    """Rezerwacje pogrupowane dniami: godziny, klient, oś, prowadzący, stan książki pobytu, płatność."""
+    """Rezerwacje pogrupowane dniami: godziny, strzelec, oś, prowadzący, stan książki pobytu, płatność."""
     from django.db.models import Count, Prefetch
 
     from apps.logbook.models import Entry

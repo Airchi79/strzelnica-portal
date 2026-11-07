@@ -22,7 +22,7 @@
   <tr><th>Pominięte (już w archiwum)</th><td>{{ result.pominiete }}</td></tr>
   {% if result.zakres %}<tr><th>Zakres dat</th><td>{{ result.zakres.0|date:"j.m.Y" }} – {{ result.zakres.1|date:"j.m.Y" }}</td></tr>{% endif %}
   <tr><th>{% if preview %}Blokady osi do utworzenia{% else %}Utworzone blokady osi{% endif %}</th><td>{{ result.blokady }}</td></tr>
-  <tr><th>{% if preview %}Telefony do uzupełnienia w kartotece{% else %}Uzupełnione telefony w kartotece{% endif %}</th><td>{{ result.telefony }}{% if result.bez_kartoteki %} <span class="small muted">(klientów bez jednoznacznej osoby w kartotece: {{ result.bez_kartoteki }})</span>{% endif %}</td></tr>
+  <tr><th>{% if preview %}Telefony do uzupełnienia w kartotece{% else %}Uzupełnione telefony w kartotece{% endif %}</th><td>{{ result.telefony }}{% if result.bez_kartoteki %} <span class="small muted">(strzelców bez jednoznacznej osoby w kartotece: {{ result.bez_kartoteki }})</span>{% endif %}</td></tr>
 </table>
 {% if result.przyszle %}<h3>Przyszłe terminy</h3><ul>{% for x in result.przyszle %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
 {% if result.konflikty %}<div class="msg warning"><strong>Kolizje z rezerwacjami w nowym systemie (bez blokady — sprawdź ręcznie):</strong><ul>{% for x in result.konflikty %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}

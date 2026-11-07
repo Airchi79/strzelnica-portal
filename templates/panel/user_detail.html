@@ -19,8 +19,8 @@
 <div class="card">
   {% if profile.approved_at %}<p><span class="badge ok">zatwierdzony</span> {{ profile.approved_at|date:"j.m.Y" }}{% if profile.approved_by %} przez {{ profile.approved_by.full_name }}{% endif %}</p>
     {% if perms.clients.manage_clients %}<form method="post" action="{% url 'panel:client_approve' subject.pk %}" class="actions" style="margin-top:0">{% csrf_token %}<input type="hidden" name="approved" value="0"><button class="btn secondary small-btn" type="submit">Cofnij zatwierdzenie</button></form>{% endif %}
-  {% elif subject.client_type == 'nowy' %}<p><span class="badge warn">nowy, niezatwierdzony</span> <span class="small muted">— zatwierdzenie oznacza go jako stałego klienta, zanim przyjdzie pierwszy raz</span></p>
-    {% if perms.clients.manage_clients %}<form method="post" action="{% url 'panel:client_approve' subject.pk %}" class="actions" style="margin-top:0">{% csrf_token %}<input type="hidden" name="approved" value="1"><button class="btn small-btn" type="submit">Zatwierdź klienta</button></form>{% endif %}
+  {% elif subject.client_type == 'nowy' %}<p><span class="badge warn">nowy, niezatwierdzony</span> <span class="small muted">— zatwierdzenie oznacza go jako stałego strzelca, zanim przyjdzie pierwszy raz</span></p>
+    {% if perms.clients.manage_clients %}<form method="post" action="{% url 'panel:client_approve' subject.pk %}" class="actions" style="margin-top:0">{% csrf_token %}<input type="hidden" name="approved" value="1"><button class="btn small-btn" type="submit">Zatwierdź strzelca</button></form>{% endif %}
   {% endif %}
   {% if perms.clients.manage_clients %}
   <form method="post" action="{% url 'panel:client_profile' subject.pk %}" novalidate>{% csrf_token %}{% include "partials/form.html" with form=profile_form %}<button class="btn" type="submit">Zapisz notatki i tagi</button></form>

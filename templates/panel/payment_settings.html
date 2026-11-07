@@ -5,7 +5,7 @@
 {% include "panel/_payments_tabs.html" %}
 {% if fee_missing_in_rules %}<div class="card">
   <div class="msg warning"><strong>Regulamin nie wspomina o opłacie za płatność online.</strong> Opłata jest włączona — dopisz ją do regulaminu
-    (Panel → <a href="{% url 'panel:regulations' %}">Regulaminy</a> → nowa wersja), żeby potrącenie przy zwrocie było zgodne z zasadami, które klient zaakceptował.</div>
+    (Panel → <a href="{% url 'panel:regulations' %}">Regulaminy</a> → nowa wersja), żeby potrącenie przy zwrocie było zgodne z zasadami, które strzelec zaakceptował.</div>
   <p class="small">Proponowany zapis (z aktualną wysokością opłaty):</p>
   <blockquote class="small" style="margin:0 0 8px;padding:8px 12px;border-left:3px solid var(--border)" data-copy-text>{{ fee_rule_text }}</blockquote>
   <button type="button" class="btn secondary small-btn" data-copy="{{ fee_rule_text }}">Kopiuj tekst</button>
@@ -25,7 +25,7 @@
     <li><strong>Oba wyłączone</strong> (jak dotąd): każda wpłata opłaca tylko wskazaną rezerwację lub składkę; nadpłaty zostają do ręcznego rozliczenia lub zwrotu.</li>
     <li><strong>Nadpłata opłaca kolejne rezerwacje</strong>: nadpłata strzelca sama opłaca jego nowe i nieopłacone rezerwacje. Składek nie dotyka.</li>
     <li><strong>Saldo strzelca</strong>: pełne przedpłaty — strzelec może doładować saldo, a z niego pobierane są rezerwacje i składki.</li>
-    <li><strong>Opłata za płatność online</strong>: doliczana do każdej płatności przez Tpay (procent + kwota stała), widoczna dla klienta przed zapłatą.
+    <li><strong>Opłata za płatność online</strong>: doliczana do każdej płatności przez Tpay (procent + kwota stała), widoczna dla strzelca przed zapłatą.
       Przy anulowaniu lub odrzuceniu rezerwacji wraca tylko opłata za rezerwację — opłata za płatność online nie (prowizja Tpay nie jest zwracana).
       Przelew i płatność na miejscu są bez opłaty. Wpisz tę zasadę do regulaminu przed włączeniem.</li>
   </ul>

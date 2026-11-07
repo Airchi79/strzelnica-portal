@@ -23,7 +23,7 @@
   <div class="msg warning">Nie masz zweryfikowanych uprawnień prowadzącego strzelanie — strzelanie poprowadzi osoba wyznaczona przez strzelnicę.
     Rezerwacja zablokuje termin i będzie czekać na zatwierdzenie: obsługa przydzieli prowadzącego, a Ty dostaniesz e-mail.</div>
   {% elif preview.rule.requires_approval and not preview.code and not preview.client_pass %}
-  <div class="msg warning">Jesteś nowym klientem — rezerwacja zablokuje termin i będzie czekać na zatwierdzenie przez obsługę strzelnicy. Dostaniesz e-mail.</div>{% endif %}
+  <div class="msg warning">Jesteś nowym strzelcem — rezerwacja zablokuje termin i będzie czekać na zatwierdzenie przez obsługę strzelnicy. Dostaniesz e-mail.</div>{% endif %}
   <ul class="small">
     <li>Rezerwacja obejmuje <strong>całą oś</strong>.</li>
     {% if not preview.code and not preview.client_pass %}<li>Płatność:

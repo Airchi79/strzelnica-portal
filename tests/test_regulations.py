@@ -80,3 +80,14 @@ def test_regulation_text_is_escaped(owner_client, client):
     version = create_and_publish(owner_client, doc, content="<script>alert(1)</script>")
     body = client.get(f"/regulamin/wersja/{version.pk}/").content.decode()
     assert "<script>alert(1)</script>" not in body and "&lt;script&gt;" in body
+
+
+def test_regulation_text_links_only_https_and_stays_escaped():
+    from apps.core.templatetags.satok import regulation_text
+
+    html = str(regulation_text('DPA: https://www.cloudflare.com/cloudflare-customer-dpa/.\n'
+                               'x https://x.pl/"onmouseover=alert(1) javascript:alert(1) http://a.pl <b>b</b>'))
+    assert '<a href="https://www.cloudflare.com/cloudflare-customer-dpa/" target="_blank" rel="noopener noreferrer">' in html
+    assert "</a>." in html  # kropka kończąca zdanie poza linkiem
+    assert 'onmouseover=alert(1)' not in html.replace("&quot;onmouseover=alert(1", "")  # cudzysłów zamieniony na encję
+    assert 'href="http://a.pl' not in html and 'href="javascript' not in html and "<b>" not in html

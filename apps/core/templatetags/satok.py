@@ -1,3 +1,5 @@
+import re
+
 from django import template
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
@@ -14,15 +16,32 @@ def pln(grosze):
     return format_pln(grosze)
 
 
+_URL = re.compile(r"https://[^\s<>\"']+")
+
+
+def _linkify(escaped_line):
+    """Adresy https:// w już escapowanym tekście → klikalne linki (bez kropki / przecinka / nawiasu na końcu)."""
+    def repl(m):
+        url = m.group(0)
+        tail = ""
+        while url and url[-1] in ".,;:)!?":
+            tail = url[-1] + tail
+            url = url[:-1]
+        return f'<a href="{url}" target="_blank" rel="noopener noreferrer">{url}</a>{tail}'
+
+    return _URL.sub(repl, escaped_line)
+
+
 @register.filter
 def regulation_text(text):
-    """Prosty format treści regulaminu: akapity i wyróżnione paragrafy (§). Treść jest zawsze escapowana."""
+    """Prosty format treści regulaminu: akapity, wyróżnione paragrafy (§) i klikalne adresy https://.
+    Treść jest zawsze escapowana — HTML wpisany w treść nie działa."""
     parts = []
     for block in (text or "").replace("\r\n", "\n").split("\n\n"):
         block = block.strip()
         if not block:
             continue
-        html = "<br>".join(escape(line) for line in block.split("\n"))
+        html = "<br>".join(_linkify(str(escape(line))) for line in block.split("\n"))
         tag = "h3" if block.startswith("§") and "\n" not in block else "p"
         parts.append(f"<{tag}>{html}</{tag}>")
     return mark_safe("\n".join(parts))

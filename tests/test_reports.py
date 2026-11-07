@@ -84,13 +84,13 @@ def test_pdf_and_csv(owner_client, client_user, owner):
     day = timezone.localdate() - timedelta(days=1)
     _pay(client_user, owner, 7000, Payment.Method.CASH, day)
     report, _ = services.generate(SalesReport.Kind.DAILY, day)
-    pdf = owner_client.get(f"/panel/raporty-sprzedazy/{report.pk}/pdf/")
+    pdf = owner_client.get(f"/panel/raporty-wplywow/{report.pk}/pdf/")
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF") and len(pdf.content) > 1000
-    csv_body = owner_client.get(f"/panel/raporty-sprzedazy/{report.pk}/csv/").content.decode("utf-8")
+    csv_body = owner_client.get(f"/panel/raporty-wplywow/{report.pk}/csv/").content.decode("utf-8")
     assert "Kasia Klientka" in csv_body and "70,00" in csv_body and report.sha256 in csv_body
-    page = owner_client.get(f"/panel/raporty-sprzedazy/{report.pk}/").content.decode()
+    page = owner_client.get(f"/panel/raporty-wplywow/{report.pk}/").content.decode()
     assert report.number in page and "dane bez zmian" in page
-    assert report.number in owner_client.get("/panel/raporty-sprzedazy/").content.decode()
+    assert report.number in owner_client.get("/panel/raporty-wplywow/").content.decode()
 
 
 def test_panel_generate_and_permissions(owner_client, client_user, owner):
@@ -98,18 +98,18 @@ def test_panel_generate_and_permissions(owner_client, client_user, owner):
 
     day = timezone.localdate() - timedelta(days=3)
     _pay(client_user, owner, 1000, Payment.Method.CASH, day)
-    response = owner_client.post("/panel/raporty-sprzedazy/generuj/", {"rodzaj": "D", "dzien": day.isoformat()})
+    response = owner_client.post("/panel/raporty-wplywow/generuj/", {"rodzaj": "D", "dzien": day.isoformat()})
     assert response.status_code == 302 and SalesReport.objects.filter(kind="D", period_start=day).exists()
-    response = owner_client.post("/panel/raporty-sprzedazy/generuj/", {"rodzaj": "D", "dzien": timezone.localdate().isoformat()}, follow=True)
+    response = owner_client.post("/panel/raporty-wplywow/generuj/", {"rodzaj": "D", "dzien": timezone.localdate().isoformat()}, follow=True)
     assert "po zakończeniu okresu" in response.content.decode()
     staff = grant(make_user("s@example.com"), "logbook.view_logbook")
     c = Client()
     login_with_otp(c, staff)
-    assert c.get("/panel/raporty-sprzedazy/").status_code == 403
+    assert c.get("/panel/raporty-wplywow/").status_code == 403
     viewer = grant(make_user("r@example.com"), "reports.view_salesreport")
     c = Client()
     login_with_otp(c, viewer)
-    assert c.get("/panel/raporty-sprzedazy/").status_code == 200
+    assert c.get("/panel/raporty-wplywow/").status_code == 200
 
 
 def test_sandbox_tpay_payment_excluded_from_report(client_user, owner):
@@ -120,3 +120,10 @@ def test_sandbox_tpay_payment_excluded_from_report(client_user, owner):
     assert test.is_test and not real.is_test
     report, _ = services.generate(SalesReport.Kind.DAILY, day)
     assert report.data["summary"]["net"] == 7000 and report.data["summary"]["count"] == 1
+
+
+def test_old_report_urls_redirect(owner_client):
+    r = owner_client.get("/panel/raporty-sprzedazy/")
+    assert r.status_code == 301 and r["Location"] == "/panel/raporty-wplywow/"
+    assert owner_client.get("/panel/raporty-sprzedazy/5/pdf/")["Location"] == "/panel/raporty-wplywow/5/pdf/"
+    assert owner_client.get("/panel/osie/3/cennik/")["Location"] == "/panel/osie/3/oplaty/"

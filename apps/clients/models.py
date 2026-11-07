@@ -72,7 +72,7 @@ class ClientPass(models.Model):
     max_hours = models.PositiveIntegerField("maks. godzin na jedno wejście", default=2)
     max_persons = models.PositiveIntegerField("maks. osób na jedno wejście", default=1)
     lanes = models.ManyToManyField("facilities.Lane", verbose_name="dozwolone osie", blank=True, help_text="Puste = wszystkie osie.")
-    price = models.PositiveIntegerField("cena [gr]", default=0)
+    price = models.PositiveIntegerField("opłata [gr]", default=0)
     paid_with = models.CharField("zapłata", max_length=12, choices=PaidWith.choices, blank=True, default="")
     paid_at = models.DateTimeField("zapłacono", null=True, blank=True)
     is_active = models.BooleanField("aktywny", default=True)

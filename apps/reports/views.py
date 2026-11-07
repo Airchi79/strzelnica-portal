@@ -71,7 +71,7 @@ def _filename(report, ext):
 @panel_required(PERM)
 def panel_csv(request, pk):
     report = get_object_or_404(SalesReport, pk=pk)
-    log_sensitive_access(None, f"raport:{report.number}:csv", "pobranie raportu sprzedaży")
+    log_sensitive_access(None, f"raport:{report.number}:csv", "pobranie raportu wpływów")
     response = HttpResponse(services.to_csv(report), content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{_filename(report, "csv")}"'
     return response
@@ -80,7 +80,7 @@ def panel_csv(request, pk):
 @panel_required(PERM)
 def panel_pdf(request, pk):
     report = get_object_or_404(SalesReport, pk=pk)
-    log_sensitive_access(None, f"raport:{report.number}:pdf", "pobranie raportu sprzedaży")
+    log_sensitive_access(None, f"raport:{report.number}:pdf", "pobranie raportu wpływów")
     response = HttpResponse(services.to_pdf(report, AssociationSettings.load()), content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{_filename(report, "pdf")}"'
     return response

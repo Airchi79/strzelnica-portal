@@ -362,7 +362,7 @@ class AccessCode(models.Model):
                                    help_text="Puste = wszystkie osie.")
     hours_limit = models.PositiveIntegerField("limit godzin w okresie", null=True, blank=True)
     contract_hourly = models.PositiveIntegerField(
-        "stawka umowna / h [gr] (do zestawień)", null=True, blank=True,
+        "kwota umowna / h [gr] (do zestawień)", null=True, blank=True,
         help_text="Informacyjnie — opłata nie jest pobierana z salda. Puste = rozliczenie ryczałtowe wg umowy.",
     )
     is_active = models.BooleanField("aktywny", default=True)

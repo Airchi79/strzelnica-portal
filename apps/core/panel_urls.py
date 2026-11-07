@@ -1,4 +1,5 @@
-from django.urls import path
+from django.urls import path, re_path
+from django.views.generic import RedirectView
 
 from apps.association import views as association_views
 from apps.bookings import views as bookings_views
@@ -46,7 +47,7 @@ urlpatterns = [
     path("osie/<int:pk>/usun/", facilities_views.panel_lane_delete, name="lane_delete"),
     path("osie/obiekt/nowy/", facilities_views.panel_facility, name="facility_new"),
     path("osie/obiekt/<int:pk>/", facilities_views.panel_facility, name="facility"),
-    path("osie/<int:pk>/cennik/", facilities_views.panel_price_add, name="price_add"),
+    path("osie/<int:pk>/oplaty/", facilities_views.panel_price_add, name="price_add"),
     path("ustawienia/", views.panel_settings, name="settings"),
     path("dzis/", bookings_views.panel_today, name="today"),
     path("teraz/", logbook_views.panel_now, name="now"),
@@ -74,11 +75,14 @@ urlpatterns = [
     path("blokady/", bookings_views.panel_blocks, name="blocks"),
     path("blokady/nowa/", bookings_views.panel_block_new, name="block_new"),
     path("blokady/<int:pk>/usun/", bookings_views.panel_block_delete, name="block_delete"),
-    path("raporty-sprzedazy/", reports_views.panel_list, name="sales_reports"),
-    path("raporty-sprzedazy/generuj/", reports_views.panel_generate, name="sales_report_generate"),
-    path("raporty-sprzedazy/<int:pk>/", reports_views.panel_detail, name="sales_report"),
-    path("raporty-sprzedazy/<int:pk>/csv/", reports_views.panel_csv, name="sales_report_csv"),
-    path("raporty-sprzedazy/<int:pk>/pdf/", reports_views.panel_pdf, name="sales_report_pdf"),
+    # dawne adresy (przed zmianą nazwy na „raporty wpływów”, „opłaty”) — zakładki dalej działają
+    re_path(r"^raporty-sprzedazy/(?P<rest>.*)$", RedirectView.as_view(url="/panel/raporty-wplywow/%(rest)s", permanent=True)),
+    re_path(r"^osie/(?P<pk>\d+)/cennik/$", RedirectView.as_view(url="/panel/osie/%(pk)s/oplaty/", permanent=True)),
+    path("raporty-wplywow/", reports_views.panel_list, name="sales_reports"),
+    path("raporty-wplywow/generuj/", reports_views.panel_generate, name="sales_report_generate"),
+    path("raporty-wplywow/<int:pk>/", reports_views.panel_detail, name="sales_report"),
+    path("raporty-wplywow/<int:pk>/csv/", reports_views.panel_csv, name="sales_report_csv"),
+    path("raporty-wplywow/<int:pk>/pdf/", reports_views.panel_pdf, name="sales_report_pdf"),
     path("ksiazka/", logbook_views.panel_list, name="logbook"),
     path("ksiazka/kioski/", kiosk_views.panel_list, name="kiosks"),
     path("rezerwacje/archiwum/", bookings_views.panel_archive, name="reservations_archive"),

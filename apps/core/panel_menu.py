@@ -26,7 +26,7 @@ SECTIONS = [
         ("Kioski", "panel:kiosks", "tablet", "logbook.manage_logbook", ["kiosks"]),
         ("Ustawienia książki", "panel:logbook_settings", "sliders", "logbook.manage_logbook",
          ["logbook_settings", "logbook_rotate", "logbook_poster"]),
-        ("Osie i cennik", "panel:lanes", "target", "facilities.manage_facilities", ["lane*", "facility*", "price_add"]),
+        ("Osie i opłaty", "panel:lanes", "target", "facilities.manage_facilities", ["lane*", "facility*", "price_add"]),
         ("Usterki", "panel:issues", "alert", "facilities.manage_facilities", ["issue*"]),
         ("Regulaminy", "panel:regulations", "file", "regulations.publish_regulation", ["regulation*"]),
         ("Ogłoszenia", "panel:announcements", "bell", "core.publish_announcement", ["announcement*"]),
@@ -39,7 +39,7 @@ SECTIONS = [
     ("Płatności", [
         ("Wpłaty", "panel:payments", "receipt", "payments.manage_payments", ["payment*"]),
         ("Salda", "panel:wallets", "wallet", "payments.manage_payments", ["wallet*"]),
-        ("Raporty sprzedaży", "panel:sales_reports", "chart", "reports.view_salesreport", ["sales_report*"]),
+        ("Raporty wpływów", "panel:sales_reports", "chart", "reports.view_salesreport", ["sales_report*"]),
     ]),
     ("Stowarzyszenie", [
         ("Członkowie", "panel:members", "landmark", "association.manage_members", ["member*", "association_import*"]),

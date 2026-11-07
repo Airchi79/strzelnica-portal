@@ -29,18 +29,18 @@
   </div>
   <div class="actions"><button class="btn" type="submit">Zapisz</button><a class="btn secondary" href="{% url 'panel:lanes' %}">Wróć</a></div>
 </form>
-<h2>Cennik</h2>
+<h2>Opłaty</h2>
 <div class="card">
   <div class="table-wrap"><table>
     <tr><th>Od</th><th>Za osobę / h</th><th>Ryczałt / h</th></tr>
     {% for r in rules %}<tr><td>{{ r.valid_from|date:"d.m.Y" }}</td><td>{{ r.per_person_hourly|pln }}</td><td>{{ r.flat_hourly|pln }}</td></tr>
-    {% empty %}<tr><td colspan="3" class="muted">Brak cennika.</td></tr>{% endfor %}
+    {% empty %}<tr><td colspan="3" class="muted">Brak ustalonych opłat.</td></tr>{% endfor %}
   </table></div>
-  <div class="actions"><a class="btn secondary" href="{% url 'panel:price_add' lane.pk %}">Dodaj cennik od wybranej daty</a></div>
+  <div class="actions"><a class="btn secondary" href="{% url 'panel:price_add' lane.pk %}">Dodaj tabelę opłat od wybranej daty</a></div>
 </div>
 <h2>Usuwanie osi</h2>
 <div class="card">
-  {% if can_delete %}<form method="post" action="{% url 'panel:lane_delete' lane.pk %}" data-confirm="Usunąć oś {{ lane.name }} razem z jej godzinami i cennikiem?">{% csrf_token %}<button class="btn danger" type="submit">Usuń oś</button></form>
+  {% if can_delete %}<form method="post" action="{% url 'panel:lane_delete' lane.pk %}" data-confirm="Usunąć oś {{ lane.name }} razem z jej godzinami i opłatami?">{% csrf_token %}<button class="btn danger" type="submit">Usuń oś</button></form>
   <p class="small muted">Oś nie ma rezerwacji ani blokad, więc można ją usunąć.</p>
   {% else %}<p class="muted">Oś ma rezerwacje lub blokady w historii — nie można jej usunąć bez utraty rozliczeń. Odznacz pole <strong>„aktywna”</strong> u góry i zapisz: oś zniknie z rezerwacji, historia zostanie.</p>{% endif %}
 </div>

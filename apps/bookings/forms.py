@@ -188,8 +188,8 @@ class ChangeTermForm(forms.Form):
     start_hour = forms.TypedChoiceField(label="Od", choices=HOUR_START, coerce=int)
     end_hour = forms.TypedChoiceField(label="Do", choices=HOUR_END, coerce=int)
     refund_difference = forms.BooleanField(
-        label="Gdy nowa cena jest niższa — zwróć różnicę na rachunek / kartę klienta (Tpay)", required=False, initial=True,
-        help_text="Bez zaznaczenia różnica zostaje nadpłatą klienta. Wyższa cena zawsze oznacza dopłatę do zapłaty.",
+        label="Gdy nowa kwota jest niższa — zwróć różnicę na rachunek / kartę klienta (Tpay)", required=False, initial=True,
+        help_text="Bez zaznaczenia różnica zostaje nadpłatą klienta. Wyższa kwota zawsze oznacza dopłatę do zapłaty.",
     )
 
     def __init__(self, *args, **kwargs):

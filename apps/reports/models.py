@@ -34,8 +34,8 @@ class SalesReport(models.Model):
 
     class Meta:
         ordering = ["-period_start", "-kind"]
-        verbose_name = "raport sprzedaży"
-        verbose_name_plural = "raporty sprzedaży"
+        verbose_name = "raport wpływów"
+        verbose_name_plural = "raporty wpływów"
         constraints = [
             models.UniqueConstraint(fields=["kind", "period_start"], name="report_one_per_period"),
             models.CheckConstraint(condition=models.Q(period_end__gte=models.F("period_start")), name="report_period_order"),

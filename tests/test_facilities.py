@@ -53,7 +53,7 @@ def test_price_versioning_by_date():
 
 def test_panel_price_add_converts_zloty_to_grosze(owner_client):
     lane = Lane.objects.get(name="Oś 35 m")
-    response = owner_client.post(f"/panel/osie/{lane.pk}/cennik/", {"valid_from": "2027-01-01", "per_person": "37,50", "flat": "110"})
+    response = owner_client.post(f"/panel/osie/{lane.pk}/oplaty/", {"valid_from": "2027-01-01", "per_person": "37,50", "flat": "110"})
     assert response.status_code == 302, response.content
     rule = lane.price_rules.get(valid_from=datetime.date(2027, 1, 1))
     assert (rule.per_person_hourly, rule.flat_hourly) == (3750, 11000)

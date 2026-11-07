@@ -179,7 +179,7 @@ class ClubForm(forms.ModelForm):
 
 
 class AccessCodeForm(forms.ModelForm):
-    contract_hourly_pln = PLNField(label="Stawka umowna / h [zł] (informacyjnie)", required=False)
+    contract_hourly_pln = PLNField(label="Kwota umowna / h [zł] (informacyjnie)", required=False)
 
     class Meta:
         model = AccessCode

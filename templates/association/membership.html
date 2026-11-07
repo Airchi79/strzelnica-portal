@@ -36,7 +36,7 @@
   <p>Członkiem może zostać każdy, kto złoży oświadczenie o przystąpieniu i akceptacji Regulaminu (§ 29). Zarząd podejmuje uchwałę w ciągu 2 miesięcy (§ 32).</p>
   <p>Wpisowe: <strong>{{ cfg.entry_fee|pln }}</strong> (jednorazowo) · składka roczna: <strong>{{ cfg.annual_fee|pln }}</strong>, płatna do {{ cfg.due_day }}.{{ cfg.due_month|stringformat:"02d" }} (przy przyjęciu w trakcie roku — pełna kwota).</p>
   {% if rules %}<p><a href="{% url 'regulations:version' rules.pk %}" target="_blank" rel="noopener">Regulamin Stowarzyszenia →</a></p>{% endif %}
-  <p class="small muted">Członkostwo nie zmienia cennika korzystania ze strzelnicy — zgodnie z § 40 Regulaminu majątek Stowarzyszenia udostępniany jest członkom na tych samych zasadach co innym osobom.</p>
+  <p class="small muted">Członkostwo nie zmienia opłat za korzystanie ze strzelnicy — zgodnie z § 40 Regulaminu majątek Stowarzyszenia udostępniany jest członkom na tych samych zasadach co innym osobom.</p>
   <form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Składam deklarację</button></form>
 </div>
 {% endif %}

@@ -37,7 +37,7 @@ class PassForm(forms.Form):
     max_persons = forms.IntegerField(label="Maks. osób na wejście", min_value=1, max_value=20, initial=1)
     lanes = forms.ModelMultipleChoiceField(label="Dozwolone osie (puste = wszystkie)", queryset=Lane.objects.none(), required=False,
                                            widget=forms.CheckboxSelectMultiple)
-    price = forms.DecimalField(label="Cena [zł]", min_value=0, max_value=100000, decimal_places=2, initial=0)
+    price = forms.DecimalField(label="Opłata [zł]", min_value=0, max_value=100000, decimal_places=2, initial=0)
     paid_with = forms.ChoiceField(label="Zapłata", choices=ClientPass.PaidWith.choices, required=False,
                                   help_text="Kod można wykorzystać dopiero po opłaceniu (lub oznaczeniu jako bezpłatny).")
     note = forms.CharField(label="Uwagi", max_length=255, required=False)

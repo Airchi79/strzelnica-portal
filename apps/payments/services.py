@@ -126,7 +126,7 @@ def online_fee_rule_text(cfg=None):
         return ""
     return ("Do płatności online (Tpay: BLIK, przelew online, karta) doliczana jest opłata za obsługę płatności w wysokości "
             f"{' + '.join(parts)}, widoczna przed zapłatą. Opłata ta nie podlega zwrotowi przy anulowaniu, wycofaniu lub odrzuceniu "
-            "rezerwacji albo zapisu — zwracana jest cena rezerwacji lub opłaty startowej. Płatność przelewem tradycyjnym "
+            "rezerwacji albo zapisu — zwracana jest opłata za rezerwację lub opłata startowa. Płatność przelewem tradycyjnym "
             "lub na miejscu jest wolna od tej opłaty.")
 
 
@@ -358,7 +358,7 @@ MANUAL_REFUND_METHODS = {"przelew": "przelew", "gotowka": "gotówka", "tpay_pane
 @transaction.atomic
 def manual_refund(user, amount, method, reason, by):
     """Zwrot wykonany poza systemem (przelew, gotówka, zwrot ręczny w panelu Tpay) — księgowany jako „zwrot do
-    wpłacającego”, więc trafia do raportu sprzedaży jako zwrot. Najwyżej do wysokości nadpłaty."""
+    wpłacającego”, więc trafia do raportu wpływów jako zwrot. Najwyżej do wysokości nadpłaty."""
     if method not in MANUAL_REFUND_METHODS:
         raise ValidationError("Wybierz sposób zwrotu.")
     if not reason.strip():

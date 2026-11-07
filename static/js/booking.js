@@ -87,7 +87,7 @@
       else if (n * pp >= flat) infoText = `Od ${Math.ceil(flat / pp)} osób obowiązuje korzystniejszy ryczałt ${fmt(flat)}/h zamiast ${fmt(pp)} za osobę.`;
       else infoText = `${n} × ${fmt(pp)} = ${fmt(hourly)} za godzinę. Od ${Math.ceil(flat / pp)} osób ryczałt ${fmt(flat)}/h.`;
       if (hours) priceText = code ? "z kodem — rozliczenie po sprawdzeniu kodu" : `${fmt(hourly * hours)} (${hours} h × ${fmt(hourly)})`;
-    } else if (data && !data.price) infoText = "Ta oś nie ma jeszcze cennika — rezerwacja nie jest możliwa.";
+    } else if (data && !data.price) infoText = "Ta oś nie ma jeszcze ustalonych opłat — rezerwacja nie jest możliwa.";
     info.textContent = infoText;
     const day = dayInput.value ? new Date(dayInput.value + "T12:00:00").toLocaleDateString("pl-PL", { weekday: "short", day: "numeric", month: "numeric" }) : "";
     if (laneName && day && hours) main.textContent = `${laneName} · ${day} · ${pad(start)}–${pad(end)} · ${n} os.`;

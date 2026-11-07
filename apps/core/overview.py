@@ -30,7 +30,7 @@ FEED_LABELS = {
     "platnosc.tpay_start": "Płatność online rozpoczęta",
     "platnosc.zwrot_tpay": "Zwrot płatności",
     "platnosci.import_wyciagu": "Import wyciągu",
-    "raport.sprzedaz": "Raport sprzedaży",
+    "raport.sprzedaz": "Raport wpływów",
     "skladka.oplacona": "Składka opłacona",
     "ksiazka.wpis": "Wpis do książki pobytu",
     "ksiazka.wypis": "Wyjście ze strzelnicy",

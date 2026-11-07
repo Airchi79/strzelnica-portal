@@ -4,7 +4,7 @@
 <h1>Składki i wpisowe {{ year }}</h1>
 {% include "panel/_assoc_tabs.html" %}
 <div class="grid">
-  <div class="card"><span class="muted small">Obowiązujące stawki</span><div>składka roczna <strong>{{ cfg.annual_fee|pln }}</strong> · wpisowe <strong>{{ cfg.entry_fee|pln }}</strong></div>
+  <div class="card"><span class="muted small">Wysokość składek</span><div>składka roczna <strong>{{ cfg.annual_fee|pln }}</strong> · wpisowe <strong>{{ cfg.entry_fee|pln }}</strong></div>
     <div class="small muted">termin: {{ cfg.due_day }}.{{ cfg.due_month|stringformat:"02d" }}; zmiana stawek — uchwałą Zarządu (§ 27)</div></div>
   {% with p=summary|get:"skladka:oplacona" d=summary|get:"skladka:do_zaplaty" %}
   <div class="card"><span class="muted small">Składki {{ year }}</span><div>opłacone: <strong>{{ p.n|default:0 }}</strong> ({{ p.s|default:0|pln }})</div><div>do zapłaty: <strong>{{ d.n|default:0 }}</strong> ({{ d.s|default:0|pln }})</div></div>

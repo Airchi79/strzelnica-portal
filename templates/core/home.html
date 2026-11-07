@@ -16,5 +16,5 @@
     <div class="card"><strong>{{ lane.name }}</strong><div class="muted small">{{ lane.get_kind_display }}{% if lane.length_m %} · {{ lane.length_m }} m{% endif %}{% if lane.exclusive_only %} · tylko na wyłączność{% endif %}</div></div>
   {% endfor %}
 </div>
-<p><a href="{% url 'bookings:calendar' %}">Sprawdź zajętość osi →</a> · <a href="{% url 'core:lanes' %}">Godziny otwarcia i cennik →</a></p>
+<p><a href="{% url 'bookings:calendar' %}">Sprawdź zajętość osi →</a> · <a href="{% url 'core:lanes' %}">Godziny otwarcia i opłaty →</a></p>
 {% endblock %}

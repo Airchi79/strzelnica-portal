@@ -208,7 +208,7 @@ Następnie w przeglądarce:
 2. **Panel zarządu → Stowarzyszenie:** nazwa, adres, NIP, REGON, numer rachunku, e-mail powiadomień.
 3. **Panel → Regulaminy:** wklej treść regulaminu strzelnicy, regulaminu rezerwacji i informacji RODO →
    **Publikuj**.
-4. **Panel → Osie i cennik:** sprawdź osie, godziny otwarcia (obecnie 9–18) i ceny.
+4. **Panel → Osie i opłaty:** sprawdź osie, godziny otwarcia (obecnie 9–18) i opłaty.
 5. **Panel → Książka pobytu → Ustawienia i kod QR → Plakat do druku:** wydrukuj i wywieś przy wejściu.
 6. Załóż próbne konto strzelca (inny e-mail), dodaj uprawnienia PS, zweryfikuj je w panelu i wykonaj
    próbną rezerwację — sprawdzisz przy okazji, czy dochodzą e-maile.

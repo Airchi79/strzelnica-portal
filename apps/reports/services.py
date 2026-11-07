@@ -39,7 +39,7 @@ def month_bounds(year, month):
 
 
 def collect(start, end):
-    """Zbiera operacje z okresu: zaksięgowane wpłaty, sprzedaż kodów wejścia, zwroty do wpłacających."""
+    """Zbiera operacje z okresu: zaksięgowane wpłaty, opłacone kody wejścia, zwroty do wpłacających."""
     from apps.clients.models import ClientPass
     from apps.payments.models import LedgerEntry, Payment
 
@@ -221,11 +221,11 @@ def to_pdf(report, association):
     head = ParagraphStyle("h", parent=base, fontName="DejaVu-Bold", fontSize=13, leading=17)
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=14 * mm, rightMargin=14 * mm, topMargin=14 * mm, bottomMargin=14 * mm,
-                            title=f"Raport sprzedaży {report.number}", author=association.name or "Strzelnica Sątok")
+                            title=f"Raport wpływów {report.number}", author=association.name or "Strzelnica Sątok")
     s = report.data["summary"]
     period = report.period_start.strftime("%d.%m.%Y") + ("" if report.period_start == report.period_end else "–" + report.period_end.strftime("%d.%m.%Y"))
     header = [
-        Paragraph(f"Raport sprzedaży {report.get_kind_display().lower()} nr {report.number}", head),
+        Paragraph(f"Raport wpływów {report.get_kind_display().lower()} nr {report.number}", head),
         Paragraph(escape(f"{association.name}{', ' + association.address if association.address else ''}"
                          f"{' · NIP ' + association.nip if association.nip else ''}"), base),
         Paragraph(f"Okres: {period} · wygenerowano: {timezone.localtime(report.generated_at):%d.%m.%Y %H:%M}", base),

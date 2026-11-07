@@ -47,7 +47,7 @@ class Lane(models.Model):
         ordering = ["facility__order", "order", "name"]
         verbose_name = "oś"
         verbose_name_plural = "osie"
-        permissions = [("manage_facilities", "Może zarządzać osiami, godzinami i cennikiem")]
+        permissions = [("manage_facilities", "Może zarządzać osiami, godzinami i opłatami")]
 
     def __str__(self):
         return self.name
@@ -88,7 +88,7 @@ class PriceRule(models.Model):
     """
 
     lane = models.ForeignKey(Lane, verbose_name="oś", on_delete=models.CASCADE, related_name="price_rules")
-    per_person_hourly = models.PositiveIntegerField("stawka za osobę / h [gr]", null=True, blank=True)
+    per_person_hourly = models.PositiveIntegerField("opłata za osobę / h [gr]", null=True, blank=True)
     flat_hourly = models.PositiveIntegerField("ryczałt / h [gr]")
     valid_from = models.DateField("obowiązuje od")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
@@ -96,8 +96,8 @@ class PriceRule(models.Model):
 
     class Meta:
         ordering = ["lane", "-valid_from"]
-        verbose_name = "cennik"
-        verbose_name_plural = "cenniki"
+        verbose_name = "tabela opłat"
+        verbose_name_plural = "tabele opłat"
         constraints = [models.UniqueConstraint(fields=["lane", "valid_from"], name="price_rule_unique_from")]
 
     def __str__(self):

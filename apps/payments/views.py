@@ -335,7 +335,7 @@ def panel_wallet(request, user_pk):
             except ValidationError as e:
                 messages.error(request, e.messages[0])
             else:
-                messages.success(request, f"Zaksięgowano zwrot ręczny {d['grosze'] / 100:.2f} zł — będzie w raporcie sprzedaży jako zwrot.")
+                messages.success(request, f"Zaksięgowano zwrot ręczny {d['grosze'] / 100:.2f} zł — będzie w raporcie wpływów jako zwrot.")
             return redirect("panel:wallet", user_pk=subject.pk)
     form = CorrectionForm(request.POST if request.method == "POST" and not request.POST.get("action") else None)
     if request.method == "POST" and form.is_valid():

@@ -139,8 +139,8 @@ class Reservation(models.Model):
     persons = models.PositiveIntegerField("liczba osób")
     notes = models.CharField("uwagi", max_length=500, blank=True)
 
-    price_rule = models.ForeignKey(PriceRule, verbose_name="cennik", on_delete=models.PROTECT, related_name="+")
-    hourly_amount = models.PositiveIntegerField("stawka za godzinę [gr]")
+    price_rule = models.ForeignKey(PriceRule, verbose_name="tabela opłat", on_delete=models.PROTECT, related_name="+")
+    hourly_amount = models.PositiveIntegerField("opłata za godzinę [gr]")
     amount = models.PositiveIntegerField("należność [gr]")
     paid_amount = models.PositiveIntegerField("zapłacono [gr]", default=0)
     access_code = models.ForeignKey(

@@ -77,7 +77,7 @@ def panel_price_add(request, pk):
             str(rule),
             changes={"za_osobe_gr": rule.per_person_hourly, "ryczalt_gr": rule.flat_hourly, "od": str(rule.valid_from)},
         )
-        messages.success(request, "Dodano cennik. Wcześniejsze rezerwacje zachowują swoją cenę.")
+        messages.success(request, "Dodano tabelę opłat. Wcześniejsze rezerwacje zachowują swoje kwoty.")
         return redirect("panel:lane", pk=lane.pk)
     return render(request, "panel/price_add.html", {"lane": lane, "form": form})
 
@@ -143,7 +143,7 @@ def panel_lane_new(request):
                                          valid_from=timezone.localdate(), created_by=request.user)
         log_event("os.dodanie", lane, str(lane), changes={"obiekt": str(lane.facility), "godziny_z": str(source) if source else None,
                                                            "cennik": d.get("price_flat") is not None})
-        messages.success(request, f"Dodano oś {lane}. Sprawdź godziny otwarcia i cennik.")
+        messages.success(request, f"Dodano oś {lane}. Sprawdź godziny otwarcia i opłaty.")
         return redirect("panel:lane", pk=lane.pk)
     return render(request, "panel/lane_new.html", {"form": form})
 

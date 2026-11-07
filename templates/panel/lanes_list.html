@@ -1,7 +1,7 @@
 {% extends "panel/base_panel.html" %}{% load satok %}
-{% block title %}Osie i cennik{% endblock %}
+{% block title %}Osie i opłaty{% endblock %}
 {% block panel %}
-<h1>Obiekty, osie i cennik</h1>
+<h1>Obiekty, osie i opłaty</h1>
 <div class="actions" style="margin-top:0;margin-bottom:12px">
   <a class="btn" href="{% url 'panel:facility_new' %}">+ Nowy obiekt (strzelnica)</a>
   <a class="btn secondary" href="{% url 'panel:lane_new' %}">+ Nowa oś</a>
@@ -16,17 +16,17 @@
     <a class="btn secondary small-btn" href="{% url 'panel:facility' facility.pk %}">Edytuj obiekt</a>
   </header>
   {% if lanes %}<div class="table-wrap"><table class="days">
-    <tr class="head"><th>Oś</th><th>Godziny</th><th>Cena / h</th><th></th></tr>
+    <tr class="head"><th>Oś</th><th>Godziny</th><th>Opłata / h</th><th></th></tr>
     {% for lane, rule in lanes %}
     <tr><td><a href="{% url 'panel:lane' lane.pk %}"><strong>{{ lane.name }}</strong></a>{% if not lane.is_active %} <span class="badge bad">wyłączona</span>{% endif %}{% if lane.exclusive_only %} <span class="badge">na wyłączność</span>{% endif %}
         <div class="small muted">{{ lane.get_kind_display }}{% if lane.length_m %} · {{ lane.length_m }} m{% endif %}</div></td>
       <td data-label="Godziny" class="small">{% with hs=lane.opening_hours.all %}{% if hs %}{{ hs|hours_summary }}{% else %}<span class="badge warn">brak godzin — oś nieczynna</span>{% endif %}{% endwith %}</td>
-      <td data-label="Cena / h">{% if rule %}{% if rule.per_person_hourly %}{{ rule.per_person_hourly|pln }}/os., maks. {{ rule.flat_hourly|pln }}{% else %}{{ rule.flat_hourly|pln }} ryczałt{% endif %}{% else %}<span class="badge warn">brak cennika</span>{% endif %}</td>
+      <td data-label="Opłata / h">{% if rule %}{% if rule.per_person_hourly %}{{ rule.per_person_hourly|pln }}/os., maks. {{ rule.flat_hourly|pln }}{% else %}{{ rule.flat_hourly|pln }} ryczałt{% endif %}{% else %}<span class="badge warn">brak cennika</span>{% endif %}</td>
       <td><a class="btn secondary small-btn" href="{% url 'panel:lane' lane.pk %}">Edytuj</a></td></tr>
     {% endfor %}
   </table></div>
   {% else %}<p class="muted" style="padding:10px 14px;margin:0">Brak osi — <a href="{% url 'panel:lane_new' %}?obiekt={{ facility.pk }}">dodaj pierwszą</a>.</p>{% endif %}
 </section>
 {% empty %}<div class="card muted">Brak obiektów. <a href="{% url 'panel:facility_new' %}">Dodaj pierwszy obiekt</a>.</div>{% endfor %}
-<p class="small muted">Oś bez godzin otwarcia albo bez cennika nie przyjmuje rezerwacji. Wyłączona oś lub obiekt znika z rezerwacji, a historia zostaje.</p>
+<p class="small muted">Oś bez godzin otwarcia albo bez ustalonych opłat nie przyjmuje rezerwacji. Wyłączona oś lub obiekt znika z rezerwacji, a historia zostaje.</p>
 {% endblock %}

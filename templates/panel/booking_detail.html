@@ -8,7 +8,7 @@
   <tr><th>Termin</th><td>{{ r.starts_at|date:"l, j E Y" }}, {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }} ({{ r.hours }} h){% if r.series %} <span class="badge">cykliczna</span>{% endif %}</td></tr>
   <tr><th>Rezerwujący (PS)</th><td>{{ r.user.full_name }} · {{ r.user.email }}{% if r.user.phone %} · {{ r.user.phone }}{% endif %}</td></tr>
   <tr><th>Liczba osób</th><td>{{ r.persons }}</td></tr>
-  <tr><th>Należność</th><td><strong>{{ r.amount|pln }}</strong> ({{ r.hourly_amount|pln }} / h, cennik od {{ r.price_rule.valid_from|date:"j.m.Y" }})</td></tr>
+  <tr><th>Należność</th><td><strong>{{ r.amount|pln }}</strong> ({{ r.hourly_amount|pln }} / h, tabela opłat od {{ r.price_rule.valid_from|date:"j.m.Y" }})</td></tr>
   <tr><th>Status</th><td>{{ r.display_status }}{% if r.late_cancellation %} <span class="badge warn">anulowana z zachowaniem należności</span>{% endif %}
     {% if r.cancelled_at %}<div class="small muted">{{ r.cancelled_at|date:"j.m.Y H:i" }}, {{ r.cancelled_by.full_name }}{% if r.cancel_reason %} — {{ r.cancel_reason }}{% endif %}</div>{% endif %}</td></tr>
   <tr><th>Płatność</th><td>{{ r.get_payment_status_display }}{% if r.payment_marked_by %}<div class="small muted">{{ r.payment_marked_by.full_name }}, {{ r.payment_marked_at|date:"j.m.Y H:i" }}</div>{% endif %}</td></tr>
@@ -77,7 +77,7 @@
 </div>
 {% if r.status == 'potwierdzona' or r.status == 'do_zatwierdzenia' %}
 <details class="card">
-  <summary><strong>Zmień oś lub termin</strong> <span class="small muted">— należność przeliczy się według cennika nowej osi</span></summary>
+  <summary><strong>Zmień oś lub termin</strong> <span class="small muted">— należność przeliczy się według opłat nowej osi</span></summary>
   <form method="post" novalidate style="margin-top:10px" data-confirm="Zmienić termin rezerwacji {{ r.number }}? Klient dostanie e-mail.">{% csrf_token %}<input type="hidden" name="action" value="change_term">
     <div class="field-row">{% include "partials/field.html" with field=term_form.lane %}{% include "partials/field.html" with field=term_form.day %}</div>
     <div class="field-row">{% include "partials/field.html" with field=term_form.start_hour %}{% include "partials/field.html" with field=term_form.end_hour %}</div>

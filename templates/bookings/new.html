@@ -14,7 +14,7 @@
     {% elif preview.client_pass %}
     <tr><th>Rozliczenie</th><td><strong>kod wejścia {{ preview.client_pass.code }}</strong> — wykorzystuje 1 wejście, bez dopłaty</td></tr>
     {% else %}
-    <tr><th>Stawka</th><td>{{ preview.hourly|pln }} / h</td></tr>
+    <tr><th>Opłata za godzinę</th><td>{{ preview.hourly|pln }} / h</td></tr>
     <tr><th>Należność</th><td><strong>{{ preview.amount|pln }}</strong></td></tr>
     {% endif %}
   </table>

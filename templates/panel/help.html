@@ -11,7 +11,7 @@
   {% if perms.logbook.view_logbook %}<li><a href="#ksiazka">Książka pobytu, kod QR, kiosk</a></li>{% endif %}
   {% if perms.events.manage_events %}<li><a href="#zawody">Zawody i wydarzenia</a></li>{% endif %}
   {% if perms.core.publish_announcement %}<li><a href="#ogloszenia">Ogłoszenie (np. strzelnica zamknięta)</a></li>{% endif %}
-  {% if perms.facilities.manage_facilities %}<li><a href="#usterki">Usterki, osie, cennik</a></li>{% endif %}
+  {% if perms.facilities.manage_facilities %}<li><a href="#usterki">Usterki, osie, opłaty</a></li>{% endif %}
   {% if perms.accounts.manage_permissions %}<li><a href="#uprawnienia">Uprawnienia i dyżurny</a></li>{% endif %}
   {% if perms.accounts.view_users %}<li><a href="#rodo">RODO: żądanie danych lub usunięcia</a></li>{% endif %}
   {% if perms.core.manage_settings %}<li><a href="#kopie">Kopie zapasowe i awaria</a></li><li><a href="#ustawienia">Dane stowarzyszenia i logo</a></li>{% endif %}
@@ -53,7 +53,7 @@
   <li>Otwórz rezerwację (np. z <em>Dziś na strzelnicy</em> → <em>rozlicz</em>).</li>
   <li><strong>Przyjmij wpłatę (gotówka / BLIK)</strong> → kwota jest wpisana → zapisz.</li>
   <li>Opłata startowa na zawodach: Wydarzenia → lista startowa → <em>Gotówka</em> / <em>BLIK</em> przy uczestniku.</li>
-  <li>Wpłata trafia do raportu sprzedaży; klient może pobrać potwierdzenie PDF.</li></ol></section>
+  <li>Wpłata trafia do raportu wpływów; klient może pobrać potwierdzenie PDF.</li></ol></section>
 {% endif %}
 
 {% if perms.payments.manage_payments %}
@@ -61,7 +61,7 @@
   <li><strong>Przelewy z banku:</strong> Wpłaty → <em>Import wyciągu</em> (CSV z banku). Wpłaty z numerem rezerwacji w tytule przypiszą się same; resztę przypisz z komunikatu „wpłat czeka na przypisanie” na liście wpłat.</li>
   <li><strong>Nadpłaty:</strong> widać w <em>Salda</em>. Karta rezerwacji → <em>Opłać z nadpłaty</em>, albo automatycznie: Wpłaty → <em>Ustawienia</em> → „nadpłata opłaca kolejne rezerwacje”.</li>
   <li><strong>Potwierdzenie wpłaty (PDF):</strong> karta wpłaty → <em>Potwierdzenie wpłaty</em>. To nie faktura.</li>
-  <li><strong>Raporty sprzedaży</strong> tworzą się same (dzienne i miesięczne); PDF i CSV dla księgowości.</li>
+  <li><strong>Raporty wpływów</strong> tworzą się same (dzienne i miesięczne); PDF i CSV dla księgowości.</li>
   <li><strong>Płatności testowe Tpay</strong> są oznaczone „TEST” i nie wchodzą do raportów.</li></ul></section>
 {% endif %}
 
@@ -99,9 +99,9 @@
 {% endif %}
 
 {% if perms.facilities.manage_facilities %}
-<section class="card help" id="usterki"><h2>Usterki, osie, cennik</h2><ul>
+<section class="card help" id="usterki"><h2>Usterki, osie, opłaty</h2><ul>
   <li><strong>Usterki:</strong> nowe zgłoszenia mają licznik w menu. Zmień status (W naprawie → Naprawione z opisem) — zgłaszający dostanie e-mail.</li>
-  <li><strong>Osie i cennik:</strong> godziny otwarcia każdej osi, nowe stawki od daty (stare rezerwacje zachowują swoją cenę), dodawanie i wyłączanie osi.</li></ul></section>
+  <li><strong>Osie i opłaty:</strong> godziny otwarcia każdej osi, nowe opłaty od daty (wcześniejsze rezerwacje zachowują swoje kwoty), dodawanie i wyłączanie osi.</li></ul></section>
 {% endif %}
 
 {% if perms.accounts.manage_permissions %}

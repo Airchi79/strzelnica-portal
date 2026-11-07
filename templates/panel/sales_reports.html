@@ -1,10 +1,10 @@
 {% extends "panel/base_panel.html" %}{% load satok %}
-{% block title %}Raporty sprzedaży{% endblock %}
+{% block title %}Raporty wpływów{% endblock %}
 {% block panel %}
-<h1>Raporty sprzedaży</h1>
+<h1>Raporty wpływów</h1>
 {% include "panel/_payments_tabs.html" %}
 <div class="card">
-  <p class="small muted">Raporty są numerowane i niezmienne. Dzienne powstają automatycznie po zakończeniu dnia, w którym były operacje; miesięczne — po zakończeniu miesiąca. Obejmują zaksięgowane wpłaty (rezerwacje, składki, inne), sprzedaż kodów wejścia i zwroty do wpłacających.</p>
+  <p class="small muted">Raporty są numerowane i niezmienne. Dzienne powstają automatycznie po zakończeniu dnia, w którym były operacje; miesięczne — po zakończeniu miesiąca. Obejmują zaksięgowane wpłaty (rezerwacje, składki, inne), opłacone kody wejścia i zwroty do wpłacających.</p>
   <div class="actions">
     <form method="post" action="{% url 'panel:sales_report_generate' %}" class="actions" style="margin:0">{% csrf_token %}
       <input type="hidden" name="rodzaj" value="D"><input type="date" name="dzien" value="{{ yesterday|date:'Y-m-d' }}" max="{{ yesterday|date:'Y-m-d' }}" aria-label="Dzień">

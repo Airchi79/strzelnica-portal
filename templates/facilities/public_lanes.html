@@ -1,8 +1,8 @@
 {% extends "base.html" %}{% load satok %}
-{% block title %}Osie i cennik{% endblock %}
+{% block title %}Osie i opłaty{% endblock %}
 {% block content %}
-<h1>Osie, godziny otwarcia i cennik</h1>
-<p class="muted">Rezerwacja obejmuje całą oś. Opłata za godzinę to mniejsza z kwot: liczba osób × stawka za osobę albo ryczałt za oś.</p>
+<h1>Osie, godziny otwarcia i opłaty</h1>
+<p class="muted">Rezerwacja obejmuje całą oś. Opłata za godzinę to mniejsza z kwot: liczba osób × opłata za osobę albo ryczałt za oś.</p>
 {% for lane, rule in lanes %}
 <div class="card">
   <h2 style="margin-top:0">{{ lane.name }}</h2>

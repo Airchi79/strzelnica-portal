@@ -4,7 +4,7 @@ from apps.reports.services import generate_missing
 
 
 class Command(BaseCommand):
-    help = "Generuje brakujące numerowane raporty sprzedaży: dzienne (dni z operacjami) i miesięczne (zakończone miesiące)."
+    help = "Generuje brakujące numerowane raporty wpływów: dzienne (dni z operacjami) i miesięczne (zakończone miesiące)."
 
     def handle(self, *args, **options):
         created = generate_missing()

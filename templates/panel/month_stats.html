@@ -54,7 +54,7 @@
     <table>{% for label, amount in income %}<tr><td>{{ label }}</td><td class="nowrap" style="text-align:right"><strong>{{ amount|pln }}</strong></td></tr>
       {% empty %}<tr><td class="muted">Brak zaksięgowanych wpłat.</td></tr>{% endfor %}
       {% if income %}<tr><td><strong>Razem</strong></td><td class="nowrap" style="text-align:right"><strong>{{ kpi.income|pln }}</strong></td></tr>{% endif %}</table>
-    <p class="small muted">Wpłaty zaksięgowane w miesiącu (bez płatności testowych Tpay). Szczegóły i dokumenty — <a href="{% url 'panel:sales_reports' %}">Raporty sprzedaży</a>.</p>
+    <p class="small muted">Wpłaty zaksięgowane w miesiącu (bez płatności testowych Tpay). Szczegóły i dokumenty — <a href="{% url 'panel:sales_reports' %}">Raporty wpływów</a>.</p>
   </div>
   <div class="card table-wrap">
     <h2 class="step-title">Kluby (rezerwacje z kodem klubu)</h2>

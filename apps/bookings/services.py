@@ -189,7 +189,7 @@ def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: i
                                   f"(do {timezone.localtime(hold.hold_until):%H:%M}). Wybierz inny albo zapisz się na listę.")
     rule = lane.price_rule_for(day)
     if rule is None:
-        raise ValidationError("Dla tej osi nie ustalono cennika. Skontaktuj się z zarządem.")
+        raise ValidationError("Dla tej osi nie ustalono opłat. Skontaktuj się z zarządem.")
     return starts_at, ends_at, rule
 
 

@@ -35,10 +35,10 @@ class NewLaneForm(LaneForm):
         super().__init__(*args, **kwargs)
         self.fields["copy_hours_from"].queryset = Lane.objects.select_related("facility").order_by("facility__order", "order")
         self.fields["copy_hours_from"].label_from_instance = lambda lane: f"{lane.facility} · {lane}"
-        self.fields["price_per_person"] = PLNField(label="Cennik: stawka za osobę / h [zł]", required=False,
+        self.fields["price_per_person"] = PLNField(label="Opłata za osobę / h [zł]", required=False,
                                                    help_text="Puste = oś tylko z ryczałtem.")
-        self.fields["price_flat"] = PLNField(label="Cennik: ryczałt / h [zł]", required=False,
-                                             help_text="Puste = bez cennika (dodasz później; bez cennika oś nie przyjmuje rezerwacji).")
+        self.fields["price_flat"] = PLNField(label="Ryczałt za oś / h [zł]", required=False,
+                                             help_text="Puste = bez opłat (dodasz później; bez ustalonych opłat oś nie przyjmuje rezerwacji).")
 
     def clean(self):
         d = super().clean()
@@ -102,7 +102,7 @@ class PLNField(forms.DecimalField):
 
 
 class PriceRuleForm(forms.ModelForm):
-    per_person = PLNField(label="Stawka za osobę / h [zł]", required=False, help_text="Puste = oś tylko z ryczałtem.")
+    per_person = PLNField(label="Opłata za osobę / h [zł]", required=False, help_text="Puste = oś tylko z ryczałtem.")
     flat = PLNField(label="Ryczałt / h [zł]")
 
     class Meta:
@@ -117,7 +117,7 @@ class PriceRuleForm(forms.ModelForm):
     def clean_valid_from(self):
         value = self.cleaned_data["valid_from"]
         if PriceRule.objects.filter(lane=self.lane, valid_from=value).exists():
-            raise forms.ValidationError("Cennik od tej daty już istnieje dla tej osi.")
+            raise forms.ValidationError("Tabela opłat od tej daty już istnieje dla tej osi.")
         return value
 
     def save(self, commit=True):

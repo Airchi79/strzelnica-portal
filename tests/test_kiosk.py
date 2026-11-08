@@ -177,3 +177,16 @@ def test_pairing_rate_limit():
     for _ in range(services.MAX_PAIR_ATTEMPTS):
         c.post("/kiosk/parowanie/", {"code": "12345678"})
     assert "Zbyt wiele prób" in c.post("/kiosk/parowanie/", {"code": "12345678"}).content.decode()
+
+
+def test_camera_choice_front_by_default_and_set_in_panel(owner_client, paired):
+    device, c = paired
+    assert device.camera == KioskDevice.Camera.FRONT
+    assert 'data-camera="user"' in c.get("/kiosk/").content.decode()
+    owner_client.post("/panel/ksiazka/kioski/", {"action": "camera", "device": device.pk, "camera": "environment"})
+    device.refresh_from_db()
+    assert device.camera == KioskDevice.Camera.BACK
+    assert 'data-camera="environment"' in c.get("/kiosk/").content.decode()
+    owner_client.post("/panel/ksiazka/kioski/", {"action": "camera", "device": device.pk, "camera": "zla"})
+    device.refresh_from_db()
+    assert device.camera == KioskDevice.Camera.BACK

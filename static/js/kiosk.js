@@ -291,7 +291,9 @@
     scanButton.addEventListener("click", async () => {
       try {
         const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        // Kamera wybrana w panelu dla urządzenia: przednia (kiosk na ścianie) albo tylna (tablet w ręku).
+        const facing = body.dataset.camera === "environment" ? "environment" : "user";
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing } } });
         const video = $("[data-video]");
         video.srcObject = stream; await video.play();
         show("scan");

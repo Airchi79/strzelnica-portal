@@ -224,6 +224,14 @@ def panel_list(request):
         if action == "add" and request.POST.get("name", "").strip():
             device, code = services.create_device(request.POST["name"], request.user)
             code = (device, code)
+        elif action == "camera":
+            device = get_object_or_404(KioskDevice, pk=request.POST.get("device"))
+            try:
+                services.set_camera(device, request.POST.get("camera", ""), request.user)
+                messages.success(request, f"{device.name}: kamera {device.get_camera_display()}. Zmiana działa po odświeżeniu strony kiosku (najpóźniej po ponownym otwarciu).")
+            except ValidationError as e:
+                messages.error(request, e.messages[0])
+            return redirect("panel:kiosks")
         elif action in ("code", "revoke"):
             device = get_object_or_404(KioskDevice, pk=request.POST.get("device"))
             if action == "code":
@@ -233,6 +241,6 @@ def panel_list(request):
                 messages.success(request, f"Wyłączono urządzenie {device.name}.")
                 return redirect("panel:kiosks")
     return render(request, "panel/kiosks.html", {
-        "devices": KioskDevice.objects.all(), "code": code, "minutes": services.PAIRING_MINUTES,
+        "devices": KioskDevice.objects.all(), "code": code, "cameras": KioskDevice.Camera.choices, "minutes": services.PAIRING_MINUTES,
         "kiosk_url": settings.SITE_URL + reverse("kiosk:home"),
     })

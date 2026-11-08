@@ -2,7 +2,7 @@
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Kiosk · {{ SITE_NAME }}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#2f5d3a">
 <link rel="stylesheet" href="{% static 'css/app.css' %}"></head>
-<body class="kiosk" data-kiosk data-api="{% url 'kiosk:home' %}api/">
+<body class="kiosk" data-kiosk data-api="{% url 'kiosk:home' %}api/" data-camera="{{ device.camera }}">
 <header class="topbar"><div class="wrap"><span class="brand"><img class="brand-logo" src="{{ BRAND.logo_small }}" alt="" width="34" height="34" data-hide-broken>{{ SITE_NAME }} · książka pobytu</span>
   <span class="kiosk-status" data-status>…</span></div></header>
 <main class="wrap">
@@ -22,7 +22,8 @@
 
 <section data-view="scan" hidden>
   <h1>Skanowanie kodu QR</h1>
-  <video data-video playsinline muted style="width:100%;max-height:60vh;background:#000;border-radius:10px"></video>
+  <p class="muted">{% if device.camera == "user" %}Pokaż kod QR (na telefonie lub wydruku) do kamery nad ekranem, z odległości ok. 20–30 cm.{% else %}Skieruj kamerę na kod QR.{% endif %}</p>
+  <video data-video playsinline muted style="width:100%;max-height:60vh;background:#000;border-radius:10px{% if device.camera == "user" %};transform:scaleX(-1){% endif %}"></video>
   <div class="actions"><button class="btn secondary" type="button" data-go="home">Anuluj</button></div>
 </section>
 

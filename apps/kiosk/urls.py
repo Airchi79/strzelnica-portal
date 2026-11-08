@@ -13,4 +13,7 @@ urlpatterns = [
     path("api/wyjscie/", views.api_exit_search, name="api_exit_search"),
     path("api/wyjscie/<int:pk>/", views.api_exit, name="api_exit"),
     path("api/odrzucony/", views.api_report_failed, name="api_failed"),
+    path("api/na-miejscu/terminy/", views.api_onsite_slots, name="api_onsite_slots"),
+    path("api/na-miejscu/start/", views.api_onsite_start, name="api_onsite_start"),
+    path("api/na-miejscu/<str:step>/", views.api_onsite_step, name="api_onsite_step"),
 ]

@@ -26,3 +26,19 @@ Notatka dla prac nad panelem na miejscu (osobny etap). Opisuje, co już jest got
 
 - Weryfikacja tożsamości i dokumentów „do kamery” (kto zatwierdza: obsługa zdalnie czy automat) i zapis tego w dzienniku.
 - Sprzedaż na miejscu / vouchery — po konsultacji z księgową (stowarzyszenie zwykłe).
+
+## Rezerwacja na miejscu w kiosku — etap 1 (część serwerowa)
+
+Decyzje właściciela (listopad 2026): tylko osoby z uprawnieniami PS; konto zakładane w tle po kodzie z e-maila;
+najpierw weryfikacja legitymacji, potem płatność; bez weryfikacji w ciągu **15 minut** rezerwacja anuluje się sama
+bez opłat; zdjęcie legitymacji usuwane po weryfikacji; tylko dziś, od bieżącej godziny; kod e-mail (nie SMS).
+
+- Logika: `apps/kiosk/onsite.py` (model przebiegu `OnsiteBooking`), API: `/kiosk/api/na-miejscu/…`
+  (`terminy`, `start`, `kod`, `regulamin`, `oswiadczenie`, `legitymacja`, `rezerwacja`, `stan`).
+- `create_reservation(..., channel=CHANNEL_ONSITE, ps_pending=True)` — rezerwacja „do zatwierdzenia” bez prowadzącego
+  od strzelnicy, gdy legitymacja czeka na weryfikację.
+- Zatwierdzenie legitymacji w module dokumentów potwierdza czekającą rezerwację, odrzucenie ją anuluje
+  (`credential_reviewed`). Wygaszanie i czyszczenie danych: `expire_reservations` (co minutę).
+- Treść oświadczenia: `onsite.STATEMENT_TEXT` — do akceptacji przez właściciela.
+- Dalej: etap 2 płatność kodem QR na własnym telefonie, etap 3 ekrany kiosku (ramka kamery, automatyczne zdjęcie),
+  etap 4 panel obsługi, etap 5 (propozycja) automatyczne porównanie danych z legitymacji (OCR).

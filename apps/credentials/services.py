@@ -72,6 +72,9 @@ def review(credential, reviewer, approve, note=""):
         actor=reviewer,
     )
     notify_user(credential.user, "Wynik weryfikacji dokumentu", "emails/credential_reviewed.txt", credential=credential)
+    from apps.kiosk.onsite import credential_reviewed
+
+    credential_reviewed(credential, reviewer)  # rezerwacja na miejscu czekająca na tę legitymację
     return credential
 
 

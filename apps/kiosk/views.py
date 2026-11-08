@@ -27,7 +27,9 @@ from apps.logbook import services as logbook
 from apps.logbook.forms import EntryForm
 from apps.logbook.models import STATEMENT_TEXT, Entry
 
-from . import services
+from apps.bookings.models import BookingSettings
+
+from . import onsite, services
 from .models import KioskDevice
 
 DEVICE_RATE_PER_HOUR = 400
@@ -211,6 +213,73 @@ def api_report_failed(request):
         url=url, body=body, event="Odrzucony wpis z kiosku (kolejka offline)", url_path=url, text=body,
     )
     return JsonResponse({"ok": True})
+
+
+# --- rezerwacja na miejscu -------------------------------------------------------------------------------
+
+
+def _json(request):
+    try:
+        data = json.loads(request.body or b"{}")
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _error(e, status=400):
+    return JsonResponse({"error": " ".join(e.messages)}, status=status)
+
+
+@require_GET
+@api
+def api_onsite_slots(request):
+    return JsonResponse({"lanes": onsite.free_slots(), "max_persons": BookingSettings.load().max_persons})
+
+
+@require_POST
+@api
+def api_onsite_start(request):
+    data = _json(request)
+    if data is None:
+        return JsonResponse({"error": "Nieprawidłowe dane."}, status=400)
+    try:
+        flow, secret = onsite.start(request.kiosk_device, data.get("email"), data.get("first_name"), data.get("last_name"),
+                                    data.get("phone"))
+    except ValidationError as e:
+        return _error(e)
+    return JsonResponse({"ref": str(flow.ref), "secret": secret, "state": onsite.state(flow)})
+
+
+@require_POST
+@api
+def api_onsite_step(request, step):
+    """Kolejne kroki przebiegu: kod, regulamin, oswiadczenie, legitymacja, rezerwacja, stan."""
+    data = _json(request)
+    if data is None:
+        return JsonResponse({"error": "Nieprawidłowe dane."}, status=400)
+    flow = onsite.get_flow(request.kiosk_device, data.get("ref"), data.get("secret"))
+    if flow is None:
+        return JsonResponse({"error": "Rezerwacja wygasła albo jest nieznana. Zacznij od nowa.", "restart": True}, status=404)
+    try:
+        if step == "kod":
+            flow = onsite.verify_code(flow, data.get("code"))
+        elif step == "regulamin":
+            onsite.accept_regulations(flow, ip=client_ip(request))
+        elif step == "oswiadczenie":
+            if not data.get("accept"):
+                raise ValidationError("Zaznacz oświadczenie.")
+            onsite.accept_statement(flow)
+        elif step == "legitymacja":
+            onsite.submit_ps(flow, data.get("number"), data.get("issuer"), data.get("issued_on"), data.get("valid_until"),
+                             data.get("photo"))
+        elif step == "rezerwacja":
+            onsite.book(flow, data.get("lane"), data.get("start_hour"), data.get("end_hour"), data.get("persons"))
+        elif step != "stan":
+            return JsonResponse({"error": "Nieznany krok."}, status=404)
+    except ValidationError as e:
+        return _error(e)
+    flow.refresh_from_db()
+    return JsonResponse({"ok": True, "state": onsite.state(flow)})
 
 
 # --- panel ------------------------------------------------------------------------------------------

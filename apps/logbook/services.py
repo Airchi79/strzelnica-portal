@@ -21,7 +21,7 @@ from apps.credentials.models import Credential, valid_credentials
 from apps.payments.services import apply_wallet
 from apps.regulations.models import RegulationDocument
 
-from .models import STATEMENT_TEXT, Entry, EntrySequence, LogbookSettings
+from .models import STATEMENT_TEXT, Entry, EntryCorrection, EntrySequence, LogbookSettings
 
 RESERVATION_SALT = "satok.logbook.reservation-qr"
 PERSONAL_SALT = "satok.logbook.personal-qr"
@@ -199,8 +199,9 @@ def create_entry(
     else:
         entered_at = now
     purpose = data["purpose"]
-    if purpose == Entry.Purpose.SHOOTING:
-        if reservation is None:
+    if purpose == Entry.Purpose.SHOOTING and reservation is None:
+        # Wyjątek: kiosk na strzelnicy (np. strzelanie poza godzinami) — z podanym prowadzącym strzelanie.
+        if source != Entry.Source.DEVICE or not (data.get("purpose_note") or "").strip():
             raise ValidationError("Przy strzelaniu wybierz rezerwację, w ramach której strzelasz.")
     if reservation is not None:
         reservation = Reservation.objects.select_related("user").get(pk=reservation.pk)
@@ -243,6 +244,87 @@ def create_entry(
 def _current_range_rules():
     doc = RegulationDocument.objects.filter(slug="regulamin-strzelnicy").first()
     return doc.current_version() if doc else None
+
+
+# --- korekty wpisów (wpis pozostaje niezmieniony) ------------------------------------------------------------------
+
+CORRECTABLE = dict(EntryCorrection.FIELDS)
+
+
+def _correction_value(field, raw):
+    if field == "exited_at":
+        from datetime import datetime
+
+        return datetime.fromisoformat(raw) if raw else None
+    return raw
+
+
+def apply_corrections(entries):
+    """Nakłada korekty na wpisy (tylko w pamięci, do wyświetlenia — wpisów nie da się zapisać). Każdy wpis dostaje
+    `corrected_fields` (zbiór pól) i `integrity_original` (suma kontrolna oryginału, liczona przed nałożeniem)."""
+    entries = list(entries)
+    by_id = {e.pk: e for e in entries}
+    for e in entries:
+        e.corrected_fields = set()
+    if not by_id:
+        return entries
+    for c in EntryCorrection.objects.filter(entry_id__in=by_id).order_by("created_at", "id"):
+        e = by_id[c.entry_id]
+        if not e.corrected_fields:
+            e.integrity_original = e.integrity_ok
+        setattr(e, c.field, _correction_value(c.field, c.new_value))
+        e.corrected_fields.add(c.field)
+    return entries
+
+
+@transaction.atomic
+def correct_entry(entry, values, reason, by, now=None):
+    """Korekta wpisu przez obsługę: tylko zmienione pola, z powodem. Wyjście dla otwartego pobytu zapisuje się
+    zwykłym trybem (raz), późniejsze zmiany godziny wyjścia — jako korekta. Zwraca listę skorygowanych pól."""
+    now = now or timezone.now()
+    reason = " ".join(str(reason or "").split())[:255]
+    if len(reason) < 5:
+        raise ValidationError("Podaj powód korekty (np. „literówka w nazwisku”, „osoba wyszła o 21:30”).")
+    entry = Entry.objects.select_for_update().get(pk=entry.pk)
+    current = apply_corrections([Entry.objects.get(pk=entry.pk)])[0]
+    changed = []
+    for field, raw in values.items():
+        if field not in CORRECTABLE:
+            raise ValidationError("Tego pola nie można korygować.")
+        if field == "exited_at":
+            new = raw
+            if new is None or new == current.exited_at:
+                continue
+            if new < current.entered_at or new > now + timedelta(minutes=1):
+                raise ValidationError("Godzina wyjścia musi być po wejściu i nie później niż teraz.")
+            if entry.exited_at is None:  # otwarty pobyt — zwykłe zapisanie wyjścia (dozwolone raz)
+                register_exit(entry, now=new)
+                changed.append(field)
+                continue
+            old_s, new_s = current.exited_at.isoformat() if current.exited_at else "", new.isoformat()
+        else:
+            new_s = " ".join(str(raw or "").split())
+            if field == "permit_number":
+                new_s = new_s.upper()
+            old_s = getattr(current, field) or ""
+            if new_s == old_s:
+                continue
+            if field in ("first_name", "last_name") and not new_s:
+                raise ValidationError("Imię i nazwisko nie mogą być puste.")
+            if field in ("permit_number", "permit_issuer") and (not current.has_permit or not new_s):
+                raise ValidationError("Dane pozwolenia: wpis bez pozwolenia albo puste pole.")
+            if field == "address" and (current.has_permit or not new_s):
+                raise ValidationError("Adres korygujemy tylko we wpisie bez pozwolenia na broń (i nie może być pusty).")
+            if field == "purpose_note" and not new_s and (current.purpose != Entry.Purpose.SHOOTING or current.reservation_id is None):
+                raise ValidationError("Opis celu nie może być pusty.")
+        EntryCorrection.objects.create(entry=entry, field=field, old_value=old_s[:255], new_value=new_s[:255], reason=reason,
+                                       created_by=by)
+        changed.append(field)
+    if not changed:
+        raise ValidationError("Nic nie zmieniono.")
+    log_event("ksiazka.korekta", entry, f"{entry.number}: {', '.join(CORRECTABLE[f] for f in changed)}",
+              changes={"pola": changed, "powod": reason}, actor=by)
+    return changed
 
 
 def register_exit(entry, now=None):
@@ -411,6 +493,7 @@ def purge_expired(now=None):
     with transaction.atomic():
         with connection.cursor() as cur:
             cur.execute("SELECT set_config('satok.logbook_purge', 'on', true)")
+        EntryCorrection.objects.filter(entry__entered_at__lt=cutoff).delete()  # korekty razem z wpisami
         deleted, _ = Entry.objects.filter(entered_at__lt=cutoff).delete()
         from .models import ArchivedEntry
 

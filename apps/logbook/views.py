@@ -22,7 +22,7 @@ from apps.core.permissions import panel_required
 from apps.core.qr import qr_svg_data_uri
 
 from . import services
-from .forms import EntryForm, LogbookSettingsForm, StaffEntryForm
+from .forms import EntryCorrectionForm, EntryForm, LogbookSettingsForm, StaffEntryForm
 from .models import Entry, LogbookSettings
 
 SESSION_RECENT = "logbook_recent_entries"
@@ -152,9 +152,9 @@ def my_qr(request):
         messages.success(request, "Wygenerowano nowy kod. Poprzedni przestał działać.")
         return redirect("logbook:my_qr")
     url = _absolute(request, reverse("logbook:personal", args=[services.personal_token(request.user)]))
-    entries = request.user.log_entries.select_related("reservation__lane").order_by("-entered_at")[:50]
+    entries = services.apply_corrections(request.user.log_entries.select_related("reservation__lane").order_by("-entered_at")[:50])
     return render(request, "logbook/my_qr.html", {
-        "qr": qr_svg_data_uri(url, box_size=10), "entries": entries,
+        "qr": qr_svg_data_uri(url, box_size=10), "entries": entries, "staff_entry": request.user.has_perm("logbook.staff_entry"),
         "open_stays": services.my_open_stays(request.user), "my_reservations": services.my_reservations_for_entry(request.user),
     })
 
@@ -263,7 +263,7 @@ def panel_list(request):
     pokaz = request.POST.get("pokaz", "") if request.method == "POST" else ""
     reveal = pokaz == "1"  # cała strona
     one = int(pokaz[1:]) if pokaz.startswith("w") and pokaz[1:].isdigit() else None  # jeden wpis („Pokaż” w wierszu)
-    entries = list(page)
+    entries = services.apply_corrections(page)
     for e in entries:
         e.identity_masked = services.masked_identity(e)
         e.revealed = reveal or e.pk == one
@@ -287,18 +287,44 @@ def panel_list(request):
 @panel_required("logbook.view_logbook")
 def panel_detail(request, pk):
     entry = get_object_or_404(Entry.objects.select_related("reservation__lane", "range_officer", "user", "created_by", "regulation_version"), pk=pk)
+    integrity = entry.integrity_ok  # oryginał — przed nałożeniem korekt
+    entry = services.apply_corrections([entry])[0]
     reveal = request.method == "POST" and request.POST.get("pokaz") == "1"
-    ctx = {"e": entry, "reveal": reveal, "identity_masked": services.masked_identity(entry)}
+    corrections = list(entry.corrections.select_related("created_by"))
+    ctx = {"e": entry, "reveal": reveal, "identity_masked": services.masked_identity(entry), "integrity": integrity,
+           "corrections": corrections, "can_correct": request.user.has_perm("logbook.correct_entry")}
     if reveal:
         log_sensitive_access(entry.user, f"ksiazka:wpis:{entry.number}", "podgląd danych wpisu w książce pobytu")
         ctx["signature"] = "data:image/png;base64," + base64.b64encode(bytes(entry.signature)).decode()
     return render(request, "panel/logbook_detail.html", ctx)
 
 
+@panel_required("logbook.correct_entry")
+def panel_correct(request, pk):
+    """Korekta wpisu: oryginał (podpis, suma kontrolna) bez zmian, korekta jako osobny zapis z powodem."""
+    entry = get_object_or_404(Entry.objects.select_related("reservation__lane"), pk=pk)
+    current = services.apply_corrections([Entry.objects.get(pk=pk)])[0]
+    form = EntryCorrectionForm(request.POST or None, entry=current)
+    if request.method == "GET":
+        log_sensitive_access(entry.user, f"ksiazka:wpis:{entry.number}", "korekta wpisu w książce pobytu")
+    if request.method == "POST" and form.is_valid():
+        d = form.cleaned_data
+        values = {k: d[k] for k in ("first_name", "last_name", "permit_number", "permit_issuer", "address", "purpose_note", "exited_at")
+                  if k in form.fields}
+        try:
+            changed = services.correct_entry(entry, values, d["reason"], request.user)
+        except ValidationError as e:
+            form.add_error(None, " ".join(e.messages))
+        else:
+            messages.success(request, f"Zapisano korektę wpisu {entry.number} ({len(changed)} pól). Oryginał pozostaje w historii.")
+            return redirect("panel:logbook_entry", pk)
+    return render(request, "panel/logbook_correct.html", {"e": current, "form": form})
+
+
 @panel_required("logbook.view_logbook")
 def panel_print(request):
     qs, f = _filtered(request.GET)
-    entries = list(qs.order_by("entered_at", "id")[:2000])
+    entries = services.apply_corrections(qs.order_by("entered_at", "id")[:2000])
     rows = [(e, "data:image/png;base64," + base64.b64encode(bytes(e.signature)).decode()) for e in entries]
     log_sensitive_access(None, f"ksiazka:wydruk:{f['od']}..{f['do']}", "wydruk książki pobytu")
     log_event("ksiazka.wydruk", summary=f"{f['od']}–{f['do']}, wpisów: {len(rows)}")
@@ -313,7 +339,7 @@ def panel_export(request):
     from .export import entries_xlsx
 
     qs, f = _filtered(request.GET)
-    entries = list(qs.select_related("regulation_version").order_by("entered_at", "id")[:EXPORT_LIMIT])
+    entries = services.apply_corrections(qs.select_related("regulation_version").order_by("entered_at", "id")[:EXPORT_LIMIT])
     log_sensitive_access(None, f"ksiazka:eksport:{f['od']}..{f['do']}", "eksport książki pobytu do XLSX")
     log_event("ksiazka.eksport", summary=f"{f['od']}–{f['do']}, wpisów: {len(entries)}")
     response = HttpResponse(entries_xlsx(entries), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -337,6 +363,11 @@ def panel_add(request):
     initial = {"entered_at": timezone.localtime(now).replace(second=0, microsecond=0)}
     if request.GET.get("rezerwacja", "").isdigit():
         initial.update(purpose=Entry.Purpose.SHOOTING, reservation=int(request.GET["rezerwacja"]))
+    elif request.GET.get("cel") in Entry.Purpose.values:  # np. „Wpis obsługi” z panelu klienta: cel „prace”
+        initial["purpose"] = request.GET["cel"]
+        if request.GET["cel"] == Entry.Purpose.WORK:
+            initial["purpose_note"] = "obsługa strzelnicy"
+            initial.update(first_name=request.user.first_name, last_name=request.user.last_name)
     # Osoba z kartoteki (np. z GunTrackera): wyszukanie i uzupełnienie danych — dostęp zapisywany w dzienniku.
     from apps.clients.models import Person
 

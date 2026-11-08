@@ -14,6 +14,8 @@
 
 <div class="card">
   <h2 class="step-title">Wpis do książki pobytu</h2>
+  {% if staff_entry %}<p style="margin-top:0"><a class="btn secondary" href="{% url 'panel:logbook_add' %}?cel=prace">Wpis obsługi</a>
+    <span class="small muted">— wpis przez obsługę (np. prace na strzelnicy, osoba bez telefonu), w panelu zarządu.</span></p>{% endif %}
   {% if my_reservations %}
     {% for r, token in my_reservations %}<div class="actions" style="margin:0 0 8px">
       <span>Twoja rezerwacja {{ r.number }}: {{ r.lane }}, {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</span>

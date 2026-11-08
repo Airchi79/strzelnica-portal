@@ -9,6 +9,7 @@
   const QUEUE_KEY = "satok_kiosk_queue";
   const STATE_KEY = "satok_kiosk_state";
   const IDLE_MS = 120000;
+  const NO_RESERVATION = "brak";
   // Dłużej na ekranach rezerwacji na miejscu (kod z e-maila na telefonie, weryfikacja legitymacji, płatność).
   const IDLE_BY_VIEW = { "os-person": 300000, "os-code": 300000, "os-rules": 300000, "os-ps": 300000, "os-camera": 180000,
     "os-preview": 180000, "os-wait": 1500000 };
@@ -158,7 +159,10 @@
     const vis = (name, on) => { const el = form.querySelector(`[data-field="${name}"]`); if (el) el.hidden = !on; };
     vis("permit_number", permit === "tak"); vis("permit_issuer", permit === "tak"); vis("address", permit === "nie");
     vis("reservation", purpose === "strzelanie" || purpose === "obserwator");
-    vis("purpose_note", purpose === "prace" || purpose === "inne");
+    // Strzelanie bez rezerwacji (np. poza godzinami) — w kiosku dozwolone, z podanym prowadzącym strzelanie.
+    const noRes = purpose === "strzelanie" && field("reservation").value === NO_RESERVATION;
+    vis("purpose_note", purpose === "prace" || purpose === "inne" || noRes);
+    $("[data-note-label]").textContent = noRes ? "Kto prowadzi strzelanie (imię i nazwisko)" : "Krótki opis celu";
   }
   form.addEventListener("change", toggleFields);
   function resetForm() {
@@ -172,6 +176,9 @@
     const select = field("reservation");
     select.innerHTML = '<option value="">— wybierz —</option>';
     openReservations().forEach((r) => { const o = document.createElement("option"); o.value = r.id; o.textContent = r.label; select.appendChild(o); });
+    const none = document.createElement("option");
+    none.value = NO_RESERVATION; none.textContent = "Bez rezerwacji (np. strzelanie poza godzinami)";
+    select.appendChild(none);
     if (ctx.reservation) { select.value = String(ctx.reservation); form.querySelector('input[name=purpose][value="strzelanie"]').checked = true; }
     const p = ctx.prefill || {};
     ["first_name", "last_name", "permit_number", "permit_issuer", "address"].forEach((k) => { if (p[k]) field(k).value = p[k]; });
@@ -185,7 +192,8 @@
     const errors = [];
     const purpose = radio("purpose"), permit = radio("has_permit");
     if (!purpose) errors.push("Wybierz cel pobytu.");
-    if (purpose === "strzelanie" && !field("reservation").value) errors.push("Przy strzelaniu wybierz rezerwację.");
+    if (purpose === "strzelanie" && !field("reservation").value) errors.push("Przy strzelaniu wybierz rezerwację albo „Bez rezerwacji”.");
+    if (purpose === "strzelanie" && field("reservation").value === NO_RESERVATION && !field("purpose_note").value.trim()) errors.push("Podaj, kto prowadzi strzelanie.");
     if ((purpose === "prace" || purpose === "inne") && !field("purpose_note").value.trim()) errors.push("Opisz krótko cel pobytu.");
     if (!field("first_name").value.trim() || !field("last_name").value.trim()) errors.push("Podaj imię i nazwisko.");
     if (!permit) errors.push("Zaznacz, czy masz pozwolenie na broń.");
@@ -207,7 +215,8 @@
     const box = $("[data-form-error]");
     if (errors.length) { box.textContent = errors.join(" "); box.hidden = false; box.scrollIntoView({ block: "center" }); return; }
     const item = {
-      ref: uuid(), entered_at: new Date().toISOString(), purpose: radio("purpose"), reservation: field("reservation").value,
+      ref: uuid(), entered_at: new Date().toISOString(), purpose: radio("purpose"),
+      reservation: field("reservation").value === NO_RESERVATION ? "" : field("reservation").value,
       purpose_note: field("purpose_note").value.trim(), first_name: field("first_name").value.trim(), last_name: field("last_name").value.trim(),
       has_permit: radio("has_permit"), permit_number: field("permit_number").value.trim(), permit_issuer: field("permit_issuer").value.trim(),
       address: field("address").value.trim(), statement: true, signature: canvas.toDataURL("image/png"), person: formContext.person || "",

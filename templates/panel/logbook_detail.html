@@ -1,7 +1,8 @@
 {% extends "panel/base_panel.html" %}
 {% block title %}{{ e.number }}{% endblock %}
 {% block panel %}
-<h1>Wpis {{ e.number }}</h1>
+<h1>Wpis {{ e.number }}{% if e.corrected_fields %} <span class="badge warn">skorygowano</span>{% endif %}</h1>
+{% if can_correct %}<p><a class="btn secondary small-btn" href="{% url 'panel:logbook_correct' e.pk %}">Popraw wpis</a></p>{% endif %}
 <div class="card"><table>
   <tr><th>Wejście</th><td>{{ e.entered_at|date:"l, j E Y, H:i:s" }}</td></tr>
   <tr><th>Wyjście</th><td>{% if e.exited_at %}{{ e.exited_at|date:"j.m.Y H:i" }}{% if e.exit_auto %} <span class="badge">zamknięte automatycznie</span>{% endif %}{% else %}<span class="badge ok">na strzelnicy</span>{% endif %}</td></tr>
@@ -11,16 +12,25 @@
       {% else %}<span class="muted">{{ identity_masked }}</span>{% endif %}</td></tr>
   <tr><th>Cel pobytu</th><td>{{ e.get_purpose_display }}{% if e.purpose_note %}: {{ e.purpose_note }}{% endif %}</td></tr>
   {% if e.reservation %}<tr><th>Rezerwacja</th><td><a href="{% url 'panel:reservation' e.reservation.pk %}">{{ e.reservation.number }}</a> · {{ e.reservation.lane }}</td></tr>
-  <tr><th>Prowadzący strzelanie</th><td>{{ e.range_officer.full_name }}</td></tr>{% endif %}
+  <tr><th>Prowadzący strzelanie</th><td>{{ e.range_officer.full_name }}</td></tr>
+  {% elif e.purpose == 'strzelanie' %}<tr><th>Rezerwacja</th><td><span class="badge warn">bez rezerwacji (wpis w kiosku)</span> — prowadzący wg opisu celu</td></tr>{% endif %}
   <tr><th>Sposób wpisu</th><td>{{ e.get_source_display }}{% if e.created_by %} ({{ e.created_by.full_name }}){% endif %}</td></tr>
   <tr><th>Oświadczenie</th><td>{{ e.statement }}{% if e.regulation_version %}<div class="small muted">Regulamin: wersja {{ e.regulation_version.number }}</div>{% endif %}</td></tr>
   <tr><th>Podpis</th><td>{% if reveal %}<div class="qr"><img src="{{ signature }}" alt="Podpis" style="width:auto;height:90px"></div>{% else %}<span class="muted">złożony — ukryty</span>{% endif %}</td></tr>
-  <tr><th>Integralność</th><td>{% if e.integrity_ok %}<span class="badge ok">dane i podpis bez zmian</span>{% else %}<span class="badge bad">NIEZGODNOŚĆ sumy kontrolnej</span>{% endif %}
-    <div class="small muted">SHA-256: {{ e.content_sha256 }}</div></td></tr>
+  <tr><th>Integralność</th><td>{% if integrity %}<span class="badge ok">oryginał wpisu: dane i podpis bez zmian</span>{% else %}<span class="badge bad">NIEZGODNOŚĆ sumy kontrolnej</span>{% endif %}
+    <div class="small muted">SHA-256: {{ e.content_sha256 }}{% if e.corrected_fields %} · wartości powyżej uwzględniają korekty (historia niżej){% endif %}</div></td></tr>
   {% if reveal %}<tr><th>Urządzenie</th><td class="small">{{ e.ip|default:"" }} · {{ e.user_agent|truncatechars:80 }}</td></tr>{% endif %}
 </table>
 {% if reveal %}<p class="small muted">Dane odkryte — dostęp zapisano w dzienniku dostępu do danych osobowych.</p>
 {% else %}<form method="post">{% csrf_token %}<input type="hidden" name="pokaz" value="1"><button class="btn secondary" type="submit">Pokaż dane i podpis</button></form>{% endif %}
 </div>
+{% if corrections %}<h2>Korekty</h2>
+<div class="card table-wrap"><table>
+  <tr><th>Kiedy</th><th>Pole</th><th>Było</th><th>Jest</th><th>Powód</th><th>Kto</th></tr>
+  {% for c in corrections %}<tr><td class="nowrap small">{{ c.created_at|date:"j.m.Y H:i" }}</td><td>{{ c.get_field_display }}</td>
+    <td>{% if reveal or c.field == 'exited_at' or c.field == 'purpose_note' %}{{ c.old_value|default:"—" }}{% else %}<span class="muted">ukryte</span>{% endif %}</td>
+    <td>{% if reveal or c.field == 'exited_at' or c.field == 'purpose_note' %}{{ c.new_value|default:"—" }}{% else %}<span class="muted">ukryte</span>{% endif %}</td>
+    <td>{{ c.reason }}</td><td>{{ c.created_by.full_name }}</td></tr>{% endfor %}
+</table></div>{% endif %}
 <p><a href="{% url 'panel:logbook' %}">← Książka pobytu</a></p>
 {% endblock %}

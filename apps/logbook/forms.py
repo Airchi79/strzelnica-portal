@@ -33,9 +33,11 @@ class EntryForm(forms.Form):
     statement = forms.BooleanField(label=STATEMENT_TEXT)
     signature = forms.CharField(widget=forms.HiddenInput, required=False)
 
-    def __init__(self, *args, reservations=None, fixed_reservation=None, purposes=None, **kwargs):
+    def __init__(self, *args, reservations=None, fixed_reservation=None, purposes=None, shooting_without_reservation=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.fixed_reservation = fixed_reservation
+        # Kiosk na strzelnicy: strzelanie także bez rezerwacji (np. poza godzinami) — z podanym prowadzącym strzelanie.
+        self.shooting_without_reservation = shooting_without_reservation
         if purposes:
             self.fields["purpose"].choices = [c for c in Entry.Purpose.choices if c[0] in purposes]
             if len(purposes) == 1:
@@ -55,7 +57,10 @@ class EntryForm(forms.Form):
             self.add_error("address", "Bez pozwolenia na broń wymagany jest adres zamieszkania.")
         purpose = data.get("purpose")
         if "reservation" in self.fields and purpose == Entry.Purpose.SHOOTING and not data.get("reservation"):
-            self.add_error("reservation", "Przy strzelaniu wybierz rezerwację, w ramach której strzelasz.")
+            if not self.shooting_without_reservation:
+                self.add_error("reservation", "Przy strzelaniu wybierz rezerwację, w ramach której strzelasz.")
+            elif not data.get("purpose_note", "").strip():
+                self.add_error("purpose_note", "Strzelanie bez rezerwacji: podaj, kto prowadzi strzelanie (imię i nazwisko).")
         if purpose in (Entry.Purpose.WORK, Entry.Purpose.OTHER) and not data.get("purpose_note", "").strip():
             self.add_error("purpose_note", "Opisz krótko cel pobytu.")
         data["has_permit"] = data.get("has_permit") == "tak"
@@ -91,3 +96,29 @@ class LogbookSettingsForm(forms.ModelForm):
         if value < 1 or value > 50:
             raise forms.ValidationError("Podaj od 1 do 50 lat.")
         return value
+
+
+class EntryCorrectionForm(forms.Form):
+    """Korekta wpisu przez obsługę — pola wypełnione bieżącymi wartościami (po wcześniejszych korektach)."""
+
+    first_name = forms.CharField(label="Imię", max_length=80)
+    last_name = forms.CharField(label="Nazwisko", max_length=120)
+    permit_number = forms.CharField(label="Numer pozwolenia na broń", max_length=64, required=False)
+    permit_issuer = forms.CharField(label="Organ, który wydał pozwolenie", max_length=160, required=False)
+    address = forms.CharField(label="Adres", max_length=255, required=False)
+    purpose_note = forms.CharField(label="Opis celu / prowadzący strzelanie", max_length=160, required=False)
+    exited_at = forms.DateTimeField(
+        label="Wyjście", required=False, input_formats=["%Y-%m-%dT%H:%M"],
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+    )
+    reason = forms.CharField(label="Powód korekty", max_length=255, help_text="Np. „literówka w nazwisku”, „osoba wyszła o 21:30”.")
+
+    def __init__(self, *args, entry=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if entry is not None:
+            for name in ("first_name", "last_name", "permit_number", "permit_issuer", "address", "purpose_note"):
+                self.fields[name].initial = getattr(entry, name)
+            self.fields["exited_at"].initial = timezone.localtime(entry.exited_at) if entry.exited_at else None
+            drop = ["address"] if entry.has_permit else ["permit_number", "permit_issuer"]
+            for name in drop:
+                del self.fields[name]

@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load satok %}
+{% block title %}Płatność za rezerwację{% endblock %}
+{% block content %}
+{% if invalid %}
+<h1>Link wygasł</h1>
+<div class="card"><p>Ten link do płatności jest nieaktualny. Zeskanuj ponownie kod QR na ekranie kiosku.</p></div>
+{% else %}
+<h1>Płatność za rezerwację</h1>
+<div class="card">
+  <p><strong>{{ r.number }}</strong> · {{ r.lane }}, {{ r.starts_at|date:"j.m.Y" }} {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</p>
+  <p>Rezerwujący: {{ r.user.first_name }} {{ r.user.last_name|slice:":1" }}.</p>
+  {% if error %}<p class="msg error">{{ error }}</p>{% endif %}
+  {% if not payable %}
+    <p><strong>Ta rezerwacja nie czeka na płatność</strong> — jest opłacona albo nieaktualna. Wróć do kiosku.</p>
+  {% elif not tpay_enabled %}
+    <p>Płatności online są chwilowo niedostępne. Skontaktuj się z obsługą strzelnicy.</p>
+  {% else %}
+    <p>Do zapłaty: <strong>{{ due|pln }}</strong>{% if online_fee_on %} + opłata za płatność online ({{ online_fee_desc }}){% endif %}.</p>
+    {% if r.status == 'oczekuje' and r.pay_by %}<p class="small muted">Termin jest trzymany do {{ r.pay_by|time:"H:i" }}.</p>{% endif %}
+    <form method="post">{% csrf_token %}<button class="btn" type="submit" style="width:100%">Zapłać online (BLIK, przelew, karta)</button></form>
+    <p class="small muted">Płatność obsługuje Tpay. Potwierdzenie zobaczysz na ekranie kiosku i w e-mailu.</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

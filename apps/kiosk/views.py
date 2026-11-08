@@ -27,7 +27,9 @@ from apps.logbook import services as logbook
 from apps.logbook.forms import EntryForm
 from apps.logbook.models import STATEMENT_TEXT, Entry
 
-from . import services
+from apps.bookings.models import BookingSettings
+
+from . import onsite, services
 from .models import KioskDevice
 
 DEVICE_RATE_PER_HOUR = 400
@@ -44,7 +46,10 @@ def kiosk_home(request):
     device = services.device_from_request(request)
     if device is None:
         return render(request, "kiosk/pair.html", {})
-    response = render(request, "kiosk/kiosk.html", {"device": device, "statement": STATEMENT_TEXT, "purposes": Entry.Purpose.choices})
+    response = render(request, "kiosk/kiosk.html", {
+        "device": device, "statement": STATEMENT_TEXT, "purposes": Entry.Purpose.choices,
+        "onsite_statement": onsite.STATEMENT_TEXT, "onsite_minutes": onsite.VERIFY_MINUTES,
+    })
     response["X-Kiosk-App"] = "1"
     response["Cache-Control"] = "no-store"
     return response
@@ -213,6 +218,83 @@ def api_report_failed(request):
     return JsonResponse({"ok": True})
 
 
+# --- rezerwacja na miejscu -------------------------------------------------------------------------------
+
+
+def _json(request):
+    try:
+        data = json.loads(request.body or b"{}")
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _error(e, status=400):
+    return JsonResponse({"error": " ".join(e.messages)}, status=status)
+
+
+@require_GET
+@api
+def api_onsite_slots(request):
+    return JsonResponse({"lanes": onsite.free_slots(), "max_persons": BookingSettings.load().max_persons})
+
+
+@require_GET
+@api
+def api_onsite_price(request):
+    g = request.GET
+    try:
+        return JsonResponse(onsite.price(g.get("os"), g.get("od"), g.get("do"), g.get("osoby")))
+    except ValidationError as e:
+        return _error(e)
+
+
+@require_POST
+@api
+def api_onsite_start(request):
+    data = _json(request)
+    if data is None:
+        return JsonResponse({"error": "Nieprawidłowe dane."}, status=400)
+    try:
+        flow, secret = onsite.start(request.kiosk_device, data.get("email"), data.get("first_name"), data.get("last_name"),
+                                    data.get("phone"))
+    except ValidationError as e:
+        return _error(e)
+    return JsonResponse({"ref": str(flow.ref), "secret": secret, "state": onsite.state(flow)})
+
+
+@require_POST
+@api
+def api_onsite_step(request, step):
+    """Kolejne kroki przebiegu: kod, regulamin, oswiadczenie, legitymacja, rezerwacja, stan."""
+    data = _json(request)
+    if data is None:
+        return JsonResponse({"error": "Nieprawidłowe dane."}, status=400)
+    flow = onsite.get_flow(request.kiosk_device, data.get("ref"), data.get("secret"))
+    if flow is None:
+        return JsonResponse({"error": "Rezerwacja wygasła albo jest nieznana. Zacznij od nowa.", "restart": True}, status=404)
+    try:
+        if step == "kod":
+            flow = onsite.verify_code(flow, data.get("code"))
+        elif step == "regulamin":
+            onsite.accept_regulations(flow, ip=client_ip(request))
+        elif step == "oswiadczenie":
+            if not data.get("accept"):
+                raise ValidationError("Zaznacz oświadczenie.")
+            onsite.accept_statement(flow)
+        elif step == "legitymacja":
+            onsite.submit_ps(flow, data.get("number"), data.get("issuer"), data.get("issued_on"), data.get("valid_until"),
+                             data.get("photo"))
+        elif step == "rezerwacja":
+            onsite.book(flow, data.get("lane"), data.get("start_hour"), data.get("end_hour"), data.get("persons"))
+        elif step != "stan":
+            return JsonResponse({"error": "Nieznany krok."}, status=404)
+    except ValidationError as e:
+        return _error(e)
+    flow.refresh_from_db()
+    return JsonResponse({"ok": True, "state": onsite.state(flow)})
+
+
 # --- panel ------------------------------------------------------------------------------------------
 
 
@@ -224,6 +306,14 @@ def panel_list(request):
         if action == "add" and request.POST.get("name", "").strip():
             device, code = services.create_device(request.POST["name"], request.user)
             code = (device, code)
+        elif action == "camera":
+            device = get_object_or_404(KioskDevice, pk=request.POST.get("device"))
+            try:
+                services.set_camera(device, request.POST.get("camera", ""), request.user)
+                messages.success(request, f"{device.name}: kamera {device.get_camera_display()}. Zmiana działa po odświeżeniu strony kiosku (najpóźniej po ponownym otwarciu).")
+            except ValidationError as e:
+                messages.error(request, e.messages[0])
+            return redirect("panel:kiosks")
         elif action in ("code", "revoke"):
             device = get_object_or_404(KioskDevice, pk=request.POST.get("device"))
             if action == "code":
@@ -233,6 +323,6 @@ def panel_list(request):
                 messages.success(request, f"Wyłączono urządzenie {device.name}.")
                 return redirect("panel:kiosks")
     return render(request, "panel/kiosks.html", {
-        "devices": KioskDevice.objects.all(), "code": code, "minutes": services.PAIRING_MINUTES,
+        "devices": KioskDevice.objects.all(), "code": code, "cameras": KioskDevice.Camera.choices, "minutes": services.PAIRING_MINUTES,
         "kiosk_url": settings.SITE_URL + reverse("kiosk:home"),
     })

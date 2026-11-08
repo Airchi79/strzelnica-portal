@@ -88,14 +88,16 @@ def day_slots(lane, day: date, now=None, lead_hours=0, holds=False, viewer=None)
     return slots
 
 
-def check_can_book(user):
-    """Zwraca listę powodów, dla których użytkownik nie może rezerwować (pusta = może)."""
+def check_can_book(user, ps_pending=False):
+    """Zwraca listę powodów, dla których użytkownik nie może rezerwować (pusta = może).
+    `ps_pending` — rezerwacja na miejscu (kiosk): legitymacja PS dodana i czeka na weryfikację; rezerwacja powstaje jako
+    „do zatwierdzenia” i zostanie potwierdzona dopiero po weryfikacji legitymacji."""
     reasons = []
     if not user.is_authenticated or not user.is_active:
         return ["Zaloguj się."]
     if not user.email_verified:
         reasons.append("Potwierdź adres e-mail.")
-    if not is_range_officer(user) and not BookingSettings.load().officer_service:
+    if not ps_pending and not is_range_officer(user) and not BookingSettings.load().officer_service:
         reasons.append("Rezerwować może tylko osoba ze zweryfikowanymi uprawnieniami prowadzącego strzelanie.")
     if pending_acceptances(user):
         reasons.append("Zaakceptuj aktualne regulaminy.")
@@ -210,13 +212,14 @@ def needs_officer(user):
     return bool(user) and not is_range_officer(user) and BookingSettings.load().officer_service
 
 
-def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", user=None, enforce_lead=False, respect_holds=None):
+def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", user=None, enforce_lead=False, respect_holds=None,
+          ps_pending=False):
     starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, persons, now, enforce_lead=enforce_lead, user=user,
                                                 respect_holds=respect_holds)
     hours = end_hour - start_hour
     base = {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "code": None, "client_pass": None,
             "with_officer": False, "officer_hourly": 0, "officer_amount": 0}
-    if user is not None and needs_officer(user):
+    if user is not None and not ps_pending and needs_officer(user):
         if access_code:
             raise ValidationError("Rezerwacja z prowadzącym od strzelnicy jest bez kodu klubu i kodu wejścia — usuń kod.")
         officer_hourly = BookingSettings.load().officer_fee_hourly
@@ -252,20 +255,25 @@ CHANNEL_ONLINE, CHANNEL_ONSITE = "online", "na_miejscu"
 
 
 def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="", created_by=None, now=None, access_code="",
-                       series=None, notify=True, channel=CHANNEL_ONLINE, checkout=False):
+                       series=None, notify=True, channel=CHANNEL_ONLINE, checkout=False, ps_pending=False):
     """Rezerwacja. `channel`: "online" (strona — limit czasu przed terminem z ustawień) albo "na_miejscu" (panel na
     strzelnicy — bez limitu czasu, po okazaniu dokumentów). Obsługa w panelu (`created_by` ≠ `user`) — bez limitu.
 
     `checkout` (rezerwacja przez strzelca na stronie): termin jest trzymany („oczekuje na płatność”) przez czas na wybór
-    płatności; potwierdzenie dopiero po zapłacie online, wyborze gotówki na miejscu albo zaksięgowaniu przelewu."""
-    reasons = check_can_book(user)
+    płatności; potwierdzenie dopiero po zapłacie online, wyborze gotówki na miejscu albo zaksięgowaniu przelewu.
+
+    `ps_pending` (tylko na miejscu): legitymacja PS czeka na weryfikację — rezerwacja „do zatwierdzenia”, bez prowadzącego
+    od strzelnicy i bez płatności do czasu weryfikacji (decyzja właściciela: najpierw weryfikacja, potem płatność)."""
+    if ps_pending and channel != CHANNEL_ONSITE:
+        raise ValueError("Rezerwacja z legitymacją PS w weryfikacji jest możliwa tylko na miejscu.")
+    reasons = check_can_book(user, ps_pending=ps_pending)
     if reasons:
         raise ValidationError(reasons)
     by_staff = created_by is not None and created_by != user
     if channel not in (CHANNEL_ONLINE, CHANNEL_ONSITE):
         raise ValueError(f"Nieznany kanał rezerwacji: {channel}")
     q = quote(lane, day, start_hour, end_hour, persons, now, access_code=access_code, user=user,
-              enforce_lead=not by_staff and channel == CHANNEL_ONLINE, respect_holds=not by_staff)
+              enforce_lead=not by_staff and channel == CHANNEL_ONLINE, respect_holds=not by_staff, ps_pending=ps_pending)
     code, client_pass = q["code"], q["client_pass"]
     now = now or timezone.now()
     group = rule = None
@@ -278,7 +286,7 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
         if client_pass is not None and not rule.pay_pass:
             raise ValidationError("Kody wejścia nie są dostępne dla Twojej grupy strzelców. Zarezerwuj bez kodu.")
     # prowadzący od strzelnicy: zawsze do zatwierdzenia (obsługa przydziela prowadzącego)
-    pending = bool(q["with_officer"] or (rule and rule.requires_approval and code is None and client_pass is None))
+    pending = bool(ps_pending or q["with_officer"] or (rule and rule.requires_approval and code is None and client_pass is None))
     cfg = BookingSettings.load()
     hold = bool(checkout and not by_staff and code is None and client_pass is None and q["amount"] > 0
                 and (not pending or cfg.prepay_before_approval))
@@ -319,7 +327,7 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
                 ),
                 status=status,
                 needs_approval=pending,
-                pay_by=min(now + timedelta(minutes=cfg.hold_minutes or 5), q["starts_at"]) if hold else None,
+                pay_by=min(now + timedelta(minutes=cfg.hold_minutes or 5), hold_limit(q["starts_at"], q["ends_at"], now)) if hold else None,
                 client_group=group or "",
                 series=series,
             )
@@ -655,6 +663,12 @@ def choose_payment(reservation, user, method, now=None):
     raise ValidationError("Nieznany sposób płatności.")
 
 
+def hold_limit(starts_at, ends_at, now):
+    """Do kiedy najdłużej trzymać termin do płatności: do rozpoczęcia rezerwacji, a dla już trwającej (rezerwacja
+    na miejscu w bieżącej godzinie) — do jej końca."""
+    return starts_at if starts_at > now else ends_at
+
+
 def start_online_payment(reservation, now=None):
     """Wejście do płatności online: termin trzymany dodatkowe minuty (BLIK, logowanie do banku)."""
     now = now or timezone.now()
@@ -662,7 +676,7 @@ def start_online_payment(reservation, now=None):
     if r.status != Reservation.Status.HOLD:
         return r
     cfg = BookingSettings.load()
-    until = min(now + timedelta(minutes=cfg.online_payment_minutes or 15), r.starts_at)
+    until = min(now + timedelta(minutes=cfg.online_payment_minutes or 15), hold_limit(r.starts_at, r.ends_at, now))
     Reservation.objects.filter(pk=r.pk).update(pay_method=Reservation.PayMethod.ONLINE,
                                                pay_by=max(r.pay_by, until) if r.pay_by else until)
     r.refresh_from_db()

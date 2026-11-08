@@ -2,7 +2,7 @@
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Kiosk · {{ SITE_NAME }}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#2f5d3a">
 <link rel="stylesheet" href="{% static 'css/app.css' %}"></head>
-<body class="kiosk" data-kiosk data-api="{% url 'kiosk:home' %}api/">
+<body class="kiosk" data-kiosk data-api="{% url 'kiosk:home' %}api/" data-camera="{{ device.camera }}">
 <header class="topbar"><div class="wrap"><span class="brand"><img class="brand-logo" src="{{ BRAND.logo_small }}" alt="" width="34" height="34" data-hide-broken>{{ SITE_NAME }} · książka pobytu</span>
   <span class="kiosk-status" data-status>…</span></div></header>
 <main class="wrap">
@@ -14,6 +14,7 @@
     <button class="btn kiosk-big" type="button" data-go="form">Wpis do książki pobytu</button>
     <button class="btn secondary kiosk-big" type="button" data-go="exit">Wyjście ze strzelnicy</button>
     <button class="btn secondary kiosk-big" type="button" data-scan hidden>Zeskanuj kod QR (rezerwacja lub „Mój kod”)</button>
+    <button class="btn secondary kiosk-big" type="button" data-os-open>Rezerwacja na miejscu (dziś)</button>
   </div>
   <p class="muted">Masz kod QR rezerwacji albo osobisty kod z konta? Przyłóż go do czytnika{% comment %} (Raspberry Pi){% endcomment %} lub zeskanuj kamerą.</p>
   <div class="card"><h2 style="margin-top:0">Dzisiejsze rezerwacje</h2><ul class="kiosk-list" data-reservations><li class="muted">Wczytywanie…</li></ul></div>
@@ -22,7 +23,8 @@
 
 <section data-view="scan" hidden>
   <h1>Skanowanie kodu QR</h1>
-  <video data-video playsinline muted style="width:100%;max-height:60vh;background:#000;border-radius:10px"></video>
+  <p class="muted">{% if device.camera == "user" %}Pokaż kod QR (na telefonie lub wydruku) do kamery nad ekranem, z odległości ok. 20–30 cm.{% else %}Skieruj kamerę na kod QR.{% endif %}</p>
+  <video data-video playsinline muted style="width:100%;max-height:60vh;background:#000;border-radius:10px{% if device.camera == "user" %};transform:scaleX(-1){% endif %}"></video>
   <div class="actions"><button class="btn secondary" type="button" data-go="home">Anuluj</button></div>
 </section>
 
@@ -59,6 +61,110 @@
   </div>
 </section>
 
+<!-- Rezerwacja na miejscu: termin → dane → kod z e-maila → regulamin i oświadczenie → legitymacja PS → weryfikacja → płatność → wpis -->
+<section data-view="os-slots" hidden>
+  <h1>Rezerwacja na miejscu</h1>
+  <p class="muted">Na dziś, dla osób z uprawnieniami prowadzącego strzelanie. Potrzebne będą: adres e-mail (przyjdzie kod), legitymacja PS i telefon do zapłaty.</p>
+  <div class="card">
+    <h2 class="step-title">1. Oś</h2><div class="kiosk-chips" data-os-lanes><span class="muted">Wczytywanie…</span></div>
+    <div data-os-when hidden>
+      <h2 class="step-title">2. Godzina rozpoczęcia</h2><div class="kiosk-chips" data-os-hours></div>
+      <h2 class="step-title">3. Ile godzin</h2><div class="kiosk-chips" data-os-durations></div>
+      <h2 class="step-title">4. Liczba osób</h2><div class="kiosk-chips" data-os-persons></div>
+    </div>
+    <p class="kiosk-price" data-os-price></p>
+    <div class="msg error" data-os-error="slots" hidden></div>
+    <div class="actions"><button class="btn kiosk-big" type="button" data-os-next="slots" disabled>Dalej</button><button class="btn secondary" type="button" data-go="home">Anuluj</button></div>
+  </div>
+</section>
+
+<section data-view="os-person" hidden>
+  <h1>Twoje dane</h1>
+  <form class="card" data-os-form="person" novalidate autocomplete="off">
+    <div class="field"><label for="os-fn">Imię</label><input id="os-fn" name="first_name" maxlength="80" autocapitalize="words"></div>
+    <div class="field"><label for="os-ln">Nazwisko</label><input id="os-ln" name="last_name" maxlength="120" autocapitalize="words"></div>
+    <div class="field"><label for="os-em">E-mail (wyślemy kod)</label><input id="os-em" name="email" type="email" inputmode="email" maxlength="254" autocapitalize="off" spellcheck="false"></div>
+    <div class="field"><label for="os-ph">Telefon</label><input id="os-ph" name="phone" type="tel" inputmode="tel" maxlength="32"></div>
+    <p class="small muted">Dane służą do rezerwacji i książki pobytu (konto w systemie strzelnicy zostanie założone automatycznie, bez hasła). Administrator: Stowarzyszenie „STRZELNICA SĄTOK” — szczegóły w polityce prywatności na stronie strzelnicy.</p>
+    <div class="msg error" data-os-error="person" hidden></div>
+    <div class="actions"><button class="btn kiosk-big" type="submit">Wyślij kod na e-mail</button><button class="btn secondary" type="button" data-os-back="os-slots">Wróć</button></div>
+  </form>
+</section>
+
+<section data-view="os-code" hidden>
+  <h1>Kod z e-maila</h1>
+  <form class="card" data-os-form="code" novalidate autocomplete="off">
+    <p>Wysłaliśmy 6-cyfrowy kod na adres <strong data-os-email></strong>. Sprawdź skrzynkę na telefonie (także folder SPAM).</p>
+    <div class="field"><label for="os-code">Kod</label><input id="os-code" name="code" inputmode="numeric" maxlength="6" class="kiosk-code"></div>
+    <div class="msg error" data-os-error="code" hidden></div>
+    <div class="actions"><button class="btn kiosk-big" type="submit">Potwierdź</button><button class="btn secondary" type="button" data-go="home">Zacznij od nowa</button></div>
+  </form>
+</section>
+
+<section data-view="os-rules" hidden>
+  <h1>Regulamin i oświadczenie</h1>
+  <form class="card" data-os-form="rules" novalidate>
+    <p>Dzień dobry, <strong data-os-name></strong>.</p>
+    <div data-os-regs-box hidden>
+      <p>Do zaakceptowania:</p>
+      <ul class="kiosk-list" data-os-regs></ul>
+      <div class="field"><label><input type="checkbox" name="regs"> Przeczytałem/am i akceptuję powyższe regulaminy.</label></div>
+    </div>
+    <div class="field"><label><input type="checkbox" name="statement"> {{ onsite_statement }}</label></div>
+    <div class="msg error" data-os-error="rules" hidden></div>
+    <div class="actions"><button class="btn kiosk-big" type="submit">Dalej</button><button class="btn secondary" type="button" data-go="home">Anuluj</button></div>
+  </form>
+</section>
+
+<section data-view="os-ps" hidden>
+  <h1>Legitymacja prowadzącego strzelanie</h1>
+  <form class="card" data-os-form="ps" novalidate autocomplete="off">
+    <p class="small muted">Wpisz dane z legitymacji, a potem zrób jej zdjęcie. Obsługa porówna dane ze zdjęciem (do {{ onsite_minutes }} minut). Zdjęcie zostanie usunięte po sprawdzeniu.</p>
+    <div class="field"><label for="os-pn">Numer legitymacji</label><input id="os-pn" name="number" maxlength="64" autocapitalize="characters" spellcheck="false"></div>
+    <div class="field"><label for="os-pi">Kto wydał (np. PZSS, LOK, nazwa organizacji)</label><input id="os-pi" name="issuer" maxlength="160"></div>
+    <div class="field"><label for="os-pd">Data wydania</label><input id="os-pd" name="issued_on" type="date"></div>
+    <div class="field"><label for="os-pv">Ważna do (puste, jeśli bezterminowa)</label><input id="os-pv" name="valid_until" type="date"></div>
+    <div class="msg error" data-os-error="ps" hidden></div>
+    <div class="actions"><button class="btn kiosk-big" type="submit">Zrób zdjęcie legitymacji</button><button class="btn secondary" type="button" data-go="home">Anuluj</button></div>
+  </form>
+</section>
+
+<section data-view="os-camera" hidden>
+  <h1>Zdjęcie legitymacji</h1>
+  <p class="os-hint" data-os-hint>Pokaż legitymację do kamery tak, aby wypełniła ramkę.</p>
+  <div class="os-cam{% if device.camera == 'user' %} mirror{% endif %}" data-os-cam>
+    <video data-os-video playsinline muted></video>
+    <div class="os-frame" data-os-frame></div>
+  </div>
+  <p class="small muted" data-os-diag hidden></p>
+  <div class="actions"><button class="btn secondary" type="button" data-os-manual hidden>Zrób zdjęcie teraz</button><button class="btn secondary" type="button" data-os-back="os-ps">Wróć</button></div>
+</section>
+
+<section data-view="os-preview" hidden>
+  <h1>Czy zdjęcie jest czytelne?</h1>
+  <p class="muted">Sprawdź, czy widać numer, imię i nazwisko — bez odblasków i rozmazania.</p>
+  <img class="os-photo" data-os-photo alt="Zdjęcie legitymacji">
+  <div class="msg error" data-os-error="preview" hidden></div>
+  <div class="os-choice"><button class="btn kiosk-big" type="button" data-os-confirm>Potwierdź</button><button class="btn secondary kiosk-big" type="button" data-os-retry>Ponów próbę</button></div>
+</section>
+
+<section data-view="os-wait" hidden>
+  <h1 data-os-wait-title>Rezerwacja</h1>
+  <div class="card kiosk-done">
+    <p data-os-wait-text></p>
+    <p class="os-countdown" data-os-countdown hidden></p>
+    <div data-os-pay hidden>
+      <img class="os-qr" data-os-qr alt="Kod QR do płatności">
+      <p>Zeskanuj kod aparatem telefonu i zapłać <strong data-os-amount></strong> (BLIK, przelew, karta).</p>
+      <p class="small muted" data-os-until></p>
+    </div>
+    <div class="actions" style="justify-content:center"><button class="btn kiosk-big" type="button" data-os-entry hidden>Wpis do książki pobytu</button>
+      <button class="btn secondary" type="button" data-go="home" data-os-close>Zakończ</button></div>
+  </div>
+</section>
+
+<dialog class="os-dialog" data-os-dialog><div data-os-dialog-body></div><div class="actions"><button class="btn" type="button" data-os-dialog-close>Zamknij</button></div></dialog>
+
 <section data-view="done" hidden>
   <div class="card kiosk-done"><h1 data-done-title>Gotowe</h1><p data-done-text></p>
     <button class="btn kiosk-big" type="button" data-go="home">OK</button></div>
@@ -66,4 +172,5 @@
 
 </main>
 <script src="{% static 'js/kiosk.js' %}" defer></script>
+<script src="{% static 'js/kiosk-onsite.js' %}" defer></script>
 </body></html>

@@ -88,3 +88,14 @@ def revoke(device, by):
     device.pairing_code_hash = ""
     device.save()
     log_event("kiosk.wylaczenie", device, device.name, actor=by)
+
+
+@transaction.atomic
+def set_camera(device, camera, by):
+    if camera not in KioskDevice.Camera.values:
+        raise ValidationError("Nieznany wybór kamery.")
+    if device.camera != camera:
+        before = device.camera
+        device.camera = camera
+        device.save(update_fields=["camera"])
+        log_event("kiosk.kamera", device, f"{device.name}: {device.get_camera_display()}", changes={"bylo": before, "jest": camera}, actor=by)

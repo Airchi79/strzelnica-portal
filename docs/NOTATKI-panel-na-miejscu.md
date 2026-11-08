@@ -26,3 +26,29 @@ Notatka dla prac nad panelem na miejscu (osobny etap). Opisuje, co już jest got
 
 - Weryfikacja tożsamości i dokumentów „do kamery” (kto zatwierdza: obsługa zdalnie czy automat) i zapis tego w dzienniku.
 - Sprzedaż na miejscu / vouchery — po konsultacji z księgową (stowarzyszenie zwykłe).
+
+## Rezerwacja na miejscu w kiosku — etap 1 (część serwerowa)
+
+Decyzje właściciela (listopad 2026): tylko osoby z uprawnieniami PS; konto zakładane w tle po kodzie z e-maila;
+najpierw weryfikacja legitymacji, potem płatność; bez weryfikacji w ciągu **15 minut** rezerwacja anuluje się sama
+bez opłat; zdjęcie legitymacji usuwane po weryfikacji; tylko dziś, od bieżącej godziny; kod e-mail (nie SMS).
+
+- Logika: `apps/kiosk/onsite.py` (model przebiegu `OnsiteBooking`), API: `/kiosk/api/na-miejscu/…`
+  (`terminy`, `start`, `kod`, `regulamin`, `oswiadczenie`, `legitymacja`, `rezerwacja`, `stan`).
+- `create_reservation(..., channel=CHANNEL_ONSITE, ps_pending=True)` — rezerwacja „do zatwierdzenia” bez prowadzącego
+  od strzelnicy, gdy legitymacja czeka na weryfikację.
+- Zatwierdzenie legitymacji w module dokumentów potwierdza czekającą rezerwację, odrzucenie ją anuluje
+  (`credential_reviewed`). Wygaszanie i czyszczenie danych: `expire_reservations` (co minutę).
+- Treść oświadczenia: `onsite.STATEMENT_TEXT` — do akceptacji przez właściciela.
+- Etap 2 (płatność): po weryfikacji legitymacji `onsite.approve_for_payment` — termin trzymany do płatności online
+  (czas z ustawień „płatność online”), także w trakcie trwającej godziny; kiosk pokazuje kod QR z linkiem
+  `/platnosci/rezerwacja/<token>/` (podpisany, ważny 2 h) — płatność Tpay na telefonie osoby, bez logowania.
+  Wspólna logika z płatnością z konta: `payments.services.reservation_online_amount` i `start_tpay`.
+  Nieopłacona w czasie — zwalniana przez `expire_reservations`. Termin trzymany dla rezerwacji w bieżącej godzinie
+  liczony do jej końca (`bookings.hold_limit`), nie do początku.
+- Etap 3 (ekrany kiosku): `static/js/kiosk-onsite.js` + sekcje `os-*` w `templates/kiosk/kiosk.html`.
+  Kamera z ramką: ocena klatki w przeglądarce (jasność, odblask, ostrość, krawędzie karty przy ramce, bezruch),
+  zdjęcie samo po ok. 1 s stabilnego ustawienia, przycisk ręczny po 12 s. Progi w `LIMITS` — do dostrojenia na
+  urządzeniu: adres `/kiosk/#diag` pokazuje wskaźniki pod podglądem kamery.
+- Dalej: etap 4 panel obsługi (zatwierdzenie legitymacji i rezerwacji jednym przyciskiem, uporządkowanie
+  powiadomień), etap 5 automatyczne porównanie danych z legitymacji (OCR, zdjęcie do przejrzenia do 7 dni).

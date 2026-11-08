@@ -1,0 +1,9 @@
+{% autoescape off %}Dzień dobry {{ first_name }},
+
+Twój kod do rezerwacji w kiosku na strzelnicy: {{ code }}
+
+Wpisz go na ekranie kiosku. Kod jest ważny {{ minutes }} minut.
+Jeśli to nie Ty rozpoczynasz rezerwację, zignoruj tę wiadomość — bez kodu nikt nie użyje Twojego adresu.
+
+Stowarzyszenie „STRZELNICA SĄTOK”
+{% endautoescape %}

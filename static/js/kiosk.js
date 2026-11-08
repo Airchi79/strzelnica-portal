@@ -9,6 +9,10 @@
   const QUEUE_KEY = "satok_kiosk_queue";
   const STATE_KEY = "satok_kiosk_state";
   const IDLE_MS = 120000;
+  // Dłużej na ekranach rezerwacji na miejscu (kod z e-maila na telefonie, weryfikacja legitymacji, płatność).
+  const IDLE_BY_VIEW = { "os-person": 300000, "os-code": 300000, "os-rules": 300000, "os-ps": 300000, "os-camera": 180000,
+    "os-preview": 180000, "os-wait": 1500000 };
+  const showHooks = [];
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
@@ -29,12 +33,13 @@
     if (view !== "scan") stopCamera();
     if (view === "home") { resetForm(); renderReservations(); renderQueue(); }
     if (view === "exit") { const q = $("[data-exit-q]"); q.value = ""; $("[data-exit-list]").innerHTML = ""; q.focus(); }
+    showHooks.forEach((fn) => fn(view));
     window.scrollTo(0, 0);
     bumpIdle();
   }
   function bumpIdle() {
     clearTimeout(idleTimer);
-    if (current !== "home") idleTimer = setTimeout(() => show("home"), IDLE_MS); // dane nie zostają na ekranie
+    if (current !== "home") idleTimer = setTimeout(() => show("home"), IDLE_BY_VIEW[current] || IDLE_MS); // dane nie zostają na ekranie
   }
   ["pointerdown", "keydown", "input"].forEach((ev) => document.addEventListener(ev, bumpIdle, { passive: true }));
   document.addEventListener("click", (e) => {
@@ -291,7 +296,9 @@
     scanButton.addEventListener("click", async () => {
       try {
         const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        // Kamera wybrana w panelu dla urządzenia: przednia (kiosk na ścianie) albo tylna (tablet w ręku).
+        const facing = body.dataset.camera === "environment" ? "environment" : "user";
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing } } });
         const video = $("[data-video]");
         video.srcObject = stream; await video.play();
         show("scan");
@@ -304,6 +311,13 @@
       } catch (e) { stopCamera(); done("Kamera niedostępna", "Zezwól na użycie kamery w ustawieniach przeglądarki albo użyj przycisku wpisu."); }
     });
   }
+
+  // Interfejs dla modułu rezerwacji na miejscu (kiosk-onsite.js).
+  window.SatokKiosk = {
+    api, show, done, openForm, refreshState, onShow: (fn) => showHooks.push(fn),
+    openReservationIds: () => openReservations().map((r) => r.id),
+    isOnline: () => online, current: () => current, camera: () => (body.dataset.camera === "environment" ? "environment" : "user"),
+  };
 
   // --- start ---------------------------------------------------------------------------------------------
   setOnline(online);

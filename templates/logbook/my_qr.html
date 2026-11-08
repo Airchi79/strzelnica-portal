@@ -1,16 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Mój kod QR{% endblock %}
+{% block title %}Książka pobytu{% endblock %}
 {% block content %}
-<h1>Mój kod QR</h1>
+<h1>Książka pobytu</h1>
+
+{% if open_stays %}<div class="card">
+  <h2 class="step-title">Jesteś na strzelnicy</h2>
+  <ul style="list-style:none;padding:0;margin:0">{% for e in open_stays %}<li>
+    <form method="post" action="{% url 'logbook:my_exit' e.pk %}" class="actions" style="margin:0 0 8px">{% csrf_token %}
+      <span>Wejście {{ e.entered_at|date:"j.m H:i" }} · {{ e.get_purpose_display }}{% if e.reservation %} · {{ e.reservation.lane }}{% endif %} · nr {{ e.number }}</span>
+      <button class="btn" type="submit">Zakończ pobyt — zapisz wyjście</button>
+    </form></li>{% endfor %}</ul>
+</div>{% endif %}
+
+<div class="card">
+  <h2 class="step-title">Wpis do książki pobytu</h2>
+  {% if my_reservations %}
+    {% for r, token in my_reservations %}<div class="actions" style="margin:0 0 8px">
+      <span>Twoja rezerwacja {{ r.number }}: {{ r.lane }}, {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}</span>
+      <a class="btn" href="{% url 'logbook:by_reservation' token %}">Wpisz się</a></div>{% endfor %}
+    <p class="small muted">Osoby z Twojej rezerwacji dopiszesz, skanując ich „Mój kod QR”, albo pokaż im kod QR rezerwacji (szczegóły rezerwacji).</p>
+  {% else %}
+    <p class="small muted" style="margin:0">Teraz nie trwa żadna Twoja rezerwacja. Bez własnej rezerwacji wpisz się kodem QR przy wejściu, w kiosku albo u prowadzącego strzelanie — wpis potwierdza obecność na strzelnicy, dlatego nie można go zrobić zdalnie.</p>
+  {% endif %}
+</div>
+
+<h2>Mój kod QR</h2>
 <div class="card" style="text-align:center">
   <div class="qr"><img src="{{ qr }}" alt="Twój stały kod QR do książki pobytu"></div>
-  <p class="small">Pokaż ten kod prowadzącemu strzelanie — zeskanuje go i dopisze Cię do książki pobytu. Kod nie zawiera Twoich danych.</p>
+  <p class="small">Pokaż ten kod w kiosku przy wejściu albo prowadzącemu strzelanie — formularz wpisu wypełni się Twoimi danymi. Kod nie zawiera Twoich danych.</p>
   <form method="post" data-confirm="Wygenerować nowy kod? Poprzedni przestanie działać.">{% csrf_token %}<button class="btn secondary" type="submit">Wygeneruj nowy kod</button></form>
 </div>
 <h2>Moje pobyty</h2>
 <div class="card table-wrap"><table>
-  <tr><th>Wejście</th><th>Cel</th><th class="hide-sm">Oś</th><th>Nr</th></tr>
-  {% for e in entries %}<tr><td>{{ e.entered_at|date:"j.m.Y H:i" }}</td><td>{{ e.get_purpose_display }}</td><td class="hide-sm">{{ e.reservation.lane|default:"—" }}</td><td>{{ e.number }}</td></tr>
-  {% empty %}<tr><td class="muted" colspan="4">Brak wpisów.</td></tr>{% endfor %}
+  <tr><th>Wejście</th><th>Wyjście</th><th>Cel</th><th class="hide-sm">Oś</th><th>Nr</th></tr>
+  {% for e in entries %}<tr><td>{{ e.entered_at|date:"j.m.Y H:i" }}</td><td>{{ e.exited_at|date:"H:i"|default:"—" }}</td><td>{{ e.get_purpose_display }}</td><td class="hide-sm">{{ e.reservation.lane|default:"—" }}</td><td>{{ e.number }}</td></tr>
+  {% empty %}<tr><td class="muted" colspan="5">Brak wpisów.</td></tr>{% endfor %}
 </table></div>
 {% endblock %}

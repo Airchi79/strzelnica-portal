@@ -528,3 +528,41 @@ def test_done_page_with_reservation_shares_reservation_link(client, running, sig
     session.save()
     url = client.get(f"/ksiazka/wpisano/{e.pk}/").context["share_url"]
     assert "/ksiazka/wpis/r/" in url
+
+
+# --- panel klienta: wpis i zakończenie pobytu bez kodu QR -------------------------------
+
+
+def test_my_page_offers_entry_for_own_running_reservation_and_manual_exit(client, running, ps, sig):
+    client.force_login(ps)
+    token = services.reservation_token(running)
+    body = client.get("/ksiazka/moj-kod/").content.decode()
+    assert f"/ksiazka/wpis/r/{token}/" in body
+    client.post(f"/ksiazka/wpis/r/{token}/", {**permit_data(first_name="Piotr", last_name="Prowadzący"), "purpose": "strzelanie",
+                                             "signature": sig})
+    entry = Entry.objects.get()
+    assert entry.user == ps and entry.exited_at is None
+    body = client.get("/ksiazka/moj-kod/").content.decode()
+    assert "Zakończ pobyt" in body and f"/ksiazka/wpis/r/{token}/" not in body  # już wpisany — bez ponownego wpisu
+    client.post(f"/ksiazka/moje-wyjscie/{entry.pk}/")
+    entry.refresh_from_db()
+    assert entry.exited_at is not None
+    assert "Zakończ pobyt" not in client.get("/ksiazka/moj-kod/").content.decode()
+
+
+def test_my_exit_only_own_open_entry(client, running, ps, sig):
+    token = services.reservation_token(running)
+    client.post(f"/ksiazka/wpis/r/{token}/", {**permit_data(), "purpose": "strzelanie", "signature": sig})
+    entry = Entry.objects.get()  # wpis anonimowy, bez konta
+    other = make_user("inny@example.com")
+    client.force_login(other)
+    client.post(f"/ksiazka/moje-wyjscie/{entry.pk}/")
+    entry.refresh_from_db()
+    assert entry.exited_at is None
+    assert client.get(f"/ksiazka/moje-wyjscie/{entry.pk}/").status_code == 405
+
+
+def test_my_page_without_reservation_explains_qr(client, user):
+    client.force_login(user)
+    body = client.get("/ksiazka/moj-kod/").content.decode()
+    assert "nie trwa żadna Twoja rezerwacja" in body

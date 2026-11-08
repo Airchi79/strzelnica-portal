@@ -129,6 +129,8 @@ def attention(user, now=None):
             Reservation.objects.filter(status=Reservation.Status.CONFIRMED, starts_at__lte=now, starts_at__gte=now - timedelta(days=30))
             .annotate(n=Count("log_entries", filter=Q(log_entries__purpose=Entry.Purpose.SHOOTING))).filter(n=0).count()
         )
+        overdue = Reservation.objects.filter(status=Reservation.Status.HOLD, pay_method=Reservation.PayMethod.TRANSFER, pay_by__lt=now).count()
+        tiles.append(("Przelewy po terminie", "Zaimportuj wyciąg albo anuluj rezerwację", overdue, reverse("panel:reservations")))
         tiles.append(("Braki w książce pobytu", "Odbyte rezerwacje bez wpisów (30 dni)", missing, reverse("panel:reservations_days") + "?filtr=braki_ksiega"))
     if user.has_perm("credentials.review_credential"):
         tiles.append(("Dokumenty do weryfikacji", "Pozwolenia i legitymacje PS", Credential.objects.filter(status=Credential.Status.PENDING).count(), reverse("panel:credentials")))
@@ -151,6 +153,13 @@ def attention(user, now=None):
         from .backups import read_status
 
         st = read_status(now)
+        from .models import OutgoingEmail
+
+        problems = OutgoingEmail.objects.filter(
+            Q(status=OutgoingEmail.Status.FAILED, created_at__gte=now - timedelta(days=7))
+            | Q(status=OutgoingEmail.Status.PENDING, attempts__gt=0)).count()
+        tiles.append(("Wysyłka e-maili", "Wiadomości niewysłane (serwer poczty)" if problems else "Wszystkie wiadomości wysłane",
+                      problems, reverse("panel:outbox")))
         tiles.append(("Kopia zapasowa", "Kopia odtworzona i sprawdzona" if st["state"] == "ok" else st["message"][:80],
                       0 if st["state"] == "ok" else 1, reverse("panel:backups")))
     if user.has_perm("payments.manage_payments"):
@@ -159,5 +168,9 @@ def attention(user, now=None):
         if online_fee_missing_in_rules():
             tiles.append(("Regulamin a opłata online", "Opłata za płatność online jest włączona, a regulamin o niej nie wspomina", 1,
                           reverse("panel:payment_settings")))
+        from apps.payments.models import TpayRefund
+
+        unknown = TpayRefund.objects.filter(status=TpayRefund.Status.UNKNOWN).count()
+        tiles.append(("Zwroty Tpay do sprawdzenia", "Sprawdź w panelu Tpay i oznacz wynik", unknown, reverse("panel:payments")))
         tiles.append(("Wpłaty do przypisania", "Przelewy bez rozpoznanego tytułu", Payment.objects.filter(status=Payment.Status.UNMATCHED).count(), reverse("panel:payments") + "?status=nieprzypisana"))
     return tiles

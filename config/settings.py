@@ -192,11 +192,17 @@ OTP_TOTP_ISSUER = "Strzelnica Sątok"
 # Folder kopii zapasowych bazy (w Dockerze: ./backups podłączony tylko do odczytu) — stan kopii w panelu i alarmy.
 BACKUP_DIR = env("BACKUP_DIR", "/backups")
 
+# Alarm e-mail o błędach serwera (500, wyjątki w zadaniach) — adresy po przecinku; puste = tylko log kontenera.
+ERROR_EMAILS = [a.strip() for a in env("ERROR_EMAIL", "").split(",") if a.strip()]
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
-    "root": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO")},
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+        "board_errors": {"class": "apps.core.errorlog.BoardErrorEmailHandler", "level": "ERROR"},
+    },
+    "root": {"handlers": ["console", "board_errors"], "level": env("LOG_LEVEL", "INFO")},
 }
 
 # Tpay (Open API). Bez kompletu danych płatności online są wyłączone.

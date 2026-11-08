@@ -58,6 +58,7 @@ urlpatterns = [
     path("pytania/nowe/", views.panel_faq_item, name="faq_new"),
     path("pytania/<int:pk>/", views.panel_faq_item, name="faq_item"),
     path("kopie/", views.panel_backups, name="backups"),
+    path("poczta/", views.panel_outbox, name="outbox"),
     path("pomoc/", views.panel_help, name="help"),
     path("widzet/", views.panel_widget, name="widget"),
     path("rodo/", views.panel_gdpr, name="gdpr"),

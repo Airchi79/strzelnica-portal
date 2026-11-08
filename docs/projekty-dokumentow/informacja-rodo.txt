@@ -40,9 +40,10 @@ Cloudflare, Inc. oraz część operatorów usług powiadomień push mają siedzi
 3. Dokumentacja wpłat i zwrotów — 5 lat, licząc od początku roku następującego po roku obrotowym, w którym operacja została zaksięgowana.
 4. Zdjęcia dokumentów do weryfikacji — do czasu decyzji obsługi (usuwane automatycznie po weryfikacji).
 5. Powiadomienia w systemie — 1 rok.
-6. Kopie zapasowe bazy danych — do 7 dni (kopie są nadpisywane automatycznie).
-7. Ewidencja członków i dokumenty Stowarzyszenia — przez okres członkostwa, a po jego ustaniu przez okres wymagany przepisami i potrzebny do udokumentowania działalności Stowarzyszenia.
-8. Dziennik zdarzeń i dane potrzebne do obrony przed roszczeniami — do upływu terminów przedawnienia roszczeń.
+6. Kopie wiadomości e-mail wysłanych przez system (potrzebne do ponowienia wysyłki) — 30 dni od wysyłki.
+7. Kopie zapasowe bazy danych — do 7 dni (kopie są nadpisywane automatycznie).
+8. Ewidencja członków i dokumenty Stowarzyszenia — przez okres członkostwa, a po jego ustaniu przez okres wymagany przepisami i potrzebny do udokumentowania działalności Stowarzyszenia.
+9. Dziennik zdarzeń i dane potrzebne do obrony przed roszczeniami — do upływu terminów przedawnienia roszczeń.
 
 § 6. Prawa osoby, której dane dotyczą
 

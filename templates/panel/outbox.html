@@ -1,0 +1,24 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Poczta wychodząca{% endblock %}
+{% block panel %}
+<h1>Poczta wychodząca</h1>
+<div class="res-banner {% if problems %}warn{% else %}ok{% endif %}"><strong>{% if problems %}Wiadomości niewysłane: {{ problems|length }}{% else %}Wszystkie wiadomości wysłane ✓{% endif %}</strong>
+  <span>Powiadomienia e-mail zapisują się razem z operacją i wychodzą zaraz po niej. Gdy serwer poczty ich nie przyjmie, system ponawia wysyłkę
+    (po 1, 5, 15, 60 minutach, 3, 6 i 12 godzinach); potem wiadomość oznacza jako nieudaną. Wysłane wiadomości są usuwane po 30 dniach.</span></div>
+<div class="card">
+  <p class="small muted" style="margin-top:0">Do wysłania: {{ stats.do_wyslania }} · wysłane (30 dni): {{ stats.wyslany }} · nieudane: {{ stats.nieudany }}</p>
+  {% if problems %}
+  <table>
+    <tr><th>Utworzono</th><th>Do</th><th>Temat</th><th>Próby</th><th>Błąd</th></tr>
+    {% for m in problems %}<tr>
+      <td>{{ m.created_at|date:"j.m.Y H:i" }}</td><td class="small">{{ m.recipients|join:", " }}</td><td>{{ m.subject }}</td>
+      <td>{{ m.attempts }}{% if m.status == 'nieudany' %} <span class="badge warn">nieudana</span>{% elif m.next_attempt_at %}<div class="small muted">kolejna {{ m.next_attempt_at|date:"j.m H:i" }}</div>{% endif %}</td>
+      <td class="small muted">{{ m.last_error }}</td>
+    </tr>{% endfor %}
+  </table>
+  <form method="post" class="actions">{% csrf_token %}<button class="btn" name="action" value="retry">Ponów wysyłkę teraz</button></form>
+  <p class="small muted">Najczęstsze przyczyny: zmienione hasło skrzynki nadawczej, limit wysyłki u dostawcy poczty, chwilowa awaria serwera poczty.
+    Ustawienia poczty są w pliku <code>.env</code> na serwerze (EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD).</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -187,3 +187,31 @@ class FaqItem(models.Model):
 
     def __str__(self):
         return self.question
+
+
+class OutgoingEmail(models.Model):
+    """Skrzynka nadawcza powiadomień e-mail. Wiadomość zapisywana jest razem z operacją (w tej samej transakcji),
+    wysyłana po jej zatwierdzeniu; nieudaną wysyłkę ponawia harmonogram. Wysłane usuwane po 30 dniach (minimalizacja danych)."""
+
+    class Status(models.TextChoices):
+        PENDING = "do_wyslania", "Do wysłania"
+        SENT = "wyslany", "Wysłany"
+        FAILED = "nieudany", "Nie udało się wysłać"
+
+    recipients = models.JSONField("odbiorcy", default=list)
+    subject = models.CharField("temat", max_length=255)
+    body = models.TextField("treść")
+    status = models.CharField("status", max_length=12, choices=Status.choices, default=Status.PENDING, db_index=True)
+    attempts = models.PositiveSmallIntegerField("próby", default=0)
+    next_attempt_at = models.DateTimeField("następna próba", null=True, blank=True, db_index=True)
+    last_error = models.CharField("ostatni błąd", max_length=255, blank=True)
+    created_at = models.DateTimeField("utworzono", auto_now_add=True, db_index=True)
+    sent_at = models.DateTimeField("wysłano", null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "wiadomość e-mail (skrzynka nadawcza)"
+        verbose_name_plural = "skrzynka nadawcza"
+
+    def __str__(self):
+        return f"{self.subject} → {', '.join(self.recipients)} ({self.get_status_display()})"

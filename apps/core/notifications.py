@@ -1,6 +1,7 @@
 """Wysyłka powiadomień e-mail. Wiadomości wychodzą dopiero po zatwierdzeniu transakcji."""
 
 import logging
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -13,20 +14,73 @@ logger = logging.getLogger(__name__)
 
 
 def _send(subject, template, context, recipients):
+    """Zapisuje wiadomość w skrzynce nadawczej (w transakcji operacji) i wysyła ją po zatwierdzeniu transakcji.
+    Wycofana operacja = brak wiadomości; błąd serwera poczty = ponowienie przez harmonogram (send_outbox)."""
+    from apps.core.models import OutgoingEmail
+
     subject = " ".join(str(subject).split())[:200]  # jedna linia: treści od użytkowników nie mogą zepsuć nagłówka
     recipients = sorted({r for r in recipients if r})
     if not recipients:
         return
     context = {"site_url": settings.SITE_URL, **context}
     body = render_to_string(template, context)
+    msg = OutgoingEmail.objects.create(recipients=recipients, subject=f"[Strzelnica Sątok] {subject}", body=body)
+    transaction.on_commit(lambda: deliver(msg.pk))
 
-    def deliver():
+
+# Ponowienia: po 1, 5, 15, 60 min, 3 h, 6 h, 12 h — potem wiadomość oznaczana jako nieudana (log błędu → alarm dla zarządu).
+RETRY_DELAYS = [timedelta(minutes=m) for m in (1, 5, 15, 60, 180, 360, 720)]
+OUTBOX_RETENTION_DAYS = 30
+
+
+def deliver(pk, now=None):
+    """Wysyła jedną wiadomość ze skrzynki nadawczej. Błąd poczty nie cofa operacji użytkownika — wiadomość czeka na ponowienie."""
+    from django.utils import timezone
+
+    from apps.core.models import OutgoingEmail
+
+    now = now or timezone.now()
+    with transaction.atomic():
+        msg = OutgoingEmail.objects.select_for_update(skip_locked=True).filter(pk=pk, status=OutgoingEmail.Status.PENDING).first()
+        if msg is None:
+            return None
         try:
-            send_mail(f"[Strzelnica Sątok] {subject}", body, settings.DEFAULT_FROM_EMAIL, recipients)
-        except Exception:  # błąd poczty nie może cofnąć operacji użytkownika
-            logger.exception("Nie udało się wysłać wiadomości %r do %s", subject, recipients)
+            send_mail(msg.subject, msg.body, settings.DEFAULT_FROM_EMAIL, msg.recipients)
+        except Exception as e:  # noqa: BLE001 — każdy błąd poczty: ponowienie
+            msg.attempts += 1
+            msg.last_error = f"{type(e).__name__}: {e}"[:255]
+            if msg.attempts > len(RETRY_DELAYS):
+                msg.status, msg.next_attempt_at = OutgoingEmail.Status.FAILED, None
+                logger.error("E-mail %s (%r do %s) nie wysłany po %s próbach: %s", msg.pk, msg.subject, msg.recipients,
+                             msg.attempts, msg.last_error)
+            else:
+                msg.next_attempt_at = now + RETRY_DELAYS[msg.attempts - 1]
+                logger.warning("E-mail %s (%r): błąd wysyłki, ponowienie o %s", msg.pk, msg.subject, msg.next_attempt_at)
+            msg.save(update_fields=["attempts", "last_error", "status", "next_attempt_at"])
+            return False
+        msg.status, msg.sent_at, msg.next_attempt_at = OutgoingEmail.Status.SENT, now, None
+        msg.save(update_fields=["status", "sent_at", "next_attempt_at"])
+        return True
 
-    transaction.on_commit(deliver)
+
+def send_outbox(now=None):
+    """Harmonogram (co minutę): wiadomości czekające na ponowienie oraz niewysłane po zatwierdzeniu (np. restart).
+    Usuwa wysłane starsze niż 30 dni. Zwraca (wysłane, nieudane_teraz)."""
+    from django.utils import timezone
+
+    from apps.core.models import OutgoingEmail
+
+    now = now or timezone.now()
+    due = OutgoingEmail.objects.filter(status=OutgoingEmail.Status.PENDING).filter(
+        Q(next_attempt_at__lte=now) | Q(next_attempt_at__isnull=True, created_at__lte=now - timedelta(minutes=2))
+    ).order_by("created_at").values_list("pk", flat=True)[:200]
+    sent = failed = 0
+    for pk in list(due):
+        result = deliver(pk, now)
+        sent += result is True
+        failed += result is False
+    OutgoingEmail.objects.filter(status=OutgoingEmail.Status.SENT, sent_at__lt=now - timedelta(days=OUTBOX_RETENTION_DAYS)).delete()
+    return sent, failed
 
 
 def _portal_link(template, context):

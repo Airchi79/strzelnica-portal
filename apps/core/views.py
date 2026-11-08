@@ -350,6 +350,24 @@ def healthz(request):
     return HttpResponse("ok", content_type="text/plain")
 
 
+@panel_required("core.manage_settings")
+def panel_outbox(request):
+    """Poczta wychodząca: wiadomości, których serwer poczty nie przyjął (ponawiane automatycznie) — z ponowieniem od razu."""
+    from django.db.models import Q
+
+    from .models import OutgoingEmail
+
+    if request.method == "POST" and request.POST.get("action") == "retry":
+        n = OutgoingEmail.objects.filter(status__in=[OutgoingEmail.Status.PENDING, OutgoingEmail.Status.FAILED], attempts__gt=0).update(
+            status=OutgoingEmail.Status.PENDING, next_attempt_at=timezone.now(), attempts=0)
+        log_event("poczta.ponowienie", None, f"Ponowiono wysyłkę {n} wiadomości")
+        messages.success(request, f"Wiadomości do ponowienia: {n}. Wyjdą w ciągu minuty.")
+        return redirect("panel:outbox")
+    problems = OutgoingEmail.objects.filter(Q(status=OutgoingEmail.Status.FAILED) | Q(status=OutgoingEmail.Status.PENDING, attempts__gt=0))[:100]
+    stats = {s: OutgoingEmail.objects.filter(status=s).count() for s in OutgoingEmail.Status.values}
+    return render(request, "panel/outbox.html", {"problems": problems, "stats": stats})
+
+
 @panel_required("core.publish_announcement")
 def panel_announcements(request):
     from . import announcements

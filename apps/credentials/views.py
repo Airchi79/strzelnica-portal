@@ -86,6 +86,7 @@ REJECT_REASONS = [
 
 
 EXPIRING = "wygasa"  # zakładka: zweryfikowane, ważne jeszcze najwyżej 30 dni
+AUTO = "automatycznie"  # zakładka: zatwierdzone automatycznie w kiosku — do przejrzenia przez obsługę
 
 
 def _pending_queue():
@@ -115,7 +116,12 @@ def panel_list(request):
     counts = {r["status"]: r["n"] for r in qs.order_by().values("status").annotate(n=Count("pk"))}
     today = timezone.localdate()
     expiring = qs.filter(status=Credential.Status.VERIFIED, valid_until__gte=today, valid_until__lte=today + timedelta(days=30))
-    if status == EXPIRING:
+    from apps.kiosk.onsite import AUTO_NOTE
+
+    auto = qs.filter(status=Credential.Status.VERIFIED, reviewed_by__isnull=True, review_note=AUTO_NOTE)
+    if status == AUTO:
+        qs = auto.order_by("-reviewed_at")
+    elif status == EXPIRING:
         qs = expiring.order_by("valid_until")  # najbliższy koniec ważności na górze
     elif status == Credential.Status.PENDING:
         qs = qs.filter(status=status).order_by("created_at", "pk")  # najdłużej czekające na górze
@@ -126,6 +132,7 @@ def panel_list(request):
     page = Paginator(qs, 30).get_page(request.GET.get("page"))
     tabs = [(value, label, counts.get(value, 0)) for value, label in Credential.Status.choices]
     tabs.insert(2, (EXPIRING, "Wygasa w 30 dni", expiring.count()))
+    tabs.insert(3, (AUTO, "Zatwierdzone automatycznie", auto.count()))
     return render(
         request,
         "panel/credentials_list.html",

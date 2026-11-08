@@ -37,6 +37,9 @@ from apps.regulations.models import Acceptance, pending_acceptances
 from .models import OnsiteBooking, token_hash
 
 VERIFY_MINUTES = 15  # decyzja właściciela: tyle czeka rezerwacja na weryfikację legitymacji
+AUTO_OK = "zgodne"  # = ocr.RESULT_OK
+AUTO_NOTE = ("Zweryfikowano automatycznie: dane wpisane w kiosku zgodne ze zdjęciem legitymacji "
+             "(imię i nazwisko, numer, rodzaj dokumentu, wystawca).")
 CODE_MINUTES = 10
 CODE_ATTEMPTS = 5
 FLOW_MINUTES = 60  # na przejście kroków w kiosku
@@ -266,7 +269,14 @@ def submit_ps(flow, number, issuer, issued_on, valid_until, photo):
     if old_scan and old_scan != credential.scan.name:
         transaction.on_commit(lambda: Credential.scan.field.storage.delete(old_scan))
     flow.credential = credential
-    flow.save(update_fields=["credential", "updated_at"])
+    flow.ocr_result = ""
+    if bookings.BookingSettings.load().onsite_auto_verify:
+        from . import ocr
+
+        scan.seek(0)
+        flow.ocr_result = ocr.check(scan.read(), flow.user, credential)[:255]
+        log_event("kiosk.na_miejscu_porownanie", credential, f"{credential}: {flow.ocr_result}", actor=flow.user)
+    flow.save(update_fields=["credential", "ocr_result", "updated_at"])
     return credential
 
 
@@ -302,6 +312,18 @@ def book(flow, lane_id, start_hour, end_hour, persons, now=None):
     if reservation.status == Reservation.Status.PENDING_APPROVAL:
         flow.status = OnsiteBooking.Status.AWAITING
         flow.awaiting_until = now + timedelta(minutes=VERIFY_MINUTES)
+        flow.save(update_fields=["reservation", "status", "awaiting_until", "updated_at"])
+        if pending_ps and flow.ocr_result == AUTO_OK:
+            # Dane zgodne ze zdjęciem legitymacji — zatwierdzenie od razu (zdjęcie usuwane, jak przy decyzji obsługi);
+            # rezerwacja przechodzi do płatności przez credential_reviewed.
+            from apps.credentials.services import review
+
+            review(flow.credential, None, True, AUTO_NOTE)
+            flow.refresh_from_db()
+            reservation.refresh_from_db()
+            log_event("kiosk.na_miejscu_rezerwacja", reservation, f"{reservation} (kiosk: {flow.device.name}, PS automatycznie)",
+                      actor=flow.user)
+            return reservation
         url = reverse("panel:credential", args=[flow.credential_id]) if pending_ps else reverse("panel:reservation", args=[reservation.pk])
         notify_board(
             f"PILNE: rezerwacja na miejscu czeka na weryfikację ({VERIFY_MINUTES} min)", "emails/board_generic.txt",

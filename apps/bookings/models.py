@@ -70,6 +70,12 @@ class BookingSettings(models.Model):
         "lista oczekujących: termin trzymany [min]", default=30,
         help_text="Po zwolnieniu terminu pierwsza osoba z listy dostaje e-mail; przez ten czas tylko ona może go zarezerwować.",
     )
+    onsite_auto_verify = models.BooleanField(
+        "rezerwacja na miejscu: automatyczne porównanie danych z legitymacją PS", default=True,
+        help_text="Kiosk odczytuje tekst ze zdjęcia legitymacji i porównuje go z wpisanymi danymi (imię i nazwisko, numer, "
+                  "rodzaj dokumentu, wystawca). Zgodne — legitymacja zatwierdzona od razu (do przejrzenia w zakładce "
+                  "„Zatwierdzone automatycznie”); niezgodne — zwykła weryfikacja przez obsługę. Automat nigdy nie odrzuca.",
+    )
     officer_service = models.BooleanField(
         "prowadzący od strzelnicy dla osób bez uprawnień PS", default=False,
         help_text="Osoba bez zweryfikowanych uprawnień PS może zarezerwować oś z prowadzącym zapewnionym przez strzelnicę. "

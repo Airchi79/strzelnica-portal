@@ -5,6 +5,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/tmp
 WORKDIR /app
 
 RUN useradd --create-home --uid 1000 app
+# Tesseract (z językiem polskim): odczyt tekstu ze zdjęcia legitymacji PS w kiosku (automatyczne porównanie danych)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-pol \
+    && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

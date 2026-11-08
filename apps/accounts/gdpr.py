@@ -82,8 +82,8 @@ def anonymize_blockers(user):
         reasons.append("Konto jest aktywne — najpierw dezaktywacja (przez osobę albo zarząd).")
     if user.is_staff or user.is_superuser:
         reasons.append("Osoba ma uprawnienia w panelu — najpierw je odbierz.")
-    if Reservation.objects.filter(user=user, ends_at__gt=timezone.now(), status__in=["potwierdzona", "do_zatwierdzenia"]).exists():
-        reasons.append("Ma przyszłe rezerwacje — anuluj je.")
+    if Reservation.objects.filter(user=user, ends_at__gt=timezone.now(), status__in=["potwierdzona", "do_zatwierdzenia", "oczekuje"]).exists():
+        reasons.append("Ma przyszłe rezerwacje (także czekające na płatność) — anuluj je.")
     if Reservation.objects.filter(user=user, payment_status="do_zaplaty").exclude(status="anulowana", late_cancellation=False).exists():
         reasons.append("Ma nierozliczone należności za rezerwacje.")
     if Registration.objects.filter(user=user, status__in=["zapisany", "rezerwowy"], event__ends_at__gt=timezone.now()).exists():

@@ -18,7 +18,6 @@ from apps.regulations.models import RegulationDocument
 
 from .models import (
     AccessCode,
-    Attendance,
     Fee,
     GeneralMeeting,
     Member,
@@ -382,7 +381,9 @@ def cast_board_vote(res, user, choice, now=None):
     Vote.objects.update_or_create(resolution=res, member=member, defaults={"choice": choice, "weight": 1})
     log_event("uchwala.glos", res, f"{member.full_name}: {choice}", actor=user)
     board = list(board_members())
-    votes = {v.member_id: v.choice for v in res.votes.all()}
+    board_ids = {m.pk for m in board}
+    # liczą się głosy obecnego składu Zarządu (osoba, która w trakcie głosowania przestała być w Zarządzie, nie decyduje)
+    votes = {v.member_id: v.choice for v in res.votes.all() if v.member_id in board_ids}
     if all(m.pk in votes for m in board):
         f = sum(1 for c in votes.values() if c == Vote.Choice.FOR)
         a = sum(1 for c in votes.values() if c == Vote.Choice.AGAINST)

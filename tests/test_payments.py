@@ -996,7 +996,7 @@ def test_block_cancellation_refunds_online_payment(client, owner, ps, tpay_keys,
 
 
 def test_manual_refund_and_sales_report(owner_client, owner, ps):
-    from apps.reports.services import collect, summarize
+    from apps.reports.services import collect
 
     PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
     services.register_manual_payment(ps, 30000, Payment.Method.CASH, owner)  # nadpłata 300 zł
@@ -1562,3 +1562,41 @@ def test_tpay_chargeback_notice_does_not_double_count_refund(client, ps, tpay_ke
     _post(client, tpay_keys, _notification(payment, status="CHARGEBACK"))
     assert balance_of(ps) == 0
     assert payment.ledger_entries.filter(kind=LedgerEntry.Kind.CHARGEBACK).count() == 1 and services.ledger_consistent(ps)
+
+
+# --- limit nieopłaconych rezerwacji, rezerwacje „oczekuje” w ogłoszeniach / RODO / „Dziś” ------------------------------
+
+
+def test_unpaid_holds_limit_per_person(ps):
+    from apps.bookings.models import BookingSettings
+
+    BookingSettings.load()
+    BookingSettings.objects.filter(pk=1).update(max_unpaid_holds=2)
+    _checkout(ps, days=7)
+    _checkout(ps, days=8)
+    with pytest.raises(ValidationError, match="nieopłacone rezerwacje"):
+        _checkout(ps, days=9)
+    BookingSettings.objects.filter(pk=1).update(max_unpaid_holds=0)  # 0 — bez limitu
+    assert _checkout(ps, days=9).status == Reservation.Status.HOLD
+
+
+def test_hold_counts_in_announcement_audience_and_gdpr_blockers(ps, owner):
+    from apps.accounts import gdpr
+    from apps.core import announcements
+    from apps.core.models import Announcement
+
+    r = _checkout(ps, days=7)
+    day = timezone.localtime(r.starts_at).date()
+    a = Announcement.objects.create(title="Zmiana godzin", email_audience=Announcement.Audience.BOOKED, booked_from=day, booked_to=day,
+                                    visible_from=timezone.now())
+    assert ps in announcements.recipients(a)
+    ps.is_active = False
+    ps.save(update_fields=["is_active"])
+    assert any("przyszłe rezerwacje" in x for x in gdpr.anonymize_blockers(ps))
+
+
+def test_today_panel_lists_hold(client, ps, owner):
+    r = _checkout(ps, days=7)
+    login_with_otp(client, owner)
+    page = client.get(f"/panel/dzis/?dzien={timezone.localtime(r.starts_at):%Y-%m-%d}").content.decode()
+    assert "Czeka na płatność" in page and r.user.full_name in page

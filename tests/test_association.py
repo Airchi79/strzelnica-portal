@@ -486,3 +486,18 @@ def test_members_csv_neutralizes_formulas(owner_client, board):
     Member.objects.filter(pk=m.pk).update(first_name="=HYPERLINK(\"http://x\")", last_name="+48")
     body = owner_client.get("/panel/czlonkowie/?format=csv").content.decode("utf-8-sig")
     assert "'=HYPERLINK" in body and ";'+48;" in body
+
+
+def test_vote_of_former_board_member_not_counted(board):
+    """Głos osoby, która w trakcie głosowania przestała być w Zarządzie, nie wpływa na wynik."""
+    president, vice = board
+    res = services.create_resolution(organ="zarzad", title="zmiana składu", content="x", by=president.user)
+    services.start_board_voting(res, president.user)
+    services.cast_board_vote(res, vice.user, "przeciw")
+    Member.objects.filter(pk=vice.pk).update(board_role="")
+    new_vice = services.add_member(user=make_user("nowy-wice@example.com"), kind="zwyczajny", joined_on=date(2026, 1, 10),
+                                   board_role="wiceprezes", by=None)
+    services.cast_board_vote(res, new_vice.user, "za")
+    services.cast_board_vote(res, president.user, "wstrzymuje")
+    res.refresh_from_db()
+    assert (res.votes_for, res.votes_against) == (1, 0) and res.status == Resolution.Status.ADOPTED

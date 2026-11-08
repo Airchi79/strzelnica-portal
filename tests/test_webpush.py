@@ -1,6 +1,5 @@
 """Powiadomienia push: szyfrowanie RFC 8291, podpis VAPID, subskrypcje, wysyłka i sprzątanie."""
 
-import base64
 import json
 import os
 

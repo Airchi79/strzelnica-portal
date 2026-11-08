@@ -412,7 +412,7 @@ def test_notifications_panel(owner_client, owner, ps, lane, django_capture_on_co
 def test_booking_settings_panel(owner_client):
     owner_client.post("/panel/rezerwacje/ustawienia/", {
         "free_cancel_hours": 12, "min_lead_hours": 0, "waitlist_hold_minutes": 30, "max_advance_days": 60, "max_persons": 20, "online_payment_minutes": 20, "approval_payment_hours": 12,
-        "hold_minutes": 5, "transfer_days": 3, "transfer_cutoff_hours": 24,
+        "hold_minutes": 5, "transfer_days": 3, "transfer_cutoff_hours": 24, "max_unpaid_holds": 3,
         "offline_instructions": "Przelew na konto.",
         **{f"{g}-{k}": "on" for g in ("czlonek", "powracajacy", "nowy") for k in ("pay_online",)},
         "czlonek-pay_pass": "on", "nowy-requires_approval": "on",
@@ -425,7 +425,7 @@ def test_booking_settings_panel(owner_client):
     # Grupa bez żadnego sposobu płatności jest odrzucana.
     response = owner_client.post("/panel/rezerwacje/ustawienia/", {
         "free_cancel_hours": 12, "max_advance_days": 60, "max_persons": 20, "online_payment_minutes": 20, "approval_payment_hours": 12,
-        "hold_minutes": 5, "transfer_days": 3, "transfer_cutoff_hours": 24,
+        "hold_minutes": 5, "transfer_days": 3, "transfer_cutoff_hours": 24, "max_unpaid_holds": 3,
         "czlonek-pay_online": "on", "powracajacy-pay_online": "on",
     })
     assert response.status_code == 200 and "co najmniej jeden sposób" in response.content.decode()

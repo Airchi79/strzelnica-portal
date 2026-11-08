@@ -22,12 +22,13 @@
   {% if payments is not None %}<div class="card tile"><span class="tile-n">{{ cash_total|pln }}</span><span class="tile-l">gotówka do rozliczenia</span></div>{% endif %}
 </div>
 
-{% if attention.unpaid or attention.pending or attention.no_log or attention.conflicts or present and not is_today %}
+{% if attention.unpaid or attention.pending or attention.hold or attention.no_log or attention.conflicts or present and not is_today %}
 <div class="card attention-box">
   <h2 class="step-title">Wymaga uwagi</h2>
   <ul class="small">
     {% for r in attention.unpaid %}<li><strong>Nie zapłacono {{ r.due|pln }}</strong> — {{ r.starts_at|time:"H:i" }} {{ r.lane }}, {{ r.user.full_name }}{% if r.user.phone %} (<a href="tel:{{ r.user.phone }}">{{ r.user.phone }}</a>){% endif %} <span class="no-print">· <a href="{% url 'panel:reservation' r.pk %}">rozlicz</a></span></li>{% endfor %}
     {% for r in attention.pending %}<li><strong>Czeka na zatwierdzenie</strong> — {{ r.starts_at|time:"H:i" }} {{ r.lane }}, {{ r.user.full_name }} <span class="no-print">· <a href="{% url 'panel:reservation' r.pk %}">otwórz</a></span></li>{% endfor %}
+    {% for r in attention.hold %}<li><strong>{% if r.pay_method == 'przelew' %}Czeka na przelew{% else %}Czeka na płatność{% endif %}</strong> — {{ r.starts_at|time:"H:i" }} {{ r.lane }}, {{ r.user.full_name }}{% if r.pay_by %} (do {{ r.pay_by|date:"j.m H:i" }}){% endif %} <span class="no-print">· <a href="{% url 'panel:reservation' r.pk %}">otwórz</a></span></li>{% endfor %}
     {% for r in attention.no_log %}<li><strong>Brak strzelców w książce pobytu</strong> — {{ r.starts_at|time:"H:i" }} {{ r.lane }}, {{ r.user.full_name }} (rezerwacja już trwa{% if r.entries %}, {{ r.entries }} wpis(y) innych osób{% endif %})</li>{% endfor %}
     {% for r, b in attention.conflicts %}<li><strong>Kolizja z blokadą „{{ b.title }}”</strong> — {{ r.starts_at|time:"H:i" }} {{ r.lane }}, {{ r.user.full_name }} <span class="no-print">· <a href="{% url 'panel:reservation' r.pk %}">otwórz</a></span></li>{% endfor %}
     {% if present and not is_today %}<li><strong>{{ present|length }} os. bez odnotowanego wyjścia</strong></li>{% endif %}

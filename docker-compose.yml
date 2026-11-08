@@ -36,8 +36,11 @@ services:
 
   app:
     <<: *app
+    # Port tylko na samym serwerze (127.0.0.1): z internetu aplikacja jest dostępna przez tunel Cloudflare (łączy się z app:8000
+    # w sieci Dockera). Dostęp z sieci domowej po adresie IP serwera: APP_BIND=0.0.0.0 w .env (omija Cloudflare i pozwala
+    # podać dowolny adres w nagłówku X-Forwarded-For — tylko w zaufanej sieci).
     ports:
-      - "${APP_PORT:-8000}:8000"
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).status == 200 else 1)"]
       interval: 30s

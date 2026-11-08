@@ -169,6 +169,8 @@ docker compose ps
 
 Poprawnie: `app` i `db` mają status **(healthy)**, `cron` i `backup` — **Up**.
 Test z sieci domowej (w przeglądarce): `http://ADRES_IP_UNRAID:8000/healthz` → odpowiedź `ok`.
+> Tunel z osobnego kontenera łączy się po adresie IP serwera — ustaw w `.env` `APP_BIND=0.0.0.0` (domyślnie aplikacja
+> nasłuchuje tylko na 127.0.0.1).
 
 Gdy coś nie działa — podgląd logów:
 

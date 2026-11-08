@@ -11,11 +11,10 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.cache import cache_control
 
-from apps.bookings.models import Reservation
 from apps.payments.services import balance_of
 from apps.audit.models import AuditLog, SensitiveAccessLog
 from apps.audit.services import diff, log_event, log_sensitive_access
-from apps.credentials.models import Credential, is_range_officer
+from apps.credentials.models import is_range_officer
 from apps.facilities.models import Lane
 
 from . import branding

@@ -33,7 +33,7 @@ def recipients(a):
             return User.objects.none()
         ids = Reservation.objects.filter(
             starts_at__gte=local_dt(a.booked_from, 0), starts_at__lt=local_dt(a.booked_to + timedelta(days=1), 0),
-            status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL],
+            status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL, Reservation.Status.HOLD],
         ).values("user_id")
         qs = qs.filter(pk__in=ids)
     elif a.email_audience != Announcement.Audience.ALL:

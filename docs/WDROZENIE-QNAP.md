@@ -162,7 +162,8 @@ cd /share/strzelnica && docker compose --profile tunel up -d && sleep 15 && dock
    to zapamiętana strona z chwili przełączenia: **Ctrl+F5**.
 
 **Powrót na Unraid:** trasy z tunelu `qnap` z powrotem do `unraid` (URL `192.168.1.9:8000`),
-a na Unraid `docker compose start db app cron`.
+a na Unraid `docker compose start db app cron` (tamtejszy tunel łączy się po adresie IP — na Unraid w `.env` musi być
+`APP_BIND=0.0.0.0`, inaczej aplikacja po aktualizacji nasłuchuje tylko na 127.0.0.1).
 
 ## 7. Sprzątanie na Unraid (po tygodniu bez problemów)
 

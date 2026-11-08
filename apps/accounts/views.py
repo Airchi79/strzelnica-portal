@@ -28,6 +28,7 @@ from .tokens import email_verification_token
 
 SESSION_2FA_USER = "pending_2fa_user"
 SESSION_2FA_NEXT = "pending_2fa_next"
+STAFF_SESSION_SECONDS = 12 * 3600
 
 
 def _safe_next(request, default="core:dashboard"):
@@ -137,6 +138,9 @@ def _finish_2fa_login(request, user, device):
     if not request.user.is_authenticated:
         login(request, user, backend="apps.accounts.backends.EmailBackend")
     otp_login(request, device)
+    if user.requires_2fa:
+        # Konta z dostępem do panelu (dane osobowe, płatności): sesja 12 h zamiast 14 dni.
+        request.session.set_expiry(STAFF_SESSION_SECONDS)
     log_event("konto.logowanie", user, "z weryfikacją dwuskładnikową")
     return redirect(nxt)
 
@@ -213,6 +217,23 @@ def profile(request):
     return render(request, "accounts/profile.html", {"form": form, "has_2fa": has_2fa})
 
 
+def _active_commitments(user):
+    """Przeszkody w dezaktywacji: przyszłe rezerwacje (także czekające na płatność lub zatwierdzenie) i zapisy na wydarzenia."""
+    from apps.bookings.models import Reservation
+    from apps.events.models import Registration
+
+    now = timezone.now()
+    reasons = []
+    n = Reservation.objects.filter(user=user, ends_at__gt=now, status__in=[
+        Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL, Reservation.Status.HOLD]).count()
+    if n:
+        reasons.append(f"Masz {n} nadchodzące rezerwacje — anuluj je w „Moich rezerwacjach” (albo poproś obsługę) przed dezaktywacją konta.")
+    if Registration.objects.filter(user=user, status__in=[Registration.Status.REGISTERED, Registration.Status.RESERVE],
+                                   event__ends_at__gt=now).exists():
+        reasons.append("Jesteś zapisany na nadchodzące wydarzenie — wycofaj zapis przed dezaktywacją konta.")
+    return reasons
+
+
 @login_required
 def deactivate(request):
     """Dezaktywacja konta przez użytkownika. Dane objęte obowiązkiem przechowywania pozostają w systemie."""
@@ -222,6 +243,8 @@ def deactivate(request):
             form.add_error("password", "Nieprawidłowe hasło.")
         elif request.user.is_superuser and not User.objects.filter(is_superuser=True, is_active=True).exclude(pk=request.user.pk).exists():
             form.add_error(None, "Jesteś jedynym administratorem. Najpierw nadaj uprawnienia innej osobie.")
+        elif _active_commitments(request.user):
+            form.add_error(None, " ".join(_active_commitments(request.user)))
         else:
             user = request.user
             user.is_active = False

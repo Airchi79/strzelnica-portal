@@ -1,5 +1,5 @@
 import csv
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 from datetime import date, timedelta
 from datetime import timezone as dt_timezone
 
@@ -18,7 +18,7 @@ from django.views.decorators.http import require_POST
 from apps.audit.services import log_event
 from apps.core.models import AssociationSettings, Notification
 from apps.core.permissions import panel_required
-from apps.facilities.models import Lane, format_pln
+from apps.facilities.models import Lane
 
 from apps.logbook.views import reservation_qr_context
 
@@ -772,7 +772,8 @@ def panel_today(request):
         )
         .order_by("starts_at", "lane__order")
     )
-    active = [r for r in reservations if r.status in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL)]
+    active = [r for r in reservations if r.status in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL,
+                                                     Reservation.Status.HOLD)]
     for r in reservations:
         r.due = max(r.amount - r.paid_amount, 0) if r.payment_status == Reservation.Payment.DUE else 0
         r.started = r.starts_at <= now
@@ -780,6 +781,7 @@ def panel_today(request):
     attention = {
         "unpaid": [r for r in active if r.payment_status == Reservation.Payment.DUE and r.status == Reservation.Status.CONFIRMED],
         "pending": [r for r in active if r.status == Reservation.Status.PENDING_APPROVAL],
+        "hold": [r for r in active if r.status == Reservation.Status.HOLD],
         "no_log": [r for r in reservations if r.no_log],
     }
     blocks = list(Block.objects.filter(starts_at__lt=end, ends_at__gt=start).prefetch_related("lanes").order_by("starts_at"))

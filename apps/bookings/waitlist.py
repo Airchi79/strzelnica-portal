@@ -4,7 +4,6 @@ from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 

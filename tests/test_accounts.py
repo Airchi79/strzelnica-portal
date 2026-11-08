@@ -7,7 +7,7 @@ from django_otp.plugins.otp_totp.models import TOTPDevice
 from apps.accounts.models import User
 from apps.audit.models import AuditLog
 
-from .conftest import PASSWORD, make_user, totp_token
+from .conftest import PASSWORD, login_with_otp, make_user, totp_token
 
 pytestmark = pytest.mark.django_db
 
@@ -144,3 +144,29 @@ def test_welcome_email_sent_once_after_verification(client, django_capture_on_co
     with django_capture_on_commit_callbacks(execute=True):
         client.get(link)
     assert len([m for m in mail.outbox if "Witamy" in m.subject]) == 1
+
+
+def test_cannot_deactivate_with_upcoming_reservation(client):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.bookings import services as booking_services
+    from apps.facilities.models import Lane
+
+    from .conftest import add_credential, approve
+
+    user = make_user("ma-rezerwacje@example.com")
+    add_credential(user)
+    approve(user)
+    lane = Lane.objects.filter(is_active=True).first()
+    booking_services.create_reservation(user, lane, timezone.localdate() + timedelta(days=7), 10, 11, 1, checkout=True)
+    client.force_login(user)
+    page = client.post("/konto/profil/dezaktywuj/", {"password": PASSWORD}).content.decode()
+    user.refresh_from_db()
+    assert user.is_active and "nadchodzące rezerwacje" in page
+
+
+def test_staff_session_expires_after_12_hours(client, owner):
+    login_with_otp(client, owner)
+    assert 11 * 3600 < client.session.get_expiry_age() <= 12 * 3600

@@ -3,7 +3,7 @@ rezerwacje jako prowadzący, udział w wydarzeniach i wydatki w danym roku."""
 
 from datetime import datetime
 
-from django.db.models import Q, Sum
+from django.db.models import Sum
 from django.utils import timezone
 
 MONTHS = ["sty", "lut", "mar", "kwi", "maj", "cze", "lip", "sie", "wrz", "paź", "lis", "gru"]

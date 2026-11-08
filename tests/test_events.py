@@ -49,7 +49,6 @@ def test_capacity_reserve_list_and_promotion(owner, django_capture_on_commit_cal
 
 
 def test_cash_payment_refund_and_sales_report(owner_client, owner):
-    from apps.payments.services import register_manual_payment
     from apps.reports.services import collect
 
     e = make_event(owner)

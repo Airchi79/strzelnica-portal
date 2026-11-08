@@ -8,8 +8,8 @@ import hashlib
 import io
 import logging
 import re
-from datetime import date, datetime, timedelta
-from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal, InvalidOperation
+from datetime import datetime, timedelta
+from decimal import ROUND_CEILING, Decimal, InvalidOperation
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError

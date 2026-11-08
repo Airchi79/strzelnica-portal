@@ -3,7 +3,7 @@ Porównanie z poprzednim miesiącem. Obłożenie liczone wobec godzin otwarcia o
 
 from datetime import date, datetime, timedelta
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q
 from django.utils import timezone
 
 WEEKDAYS_SHORT = ["pn", "wt", "śr", "cz", "pt", "so", "nd"]

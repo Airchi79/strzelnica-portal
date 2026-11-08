@@ -90,7 +90,8 @@ def panel_price_add(request, pk):
 def _future_reservations(lane):
     from apps.bookings.models import Reservation
 
-    return lane.reservations.filter(ends_at__gt=timezone.now(), status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL])
+    return lane.reservations.filter(ends_at__gt=timezone.now(), status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL,
+                                                                                      Reservation.Status.HOLD])
 
 
 def _lane_deletable(lane):

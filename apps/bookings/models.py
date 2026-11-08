@@ -38,6 +38,11 @@ class BookingSettings(models.Model):
         help_text="Termin zaksięgowania przelewu nie później niż tyle godzin przed strzelaniem. Przelew jest dostępny tylko, "
                   "gdy do terminu zostało co najmniej „dni na zaksięgowanie” + te godziny.",
     )
+    max_unpaid_holds = models.PositiveIntegerField(
+        "nieopłacone rezerwacje jednej osoby naraz", default=3,
+        help_text="Ile rezerwacji „oczekuje na płatność” (wybór płatności, płatność online, przelew) może mieć jednocześnie jeden "
+                  "strzelec — przelew trzyma termin kilka dni bez zapłaty. 0 — bez limitu. Nie dotyczy rezerwacji przez obsługę.",
+    )
     online_payment_minutes = models.PositiveIntegerField(
         "czas na płatność online [min]", default=15,
         help_text="Po wejściu do płatności online termin jest trzymany tyle minut od jej rozpoczęcia (BLIK, logowanie do banku). "

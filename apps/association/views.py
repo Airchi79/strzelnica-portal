@@ -1,7 +1,6 @@
 import csv
 from datetime import date, timedelta
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -339,7 +338,7 @@ def panel_resolution(request, pk):
 @panel_required()
 def panel_resolution_print(request, pk):
     res = get_object_or_404(Resolution, pk=pk)
-    if not request.user.has_perm(PERM_R) and not Member.objects.filter(user=request.user).exclude(board_role="").exists():
+    if not request.user.has_perm(PERM_R) and not Member.objects.filter(user=request.user, status=Member.Status.ACTIVE).exclude(board_role="").exists():
         raise PermissionDenied
     return render(request, "association/resolution_print.html", {"r": res, "votes": res.votes.select_related("member", "proxy"),
                                                                  "association": AssociationSettings.load(), "board": services.board_members()})

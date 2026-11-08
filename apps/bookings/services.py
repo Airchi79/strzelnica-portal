@@ -283,6 +283,10 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     hold = bool(checkout and not by_staff and code is None and client_pass is None and q["amount"] > 0
                 and (not pending or cfg.prepay_before_approval))
     if hold:
+        if cfg.max_unpaid_holds and Reservation.objects.filter(user=user, status=Reservation.Status.HOLD,
+                                                               ends_at__gt=now).count() >= cfg.max_unpaid_holds:
+            raise ValidationError(f"Masz już {cfg.max_unpaid_holds} nieopłacone rezerwacje — opłać je (albo anuluj niepotrzebne) "
+                                  "przed kolejną rezerwacją.")
         status = Reservation.Status.HOLD
     else:
         status = Reservation.Status.PENDING_APPROVAL if pending else Reservation.Status.CONFIRMED

@@ -153,7 +153,7 @@ def panel_detail(request, pk):
 
         upcoming = Reservation.objects.filter(
             user=credential.user, starts_at__gte=timezone.now(),
-            status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL],
+            status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL, Reservation.Status.HOLD],
         ).select_related("lane").order_by("starts_at")[:10]
     scan_kind = ""
     if credential.scan:

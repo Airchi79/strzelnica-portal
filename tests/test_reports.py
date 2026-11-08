@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import timedelta
 
 import pytest
 from django.core.exceptions import ValidationError

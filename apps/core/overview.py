@@ -133,6 +133,12 @@ def attention(user, now=None):
         tiles.append(("Przelewy po terminie", "Zaimportuj wyciąg albo anuluj rezerwację", overdue, reverse("panel:reservations")))
         tiles.append(("Braki w książce pobytu", "Odbyte rezerwacje bez wpisów (30 dni)", missing, reverse("panel:reservations_days") + "?filtr=braki_ksiega"))
     if user.has_perm("credentials.review_credential"):
+        from apps.kiosk.models import OnsiteBooking
+
+        waiting = OnsiteBooking.objects.filter(status=OnsiteBooking.Status.AWAITING, awaiting_until__gt=now)
+        first = waiting.exclude(credential=None).order_by("awaiting_until").first()
+        url = reverse("panel:credential", args=[first.credential_id]) if first else reverse("panel:credentials")
+        tiles.insert(0, ("Czekają przy kiosku", "Rezerwacja na miejscu — sprawdź legitymację PS", waiting.count(), url))
         tiles.append(("Dokumenty do weryfikacji", "Pozwolenia i legitymacje PS", Credential.objects.filter(status=Credential.Status.PENDING).count(), reverse("panel:credentials")))
         today = timezone.localdate()
         soon = Credential.objects.filter(status=Credential.Status.VERIFIED, valid_until__gte=today, valid_until__lte=today + timedelta(days=30)).count()

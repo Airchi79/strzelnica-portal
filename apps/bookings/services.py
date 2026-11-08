@@ -531,6 +531,13 @@ def assign_officer(reservation, officer, by):
 @transaction.atomic
 def approve_reservation(reservation, by, now=None):
     now = now or timezone.now()
+    from apps.kiosk.models import OnsiteBooking
+
+    if OnsiteBooking.objects.filter(reservation_id=reservation.pk, status=OnsiteBooking.Status.AWAITING).exists():
+        # rezerwacja na miejscu (osoba czeka przy kiosku): także w trwającej godzinie, potem płatność kodem QR
+        from apps.kiosk.onsite import approve_for_payment
+
+        return approve_for_payment(reservation, by, now=now)
     r = Reservation.objects.select_for_update().get(pk=reservation.pk)
     if r.status != Reservation.Status.PENDING_APPROVAL:
         raise ValidationError("Ta rezerwacja nie czeka na zatwierdzenie.")

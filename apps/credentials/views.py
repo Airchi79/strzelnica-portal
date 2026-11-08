@@ -89,7 +89,14 @@ EXPIRING = "wygasa"  # zakładka: zweryfikowane, ważne jeszcze najwyżej 30 dni
 
 
 def _pending_queue():
-    return Credential.objects.filter(status=Credential.Status.PENDING).order_by("created_at", "pk")
+    """Dokumenty do weryfikacji — najpierw legitymacje osób czekających przy kiosku (rezerwacja na miejscu)."""
+    from django.db.models import Exists, OuterRef
+
+    from apps.kiosk.models import OnsiteBooking
+
+    waiting = OnsiteBooking.objects.filter(credential=OuterRef("pk"), status=OnsiteBooking.Status.AWAITING)
+    return (Credential.objects.filter(status=Credential.Status.PENDING).annotate(at_kiosk=Exists(waiting))
+            .order_by("-at_kiosk", "created_at", "pk"))
 
 
 @panel_required("credentials.review_credential")
@@ -155,6 +162,10 @@ def panel_detail(request, pk):
             user=credential.user, starts_at__gte=timezone.now(),
             status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL, Reservation.Status.HOLD],
         ).select_related("lane").order_by("starts_at")[:10]
+    from apps.kiosk.models import OnsiteBooking
+
+    onsite = (OnsiteBooking.objects.filter(credential=credential, status=OnsiteBooking.Status.AWAITING)
+              .select_related("reservation__lane", "device").first())
     scan_kind = ""
     if credential.scan:
         scan_kind = "pdf" if credential.scan.name.lower().endswith(".pdf") else "image"
@@ -173,6 +184,7 @@ def panel_detail(request, pk):
             "has_next": any(x != pk for x in queue),
             "revoke_form": RevokeForm(),
             "upcoming": upcoming,
+            "onsite": onsite,
         },
     )
 

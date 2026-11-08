@@ -262,7 +262,7 @@ def submit_ps(flow, number, issuer, issued_on, valid_until, photo):
         raise ValidationError([m for msgs in form.errors.values() for m in msgs])
     credential = form.save(commit=False)
     credential.user = flow.user
-    submit(credential, changed_fields=form.changed_data + ["scan"])
+    submit(credential, changed_fields=form.changed_data + ["scan"], notify=False)  # pilne powiadomienie przy rezerwacji
     if old_scan and old_scan != credential.scan.name:
         transaction.on_commit(lambda: Credential.scan.field.storage.delete(old_scan))
     flow.credential = credential
@@ -296,6 +296,7 @@ def book(flow, lane_id, start_hour, end_hour, persons, now=None):
     reservation = bookings.create_reservation(
         flow.user, lane, day, start_hour, end_hour, persons, notes=f"Rezerwacja na miejscu (kiosk: {flow.device.name})",
         now=now, channel=bookings.CHANNEL_ONSITE, checkout=verified, ps_pending=not verified,
+        notify=False,  # zamiast ogólnych powiadomień: jedno pilne (poniżej), potwierdzenie e-mail po płatności
     )
     flow.reservation = reservation
     if reservation.status == Reservation.Status.PENDING_APPROVAL:

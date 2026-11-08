@@ -121,9 +121,10 @@
   <form class="card" data-os-form="ps" novalidate autocomplete="off">
     <p class="small muted">Wpisz dane z legitymacji, a potem zrób jej zdjęcie. Obsługa porówna dane ze zdjęciem (do {{ onsite_minutes }} minut). Zdjęcie zostanie usunięte po sprawdzeniu.</p>
     <div class="field"><label for="os-pn">Numer legitymacji</label><input id="os-pn" name="number" maxlength="64" autocapitalize="characters" spellcheck="false"></div>
-    <div class="field"><label for="os-pi">Kto wydał (np. PZSS, LOK, nazwa organizacji)</label><input id="os-pi" name="issuer" maxlength="160"></div>
-    <div class="field"><label for="os-pd">Data wydania</label><input id="os-pd" name="issued_on" type="date"></div>
-    <div class="field"><label for="os-pv">Ważna do (puste, jeśli bezterminowa)</label><input id="os-pv" name="valid_until" type="date"></div>
+    <div class="field"><label>Kto wydał legitymację</label>
+      <div class="kiosk-chips" data-os-issuers></div>
+      <input id="os-pi" name="issuer" maxlength="160" placeholder="Nazwa organizacji" aria-label="Nazwa organizacji, która wydała legitymację" hidden></div>
+    <div class="field"><label for="os-pd">Data wydania (na legitymacji PZŁ: data nabycia uprawnień)</label><input id="os-pd" name="issued_on" type="date"></div>
     <div class="msg error" data-os-error="ps" hidden></div>
     <div class="actions"><button class="btn kiosk-big" type="submit">Zrób zdjęcie legitymacji</button><button class="btn secondary" type="button" data-go="home">Anuluj</button></div>
   </form>

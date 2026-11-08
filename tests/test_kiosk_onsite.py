@@ -112,11 +112,11 @@ def test_staff_approving_reservation_in_panel_also_ends_waiting(device, lane, ow
     flow = verified_flow(device)
     onsite.submit_ps(flow, "PS-9", "PZSS", "2020-05-01", "", photo_data_url())
     r = onsite.book(flow, lane.pk, 10, 11, 1, now=now)
-    bookings.approve_reservation(r, by=owner)
+    bookings.approve_reservation(r, by=owner)  # z widoku rezerwacji — zasady kiosku: termin trzymany do płatności
     assert onsite.expire_pending(now=now + timedelta(minutes=30)) == 0
     flow.refresh_from_db()
     r.refresh_from_db()
-    assert flow.status == OnsiteBooking.Status.BOOKED and r.status == Reservation.Status.CONFIRMED
+    assert flow.status == OnsiteBooking.Status.BOOKED and r.status == Reservation.Status.HOLD
 
 
 def test_existing_verified_range_officer_books_immediately_for_payment(device, lane, now):
@@ -279,9 +279,7 @@ def test_onsite_approval_allowed_during_reservation(device, lane, owner):
     flow = verified_flow(device)
     onsite.submit_ps(flow, "PS-9", "PZSS", "2020-05-01", "", photo_data_url())
     r = onsite.book(flow, lane.pk, 10, 11, 1, now=booked_at)
-    with pytest.raises(ValidationError, match="minął"):
-        bookings.approve_reservation(r, by=owner, now=booked_at + timedelta(minutes=5))  # zwykłe zatwierdzenie odmawia
-    r = onsite.approve_for_payment(r, owner, now=booked_at + timedelta(minutes=5))
+    r = bookings.approve_reservation(r, by=owner, now=booked_at + timedelta(minutes=5))  # w trakcie godziny — dozwolone
     assert r.status == Reservation.Status.HOLD and r.pay_by <= r.ends_at
     with pytest.raises(ValidationError, match="nie czeka"):
         onsite.approve_for_payment(r, owner, now=booked_at + timedelta(minutes=6))
@@ -361,3 +359,41 @@ def test_kiosk_page_has_onsite_screens(kiosk):
     assert "data-os-open" in body and "kiosk-onsite.js" in body and "art. 275" in body
     r = c.get("/kiosk/api/na-miejscu/cena/?os=x&od=10&do=11&osoby=1", **H)
     assert r.status_code == 400
+
+
+
+# --- etap 4: panel obsługi ---------------------------------------------------------------------------------------------
+
+
+def _board_subjects():
+    return list(OutgoingEmail.objects.filter(recipients__contains=["wlasciciel@example.com"]).values_list("subject", flat=True))
+
+
+def test_one_urgent_notification_and_panel_banner_first_in_queue(device, lane, owner, owner_client, now):
+    other = make_user("inny@example.com")
+    older = Credential.objects.create(user=other, kind=Credential.Kind.RANGE_OFFICER, number="X-1", issuer="LOK",
+                                      issued_on=timezone.localdate() - timedelta(days=400))
+    flow = verified_flow(device)
+    credential = onsite.submit_ps(flow, "PS-9", "PZSS (Polski Związek Strzelectwa Sportowego)", "2020-05-01", "", photo_data_url())
+    OutgoingEmail.objects.all().delete()
+    onsite.book(flow, lane.pk, 10, 11, 1, now=now)
+    subjects = _board_subjects()
+    assert len(subjects) == 1 and "PILNE" in subjects[0] and onsite.VERIFY_MINUTES == 15
+    from apps.credentials.views import _pending_queue
+
+    assert list(_pending_queue().values_list("pk", flat=True))[:2] == [credential.pk, older.pk]
+    body = owner_client.get(f"/panel/weryfikacja/{credential.pk}/").content.decode()
+    assert "Osoba czeka przy kiosku" in body and "data-countdown-to" in body and "600 700 800" in body
+    assert "Osoba czeka przy kiosku" not in owner_client.get(f"/panel/weryfikacja/{older.pk}/").content.decode()
+    home = owner_client.get("/panel/").content.decode()
+    assert "Czekają przy kiosku" in home and f"/panel/weryfikacja/{credential.pk}/" in home
+
+
+def test_approve_from_panel_page_confirms_for_payment(device, lane, owner, owner_client, now):
+    flow = verified_flow(device)
+    credential = onsite.submit_ps(flow, "PS-9", "LOK (Liga Obrony Kraju)", "2020-05-01", "", photo_data_url())
+    r = onsite.book(flow, lane.pk, 10, 11, 1, now=now)
+    owner_client.post(f"/panel/weryfikacja/{credential.pk}/", {"decision": "approve", "note": ""})
+    r.refresh_from_db()
+    credential.refresh_from_db()
+    assert credential.status == Credential.Status.VERIFIED and r.status == Reservation.Status.HOLD and not credential.scan

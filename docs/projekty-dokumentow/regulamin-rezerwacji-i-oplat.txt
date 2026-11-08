@@ -75,8 +75,9 @@ Rezerwacja opłacona w całości ze środków na saldzie jest potwierdzana od ra
 § 8. Wydarzenia i zawody
 
 1. Zapisy na wydarzenia i zawody organizowane przez Stowarzyszenie odbywają się w Systemie do terminu zamknięcia zapisów. Po wyczerpaniu miejsc można zapisać się na listę rezerwową.
-2. Uczestnik może wycofać zapis do zamknięcia zapisów — opłata startowa wraca na zasadach § 7 ust. 3 i 6.
-3. W przypadku odwołania wydarzenia przez Stowarzyszenie uczestnicy otrzymują zwrot opłat startowych na zasadach § 7 ust. 3 i 6.
+2. Opłatę startową należy wnieść w terminie podanym przy zapisie (w Systemie i w wiadomości e-mail) — nie później niż do zamknięcia zapisów. Dzień przed terminem System przypomina o opłacie. Zapis nieopłacony w terminie zostaje wycofany, a miejsce otrzymuje pierwsza osoba z listy rezerwowej, której termin opłaty liczy się od chwili otrzymania miejsca.
+3. Uczestnik może wycofać zapis do zamknięcia zapisów — opłata startowa wraca na zasadach § 7 ust. 3 i 6.
+4. W przypadku odwołania wydarzenia przez Stowarzyszenie uczestnicy otrzymują zwrot opłat startowych na zasadach § 7 ust. 3 i 6.
 
 § 9. Powiadomienia
 

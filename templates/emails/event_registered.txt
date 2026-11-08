@@ -4,7 +4,8 @@
 
 Termin: {{ reg.event.starts_at|date:"l, j E Y" }}, {{ reg.event.starts_at|time:"H:i" }}–{{ reg.event.ends_at|time:"H:i" }}
 {% if reg.note %}{{ reg.event.note_label|default:"Informacja" }}: {{ reg.note }}
-{% endif %}{% if reg.status == 'zapisany' and reg.payment_status == 'do_zaplaty' %}Opłata startowa: {{ reg.amount|pln }} — zapłać na stronie wydarzenia (online) albo na miejscu.
+{% endif %}{% if reg.status == 'zapisany' and reg.payment_status == 'do_zaplaty' %}Opłata startowa: {{ reg.amount|pln }} — zapłać na stronie wydarzenia (online) albo u organizatora{% if reg.pay_by %} do {{ reg.pay_by|date:"j.m.Y H:i" }}.
+Bez opłaty w tym terminie zapis zostanie wycofany, a miejsce dostanie osoba z listy rezerwowej (dzień wcześniej przypomnimy){% else %} lub na miejscu{% endif %}.
 {% elif reg.payment_status == 'oplacona' %}Opłata startowa opłacona.
 {% endif %}
 Szczegóły i rezygnacja (do {{ reg.event.registration_until|date:"j.m.Y H:i" }}): {{ site_url }}{% url 'events:detail' reg.event_id %}

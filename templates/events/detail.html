@@ -20,10 +20,11 @@
   {% if reg.status == 'rezerwowy' %}<div class="res-banner warn"><strong>Jesteś na liście rezerwowej</strong><span>Gdy zwolni się miejsce, wejdziesz automatycznie i dostaniesz e-mail.</span></div>
   {% else %}<div class="res-banner ok"><strong>Jesteś zapisany ✓</strong>{% if reg.note %}<span>{{ event.note_label }}: {{ reg.note }}</span>{% endif %}</div>{% endif %}
   {% if reg.status == 'zapisany' and reg.payment_status == 'do_zaplaty' %}
-    <p>Opłata startowa: <strong>{{ reg.amount|sub:reg.paid_amount|pln }}</strong></p>
+    <p>Opłata startowa: <strong>{{ reg.amount|sub:reg.paid_amount|pln }}</strong>{% if reg.pay_by %} · zapłać do <strong>{{ reg.pay_by|date:"j.m.Y H:i" }}</strong>{% endif %}</p>
+    {% if reg.pay_by %}<p class="small muted">Bez opłaty w tym terminie zapis zostanie wycofany, a miejsce dostanie osoba z listy rezerwowej.</p>{% endif %}
     {% if tpay_enabled %}<form method="post" action="{% url 'payments:tpay_start' %}">{% csrf_token %}<input type="hidden" name="registration" value="{{ reg.pk }}"><button class="btn" type="submit">Zapłać online — BLIK, przelew, karta</button></form>
     {% include "partials/online_fee_note.html" with base=reg.amount|sub:reg.paid_amount offline=True %}{% endif %}
-    <p class="small muted">Możesz też zapłacić na miejscu u organizatora.</p>
+    <p class="small muted">Możesz też zapłacić u organizatora{% if not reg.pay_by %} na miejscu{% endif %}.</p>
   {% elif reg.payment_status == 'oplacona' %}<p><span class="badge ok">opłacone</span></p>{% endif %}
   {% if event.registration_open %}
   <form method="post" data-confirm="Wycofać zapis na „{{ event.title }}”?">{% csrf_token %}<input type="hidden" name="action" value="cancel">

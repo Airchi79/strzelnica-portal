@@ -16,7 +16,8 @@ class EventForm(forms.ModelForm):
 
     class Meta:
         model = Event
-        fields = ["title", "description", "starts_at", "ends_at", "lanes", "capacity", "registration_until", "note_label", "status"]
+        fields = ["title", "description", "starts_at", "ends_at", "lanes", "capacity", "registration_until", "payment_days", "note_label",
+                  "status"]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 5}),
             "starts_at": DateTimeInput(), "ends_at": DateTimeInput(), "registration_until": DateTimeInput(),

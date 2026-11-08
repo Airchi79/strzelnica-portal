@@ -25,7 +25,7 @@
       <td>{{ forloop.counter }}</td>
       <td><strong>{{ r.user.full_name }}</strong><div class="small muted">{{ r.user.email }}{% if r.user.phone %} · <a href="tel:{{ r.user.phone }}">{{ r.user.phone }}</a>{% endif %}</div></td>
       {% if event.note_label %}<td>{{ r.note }}</td>{% endif %}
-      <td class="nowrap">{% if r.payment_status == 'do_zaplaty' %}<span class="badge warn">do zapłaty {{ r.amount|sub:r.paid_amount|pln }}</span>{% else %}<span class="badge {% if r.payment_status == 'oplacona' %}ok{% endif %}">{{ r.get_payment_status_display }}</span>{% endif %}</td>
+      <td class="nowrap">{% if r.payment_status == 'do_zaplaty' %}<span class="badge warn">do zapłaty {{ r.amount|sub:r.paid_amount|pln }}</span>{% if r.pay_by and r.status == 'zapisany' %}<div class="small muted">do {{ r.pay_by|date:"j.m H:i" }}</div>{% endif %}{% else %}<span class="badge {% if r.payment_status == 'oplacona' %}ok{% endif %}">{{ r.get_payment_status_display }}</span>{% endif %}</td>
       <td class="no-print"><form method="post" class="inline-actions">{% csrf_token %}<input type="hidden" name="reg" value="{{ r.pk }}">
         {% if r.payment_status == 'do_zaplaty' %}{% if perms.payments.manage_payments or perms.payments.accept_onsite %}<button class="btn secondary small-btn" name="action" value="cash" data-confirm-click="Przyjąć {{ r.amount|sub:r.paid_amount|pln }} gotówką od {{ r.user.full_name }}?">Gotówka</button>
         <button class="btn secondary small-btn" name="action" value="blik" data-confirm-click="Przyjąć {{ r.amount|sub:r.paid_amount|pln }} BLIK-iem od {{ r.user.full_name }}?">BLIK</button>{% endif %}

@@ -10,7 +10,8 @@ Tytuł przelewu: {{ reservation.number }}{% if association.bank_account %}
 Rachunek: {{ association.bank_account }}{% endif %}
 {{ options.instructions }}
 
-Wolisz zapłacić od razu? Płatność online jest na stronie rezerwacji: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
+Na stronie rezerwacji jest kod QR do przelewu — zeskanuj go w aplikacji banku, a rachunek, kwota i tytuł wpiszą się same.
+Tam też zapłacisz od razu online: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
 
 Stowarzyszenie „STRZELNICA SĄTOK”
 {% endautoescape %}

@@ -1600,3 +1600,20 @@ def test_today_panel_lists_hold(client, ps, owner):
     login_with_otp(client, owner)
     page = client.get(f"/panel/dzis/?dzien={timezone.localtime(r.starts_at):%Y-%m-%d}").content.decode()
     assert "Czeka na płatność" in page and r.user.full_name in page
+
+
+def test_transfer_qr_on_reservation_and_wallet_pages(client, ps):
+    from apps.core.models import AssociationSettings
+
+    AssociationSettings.objects.filter(pk=AssociationSettings.load().pk).update(bank_account="PL61109010140000071219812874")
+    r = _transfer_hold(ps)
+    client.force_login(ps)
+    page = client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    assert 'alt="Kod QR do przelewu"' in page and "Zeskanuj w aplikacji banku" in page
+    assert 'alt="Kod QR do przelewu z Twoim kodem w tytule"' in client.get("/platnosci/").content.decode()
+
+
+def test_no_transfer_qr_without_bank_account(client, ps):
+    r = _transfer_hold(ps)
+    client.force_login(ps)
+    assert "Kod QR do przelewu" not in client.get(f"/rezerwacje/{r.pk}/").content.decode()

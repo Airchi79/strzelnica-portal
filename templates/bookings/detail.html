@@ -89,6 +89,8 @@
       <p class="small">Kwota: <strong>{{ remaining|pln }}</strong>{% if r.pay_by %} · zaksięguj do {{ r.pay_by|date:"j.m.Y H:i" }}{% endif %}</p>
       <p class="small">Tytuł przelewu: <strong class="code" data-copy-text>{{ r.number }}</strong> <button type="button" class="link-btn" data-copy="{{ r.number }}">kopiuj</button>
       {% if association.bank_account %}<br>Rachunek: <strong class="code">{{ association.bank_account }}</strong> <button type="button" class="link-btn" data-copy="{{ association.bank_account }}">kopiuj</button>{% endif %}</p>
+      {% transfer_qr association remaining r.number as qr %}{% if qr %}<div class="transfer-qr"><img src="{{ qr }}" alt="Kod QR do przelewu" width="160" height="160">
+        <p class="small muted">Zeskanuj w aplikacji banku („Zeskanuj i zapłać”, „Płatność kodem QR”) — rachunek, kwota i tytuł wpiszą się same.</p></div>{% endif %}
     </div>
   {% elif not tpay_enabled %}<p class="small muted">Płatności online są chwilowo niedostępne — skontaktuj się z obsługą strzelnicy.</p>{% endif %}
   <p class="small"><a href="{% url 'payments:wallet' %}">Moje płatności</a></p>

@@ -122,7 +122,7 @@ def test_panel_edit_shows_lane_conflicts(owner_client, owner):
     start = booking_services.local_dt(day, h)
     data = {"title": "Zawody", "description": "", "starts_at": timezone.localtime(start).strftime("%Y-%m-%dT%H:%M"),
             "ends_at": timezone.localtime(start + dt.timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M"), "lanes": [lane.pk],
-            "capacity": "", "fee_pln": "30", "registration_until": timezone.localtime(start - dt.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M"),
+            "capacity": "", "fee_pln": "30", "payment_days": 3, "registration_until": timezone.localtime(start - dt.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M"),
             "note_label": "", "status": "opublikowane"}
     page = owner_client.post("/panel/wydarzenia/nowe/", data)
     assert page.status_code == 200 and [c.pk for c in page.context["conflicts"]] == [r.pk]
@@ -210,3 +210,75 @@ def test_cancel_event_without_refund_keeps_overpayment(owner_client, owner, refu
     _paid_online(a, ra, ext="tpay:01D")
     owner_client.post(f"/panel/wydarzenia/{e.pk}/", {"action": "cancel_event", "reason": "Burza"})
     assert refunds == [] and balance_of(a) == 5000
+
+
+# --- termin opłaty startowej: przypomnienie, wycofanie po terminie, miejsce dla listy rezerwowej ------------------------
+
+
+def test_payment_deadline_set_on_registration_and_capped(owner):
+    e = make_event(owner, capacity=5)  # zapisy zamykają się za 9 dni
+    reg = services.register(shooter("t1@example.com"), e)
+    assert abs((reg.pay_by - timezone.now()) - dt.timedelta(days=3)) < dt.timedelta(minutes=1)
+    Event.objects.filter(pk=e.pk).update(registration_until=timezone.now() + dt.timedelta(hours=10))
+    e.refresh_from_db()
+    assert services.payment_deadline(e, timezone.now()) == e.registration_until  # nie później niż zamknięcie zapisów
+    Event.objects.filter(pk=e.pk).update(registration_until=timezone.now() + dt.timedelta(minutes=20))
+    e.refresh_from_db()
+    now = timezone.now()
+    assert services.payment_deadline(e, now) == now + services.MIN_PAYMENT_WINDOW  # co najmniej 2 h
+    Event.objects.filter(pk=e.pk).update(payment_days=0)
+    e.refresh_from_db()
+    assert services.payment_deadline(e, now) is None  # 0 — bez terminu
+    free = make_event(owner, fee=0)
+    assert services.register(shooter("t2@example.com"), free).pay_by is None
+
+
+def test_unpaid_registration_expires_and_reserve_gets_place_with_own_deadline(owner, django_capture_on_commit_callbacks):
+    e = make_event(owner, capacity=1)
+    a, b = shooter("t3@example.com"), shooter("t4@example.com")
+    ra, rb = services.register(a, e), services.register(b, e)
+    assert rb.status == Registration.Status.RESERVE and rb.pay_by is None
+    later = ra.pay_by + dt.timedelta(minutes=1)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert services.expire_unpaid_registrations(now=later) == 1
+    ra.refresh_from_db()
+    rb.refresh_from_db()
+    assert ra.status == Registration.Status.CANCELLED
+    assert rb.status == Registration.Status.REGISTERED and rb.pay_by > timezone.now() + dt.timedelta(days=2)
+    subjects = {m.to[0]: m.subject for m in mail.outbox}
+    assert "Wycofano zapis" in subjects["t3@example.com"] and "Zwolniło się miejsce" in subjects["t4@example.com"]
+    assert "nie została wniesiona w terminie" in [m for m in mail.outbox if m.to == ["t3@example.com"]][0].body
+
+
+def test_paid_or_pending_registration_not_expired(owner):
+    e = make_event(owner, capacity=5)
+    a, b = shooter("t5@example.com"), shooter("t6@example.com")
+    ra, rb = services.register(a, e), services.register(b, e)
+    _paid_online(a, ra, ext="tpay:01T5")
+    Payment.objects.create(user=b, amount=rb.amount, method=Payment.Method.TPAY, event_registration=rb, title=rb.label)
+    Registration.objects.filter(pk__in=[ra.pk, rb.pk]).update(pay_by=timezone.now() - dt.timedelta(minutes=1))  # termin minął
+    assert services.expire_unpaid_registrations() == 0  # opłacony + płatność online w toku (ostatnie 30 min)
+    assert services.expire_unpaid_registrations(now=timezone.now() + dt.timedelta(minutes=40)) == 1
+    ra.refresh_from_db()
+    assert ra.status == Registration.Status.REGISTERED
+
+
+def test_event_payment_reminder_once(owner, django_capture_on_commit_callbacks):
+    e = make_event(owner, capacity=5)
+    reg = services.register(shooter("t7@example.com"), e)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert services.send_payment_reminders(now=reg.pay_by - dt.timedelta(hours=30)) == 0
+        assert services.send_payment_reminders(now=reg.pay_by - dt.timedelta(hours=20)) == 1
+        assert services.send_payment_reminders(now=reg.pay_by - dt.timedelta(hours=19)) == 0
+    assert [m.subject for m in mail.outbox] == ["[Strzelnica Sątok] Przypomnienie: opłata startowa — Zawody klubowe"]
+
+
+def test_event_page_shows_payment_deadline(client, owner):
+    e = make_event(owner, capacity=5)
+    u = shooter("t8@example.com")
+    services.register(u, e)
+    client.force_login(u)
+    page = client.get(f"/wydarzenia/{e.pk}/").content.decode()
+    assert "zapłać do" in page and "zapis zostanie wycofany" in page

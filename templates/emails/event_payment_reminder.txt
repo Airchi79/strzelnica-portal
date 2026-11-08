@@ -1,0 +1,10 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
+
+przypominamy o opłacie startowej za „{{ reg.event.title }}” ({{ reg.event.starts_at|date:"j.m.Y H:i" }}): {{ reg.amount|sub:reg.paid_amount|pln }}.
+Termin: {{ reg.pay_by|date:"j.m.Y H:i" }}. Bez opłaty w tym terminie zapis zostanie wycofany, a miejsce dostanie osoba z listy rezerwowej.
+
+Zapłać online na stronie wydarzenia albo u organizatora: {{ site_url }}{% url 'events:detail' reg.event_id %}
+Nie możesz przyjechać? Zrezygnuj na tej samej stronie — miejsce dostanie kolejna osoba.
+
+Stowarzyszenie „STRZELNICA SĄTOK”
+{% endautoescape %}

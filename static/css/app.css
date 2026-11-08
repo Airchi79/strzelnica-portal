@@ -624,3 +624,8 @@ tr.now-bez_rezerwacji td { background: var(--bad-bg); }
 .doc-actions { display: flex; gap: 8px; flex-wrap: wrap; flex: none; }
 @media (max-width: 640px) { .doc-item { flex-wrap: wrap; } .doc-actions { width: 100%; } }
 .res-choice { margin-top: 10px; }
+
+/* Kod QR do przelewu — zawsze ciemny na białym (także w ciemnym motywie: inaczej aplikacja banku go nie odczyta) */
+.transfer-qr { display: flex; gap: 12px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.transfer-qr img { background: #fff; padding: 8px; border-radius: 8px; width: 160px; height: 160px; flex: none; }
+.transfer-qr p { margin: 0; flex: 1 1 180px; }

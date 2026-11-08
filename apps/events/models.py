@@ -20,6 +20,12 @@ class Event(models.Model):
     capacity = models.PositiveIntegerField("limit uczestników", null=True, blank=True, help_text="Puste — bez limitu.")
     fee = models.PositiveIntegerField("opłata startowa [gr]", default=0)
     registration_until = models.DateTimeField("zapisy do")
+    payment_days = models.PositiveIntegerField(
+        "opłata startowa: czas na zapłatę [dni]", default=3,
+        help_text="Liczony od zapisu (albo wejścia z listy rezerwowej), najpóźniej do zamknięcia zapisów. Dzień przed terminem "
+                  "przypomnienie; po terminie nieopłacony zapis zostaje wycofany, a miejsce dostaje pierwsza osoba z listy "
+                  "rezerwowej. 0 — bez terminu.",
+    )
     note_label = models.CharField("dodatkowe pole przy zapisie", max_length=80, blank=True,
                                   help_text="Np. „Klasa / kategoria” albo „Klub”. Puste — bez dodatkowego pola.")
     status = models.CharField("status", max_length=14, choices=Status.choices, default=Status.DRAFT, db_index=True)
@@ -69,6 +75,8 @@ class Registration(models.Model):
     payment_status = models.CharField("płatność", max_length=10, choices=Payment.choices, default=Payment.FREE)
     created_at = models.DateTimeField("zapisano", auto_now_add=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    pay_by = models.DateTimeField("opłać do (inaczej zapis zostanie wycofany)", null=True, blank=True)
+    pay_reminder_sent_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["created_at", "pk"]

@@ -160,3 +160,14 @@ def hours_summary(hours):
         days = DAY_SHORT[start] if start == end else f"{DAY_SHORT[start]}–{DAY_SHORT[end]}"
         parts.append(f"{days} {span}")
     return ", ".join(parts)
+
+
+@register.simple_tag
+def transfer_qr(association, amount_grosze, title):
+    """Kod QR do przelewu (standard ZBP) — obraz SVG w adresie data: albo '' bez numeru rachunku."""
+    from apps.payments.transfer_qr import qr_for
+
+    try:
+        return qr_for(association, amount_grosze, title)
+    except Exception:  # noqa: BLE001 — kod QR to wygoda; jego błąd nie może zepsuć strony płatności
+        return ""

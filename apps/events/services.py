@@ -1,5 +1,7 @@
 """Wydarzenia: publikacja z blokadą osi, zapisy z limitem i listą rezerwową, wycofanie z awansem z listy, odwołanie."""
 
+from datetime import timedelta
+
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.urls import reverse
@@ -85,8 +87,69 @@ def register(user, event, note=""):
         if event.fee and _has_overpayment(user, reg):  # nadpłata/saldo pokrywa opłatę od razu (gdy włączone w ustawieniach)
             apply_wallet(user, targets=[reg])
             reg.refresh_from_db()
+        _set_payment_deadline(reg, event)
     notify_user(user, f"Zapis: {event.title}" + (" — lista rezerwowa" if full else ""), "emails/event_registered.txt", reg=reg)
     return reg
+
+
+MIN_PAYMENT_WINDOW = timedelta(hours=2)
+PAYMENT_REMINDER_BEFORE = timedelta(hours=24)
+
+
+def payment_deadline(event, start):
+    """Termin opłaty startowej: `payment_days` od zapisu, najpóźniej do zamknięcia zapisów (po zamknięciu — do początku
+    wydarzenia); co najmniej 2 godziny, nie później niż początek wydarzenia. None — bez terminu."""
+    if not event.fee or not event.payment_days:
+        return None
+    cap = event.registration_until if event.registration_until > start else event.starts_at
+    deadline = min(start + timedelta(days=event.payment_days), cap)
+    if deadline < start + MIN_PAYMENT_WINDOW:
+        deadline = min(start + MIN_PAYMENT_WINDOW, event.starts_at)
+    return deadline
+
+
+def _set_payment_deadline(reg, event, now=None):
+    if reg.payment_status != Registration.Payment.DUE:
+        return
+    reg.pay_by = payment_deadline(event, now or timezone.now())
+    reg.pay_reminder_sent_at = None
+    reg.save(update_fields=["pay_by", "pay_reminder_sent_at"])
+
+
+def send_payment_reminders(now=None):
+    """Przypomnienie o opłacie startowej na dobę przed terminem (raz)."""
+    now = now or timezone.now()
+    qs = Registration.objects.filter(status=Registration.Status.REGISTERED, payment_status=Registration.Payment.DUE,
+                                     pay_reminder_sent_at__isnull=True, pay_by__gt=now + timedelta(hours=1),
+                                     pay_by__lte=now + PAYMENT_REMINDER_BEFORE, event__status=Event.Status.PUBLISHED)
+    count = 0
+    for reg in qs.select_related("event", "user"):
+        with transaction.atomic():
+            if not Registration.objects.filter(pk=reg.pk, pay_reminder_sent_at__isnull=True).update(pay_reminder_sent_at=now):
+                continue
+            notify_user(reg.user, f"Przypomnienie: opłata startowa — {reg.event.title}", "emails/event_payment_reminder.txt", reg=reg)
+        count += 1
+    return count
+
+
+def expire_unpaid_registrations(now=None):
+    """Wycofuje zapisy nieopłacone w terminie; miejsce dostaje pierwsza osoba z listy rezerwowej. Pomija trwające płatności Tpay."""
+    from apps.payments.models import Payment
+
+    now = now or timezone.now()
+    count = 0
+    qs = Registration.objects.filter(status=Registration.Status.REGISTERED, payment_status=Registration.Payment.DUE,
+                                     pay_by__isnull=False, pay_by__lt=now, event__status=Event.Status.PUBLISHED)
+    for reg in qs.select_related("event"):
+        if Payment.objects.filter(event_registration=reg, status=Payment.Status.PENDING,
+                                  created_at__gte=now - timedelta(minutes=30)).exists():
+            continue
+        try:
+            cancel_registration(reg, None, by_staff=True, reason="Opłata startowa nie została wniesiona w terminie", refund=True)
+        except ValidationError:
+            continue
+        count += 1
+    return count
 
 
 def _has_overpayment(user, reg):
@@ -106,6 +169,7 @@ def _promote_reserve(event, by):
         return None
     nxt.status = Registration.Status.REGISTERED
     nxt.save(update_fields=["status"])
+    _set_payment_deadline(nxt, event)  # termin liczony od wejścia na listę startową
     log_event("wydarzenie.awans_z_listy", nxt, str(nxt), actor=by)
     notify_user(nxt.user, f"Zwolniło się miejsce: {event.title}", "emails/event_promoted.txt", reg=nxt)
     return nxt
@@ -159,7 +223,7 @@ def cancel_registration(reg, by, by_staff=False, reason="", refund=True):
     refund_registration(reg, by=by)
     info = _refund_paid(reg, paid, by, f"Wycofano zapis: {event.title}", refund or not by_staff)
     log_event("wydarzenie.wycofanie", reg, str(reg), changes={"przez_organizatora": by_staff, "powod": reason, **info}, actor=by)
-    by_self = not by_staff or reg.user_id == by.pk
+    by_self = not by_staff or (by is not None and reg.user_id == by.pk)
     notify_user(reg.user, f"Wycofano zapis: {event.title}", "emails/event_cancelled_registration.txt", reg=reg, reason=reason,
                 by_self=by_self, **info)
     reg.refund_info = info

@@ -1,7 +1,8 @@
 {% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
 
 zwolniło się miejsce — jesteś zapisany na „{{ reg.event.title }}” ({{ reg.event.starts_at|date:"j.m.Y H:i" }}).
-{% if reg.payment_status == 'do_zaplaty' %}Opłata startowa: {{ reg.amount|pln }} — zapłać na stronie wydarzenia albo na miejscu.
+{% if reg.payment_status == 'do_zaplaty' %}Opłata startowa: {{ reg.amount|pln }} — zapłać na stronie wydarzenia albo u organizatora{% if reg.pay_by %} do {{ reg.pay_by|date:"j.m.Y H:i" }}.
+Bez opłaty w tym terminie zapis zostanie wycofany, a miejsce dostanie kolejna osoba z listy rezerwowej{% else %} lub na miejscu{% endif %}.
 {% endif %}Nie możesz przyjechać? Zrezygnuj, żeby miejsce dostała kolejna osoba: {{ site_url }}{% url 'events:detail' reg.event_id %}
 
 Stowarzyszenie „STRZELNICA SĄTOK”

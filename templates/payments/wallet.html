@@ -41,6 +41,8 @@
   {% if association.bank_account %}<p>Rachunek: <strong>{{ association.bank_account }}</strong><br>Odbiorca: {{ association.name }}</p>{% else %}<p class="muted">Numer rachunku pojawi się po uzupełnieniu danych przez zarząd.</p>{% endif %}
   <p class="small">Tytuł przelewu: <strong>numer rezerwacji</strong> (np. SATOK-R-2026-0001) — za rezerwację,
   albo Twój kod <strong class="code">{{ topup_code }}</strong> — za składki członkowskie{% if WALLET_ENABLED %} lub doładowanie salda{% endif %}.</p>
+  {% transfer_qr association 0 topup_code as qr %}{% if qr %}<div class="transfer-qr"><img src="{{ qr }}" alt="Kod QR do przelewu z Twoim kodem w tytule" width="160" height="160">
+    <p class="small muted">Kod QR z Twoim kodem {{ topup_code }} w tytule — zeskanuj w aplikacji banku i wpisz kwotę. Za rezerwację płać kodem ze strony rezerwacji.</p></div>{% endif %}
   <p class="small muted">Przelewy księgujemy po wczytaniu wyciągu bankowego.</p>
 </div>
 <div class="card"><strong>Na miejscu</strong><p class="small">Gotówka lub BLIK na telefon — wpłatę rejestruje zarząd.</p></div>

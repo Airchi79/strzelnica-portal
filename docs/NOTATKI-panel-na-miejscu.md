@@ -50,5 +50,5 @@ bez opłat; zdjęcie legitymacji usuwane po weryfikacji; tylko dziś, od bieżą
   Kamera z ramką: ocena klatki w przeglądarce (jasność, odblask, ostrość, krawędzie karty przy ramce, bezruch),
   zdjęcie samo po ok. 1 s stabilnego ustawienia, przycisk ręczny po 12 s. Progi w `LIMITS` — do dostrojenia na
   urządzeniu: adres `/kiosk/#diag` pokazuje wskaźniki pod podglądem kamery.
-- Dalej: etap 4 ekrany kiosku (ramka kamery, automatyczne zdjęcie),
-  etap 4 panel obsługi, etap 5 (propozycja) automatyczne porównanie danych z legitymacji (OCR).
+- Dalej: etap 4 panel obsługi (zatwierdzenie legitymacji i rezerwacji jednym przyciskiem, uporządkowanie
+  powiadomień), etap 5 automatyczne porównanie danych z legitymacji (OCR, zdjęcie do przejrzenia do 7 dni).

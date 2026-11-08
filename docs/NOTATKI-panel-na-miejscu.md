@@ -46,5 +46,9 @@ bez opłat; zdjęcie legitymacji usuwane po weryfikacji; tylko dziś, od bieżą
   Wspólna logika z płatnością z konta: `payments.services.reservation_online_amount` i `start_tpay`.
   Nieopłacona w czasie — zwalniana przez `expire_reservations`. Termin trzymany dla rezerwacji w bieżącej godzinie
   liczony do jej końca (`bookings.hold_limit`), nie do początku.
-- Dalej: etap 3 ekrany kiosku (ramka kamery, automatyczne zdjęcie),
+- Etap 3 (ekrany kiosku): `static/js/kiosk-onsite.js` + sekcje `os-*` w `templates/kiosk/kiosk.html`.
+  Kamera z ramką: ocena klatki w przeglądarce (jasność, odblask, ostrość, krawędzie karty przy ramce, bezruch),
+  zdjęcie samo po ok. 1 s stabilnego ustawienia, przycisk ręczny po 12 s. Progi w `LIMITS` — do dostrojenia na
+  urządzeniu: adres `/kiosk/#diag` pokazuje wskaźniki pod podglądem kamery.
+- Dalej: etap 4 ekrany kiosku (ramka kamery, automatyczne zdjęcie),
   etap 4 panel obsługi, etap 5 (propozycja) automatyczne porównanie danych z legitymacji (OCR).

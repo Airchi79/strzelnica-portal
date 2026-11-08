@@ -46,7 +46,10 @@ def kiosk_home(request):
     device = services.device_from_request(request)
     if device is None:
         return render(request, "kiosk/pair.html", {})
-    response = render(request, "kiosk/kiosk.html", {"device": device, "statement": STATEMENT_TEXT, "purposes": Entry.Purpose.choices})
+    response = render(request, "kiosk/kiosk.html", {
+        "device": device, "statement": STATEMENT_TEXT, "purposes": Entry.Purpose.choices,
+        "onsite_statement": onsite.STATEMENT_TEXT, "onsite_minutes": onsite.VERIFY_MINUTES,
+    })
     response["X-Kiosk-App"] = "1"
     response["Cache-Control"] = "no-store"
     return response
@@ -234,6 +237,16 @@ def _error(e, status=400):
 @api
 def api_onsite_slots(request):
     return JsonResponse({"lanes": onsite.free_slots(), "max_persons": BookingSettings.load().max_persons})
+
+
+@require_GET
+@api
+def api_onsite_price(request):
+    g = request.GET
+    try:
+        return JsonResponse(onsite.price(g.get("os"), g.get("od"), g.get("do"), g.get("osoby")))
+    except ValidationError as e:
+        return _error(e)
 
 
 @require_POST

@@ -335,3 +335,29 @@ def test_guest_pay_refuses_paid_or_cancelled(client, device, lane, now, settings
     from apps.payments.models import Payment
 
     assert not Payment.objects.exists()
+
+
+# --- etap 3: dane dla ekranów kiosku ---------------------------------------------------------------------------------
+
+
+def test_price_and_state_fields_for_screens(device, lane, now):
+    q = onsite.price(lane.pk, 10, 12, 2, now=now)
+    assert q["amount"] > 0 and "10:00–12:00" in q["label"]
+    with pytest.raises(ValidationError):
+        onsite.price("x", 10, 12, 2, now=now)
+    flow = verified_flow(device)
+    st = onsite.state(flow)
+    assert st["first_name"] == "Nowak" and st["last_name"] == "Jan" and st["statement"] is True
+    assert "275" in st["statement_text"]
+    onsite.submit_ps(flow, "PS-9", "PZSS", "2020-05-01", "", photo_data_url())
+    r = onsite.book(flow, lane.pk, 10, 12, 2, now=now)
+    flow.refresh_from_db()
+    assert onsite.state(flow, now=now)["reservation"]["id"] == r.pk and r.amount == q["amount"]
+
+
+def test_kiosk_page_has_onsite_screens(kiosk):
+    _, c = kiosk
+    body = c.get("/kiosk/").content.decode()
+    assert "data-os-open" in body and "kiosk-onsite.js" in body and "art. 275" in body
+    r = c.get("/kiosk/api/na-miejscu/cena/?os=x&od=10&do=11&osoby=1", **H)
+    assert r.status_code == 400

@@ -179,6 +179,24 @@ body.kiosk { font-size: 18px; }
 .kiosk-status.offline { background: var(--bad-bg); color: var(--bad); }
 .kiosk-done { text-align: center; padding: 32px 16px; }
 @media (min-width: 720px) { .kiosk-buttons { grid-template-columns: 1fr 1fr; } }
+/* kiosk: rezerwacja na miejscu */
+.kiosk-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.kiosk-chips button { min-height: 52px; min-width: 64px; font-size: 1.05rem; }
+.kiosk-chips button[aria-pressed="true"] { background: var(--brand); color: var(--brand-contrast); border-color: transparent; }
+.kiosk-price { font-size: 1.2rem; font-weight: 600; min-height: 1.4em; }
+.kiosk-code { font-size: 2rem; letter-spacing: .4em; text-align: center; max-width: 12ch; }
+.os-hint { font-size: 1.15rem; font-weight: 600; text-align: center; min-height: 2.6em; }
+.os-cam { position: relative; background: #000; border-radius: 12px; overflow: hidden; }
+.os-cam video { display: block; width: 100%; max-height: 62vh; object-fit: cover; }
+.os-cam.mirror video { transform: scaleX(-1); }
+.os-frame { position: absolute; border: 6px solid #d33; border-radius: 16px; box-shadow: 0 0 0 9999px rgba(0,0,0,.35); transition: border-color .15s; pointer-events: none; }
+.os-frame.ok { border-color: #2fa84f; }
+.os-photo { display: block; width: 100%; border-radius: 10px; margin: 8px 0 16px; }
+.os-choice { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+.os-countdown { font-size: 2.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.os-qr { width: min(320px, 80vw); height: auto; background: #fff; padding: 12px; border-radius: 12px; }
+.os-dialog { width: min(900px, 94vw); max-height: 86vh; overflow: auto; border: 0; border-radius: 12px; }
+.os-dialog::backdrop { background: rgba(0,0,0,.5); }
 
 
 /* ===== Panel obsługi: układ aplikacji (menu boczne, górny pasek, gęstsze tabele) ===== */

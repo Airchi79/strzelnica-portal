@@ -71,6 +71,18 @@ def _clean_text(value, limit):
 # --- terminy -----------------------------------------------------------------------------------------------------
 
 
+def price(lane_id, start_hour, end_hour, persons, now=None):
+    """Wycena przed rezerwacją (do pokazania w kiosku przed podaniem danych). Bez prowadzącego od strzelnicy."""
+    now = now or timezone.now()
+    try:
+        lane = Lane.objects.get(pk=int(lane_id), is_active=True)
+        start_hour, end_hour, persons = int(start_hour), int(end_hour), int(persons)
+    except (Lane.DoesNotExist, TypeError, ValueError):
+        raise ValidationError("Wybierz oś i godziny.") from None
+    q = bookings.quote(lane, timezone.localdate(now), start_hour, end_hour, persons, now=now, respect_holds=True)
+    return {"amount": q["amount"], "lane": str(lane), "label": f"{lane} · {start_hour:02d}:00–{end_hour:02d}:00"}
+
+
 def free_slots(now=None):
     """Wolne godziny dziś (od bieżącej godziny) na czynnych osiach — do wyboru w kiosku."""
     now = now or timezone.now()
@@ -329,6 +341,7 @@ def state(flow, now=None):
     if user is None:
         return out
     out["name"] = user.full_name
+    out["first_name"], out["last_name"] = user.first_name, user.last_name
     out["regulations"] = [{"id": v.pk, "title": str(v), "url": reverse("regulations:version", args=[v.pk])}
                           for v in pending_acceptances(user)]
     out["statement"] = flow.statement_at is not None
@@ -342,7 +355,7 @@ def state(flow, now=None):
     r = flow.reservation
     if r is not None:
         out["reservation"] = {
-            "number": r.number, "status": r.status, "status_label": r.get_status_display(), "amount": r.amount,
+            "id": r.pk, "number": r.number, "status": r.status, "status_label": r.get_status_display(), "amount": r.amount,
             "label": f"{r.lane} · {timezone.localtime(r.starts_at):%H:%M}–{timezone.localtime(r.ends_at):%H:%M}",
         }
         out["reservation"]["paid"] = r.payment_status != Reservation.Payment.DUE or r.paid_amount >= r.amount

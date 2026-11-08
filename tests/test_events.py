@@ -172,7 +172,7 @@ def test_self_withdrawal_refunds_online_payment(owner, refunds, django_capture_o
     assert "wycofałeś zapis" in body and "Zwrot 50\xa0zł" in body and "nie podlega zwrotowi" in body
 
 
-def test_staff_withdraw_with_and_without_refund(owner_client, owner, refunds):
+def test_staff_withdraw_with_and_without_refund(owner_client, owner, refunds, django_capture_on_commit_callbacks):
     e = make_event(owner, capacity=5)
     a, b = shooter("a1@example.com"), shooter("b1@example.com")
     ra, rb = services.register(a, e), services.register(b, e)
@@ -180,8 +180,9 @@ def test_staff_withdraw_with_and_without_refund(owner_client, owner, refunds):
     _paid_online(b, rb, ext="tpay:01B")
     page = owner_client.get(f"/panel/wydarzenia/{e.pk}/").content.decode()
     assert "Wycofaj bez zwrotu" in page
-    owner_client.post(f"/panel/wydarzenia/{e.pk}/", {"action": "withdraw", "reg": ra.pk})
-    owner_client.post(f"/panel/wydarzenia/{e.pk}/", {"action": "withdraw_keep", "reg": rb.pk})
+    with django_capture_on_commit_callbacks(execute=True):
+        owner_client.post(f"/panel/wydarzenia/{e.pk}/", {"action": "withdraw", "reg": ra.pk})
+        owner_client.post(f"/panel/wydarzenia/{e.pk}/", {"action": "withdraw_keep", "reg": rb.pk})
     assert refunds == [("01A", None)]
     assert balance_of(a) == 0 and balance_of(b) == 5000  # b: nadpłata do decyzji zarządu
 

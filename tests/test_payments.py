@@ -673,9 +673,11 @@ def test_reject_refund_failure_notifies_board(client, owner, tpay_keys, monkeypa
     mail.outbox.clear()
     with django_capture_on_commit_callbacks(execute=True):
         booking_services.reject_reservation(r, owner, "x")
-    assert balance_of(u) == r.amount  # zostaje jako nadpłata do ręcznego zwrotu
-    assert any("Zwrot do wykonania ręcznie" in m.subject for m in mail.outbox)
-    assert "zwrócimy ręcznie" in [m for m in mail.outbox if m.to == [u.email]][0].body
+    assert balance_of(u) == r.amount  # Tpay odrzucił zlecony zwrot → kwota wraca na saldo (nadpłata)
+    assert any("Zwrot Tpay nie powiódł się" in m.subject for m in mail.outbox)
+    user_subjects = [m.subject for m in mail.outbox if m.to == [u.email]]
+    assert any("nie została zatwierdzona" in x for x in user_subjects) and any("Zwrot przez Tpay nie powiódł się" in x for x in user_subjects)
+    assert services.ledger_consistent(u)
 
 
 def test_prepay_setting_off_hides_and_refuses_payment(client, tpay_keys, monkeypatch):
@@ -862,7 +864,7 @@ def test_client_cancel_with_wallet_keeps_money_on_balance(ps, owner, monkeypatch
     assert "wróciła na Twoje saldo" in [m for m in mail.outbox if m.to == [ps.email]][0].body
 
 
-def test_panel_refund_overpayment_via_tpay(client, owner, ps, tpay_keys, monkeypatch):
+def test_panel_refund_overpayment_via_tpay(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
     """Nadpłata po anulowaniu bez zwrotu (np. stary przypadek, blokada osi) — zarząd zwraca ją z panelu, tylko raz."""
     PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
     r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
@@ -874,14 +876,17 @@ def test_panel_refund_overpayment_via_tpay(client, owner, ps, tpay_keys, monkeyp
     client.logout()
     other = make_user("bez-uprawnien@example.com", is_staff=True)
     login_with_otp(client, other)
-    client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})
+    with django_capture_on_commit_callbacks(execute=True):
+        client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})
     assert not calls  # bez uprawnień do płatności
     client.logout()
     login_with_otp(client, owner)
     page = client.get(f"/panel/salda/{ps.pk}/").content.decode()
     assert "Zwróć przez Tpay" in page and r.number in page
-    client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})
-    client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})  # drugi raz — nic
+    with django_capture_on_commit_callbacks(execute=True):
+        client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})
+    with django_capture_on_commit_callbacks(execute=True):
+        client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})  # drugi raz — nic
     assert calls == [("01CANC", None)] and balance_of(ps) == 0
     assert services.refundable_overpayments(ps) == []
     assert "Zwróć przez Tpay" not in client.get(f"/panel/salda/{ps.pk}/").content.decode()
@@ -1076,7 +1081,10 @@ def test_failed_tpay_refund_with_wallet_notifies_board_and_can_be_retried(client
     mail.outbox.clear()
     with django_capture_on_commit_callbacks(execute=True):
         r, refunded, manual, to_wallet = booking_services.cancel_by_client(r, ps)
-    assert (refunded, manual, to_wallet) == (0, 0, 24000) and balance_of(ps) == 24000
+    # zwrot zlecony (strzelec dostał „zwrot zlecony”); Tpay odrzucił go po zatwierdzeniu → kwota wraca na saldo
+    assert (refunded, manual, to_wallet) == (24000, 0, 0) and balance_of(ps) == 24000
+    assert payment.tpay_refunds.get().status == "nieudany"
+    assert any("Zwrot przez Tpay nie powiódł się" in m.subject for m in mail.outbox if m.to == [ps.email])
     n = Notification.objects.get(recipient=owner, channel="panel", title__startswith="Zwrot Tpay nie powiódł się")
     assert n.url == f"/panel/salda/{ps.pk}/" and "Ponów" in n.body
     assert any("Zwrot Tpay nie powiódł się" in m.subject for m in mail.outbox)
@@ -1085,8 +1093,11 @@ def test_failed_tpay_refund_with_wallet_notifies_board_and_can_be_retried(client
     monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append(tid) or {"result": "success"})
     client.logout()
     login_with_otp(client, owner)
-    client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})
+    with django_capture_on_commit_callbacks(execute=True):
+        client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})
     assert calls == ["01CANC"] and balance_of(ps) == 0
+    assert sorted(payment.tpay_refunds.values_list("status", flat=True)) == ["nieudany", "wykonany"]
+    assert services.ledger_consistent(ps)
 
 
 def test_failed_tpay_refund_without_wallet_single_reminder(client, owner, ps, tpay_keys, monkeypatch,
@@ -1103,8 +1114,10 @@ def test_failed_tpay_refund_without_wallet_single_reminder(client, owner, ps, tp
     with django_capture_on_commit_callbacks(execute=True):
         booking_services.cancel_by_client(r, ps)
     titles = list(Notification.objects.filter(recipient=owner, channel="panel").values_list("title", flat=True))
-    assert any(t.startswith("Zwrot do wykonania ręcznie") for t in titles)
-    assert not any(t.startswith("Zwrot Tpay nie powiódł się") for t in titles)  # bez podwójnego powiadomienia
+    # jedno powiadomienie o nieudanym zwrocie (z instrukcją: ponów albo zwróć ręcznie), bez dodatkowego „ręcznie”
+    assert sum(t.startswith("Zwrot Tpay nie powiódł się") for t in titles) == 1
+    assert not any(t.startswith("Zwrot do wykonania ręcznie") for t in titles)
+    assert balance_of(ps) == 24000
 
 
 def test_wallet_first_partial_then_online_and_refund_split(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
@@ -1444,3 +1457,108 @@ def test_abandoned_hold_without_money_stays_silent(ps, django_capture_on_commit_
     with django_capture_on_commit_callbacks(execute=True):
         assert booking_services.expire_unpaid(now=r.pay_by + timedelta(minutes=1)) == 1
     assert not [m for m in mail.outbox if m.to == [ps.email]]
+
+
+# --- zwroty Tpay jako zlecenia: API dopiero po zatwierdzeniu transakcji, bez automatycznego ponawiania niepewnych -------
+
+
+def _calls(monkeypatch):
+    calls = []
+    monkeypatch.setattr(tpay, "refund_transaction", lambda tid, amount=None: calls.append((tid, amount)) or {"result": "success"})
+    return calls
+
+
+def test_refund_not_sent_when_operation_rolls_back(client, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    from apps.payments.models import TpayRefund
+
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    calls = _calls(monkeypatch)
+    with django_capture_on_commit_callbacks(execute=True):
+        with pytest.raises(RuntimeError):
+            with transaction.atomic():
+                booking_services.cancel_by_client(r, ps)
+                raise RuntimeError("błąd po zleceniu zwrotu (np. w szablonie e-maila)")
+    r.refresh_from_db()
+    assert calls == [] and not TpayRefund.objects.exists()  # wycofane razem z operacją — Tpay nic nie dostał
+    assert r.status == Reservation.Status.CONFIRMED and services.ledger_consistent(ps)
+    with django_capture_on_commit_callbacks(execute=True):  # ponowne anulowanie — dokładnie jeden zwrot
+        booking_services.cancel_by_client(r, ps)
+    assert calls == [("01CANC", None)] and TpayRefund.objects.get().status == TpayRefund.Status.DONE
+
+
+def test_lost_refund_is_sent_by_scheduler(client, ps, tpay_keys, monkeypatch):
+    from apps.payments.models import TpayRefund
+
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    calls = _calls(monkeypatch)
+    booking_services.cancel_by_client(r, ps)  # bez wykonania on_commit — jak restart w chwili zatwierdzenia
+    ref = TpayRefund.objects.get()
+    assert ref.status == TpayRefund.Status.QUEUED and calls == [] and balance_of(ps) == 0
+    assert services.process_refund_queue(now=timezone.now()) == (0, 0)  # jeszcze za wcześnie
+    assert services.process_refund_queue(now=timezone.now() + timedelta(minutes=3)) == (1, 0)
+    assert calls == [("01CANC", None)] and TpayRefund.objects.get().status == TpayRefund.Status.DONE
+    assert services.process_refund_queue(now=timezone.now() + timedelta(minutes=10)) == (0, 0)
+    assert len(calls) == 1
+
+
+def test_stuck_refund_goes_to_board_and_is_not_retried(client, owner, ps, tpay_keys, monkeypatch):
+    from apps.core.models import Notification
+    from apps.payments.models import TpayRefund
+
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    calls = _calls(monkeypatch)
+    booking_services.cancel_by_client(r, ps)
+    TpayRefund.objects.update(status=TpayRefund.Status.SENDING, sent_at=timezone.now())  # proces przerwany w trakcie wysyłania
+    assert services.process_refund_queue(now=timezone.now() + timedelta(minutes=11)) == (0, 1)
+    assert calls == [] and TpayRefund.objects.get().status == TpayRefund.Status.UNKNOWN
+    assert Notification.objects.filter(recipient=owner, channel="panel", title__startswith="Zwrot Tpay do sprawdzenia").count() == 1
+    assert services.process_refund_queue(now=timezone.now() + timedelta(minutes=30)) == (0, 0)  # bez ponawiania i bez powtórek
+    assert services.refundable_overpayments(ps) == []  # w toku — nie da się zlecić drugiego zwrotu
+    # zarząd sprawdza w panelu Tpay: zwrotu nie ma → kwota wraca na saldo, można zlecić ponownie
+    client.logout()
+    login_with_otp(client, owner)
+    page = client.get(f"/panel/platnosci/{payment.pk}/").content.decode()
+    assert "Do sprawdzenia w panelu Tpay" in page and "Zwrotu nie ma" in page
+    ref = TpayRefund.objects.get()
+    client.post(f"/panel/platnosci/{payment.pk}/", {"action": "refund_missing", "refund": ref.pk})
+    ref.refresh_from_db()
+    assert ref.status == TpayRefund.Status.FAILED and ref.resolved_by == owner and balance_of(ps) == 24000
+    assert services.refundable_overpayments(ps) == [(payment, 24000)] and services.ledger_consistent(ps)
+
+
+def test_stuck_refund_marked_done_by_board(client, owner, ps, tpay_keys, monkeypatch):
+    from apps.payments.models import TpayRefund
+
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    _calls(monkeypatch)
+    booking_services.cancel_by_client(r, ps)
+    TpayRefund.objects.update(status=TpayRefund.Status.UNKNOWN)
+    client.logout()
+    login_with_otp(client, owner)
+    client.post(f"/panel/platnosci/{payment.pk}/", {"action": "refund_done", "refund": TpayRefund.objects.get().pk})
+    assert TpayRefund.objects.get().status == TpayRefund.Status.DONE and balance_of(ps) == 0
+    assert services.refundable_overpayments(ps) == []
+
+
+def test_unexpected_refund_error_is_not_retried(client, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    from apps.payments.models import TpayRefund
+
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+
+    def broken(tid, amount=None):
+        raise ConnectionResetError("zerwane połączenie")
+
+    monkeypatch.setattr(tpay, "refund_transaction", broken)
+    with django_capture_on_commit_callbacks(execute=True):
+        booking_services.cancel_by_client(r, ps)
+    assert TpayRefund.objects.get().status == TpayRefund.Status.UNKNOWN and balance_of(ps) == 0
+
+
+def test_tpay_chargeback_notice_does_not_double_count_refund(client, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
+    r, payment = _confirmed_paid_online(client, ps, tpay_keys, monkeypatch)
+    _calls(monkeypatch)
+    with django_capture_on_commit_callbacks(execute=True):
+        booking_services.cancel_by_client(r, ps)
+    _post(client, tpay_keys, _notification(payment, status="CHARGEBACK"))
+    assert balance_of(ps) == 0
+    assert payment.ledger_entries.filter(kind=LedgerEntry.Kind.CHARGEBACK).count() == 1 and services.ledger_consistent(ps)

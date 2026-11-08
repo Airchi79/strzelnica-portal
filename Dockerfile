@@ -15,4 +15,4 @@ RUN DJANGO_DEBUG=1 python manage.py collectstatic --noinput \
 USER app
 ENV PRIVATE_MEDIA_ROOT=/data/private
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py createcachetable && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --access-logfile -"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py createcachetable && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60 --graceful-timeout 30 --access-logfile -"]

@@ -16,6 +16,26 @@
 </table>
 {% if p.status == 'zaksiegowana' %}<div class="actions"><a class="btn secondary small-btn" href="{% url 'panel:payment_receipt' p.pk %}" target="_blank" rel="noopener">Potwierdzenie wpłaty (PDF)</a></div>{% endif %}
 </div>
+{% if refunds %}
+<h2>Zwroty przez Tpay</h2>
+<div class="card"><table>
+  <tr><th>Zlecono</th><th>Kwota</th><th>Status</th><th>Powód</th></tr>
+  {% for z in refunds %}<tr>
+    <td>{{ z.created_at|date:"j.m.Y H:i" }}{% if z.created_by %}<div class="small muted">{{ z.created_by.full_name }}</div>{% endif %}</td>
+    <td>{{ z.amount|pln }}</td>
+    <td>{% if z.status == 'wykonany' %}<span class="badge ok">{{ z.get_status_display }}</span>{% elif z.status == 'nieudany' or z.status == 'do_sprawdzenia' %}<span class="badge warn">{{ z.get_status_display }}</span>{% else %}{{ z.get_status_display }}{% endif %}
+      {% if z.error %}<div class="small muted">{{ z.error }}</div>{% endif %}
+      {% if z.resolved_by %}<div class="small muted">oznaczył: {{ z.resolved_by.full_name }}</div>{% endif %}
+      {% if z.status == 'do_sprawdzenia' %}
+      <form method="post" class="actions" style="margin-top:6px">{% csrf_token %}<input type="hidden" name="refund" value="{{ z.pk }}">
+        <button class="btn small-btn" name="action" value="refund_done" data-confirm-click="Potwierdzasz, że w panelu Tpay jest zwrot {{ z.amount|pln }} dla tej transakcji?">Zwrot wykonany</button>
+        <button class="btn secondary small-btn" name="action" value="refund_missing" data-confirm-click="Potwierdzasz, że w panelu Tpay NIE ma tego zwrotu? Kwota wróci na saldo strzelca.">Zwrotu nie ma</button>
+      </form>
+      <div class="small muted">Sprawdź w panelu Tpay (transakcja {{ p.external_id|slice:"5:" }}) — system nie ponawia takiego zwrotu sam.</div>{% endif %}</td>
+    <td>{{ z.reason }}</td>
+  </tr>{% endfor %}
+</table></div>
+{% endif %}
 {% if p.status == 'nieprzypisana' %}
 <div class="card"><form method="post">{% csrf_token %}
   {% include "partials/form.html" %}

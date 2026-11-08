@@ -162,3 +162,47 @@ class BankImport(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class TpayRefund(models.Model):
+    """Zlecenie zwrotu przez Tpay (na kartę / rachunek płacącego).
+
+    Zlecenie powstaje w transakcji operacji (anulowanie, odrzucenie, zwrot nadpłaty) razem z obciążeniem salda; wywołanie
+    API Tpay następuje dopiero po zatwierdzeniu transakcji — wycofanie operacji nie zostawi zwrotu bez śladu w systemie.
+    Przed wywołaniem zlecenie dostaje status „wysyłane” (zapisany osobno): przerwanie w trakcie nie spowoduje
+    automatycznego ponowienia (ryzyko podwójnego zwrotu) — zarząd sprawdza w panelu Tpay i oznacza wynik."""
+
+    class Status(models.TextChoices):
+        QUEUED = "zlecony", "Zlecony"
+        SENDING = "wysylany", "Wysyłany do Tpay"
+        DONE = "wykonany", "Przyjęty przez Tpay"
+        FAILED = "nieudany", "Nieudany (kwota wróciła na saldo)"
+        UNKNOWN = "do_sprawdzenia", "Do sprawdzenia w panelu Tpay"
+
+    ACTIVE = (Status.QUEUED, Status.SENDING, Status.DONE, Status.UNKNOWN)
+
+    payment = models.ForeignKey(Payment, on_delete=models.PROTECT, related_name="tpay_refunds", verbose_name="wpłata")
+    amount = models.PositiveIntegerField("kwota [gr]")
+    reason = models.CharField("powód", max_length=255)
+    status = models.CharField("status", max_length=16, choices=Status.choices, default=Status.QUEUED, db_index=True)
+    response = models.JSONField("odpowiedź Tpay", default=dict, blank=True)
+    error = models.CharField("błąd", max_length=255, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField("zlecono", auto_now_add=True)
+    sent_at = models.DateTimeField("wysłano", null=True, blank=True)
+    finished_at = models.DateTimeField("zakończono", null=True, blank=True)
+    resolved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+                                    verbose_name="wynik oznaczył (zarząd)")
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "zwrot Tpay"
+        verbose_name_plural = "zwroty Tpay"
+        constraints = [
+            models.CheckConstraint(condition=models.Q(amount__gt=0), name="tpay_refund_positive"),
+            # jeden aktywny (niezakończony porażką) zwrot na wpłatę — ochrona przed podwójnym zwrotem
+            models.UniqueConstraint(fields=["payment"], condition=~models.Q(status="nieudany"), name="tpay_refund_one_active"),
+        ]
+
+    def __str__(self):
+        return f"Zwrot {self.amount / 100:.2f} zł · {self.get_status_display()}"

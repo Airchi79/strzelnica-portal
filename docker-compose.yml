@@ -45,7 +45,7 @@ services:
       retries: 3
       start_period: 40s
 
-  # Zadania okresowe: co minutę zwalnianie wygasłych blokad terminów i nieopłaconych rezerwacji oraz lista oczekujących;
+  # Zadania okresowe: co minutę zwalnianie wygasłych blokad terminów i nieopłaconych rezerwacji, lista oczekujących i zwroty Tpay;
   # co 5 minut wysyłka ogłoszeń; co godzinę przypomnienia, rozliczenia rezerwacji, wygaszanie dokumentów, zamykanie pobytów
   # i czyszczenie książki pobytu, zadania stowarzyszenia, raporty, kontrola kopii zapasowych.
   cron:
@@ -57,6 +57,7 @@ services:
       sh -c 'n=0; while true; do
         python manage.py expire_reservations;
         python manage.py process_waitlist;
+        python manage.py process_refunds;
         if [ $$((n % 5)) -eq 0 ]; then
           python manage.py send_announcements;
         fi;

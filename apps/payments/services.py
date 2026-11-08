@@ -6,8 +6,9 @@ Zasada (decyzja właściciela): każda wpłata trafia na saldo, a opłaty za rez
 import csv
 import hashlib
 import io
+import logging
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.contrib.auth import get_user_model
@@ -20,7 +21,9 @@ from django.utils import timezone
 from apps.audit.services import log_event
 from apps.core.notifications import notify_board, notify_user
 
-from .models import BankImport, LedgerEntry, Payment, PaymentSettings, Wallet
+from .models import BankImport, LedgerEntry, Payment, PaymentSettings, TpayRefund, Wallet
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -176,9 +179,11 @@ def _pay_item(user, item, by):
     from apps.association.models import Fee
     from apps.bookings.models import Reservation
 
-    wallet = _locked_wallet(user)
+    # Kolejność blokad w całym module: najpierw należność (rezerwacja / zapis / składka), potem saldo — jak przy anulowaniu
+    # i zaliczaniu wpłat; odwrotna kolejność groziła zakleszczeniem przy równoczesnym powiadomieniu Tpay i akcji strzelca.
     if isinstance(item, Reservation):
         r = Reservation.objects.select_for_update().get(pk=item.pk)
+        wallet = _locked_wallet(user)
         if r.payment_status != Reservation.Payment.DUE:
             return False
         remaining = r.amount - r.paid_amount
@@ -201,6 +206,7 @@ def _pay_item(user, item, by):
 
     if isinstance(item, Registration):
         reg = Registration.objects.select_for_update().select_related("event").get(pk=item.pk)
+        wallet = _locked_wallet(user)
         if reg.payment_status != Registration.Payment.DUE or reg.status != Registration.Status.REGISTERED:
             return False
         remaining = reg.amount - reg.paid_amount
@@ -214,6 +220,7 @@ def _pay_item(user, item, by):
         log_event("wydarzenie.oplacone", reg, str(reg), actor=by)
         return True
     fee = Fee.objects.select_for_update().get(pk=item.pk)
+    wallet = _locked_wallet(user)
     if fee.status != Fee.Status.DUE or wallet.balance < fee.amount:
         return False
     post(user, -fee.amount, LedgerEntry.Kind.MEMBERSHIP_FEE, f"{fee.label} — członek nr {fee.member.number}", by=by)
@@ -286,11 +293,22 @@ def apply_wallet(user, by=None, targets=None):
             targets = [x for x in _due_items(user) if isinstance(x, Reservation)]
         else:
             return 0
+    targets = [t for t in targets if t is not None]
+    _lock_items(targets)  # wszystkie należności przed saldem — ta sama kolejność blokad co w pozostałych operacjach
     paid = 0
     for item in targets:
-        if item is not None and _pay_item(user, item, by):
+        if _pay_item(user, item, by):
             paid += 1
     return paid
+
+
+def _lock_items(items):
+    """Blokuje wiersze należności (rezerwacje, zapisy, składki) w stałej kolejności (typ, klucz)."""
+    by_model = {}
+    for item in items:
+        by_model.setdefault(type(item), set()).add(item.pk)
+    for model in sorted(by_model, key=lambda m: m._meta.label):
+        list(model.objects.select_for_update().filter(pk__in=by_model[model]).order_by("pk").values_list("pk", flat=True))
 
 
 @transaction.atomic
@@ -347,6 +365,11 @@ def complete_payment(payment, user=None, by=None, note=""):
     payment = Payment.objects.select_for_update().get(pk=payment.pk)
     if payment.status == Payment.Status.COMPLETED:
         return payment  # idempotentnie (np. powtórzone powiadomienie Tpay)
+    if payment.reservation_id:
+        # rezerwacja przed saldem (kolejność blokad jak w całym module — bez zakleszczeń z anulowaniem / „Użyj salda”)
+        from apps.bookings.models import Reservation
+
+        Reservation.objects.select_for_update().filter(pk=payment.reservation_id).first()
     if user is not None:
         payment.user = user
     if payment.user is None:
@@ -607,35 +630,136 @@ def apply_all_overpayments(by=None):
     return count
 
 
-def refund_to_payer(payment, amount, by=None, reason="Zwrot"):
-    """Zwrot pieniędzy płacącemu przez Tpay (na kartę / rachunek / BLIK). Księguje operację „zwrot do wpłacającego”
-    na saldzie (ta sama, którą dodaje powiadomienie Tpay o zwrocie — nie zostanie zaksięgowana drugi raz).
-    Zwraca True, gdy Tpay przyjął zwrot; False (i powiadomienie zarządu), gdy trzeba zwrócić ręcznie."""
-    from . import tpay
+def refund_outstanding(payment):
+    """True, gdy wpłata ma aktywny zwrot Tpay (zlecony / wysyłany / wykonany / do sprawdzenia) albo zaksięgowany zwrot
+    do płacącego (także sprzed kolejki zwrotów i z powiadomienia Tpay o chargebacku). Zwrot nieudany nie blokuje ponowienia."""
+    if payment.tpay_refunds.filter(status__in=TpayRefund.ACTIVE).exists():
+        return True
+    net = payment.ledger_entries.filter(kind=LedgerEntry.Kind.CHARGEBACK).aggregate(s=Sum("amount"))["s"] or 0
+    return net < 0
 
+
+def refund_to_payer(payment, amount, by=None, reason="Zwrot"):
+    """Zleca zwrot pieniędzy płacącemu przez Tpay (na kartę / rachunek / BLIK).
+
+    W bieżącej transakcji: obciążenie salda („zwrot do wpłacającego”) i zlecenie zwrotu. Wywołanie API Tpay — dopiero po
+    zatwierdzeniu transakcji (`execute_refund`); przy odrzuceniu przez Tpay kwota wraca na saldo, a zarząd dostaje
+    powiadomienie. Zwraca True, gdy zwrot zlecono (albo był już zlecony); False — wpłata poza Tpay (zwrot ręczny)."""
     if amount <= 0:
         return True
     if payment.method != Payment.Method.TPAY or payment.status != Payment.Status.COMPLETED or not (payment.external_id or "").startswith("tpay:"):
         return False
     with transaction.atomic():
         p = Payment.objects.select_for_update().get(pk=payment.pk)
-        if p.ledger_entries.filter(kind=LedgerEntry.Kind.CHARGEBACK).exists() or (p.raw or {}).get("zwrot_api"):
-            return True  # już zwrócone
-        try:
-            resp = tpay.refund_transaction(p.external_id.split(":", 1)[1], None if amount >= p.amount else amount) or {}
-        except tpay.TpayError as e:
-            log_event("platnosc.zwrot_nieudany", p, f"{p}: {e}", actor=by)
-            if wallet_enabled():
-                # Przy włączonym saldzie kwota trafia na saldo strzelca bez przypomnienia o zwrocie ręcznym (to wysyłane jest
-                # tylko przy wyłączonym saldzie) — zarząd musi wiedzieć, że strzelec czeka na zwrot na kartę / rachunek.
-                _notify_tpay_refund_failed(p, amount, str(e))
-            return False
-        p.raw = {**(p.raw or {}), "zwrot_api": {"kwota_gr": amount, "kiedy": timezone.now().isoformat(), "powod": reason[:120],
-                                     "odpowiedz": {k: resp.get(k) for k in ("result", "requestId", "status", "transactionId") if k in resp}}}
-        p.save(update_fields=["raw"])
+        if refund_outstanding(p) or (p.raw or {}).get("zwrot_api"):
+            return True  # już zwrócone albo w toku
+        refund = TpayRefund.objects.create(payment=p, amount=amount, reason=reason[:255], created_by=by)
         post(p.user, -amount, LedgerEntry.Kind.CHARGEBACK, f"{reason} — zwrot na rachunek płacącego (Tpay)", payment=p, by=by)
-        log_event("platnosc.zwrot_tpay", p, f"{p}: zwrot {amount / 100:.2f} zł", actor=by)
+        log_event("platnosc.zwrot_zlecony", p, f"{p}: zwrot {amount / 100:.2f} zł", actor=by)
+        transaction.on_commit(lambda: execute_refund(refund.pk))
     return True
+
+
+REFUND_RESEND_AFTER = timedelta(minutes=2)   # zlecenie niewysłane (np. restart w chwili zatwierdzenia) — wysyła harmonogram
+REFUND_STUCK_AFTER = timedelta(minutes=10)   # „wysyłane” bez wyniku — do sprawdzenia przez zarząd (bez ponawiania)
+
+
+def execute_refund(refund_pk):
+    """Wysyła zlecony zwrot do Tpay. Uruchamiane po zatwierdzeniu transakcji, która go zleciła (albo przez harmonogram).
+    Musi działać poza transakcją: status „wysyłane” jest zapisywany PRZED wywołaniem API."""
+    from . import tpay
+
+    with transaction.atomic():
+        refund = TpayRefund.objects.select_for_update().select_related("payment").filter(pk=refund_pk, status=TpayRefund.Status.QUEUED).first()
+        if refund is None:
+            return None
+        refund.status, refund.sent_at = TpayRefund.Status.SENDING, timezone.now()
+        refund.save(update_fields=["status", "sent_at"])
+    p = refund.payment
+    try:
+        resp = tpay.refund_transaction(p.external_id.split(":", 1)[1], None if refund.amount >= p.amount else refund.amount) or {}
+    except tpay.TpayError as e:
+        _refund_failed(refund.pk, str(e))
+        return False
+    except Exception as e:  # nieprzewidziany błąd (np. sieć) — wynik nieznany: do sprawdzenia, bez ponawiania
+        logger.exception("Zwrot Tpay %s: nieoczekiwany błąd", refund.pk)
+        TpayRefund.objects.filter(pk=refund.pk, status=TpayRefund.Status.SENDING).update(
+            status=TpayRefund.Status.UNKNOWN, error=str(e)[:255])
+        _notify_refund_unknown(refund)
+        return None
+    with transaction.atomic():
+        refund = TpayRefund.objects.select_for_update().get(pk=refund.pk)
+        refund.status, refund.finished_at = TpayRefund.Status.DONE, timezone.now()
+        refund.response = {k: resp.get(k) for k in ("result", "requestId", "status", "transactionId") if k in resp}
+        refund.save(update_fields=["status", "finished_at", "response"])
+        p = Payment.objects.select_for_update().get(pk=p.pk)
+        p.raw = {**(p.raw or {}), "zwrot_api": {"kwota_gr": refund.amount, "kiedy": refund.finished_at.isoformat(),
+                                               "powod": refund.reason[:120], "odpowiedz": refund.response}}
+        p.save(update_fields=["raw"])
+        log_event("platnosc.zwrot_tpay", p, f"{p}: zwrot {refund.amount / 100:.2f} zł przyjęty przez Tpay", actor=refund.created_by)
+    return True
+
+
+@transaction.atomic
+def _refund_failed(refund_pk, error, by=None):
+    """Tpay odrzucił zwrot: kwota wraca na saldo strzelca, zarząd dostaje powiadomienie (ponowienie w panelu)."""
+    refund = TpayRefund.objects.select_for_update(of=("self",)).select_related("payment__user").get(pk=refund_pk)
+    if refund.status not in (TpayRefund.Status.SENDING, TpayRefund.Status.UNKNOWN):
+        return refund
+    refund.status, refund.finished_at, refund.error, refund.resolved_by = TpayRefund.Status.FAILED, timezone.now(), error[:255], by
+    refund.save(update_fields=["status", "finished_at", "error", "resolved_by"])
+    p = refund.payment
+    post(p.user, refund.amount, LedgerEntry.Kind.CHARGEBACK, f"Zwrot Tpay nieudany — kwota wraca na saldo ({refund.reason})"[:255],
+         payment=p, by=by)
+    log_event("platnosc.zwrot_nieudany", p, f"{p}: {error}", actor=by)
+    _notify_tpay_refund_failed(p, refund.amount, error)
+    notify_user(p.user, "Zwrot przez Tpay nie powiódł się", "emails/refund_failed.txt", payment=p, amount=refund.amount,
+                wallet=wallet_enabled())
+    return refund
+
+
+@transaction.atomic
+def resolve_unknown_refund(refund, done, by):
+    """Zarząd oznacza wynik zwrotu „do sprawdzenia” po sprawdzeniu w panelu Tpay."""
+    refund = TpayRefund.objects.select_for_update().get(pk=refund.pk)
+    if refund.status != TpayRefund.Status.UNKNOWN:
+        raise ValidationError("Ten zwrot nie czeka na sprawdzenie.")
+    if not done:
+        return _refund_failed(refund.pk, "oznaczono w panelu: zwrotu nie ma w Tpay", by=by)
+    refund.status, refund.finished_at, refund.resolved_by = TpayRefund.Status.DONE, timezone.now(), by
+    refund.save(update_fields=["status", "finished_at", "resolved_by"])
+    log_event("platnosc.zwrot_potwierdzony", refund.payment, f"{refund}: potwierdzony ręcznie (panel Tpay)", actor=by)
+    return refund
+
+
+def process_refund_queue(now=None):
+    """Harmonogram: wysyła zlecenia, które nie wyszły po zatwierdzeniu (restart, błąd procesu); zawieszone „wysyłane”
+    oznacza do sprawdzenia przez zarząd. Zwraca (wysłane, do_sprawdzenia)."""
+    now = now or timezone.now()
+    sent = 0
+    for pk in TpayRefund.objects.filter(status=TpayRefund.Status.QUEUED, created_at__lte=now - REFUND_RESEND_AFTER).values_list("pk", flat=True):
+        if execute_refund(pk) is not None:
+            sent += 1
+    stuck = 0
+    for refund in TpayRefund.objects.filter(status=TpayRefund.Status.SENDING, sent_at__lte=now - REFUND_STUCK_AFTER).select_related("payment__user"):
+        if TpayRefund.objects.filter(pk=refund.pk, status=TpayRefund.Status.SENDING).update(
+                status=TpayRefund.Status.UNKNOWN, error="brak odpowiedzi Tpay (przerwane wysyłanie)"):
+            _notify_refund_unknown(refund)
+            stuck += 1
+    return sent, stuck
+
+
+def _notify_refund_unknown(refund):
+    p = refund.payment
+    url = reverse("panel:payment", args=[p.pk])
+    what = f"{p.user.full_name}: {refund.amount / 100:.2f} zł"
+    notify_board(f"Zwrot Tpay do sprawdzenia — {p.user.full_name}", "emails/board_generic.txt", "payments.manage_payments", url=url,
+                 body=f"{what}: brak potwierdzenia od Tpay. Sprawdź w panelu Tpay, czy zwrot jest wykonany, i oznacz wynik w panelu.",
+                 event=f"Zwrot Tpay do sprawdzenia — {p.user.full_name}",
+                 text=f"{what} — wysyłanie zwrotu zostało przerwane i nie wiadomo, czy Tpay go przyjął. System NIE ponawia zwrotu "
+                      "automatycznie (ryzyko podwójnego zwrotu). Sprawdź w panelu Tpay (transakcja " + p.external_id.split(":", 1)[-1] +
+                      ") i oznacz wynik: Płatności → wpłata → „Zwrot wykonany” albo „Zwrotu nie ma”.",
+                 url_path=url)
 
 
 def _notify_tpay_refund_failed(payment, amount, error):
@@ -643,10 +767,12 @@ def _notify_tpay_refund_failed(payment, amount, error):
     url = reverse("panel:wallet", args=[user.pk])
     what = f"{user.full_name}: {amount / 100:.2f} zł"
     notify_board(f"Zwrot Tpay nie powiódł się — {user.full_name}", "emails/board_generic.txt", "payments.manage_payments", url=url,
-                 body=f"{what} wróciło na saldo strzelca zamiast na kartę / rachunek ({error}). Ponów: Salda → „Zwróć przez Tpay”.",
+                 body=f"{what} wróciło na saldo strzelca zamiast na kartę / rachunek ({error}). Ponów: Salda → „Zwróć przez Tpay” "
+                      "albo zwróć ręcznie.",
                  event=f"Zwrot Tpay nie powiódł się — {user.full_name}",
-                 text=f"{what} — Tpay odrzucił zwrot ({error}). Kwota jest na saldzie strzelca. Ponów zwrot w panelu: "
-                      f"Płatności → Salda → strzelec → „Zwróć przez Tpay” (np. po uzupełnieniu środków na koncie Tpay).",
+                 text=f"{what} — Tpay odrzucił zwrot ({error}). Strzelec dostał informację, że zwrot zlecono; kwota jest na jego "
+                      "saldzie. Ponów zwrot w panelu: Płatności → Salda → strzelec → „Zwróć przez Tpay” (np. po uzupełnieniu środków "
+                      "na koncie Tpay) albo zwróć ręcznie i zaksięguj zwrot ręczny.",
                  url_path=url)
 
 
@@ -685,9 +811,9 @@ def refundable_overpayments(user):
     out = []
     qs = (Payment.objects.filter(user=user, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED, external_id__startswith="tpay:",
                                  reservation__status="anulowana", reservation__late_cancellation=False)
-          .exclude(ledger_entries__kind=LedgerEntry.Kind.CHARGEBACK).select_related("reservation").order_by("completed_at"))
+          .select_related("reservation").order_by("completed_at"))
     for p in qs:
-        if (p.raw or {}).get("zwrot_api") or balance <= 0:
+        if refund_outstanding(p) or (p.raw or {}).get("zwrot_api") or balance <= 0:
             continue
         amount = min(p.amount - p.surcharge, balance)  # bez opłaty za płatność online
         if amount <= 0:

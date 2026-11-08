@@ -206,7 +206,7 @@ def tpay_notify(request):
                 payment.save(update_fields=["note", "status"])
             else:
                 services.complete_payment(payment)
-        elif status == "chargeback" and payment.status == Payment.Status.COMPLETED and not payment.ledger_entries.filter(kind=LedgerEntry.Kind.CHARGEBACK).exists():
+        elif status == "chargeback" and payment.status == Payment.Status.COMPLETED and not services.refund_outstanding(payment):
             services.post(payment.user, -payment.amount, LedgerEntry.Kind.CHARGEBACK, f"Zwrot płatności Tpay {fields.get('tr_id', '')}", payment=payment)
             log_event("platnosc.zwrot_tpay", payment, str(payment))
     return HttpResponse("TRUE")
@@ -242,6 +242,18 @@ def panel_payments(request):
 @panel_required(PERM)
 def panel_payment(request, pk):
     payment = get_object_or_404(Payment.objects.select_related("user", "reservation", "created_by"), pk=pk)
+    if request.method == "POST" and request.POST.get("action") in ("refund_done", "refund_missing"):
+        from .models import TpayRefund
+
+        refund = get_object_or_404(TpayRefund, pk=request.POST.get("refund"), payment=payment)
+        try:
+            services.resolve_unknown_refund(refund, request.POST["action"] == "refund_done", request.user)
+        except ValidationError as e:
+            messages.error(request, e.messages[0])
+        else:
+            messages.success(request, "Zapisano: zwrot wykonany w Tpay." if request.POST["action"] == "refund_done"
+                             else "Zapisano: zwrotu nie ma — kwota wróciła na saldo strzelca; możesz go ponowić lub zwrócić ręcznie.")
+        return redirect("panel:payment", pk=payment.pk)
     form = AssignForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
@@ -258,7 +270,8 @@ def panel_payment(request, pk):
         except ValidationError as e:
             messages.error(request, e.messages[0])
         return redirect("panel:payment", pk=payment.pk)
-    return render(request, "panel/payment_detail.html", {"p": payment, "form": form, "ledger": payment.ledger_entries.all()})
+    return render(request, "panel/payment_detail.html", {"p": payment, "form": form, "ledger": payment.ledger_entries.all(),
+                                                         "refunds": payment.tpay_refunds.select_related("created_by", "resolved_by")})
 
 
 @panel_required((PERM, "payments.accept_onsite"))
@@ -331,9 +344,10 @@ def panel_wallet(request, user_pk):
             messages.error(request, "Tej wpłaty nie można już zwrócić (zwrócona wcześniej albo brak nadpłaty).")
         elif services.refund_to_payer(match[0][0], match[0][1], by=request.user,
                                       reason=f"Zwrot nadpłaty za anulowaną rezerwację {match[0][0].reservation.number}"):
-            messages.success(request, f"Zlecono zwrot {match[0][1] / 100:.2f} zł przez Tpay na rachunek / kartę płacącego.")
+            messages.success(request, f"Zlecono zwrot {match[0][1] / 100:.2f} zł przez Tpay na rachunek / kartę płacącego. "
+                                      "Jeśli Tpay go odrzuci, dostaniesz powiadomienie, a kwota wróci na saldo.")
         else:
-            messages.error(request, "Tpay nie przyjął zwrotu — zwróć ręcznie (przelew / panel Tpay) i zaksięguj korektę salda.")
+            messages.error(request, "Tej wpłaty nie można zwrócić przez Tpay — zwróć ręcznie i zaksięguj zwrot ręczny.")
         return redirect("panel:wallet", user_pk=subject.pk)
     refund_form = ManualRefundForm(request.POST if request.POST.get("action") == "manual_refund" else None, prefix="zwrot")
     if request.method == "POST" and request.POST.get("action") == "manual_refund":

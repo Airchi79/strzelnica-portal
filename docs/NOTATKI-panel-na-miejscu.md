@@ -50,5 +50,14 @@ bez opłat; zdjęcie legitymacji usuwane po weryfikacji; tylko dziś, od bieżą
   Kamera z ramką: ocena klatki w przeglądarce (jasność, odblask, ostrość, krawędzie karty przy ramce, bezruch),
   zdjęcie samo po ok. 1 s stabilnego ustawienia, przycisk ręczny po 12 s. Progi w `LIMITS` — do dostrojenia na
   urządzeniu: adres `/kiosk/#diag` pokazuje wskaźniki pod podglądem kamery.
-- Dalej: etap 4 panel obsługi (zatwierdzenie legitymacji i rezerwacji jednym przyciskiem, uporządkowanie
-  powiadomień), etap 5 automatyczne porównanie danych z legitymacji (OCR, zdjęcie do przejrzenia do 7 dni).
+- Etap 4 (panel obsługi): strona weryfikacji dokumentu pokazuje baner „Osoba czeka przy kiosku” z odliczaniem
+  i danymi podanymi w kiosku; takie legitymacje są pierwsze w kolejce; kafelek „Czekają przy kiosku” na stronie
+  głównej panelu; jedno pilne powiadomienie zamiast trzech; `approve_reservation` dla rezerwacji czekającej
+  w kiosku działa wg zasad kiosku (także w trwającej godzinie, potem płatność). W kiosku wystawca jako przyciski
+  PZSS / PZŁ / LOK / Inny, bez pola „ważna do” (uprawnienia PS są bezterminowe; wygaśnięcia, np. po skreśleniu
+  z PZSS, obsługa nie jest w stanie sprawdzić — weryfikator PZSS sprawdza dziś tylko licencje zawodnicze).
+- Etap 5 (do zrobienia) — automatyczne porównanie danych z legitymacji (OCR, Tesseract na serwerze), decyzje:
+  zgodność → zatwierdzenie od razu, oznaczone „automatycznie” do przejrzenia; niezgodność → zwykła weryfikacja
+  (15 min); automat tylko akceptuje (odmowę podejmuje człowiek — art. 22 RODO). Legitymacje LOK i PZSS zawierają
+  PESEL: zdjęcie usuwane od razu także po zatwierdzeniu automatycznym, zapisywane tylko odczytane dane bez PESEL.
+  Odczyt niezależny od układu (wzory: PZŁ „Nr …/PS”, „Kol. …”; LOK „0079/BZGLOK/2022”; PZSS „98655/2024”).

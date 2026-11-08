@@ -215,12 +215,28 @@
   }
 
   // --- 4. legitymacja PS: dane, kamera z ramką, podgląd ---------------------------------------------------------------
+  // Uprawnienia PS są bezterminowe — bez pola „ważna do”. Najczęstsi wystawcy jako przyciski (szybciej, pewniejszy odczyt).
+  const ISSUERS = [["PZSS", "Polski Związek Strzelectwa Sportowego"], ["PZŁ", "Polski Związek Łowiecki"], ["LOK", "Liga Obrony Kraju"], ["Inny", ""]];
+  let issuerPick = "";
+  function renderIssuers() {
+    chips($("[data-os-issuers]"), ISSUERS.map(([label]) => ({ value: label, label })), issuerPick, (v) => {
+      issuerPick = v;
+      const other = $("#os-pi");
+      other.hidden = v !== "Inny";
+      if (v === "Inny") { other.value = ""; other.focus(); }
+      renderIssuers();
+    });
+  }
+  renderIssuers();
+  K.onShow((view) => { if (view === "home") { issuerPick = ""; $("#os-pi").hidden = true; renderIssuers(); } });
   $("[data-os-form=ps]").addEventListener("submit", (e) => {
     e.preventDefault();
     const f = e.target.elements;
-    psData = { number: f.number.value.trim(), issuer: f.issuer.value.trim(), issued_on: f.issued_on.value, valid_until: f.valid_until.value };
+    const known = ISSUERS.find(([label]) => label === issuerPick && label !== "Inny");
+    const issuer = known ? `${known[0]} (${known[1]})` : f.issuer.value.trim();
+    psData = { number: f.number.value.trim(), issuer, issued_on: f.issued_on.value, valid_until: "" };
     if (!psData.number || !psData.issuer || !psData.issued_on) { err("ps", "Podaj numer legitymacji, kto ją wydał i datę wydania."); return; }
-    if (psData.valid_until && psData.valid_until < new Date().toISOString().slice(0, 10)) { err("ps", "Legitymacja jest nieważna (minęła data ważności)."); return; }
+    if (psData.issued_on > new Date().toISOString().slice(0, 10)) { err("ps", "Data wydania nie może być z przyszłości."); return; }
     startCam();
   });
 

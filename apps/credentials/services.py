@@ -18,7 +18,7 @@ def delete_scan(credential):
         credential.scan = ""
 
 
-def submit(credential, changed_fields=None):
+def submit(credential, changed_fields=None, notify=True):
     """Zapis dokumentu przez strzelca. Zmiana danych już zweryfikowanego dokumentu przywraca weryfikację."""
     is_new = credential.pk is None
     if is_new or (changed_fields and set(changed_fields) & set(KEY_FIELDS + ["scan"])):
@@ -35,7 +35,7 @@ def submit(credential, changed_fields=None):
         str(credential),
         changes={"pola": sorted(changed_fields or [])},
     )
-    if credential.status == Credential.Status.PENDING:
+    if credential.status == Credential.Status.PENDING and notify:  # kiosk: osobne, pilne powiadomienie
         notify_board(
             "Nowy dokument do weryfikacji",
             "emails/credential_submitted.txt",

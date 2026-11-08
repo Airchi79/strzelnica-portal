@@ -22,3 +22,14 @@
   if (media && media.addEventListener) media.addEventListener("change", sync);
   sync();
 })();
+
+// Odliczanie do terminu (np. rezerwacja na miejscu czeka przy kiosku na weryfikację legitymacji): <el data-countdown-to="ISO">.
+document.querySelectorAll("[data-countdown-to]").forEach((el) => {
+  const end = new Date(el.dataset.countdownTo).getTime();
+  const tick = () => {
+    const s = Math.max(0, Math.round((end - Date.now()) / 1000));
+    el.textContent = s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : "czas minął";
+    if (s > 0) setTimeout(tick, 1000);
+  };
+  tick();
+});

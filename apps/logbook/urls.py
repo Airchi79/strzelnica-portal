@@ -11,6 +11,7 @@ urlpatterns = [
     path("dolacz/<str:token>/", views.entry_by_companion, name="companion"),
     path("wyjscie/<str:token>/", views.exit_view, name="exit"),
     path("moj-kod/", views.my_qr, name="my_qr"),
+    path("moje-wyjscie/<int:pk>/", views.my_exit, name="my_exit"),
     path("dziennik/", views.my_diary, name="diary"),
     path("osoba/<str:token>/", views.personal_add, name="personal"),
 ]

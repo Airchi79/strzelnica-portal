@@ -153,7 +153,26 @@ def my_qr(request):
         return redirect("logbook:my_qr")
     url = _absolute(request, reverse("logbook:personal", args=[services.personal_token(request.user)]))
     entries = request.user.log_entries.select_related("reservation__lane").order_by("-entered_at")[:50]
-    return render(request, "logbook/my_qr.html", {"qr": qr_svg_data_uri(url, box_size=10), "entries": entries})
+    return render(request, "logbook/my_qr.html", {
+        "qr": qr_svg_data_uri(url, box_size=10), "entries": entries,
+        "open_stays": services.my_open_stays(request.user), "my_reservations": services.my_reservations_for_entry(request.user),
+    })
+
+
+@login_required
+@require_POST
+def my_exit(request, pk):
+    """Zakończenie własnego pobytu z konta (bez kodu QR) — tylko wpis powiązany z kontem i jeszcze otwarty."""
+    entry = services.my_open_stays(request.user).filter(pk=pk).first()
+    if entry is None:
+        messages.info(request, "Ten pobyt jest już zakończony albo nie należy do Twojego konta.")
+    else:
+        try:
+            services.register_exit(entry)
+            messages.success(request, f"Zapisano wyjście ({timezone.localtime(entry.exited_at):%H:%M}). Do zobaczenia!")
+        except ValidationError as e:
+            messages.info(request, e.messages[0])
+    return redirect("logbook:my_qr")
 
 
 @login_required

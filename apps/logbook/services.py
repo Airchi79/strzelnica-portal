@@ -255,6 +255,27 @@ def register_exit(entry, now=None):
     return entry
 
 
+MY_EXIT_HOURS = 36  # jak ważność linku wyjścia z ekranu po wpisie
+
+
+def my_open_stays(user, now=None):
+    """Otwarte pobyty powiązane z kontem (do zakończenia z panelu klienta)."""
+    now = now or timezone.now()
+    return (Entry.objects.filter(user=user, exited_at__isnull=True, entered_at__gte=now - timedelta(hours=MY_EXIT_HOURS))
+            .select_related("reservation__lane").order_by("-entered_at"))
+
+
+def my_reservations_for_entry(user, now=None):
+    """Trwające rezerwacje, w których osoba jest rezerwującym lub przydzielonym prowadzącym, a jeszcze nie ma w nich
+    swojego otwartego wpisu — z linkiem do wpisu bez skanowania kodu (to ten sam link co w kodzie QR rezerwacji)."""
+    from django.db.models import Q
+
+    now = now or timezone.now()
+    entered = Entry.objects.filter(user=user, exited_at__isnull=True).values("reservation_id")
+    qs = open_reservations(now).filter(Q(user=user) | Q(officer=user)).exclude(pk__in=entered)
+    return [(r, reservation_token(r)) for r in qs]
+
+
 def auto_close_at(entry):
     """Kiedy pobyt zamknie się sam (ta sama zasada co close_stale_entries): koniec rezerwacji albo N godzin od wejścia."""
     hours = LogbookSettings.load().auto_exit_hours

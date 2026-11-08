@@ -55,6 +55,14 @@ def kiosk_home(request):
     return response
 
 
+def kiosk_manifest(request):
+    """Osobna aplikacja kiosku (pełny ekran, zakres /kiosk/) — do przypięcia na telefonie lub tablecie."""
+    from django.http import HttpResponse
+    from django.template.loader import render_to_string
+
+    return HttpResponse(render_to_string("kiosk/manifest.webmanifest", request=request), content_type="application/manifest+json")
+
+
 @require_POST
 def kiosk_pair(request):
     try:

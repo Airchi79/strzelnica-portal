@@ -1,7 +1,7 @@
 {% load static %}<!doctype html>
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kiosk — parowanie · {{ SITE_NAME }}</title>
-<link rel="stylesheet" href="{% static 'css/app.css' %}"><meta name="robots" content="noindex"></head>
+<link rel="stylesheet" href="{% static 'css/app.css' %}"><link rel="manifest" href="{% url 'kiosk:manifest' %}"><link rel="icon" href="{{ BRAND.icon_192 }}"><meta name="robots" content="noindex"></head>
 <body class="kiosk">
 <main class="wrap" style="max-width:520px">
   <h1>Parowanie kiosku</h1>

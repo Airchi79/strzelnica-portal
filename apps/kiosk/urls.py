@@ -7,6 +7,7 @@ app_name = "kiosk"
 urlpatterns = [
     path("", views.kiosk_home, name="home"),
     path("parowanie/", views.kiosk_pair, name="pair"),
+    path("manifest.webmanifest", views.kiosk_manifest, name="manifest"),
     path("api/stan/", views.api_state, name="api_state"),
     path("api/wpis/", views.api_entry, name="api_entry"),
     path("api/osoba/<str:token>/", views.api_person, name="api_person"),

@@ -314,10 +314,48 @@
 
   // Interfejs dla modułu rezerwacji na miejscu (kiosk-onsite.js).
   window.SatokKiosk = {
-    api, show, done, openForm, refreshState, onShow: (fn) => showHooks.push(fn),
+    api, show, done, openForm, refreshState, onShow: (fn) => showHooks.push(fn), startSaver: () => startSaver(),
     openReservationIds: () => openReservations().map((r) => r.id),
     isOnline: () => online, current: () => current, camera: () => (body.dataset.camera === "environment" ? "environment" : "user"),
   };
+
+  // --- zabezpieczenia (uzupełnienie przypięcia aplikacji w Androidzie — wyjście z kiosku tylko z PIN-em admina) -----------
+  // Wstecz nie opuszcza kiosku: zamyka okienko albo wraca do ekranu startowego (dane z formularza są czyszczone).
+  history.pushState({ kiosk: 1 }, "", location.href);
+  window.addEventListener("popstate", () => {
+    history.pushState({ kiosk: 1 }, "", location.href);
+    const dlg = $("dialog[open]");
+    if (dlg) dlg.close(); else show("home");
+  });
+  // Żaden link nie wyprowadza poza kiosk (np. w treści regulaminu); bez menu przytrzymania.
+  document.addEventListener("click", (e) => { if (e.target.closest("a[href]")) e.preventDefault(); }, true);
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // Ekran nie gaśnie systemowo (po wygaszeniu telefon pokazałby blokadę PIN i kiosk byłby nieużywalny) —
+  // zamiast tego czarny wygaszacz po bezczynności (na ekranie OLED czarny = prawie bez poboru prądu).
+  async function keepAwake() {
+    try { if ("wakeLock" in navigator && document.visibilityState === "visible") await navigator.wakeLock.request("screen"); } catch (e) { /* brak wsparcia */ }
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") keepAwake(); });
+  keepAwake();
+  const SAVER_MS = 180000;
+  const saver = $("[data-saver]");
+  let saverTimer = null, saverMove = null, swallowClick = false;
+  function moveSaverText() { $("[data-saver-text]").style.top = `${10 + Math.random() * 75}vh`; } // bez wypalania ekranu
+  function armSaver() { clearTimeout(saverTimer); if (current === "home") saverTimer = setTimeout(startSaver, SAVER_MS); }
+  function startSaver() { if (current !== "home") return; saver.hidden = false; moveSaverText(); saverMove = setInterval(moveSaverText, 20000); }
+  function wake(e) {
+    if (!saver.hidden) {
+      saver.hidden = true; clearInterval(saverMove);
+      if (e.type === "pointerdown") { // dotknięcie budzi ekran — nie naciska przycisku pod spodem
+        swallowClick = true;
+        setTimeout(() => { swallowClick = false; }, 700);
+      }
+    }
+    armSaver();
+  }
+  ["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, wake, { passive: true, capture: true }));
+  document.addEventListener("click", (e) => { if (swallowClick) { swallowClick = false; e.preventDefault(); e.stopPropagation(); } }, true);
+  showHooks.push(armSaver);
 
   // --- start ---------------------------------------------------------------------------------------------
   setOnline(online);

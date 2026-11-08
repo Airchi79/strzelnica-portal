@@ -190,3 +190,13 @@ def test_camera_choice_front_by_default_and_set_in_panel(owner_client, paired):
     owner_client.post("/panel/ksiazka/kioski/", {"action": "camera", "device": device.pk, "camera": "zla"})
     device.refresh_from_db()
     assert device.camera == KioskDevice.Camera.BACK
+
+
+def test_kiosk_app_manifest_fullscreen_scoped_to_kiosk(paired):
+    _, c = paired
+    r = c.get("/kiosk/manifest.webmanifest")
+    data = json.loads(r.content)
+    assert r["Content-Type"] == "application/manifest+json"
+    assert data["start_url"] == "/kiosk/" and data["scope"] == "/kiosk/" and data["display"] == "fullscreen"
+    assert 'rel="manifest" href="/kiosk/manifest.webmanifest"' in c.get("/kiosk/").content.decode()
+    assert 'rel="manifest" href="/kiosk/manifest.webmanifest"' in Client().get("/kiosk/").content.decode()  # strona parowania

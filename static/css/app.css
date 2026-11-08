@@ -179,6 +179,12 @@ body.kiosk { font-size: 18px; }
 .kiosk-status.offline { background: var(--bad-bg); color: var(--bad); }
 .kiosk-done { text-align: center; padding: 32px 16px; }
 @media (min-width: 720px) { .kiosk-buttons { grid-template-columns: 1fr 1fr; } }
+/* kiosk: bez zaznaczania tekstu i menu przytrzymania (pola formularza bez zmian); wygaszacz — czarny ekran (OLED) */
+body.kiosk { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+body.kiosk input, body.kiosk textarea, body.kiosk select { -webkit-user-select: text; user-select: text; }
+.kiosk-saver { position: fixed; inset: 0; z-index: 1000; background: #000; color: #555; display: flex; align-items: flex-start; justify-content: center; }
+.kiosk-saver[hidden] { display: none; }
+.kiosk-saver p { position: relative; font-size: 1.1rem; transition: top 1s; }
 /* kiosk: rezerwacja na miejscu */
 .kiosk-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .kiosk-chips button { min-height: 52px; min-width: 64px; font-size: 1.05rem; }

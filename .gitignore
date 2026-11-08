@@ -7,3 +7,6 @@ private_media/
 .pytest_cache/
 backups/
 *.zip
+data/
+tmp/
+*.dump

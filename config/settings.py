@@ -112,6 +112,9 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
         "LOCATION": "cache_table",
+        # Domyślnie 300 wpisów — po przekroczeniu Django usuwa co trzeci wpis, także liczniki limitów prób (można je było
+        # „wypchnąć” wieloma próbami z różnymi adresami). Wygasłe wpisy są usuwane przy zapisie.
+        "OPTIONS": {"MAX_ENTRIES": 100000},
     }
 }
 

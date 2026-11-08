@@ -36,7 +36,7 @@ def user_for_token(token):
 
 
 def _esc(text):
-    return str(text).replace("\\", "\\\\").replace(";", "\;").replace(",", "\\,").replace("\r", "").replace("\n", "\\n")
+    return str(text).replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r", "").replace("\n", "\\n")
 
 
 def build(now=None):

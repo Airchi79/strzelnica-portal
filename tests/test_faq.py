@@ -39,3 +39,11 @@ def test_panel_requires_permission(client):
     u = make_user("bezfaq@example.com", is_staff=True)
     login_with_otp(client, u)
     assert client.get("/panel/pytania/").status_code == 403
+
+
+def test_faq_describes_checkout_flow(db):
+    from apps.core.models import FaqItem
+
+    pay = FaqItem.objects.get(question="Jak mogę zapłacić?").answer
+    assert "5 minut" in pay and "Przelewem tradycyjnym" in pay and "przypomnimy" in pay
+    assert "wybierz sposób płatności" in FaqItem.objects.get(question="Jak zarezerwować oś?").answer

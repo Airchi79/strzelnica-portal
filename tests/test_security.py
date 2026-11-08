@@ -117,3 +117,50 @@ def test_no_inline_handlers_in_templates():
     root = pathlib.Path(__file__).resolve().parent.parent / "templates"
     bad = [str(p) for p in root.rglob("*.html") if re.search(r"\son(click|change|error|load|submit|input)=|javascript:", p.read_text())]
     assert bad == []
+
+
+# --- limity prób: okno liczone od pierwszej próby (wcześniej cache.incr skracał je do 5 minut) ----------------------------
+
+
+def test_rate_limit_window_not_shortened_by_later_attempts(monkeypatch):
+    from apps.accounts import ratelimit
+
+    t0 = 1_000_000.0
+    monkeypatch.setattr(ratelimit, "_now", lambda: t0)
+    for _ in range(5):
+        ratelimit.register_failure("ofiara@example.com", "10.0.0.1")
+    assert ratelimit.is_blocked("ofiara@example.com", "10.0.0.2")
+    monkeypatch.setattr(ratelimit, "_now", lambda: t0 + 600)  # 10 min — nadal w 15-minutowym oknie
+    assert ratelimit.is_blocked("ofiara@example.com", "10.0.0.2")
+    monkeypatch.setattr(ratelimit, "_now", lambda: t0 + 901)  # okno minęło
+    assert not ratelimit.is_blocked("ofiara@example.com", "10.0.0.2")
+
+
+def test_rate_limit_hourly_allow_holds_for_full_hour(monkeypatch):
+    from apps.accounts import ratelimit
+
+    t0 = 2_000_000.0
+    monkeypatch.setattr(ratelimit, "_now", lambda: t0)
+    assert all(ratelimit.allow("reset-mail", "a@example.com", 3) for _ in range(3))
+    assert not ratelimit.allow("reset-mail", "a@example.com", 3)
+    monkeypatch.setattr(ratelimit, "_now", lambda: t0 + 1800)  # pół godziny później — dalej limit
+    assert not ratelimit.allow("reset-mail", "a@example.com", 3)
+    monkeypatch.setattr(ratelimit, "_now", lambda: t0 + 3601)
+    assert ratelimit.allow("reset-mail", "a@example.com", 3)
+
+
+def test_rate_limit_reads_legacy_integer_counter():
+    from django.core.cache import cache
+
+    from apps.accounts import ratelimit
+
+    cache.set(ratelimit._key("email", "stary@example.com"), 5, 900)  # format sprzed zmiany
+    assert ratelimit.is_blocked("stary@example.com", "10.0.0.9")
+    ratelimit.register_failure("stary@example.com", "10.0.0.9")
+    assert ratelimit.count(ratelimit._key("email", "stary@example.com")) == 6
+
+
+def test_cache_does_not_cull_rate_limit_counters():
+    from django.conf import settings
+
+    assert settings.CACHES["default"]["OPTIONS"]["MAX_ENTRIES"] >= 100000

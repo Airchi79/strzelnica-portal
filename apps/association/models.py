@@ -18,7 +18,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
-from apps.credentials.models import private_storage
+from apps.credentials.models import get_private_storage
 
 
 class MembershipSettings(models.Model):
@@ -237,7 +237,7 @@ class Resolution(models.Model):
     votes_against = models.PositiveIntegerField("głosy przeciw (ważone)", default=0)
     votes_abstain = models.PositiveIntegerField("wstrzymujące (ważone)", default=0)
     meeting = models.ForeignKey("GeneralMeeting", null=True, blank=True, on_delete=models.PROTECT, related_name="resolutions")
-    attachment = models.FileField("skan / załącznik (PDF)", storage=private_storage, upload_to="uchwaly/", blank=True)
+    attachment = models.FileField("skan / załącznik (PDF)", storage=get_private_storage, upload_to="uchwaly/", blank=True)
     repealed_by = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="repeals")
 
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT, related_name="+")

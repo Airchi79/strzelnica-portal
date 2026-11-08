@@ -7,7 +7,6 @@ from datetime import timedelta
 from io import BytesIO
 
 from django.core import signing
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
 from django.db.models import Q
@@ -172,15 +171,10 @@ def _next_number(year):
 def check_rate_limit(ip):
     if not ip:
         return
-    key = f"logbook-rl:{ip}"
-    limit = LogbookSettings.load().max_entries_per_hour
-    count = cache.get(key, 0)
-    if count >= limit:
+    from apps.accounts.ratelimit import allow
+
+    if not allow("logbook", ip, LogbookSettings.load().max_entries_per_hour, 3600):
         raise ValidationError("Zbyt wiele wpisów z tego urządzenia. Spróbuj później lub poproś o pomoc prowadzącego strzelanie.")
-    try:
-        cache.incr(key)
-    except ValueError:
-        cache.set(key, 1, 3600)
 
 
 STAFF_BACKDATE_HOURS = 24

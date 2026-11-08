@@ -122,7 +122,7 @@ def format_pln(grosze: int) -> str:
     return f"{zl:,}".replace(",", " ") + (f",{gr:02d}" if gr else "") + " zł"
 
 
-from apps.credentials.models import private_storage  # noqa: E402 — zdjęcia usterek poza publicznym dostępem
+from apps.credentials.models import get_private_storage  # noqa: E402 — zdjęcia usterek poza publicznym dostępem
 
 
 def issue_photo_upload_to(instance, filename):
@@ -146,7 +146,7 @@ class Issue(models.Model):
     title = models.CharField("co się stało", max_length=120)
     description = models.TextField("opis", max_length=2000, blank=True)
     urgent = models.BooleanField("pilne — zagraża bezpieczeństwu albo uniemożliwia strzelanie", default=False)
-    photo = models.FileField("zdjęcie", upload_to=issue_photo_upload_to, blank=True, storage=private_storage)
+    photo = models.FileField("zdjęcie", upload_to=issue_photo_upload_to, blank=True, storage=get_private_storage)
     status = models.CharField("status", max_length=12, choices=Status.choices, default=Status.NEW, db_index=True)
     reported_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="zgłaszający", null=True, blank=True,
                                     on_delete=models.SET_NULL, related_name="reported_issues")

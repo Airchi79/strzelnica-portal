@@ -30,7 +30,7 @@ Publikacja nowej wersji wymaga ponownej akceptacji przez wszystkich strzelców p
 
 1. Rezerwacja obejmuje całą oś w wybranych pełnych godzinach, w granicach godzin otwarcia osi. Godziny otwarcia i opłaty są podane w zakładce „Opłaty”.
 2. Rezerwować można z wyprzedzeniem nie większym niż określone w Systemie. Obsługa może ustalić minimalny czas między rezerwacją online a rozpoczęciem strzelania.
-3. Przy rezerwacji strzelec podaje przewidywaną liczbę osób. Rezerwacja jest potwierdzana w Systemie i wiadomością e-mail.
+3. Przy rezerwacji strzelec podaje przewidywaną liczbę osób. Rezerwacja jest potwierdzana w Systemie i wiadomością e-mail na zasadach określonych w § 6.
 4. Rezerwujący odpowiada za to, aby każdy uczestnik przed rozpoczęciem strzelania wpisał się do książki pobytu (kodem QR rezerwacji, w kiosku lub u obsługi).
 5. Oś może zostać zablokowana przez Stowarzyszenie (zawody, prace, względy bezpieczeństwa). W takim przypadku obsługa może anulować kolidujące rezerwacje — zasady zwrotu określa § 7 ust. 5.
 6. Gdy termin jest zajęty, strzelec może zapisać się na listę oczekujących. Po zwolnieniu terminu pierwsza osoba z listy dostaje wiadomość, a termin jest dla niej zatrzymany przez czas podany w wiadomości.
@@ -43,17 +43,24 @@ Publikacja nowej wersji wymaga ponownej akceptacji przez wszystkich strzelców p
 4. Rezerwacje z kodem klubu rozliczane są według umowy Stowarzyszenia z klubem. Rezerwacja z kodem wejścia (karnet, abonament) wykorzystuje wejście z kodu bez osobnej należności.
 5. Obsługa może zmienić liczbę osób, oś lub termin rezerwacji na prośbę strzelca. Należność zostaje wówczas przeliczona: wyższa kwota oznacza dopłatę, a nadwyżkę zwraca się zgodnie z § 7.
 
-§ 6. Płatności
+§ 6. Płatności i potwierdzenie rezerwacji
 
 1. Należność można zapłacić:
 a) online przez operatora płatności Tpay (BLIK, szybki przelew, karta),
 b) przelewem tradycyjnym na rachunek Stowarzyszenia, z numerem rezerwacji w tytule,
 c) gotówką na miejscu u obsługi.
-Dostępne sposoby płatności mogą zależeć od grupy strzelca i są pokazywane przy rezerwacji.
-2. Jeżeli dla danej grupy dostępna jest wyłącznie płatność online, rezerwację należy opłacić w ciągu 15 minut od jej dokonania, a po zatwierdzeniu przez obsługę — w ciągu 24 godzin od zatwierdzenia, nie później niż do rozpoczęcia strzelania. Nieopłacona w tym czasie rezerwacja zwalnia się automatycznie.
-3. Rezerwację wymagającą zatwierdzenia można opłacić online przed decyzją obsługi. Jeżeli rezerwacja nie zostanie zatwierdzona, wpłata wraca zgodnie z § 7 ust. 4.
-4. Do płatności online może być doliczana opłata za obsługę płatności. Jej wysokość jest widoczna przed zapłatą. Opłata ta pokrywa koszt operatora płatności i nie podlega zwrotowi. Płatność przelewem tradycyjnym lub gotówką na miejscu jest wolna od tej opłaty.
-5. Po zaksięgowaniu wpłaty strzelec może pobrać w Systemie potwierdzenie wpłaty. Potwierdzenie nie jest fakturą ani rachunkiem.
+Dostępne sposoby płatności zależą od grupy strzelca i są pokazywane przy rezerwacji. Jeżeli strzelec ma środki na saldzie (§ 7 ust. 7), są one wykorzystywane w pierwszej kolejności.
+2. Po wybraniu terminu w Systemie termin jest zatrzymywany dla strzelca na 5 minut na wybór sposobu płatności. Jeżeli w tym czasie sposób płatności nie zostanie wybrany, termin wraca do puli.
+3. Rezerwacja dokonana w Systemie zostaje potwierdzona:
+a) przy płatności online — po zaksięgowaniu wpłaty; na dokonanie płatności strzelec ma 15 minut od jej rozpoczęcia, po czym nieopłacony termin wraca do puli,
+b) przy płatności gotówką na miejscu — z chwilą wyboru tego sposobu płatności; należność płaci się u obsługi przed rozpoczęciem strzelania,
+c) przy przelewie tradycyjnym — po zaksięgowaniu wpłaty na rachunku Stowarzyszenia.
+Rezerwacja opłacona w całości ze środków na saldzie jest potwierdzana od razu.
+4. Przelew tradycyjny można wybrać, jeżeli do rozpoczęcia strzelania pozostały co najmniej 4 dni. Wpłata powinna zostać zaksięgowana w ciągu 3 dni od wyboru tego sposobu płatności — termin jest podany w Systemie i w wiadomości e-mail, a dzień wcześniej System przypomina o przelewie. Do czasu zaksięgowania wpłaty termin jest zatrzymany dla strzelca. Jeżeli wpłata nie zostanie zaksięgowana w terminie, obsługa może anulować rezerwację; rezerwacja nieopłacona do rozpoczęcia strzelania zostaje anulowana automatycznie.
+5. Rezerwacja wymagająca zatwierdzenia (§ 3 ust. 3 i 4) jest potwierdzana po decyzji obsługi. Jeżeli System na to pozwala, można ją opłacić online przed decyzją obsługi; jeżeli rezerwacja nie zostanie zatwierdzona, wpłata wraca zgodnie z § 7 ust. 4. Jeżeli dla grupy strzelca dostępna jest wyłącznie płatność online, rezerwację zatwierdzoną przez obsługę należy opłacić w ciągu 24 godzin od zatwierdzenia, nie później niż do rozpoczęcia strzelania; nieopłacona w tym czasie zwalnia się automatycznie.
+6. Wpłaty dokonane za rezerwację, która została zwolniona albo anulowana na zasadach ust. 2–5, zwraca się zgodnie z § 7 ust. 3 i 7.
+7. Do płatności online może być doliczana opłata za obsługę płatności. Jej wysokość jest widoczna przed zapłatą. Opłata ta pokrywa koszt operatora płatności i nie podlega zwrotowi. Płatność przelewem tradycyjnym lub gotówką na miejscu jest wolna od tej opłaty.
+8. Po zaksięgowaniu wpłaty strzelec może pobrać w Systemie potwierdzenie wpłaty. Potwierdzenie nie jest fakturą ani rachunkiem.
 
 § 7. Anulowanie rezerwacji i zwroty
 
@@ -62,7 +69,7 @@ Dostępne sposoby płatności mogą zależeć od grupy strzelca i są pokazywane
 3. Przy anulowaniu bez opłat wpłata online wraca automatycznie na rachunek lub kartę, z których dokonano płatności, za pośrednictwem Tpay — zwykle w ciągu kilku dni roboczych. Wpłaty gotówką i przelewem tradycyjnym zwraca obsługa w uzgodniony sposób.
 4. Jeżeli rezerwacja nie zostanie zatwierdzona, wpłata wraca na zasadach z ust. 3.
 5. Jeżeli rezerwację anuluje Stowarzyszenie z przyczyn niezależnych od strzelca (w szczególności blokada osi, awaria, względy bezpieczeństwa), strzelec otrzymuje zwrot całej wpłaty za rezerwację na zasadach z ust. 3.
-6. Zwrot nie obejmuje opłaty za obsługę płatności online, o której mowa w § 6 ust. 4.
+6. Zwrot nie obejmuje opłaty za obsługę płatności online, o której mowa w § 6 ust. 7.
 7. Jeżeli w Systemie włączone jest saldo strzelca, wpłaty, których nie można zwrócić automatycznie (gotówka, przelew tradycyjny), wracają na saldo strzelca i mogą zostać wykorzystane na kolejne opłaty. Na życzenie strzelca obsługa zwraca środki z salda w uzgodniony sposób.
 
 § 8. Wydarzenia i zawody
@@ -89,8 +96,14 @@ Dostępne sposoby płatności mogą zależeć od grupy strzelca i są pokazywane
 
 =====
 NOTATKA DLA ZARZĄDU (nie wklejać):
-- § 6 ust. 2 i § 7 ust. 1: liczby 15 minut, 24 godziny i 24 godziny to wartości domyślne Systemu — porównaj z Rezerwacje → Ustawienia rezerwacji i popraw, jeśli są inne.
-- § 6 ust. 4 i § 7 ust. 6 (opłata za płatność online): zostaw, jeśli planujesz ją włączyć — wtedy przypomnienie w panelu zniknie. Jeśli opłaty nie będzie, możesz te ustępy usunąć.
+- § 6 ust. 2–5 i § 7 ust. 1: liczby to wartości domyślne Systemu — porównaj z Rezerwacje → Ustawienia rezerwacji i popraw, jeśli są inne:
+  5 minut = „czas na wybór płatności”, 15 minut = „czas na płatność online”, 3 dni = „przelew tradycyjny: czas na zaksięgowanie”,
+  4 dni = „czas na zaksięgowanie” + „najpóźniej [h] przed terminem” (3 dni + 24 h), 24 godziny w § 6 ust. 5 = „czas na płatność po zatwierdzeniu”,
+  24 godziny w § 7 ust. 1 = „strzelec może sam anulować do [h] przed terminem”.
+- § 6 ust. 1: sposoby płatności dla grup ustawiasz w Rezerwacje → Ustawienia rezerwacji → Grupy strzelców (obecnie gotówka na miejscu:
+  członkowie i powracający; nie dotyczy rezerwacji czekających na zatwierdzenie). Regulamin celowo tego nie wymienia — zmiana ustawień nie wymaga nowej wersji.
+- § 6 ust. 4: przelew po terminie nie jest anulowany automatycznie — zarząd dostaje powiadomienie, importuje wyciąg albo anuluje rezerwację.
+- § 6 ust. 7 i § 7 ust. 6 (opłata za płatność online): zostaw, jeśli planujesz ją włączyć — wtedy przypomnienie w panelu zniknie. Jeśli opłaty nie będzie, możesz te ustępy usunąć.
 - § 3 ust. 3 (prowadzący od strzelnicy) jest sformułowany warunkowo („jeżeli Stowarzyszenie udostępnia”), więc może zostać, nawet gdy opcja jest wyłączona.
 - § 1 ust. 4 i charakter opłat przy stowarzyszeniu zwykłym — do potwierdzenia z księgową / prawnikiem.
 - Projekt przygotowany na podstawie działania Systemu; nie jest opinią prawną.

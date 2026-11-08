@@ -18,6 +18,12 @@ class PrivateStorage(LazyObject):
 private_storage = PrivateStorage()
 
 
+def get_private_storage():
+    """Magazyn prywatny dla pól plików. Podawany jako funkcja, żeby migracje nie zapisywały ścieżki zależnej od środowiska
+    (PRIVATE_MEDIA_ROOT jest inny na serwerze, w testach i lokalnie)."""
+    return private_storage
+
+
 def scan_upload_to(instance, filename):
     ext = Path(filename).suffix.lower()[:5]
     return f"scans/{uuid.uuid4().hex}{ext}"
@@ -47,7 +53,7 @@ class Credential(models.Model):
     details = models.CharField(
         "szczegóły", max_length=255, blank=True, help_text="Np. cel pozwolenia (sportowy, kolekcjonerski, łowiecki)."
     )
-    scan = models.FileField("skan (do weryfikacji)", storage=private_storage, upload_to=scan_upload_to, blank=True)
+    scan = models.FileField("skan (do weryfikacji)", storage=get_private_storage, upload_to=scan_upload_to, blank=True)
 
     status = models.CharField("status", max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True)
     review_note = models.CharField("uwagi weryfikującego", max_length=255, blank=True)

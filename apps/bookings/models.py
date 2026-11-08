@@ -30,7 +30,8 @@ class BookingSettings(models.Model):
     )
     transfer_days = models.PositiveIntegerField(
         "przelew tradycyjny: czas na zaksięgowanie [dni]", default=3,
-        help_text="Rezerwacja „oczekuje na przelew” najwyżej tyle dni; potem termin się zwalnia.",
+        help_text="Rezerwacja „oczekuje na przelew” tyle dni (dzień przed terminem strzelec dostaje przypomnienie). Po terminie "
+                  "zarząd dostaje powiadomienie do decyzji; bez decyzji rezerwacja zwalnia się w chwili rozpoczęcia.",
     )
     transfer_cutoff_hours = models.PositiveIntegerField(
         "przelew tradycyjny: najpóźniej [h] przed terminem", default=24,

@@ -123,8 +123,9 @@ def panel_members(request):
         w = csv.writer(response, delimiter=";")
         w.writerow(["Nr", "Imię", "Nazwisko", "E-mail", "Rodzaj", "Status", "Funkcja", "Data przyjęcia", "Założyciel"])
         for m in qs:
-            w.writerow([m.number, m.first_name, m.last_name, m.contact_email, m.get_kind_display(), m.get_status_display(),
-                        m.get_board_role_display() if m.board_role else "", m.joined_on, "tak" if m.founder else ""])
+            w.writerow([_csv_safe(v) for v in (m.number, m.first_name, m.last_name, m.contact_email, m.get_kind_display(),
+                        m.get_status_display(), m.get_board_role_display() if m.board_role else "", m.joined_on or "",
+                        "tak" if m.founder else "")])
         return response
     stats = services.membership_stats()
     page = Paginator(qs, 50).get_page(request.GET.get("page"))
@@ -584,3 +585,9 @@ def panel_month_stats(request):
     data.update({"prev_m": f"{py}-{pm:02d}", "next_m": f"{ny}-{nm:02d}", "this_m": f"{year}-{month:02d}",
                  "is_future": (ny, nm) > (today.year, today.month)})
     return render(request, "panel/month_stats.html", data)
+
+
+def _csv_safe(value):
+    """Ochrona przed wstrzyknięciem formuł do arkusza (CSV injection) — dane z deklaracji wpisują sami zainteresowani."""
+    value = str(value)
+    return "'" + value if value[:1] in ("=", "+", "-", "@", "\t", "\r") else value

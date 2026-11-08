@@ -479,3 +479,10 @@ def test_month_stats_occupancy_and_comparison(owner_client):
     response = owner_client.get(f"/panel/raporty/miesiac/?m={y}-{m:02d}")
     assert response.status_code == 200 and "Obłożenie osi" in response.content.decode()
     assert owner_client.get("/panel/raporty/miesiac/?m=zle").status_code == 200
+
+
+def test_members_csv_neutralizes_formulas(owner_client, board):
+    m = board[0]
+    Member.objects.filter(pk=m.pk).update(first_name="=HYPERLINK(\"http://x\")", last_name="+48")
+    body = owner_client.get("/panel/czlonkowie/?format=csv").content.decode("utf-8-sig")
+    assert "'=HYPERLINK" in body and ";'+48;" in body

@@ -101,6 +101,7 @@ urlpatterns = [
     path("ksiazka/ustawienia/nowy-kod/", logbook_views.panel_rotate_gate, name="logbook_rotate"),
     path("ksiazka/plakat/", logbook_views.panel_gate_poster, name="logbook_poster"),
     path("ksiazka/<int:pk>/", logbook_views.panel_detail, name="logbook_entry"),
+    path("ksiazka/<int:pk>/korekta/", logbook_views.panel_correct, name="logbook_correct"),
     path("platnosci/", payments_views.panel_payments, name="payments"),
     path("platnosci/wplata/", payments_views.panel_manual, name="payment_manual"),
     path("platnosci/import/", payments_views.panel_import, name="payment_import"),

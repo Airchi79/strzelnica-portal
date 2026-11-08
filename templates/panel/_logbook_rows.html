@@ -2,7 +2,7 @@
   <tr class="head"><th>Wejście</th><th>Osoba</th><th>Pozwolenie / adres</th><th>Cel</th><th>Wyjście</th></tr>
   {% for e in rows %}
   <tr><td><a href="{% url 'panel:logbook_entry' e.pk %}">{{ e.entered_at|date:"j.m H:i" }}</a><div class="small muted code">{{ e.number }}</div></td>
-    <td data-label="Osoba">{{ e.full_name }}{% if e.source == 'obsluga' %}<div class="small muted">wpis obsługi</div>{% endif %}</td>
+    <td data-label="Osoba">{{ e.full_name }}{% if e.source == 'obsluga' %}<div class="small muted">wpis obsługi</div>{% endif %}{% if e.corrected_fields %} <span class="badge warn" title="Wpis skorygowany — historia w szczegółach">skorygowano</span>{% endif %}{% if e.purpose == 'strzelanie' and not e.reservation_id %} <span class="badge warn">bez rezerwacji</span>{% endif %}</td>
     <td data-label="Pozwolenie / adres">{% if e.revealed or reveal %}{% if e.has_permit %}{{ e.permit_number }}<div class="small muted">{{ e.permit_issuer }}</div>{% else %}{{ e.address }}{% endif %}{% else %}<span class="muted">{{ e.identity_masked }}</span>
       {% if query is not None %}<form method="post" action="?{{ query }}" class="inline-reveal">{% csrf_token %}<input type="hidden" name="pokaz" value="w{{ e.pk }}"><button class="link-btn small" type="submit" title="Pokaż dane tej osoby (zapisuje wgląd)">Pokaż</button></form>{% endif %}{% endif %}</td>
     <td data-label="Cel">{{ e.get_purpose_display }}{% if e.purpose_note %}<div class="small muted">{{ e.purpose_note }}</div>{% endif %}</td>

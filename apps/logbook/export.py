@@ -10,7 +10,7 @@ from openpyxl.utils import get_column_letter
 HEADERS = [
     "Nr wpisu", "Wejście", "Wyjście", "Wyjście automatyczne", "Imię", "Nazwisko", "Nr pozwolenia na broń", "Organ wydający",
     "Adres", "Cel pobytu", "Opis celu", "Rezerwacja", "Oś", "Prowadzący strzelanie", "Sposób wpisu", "Wpisał (obsługa)",
-    "Wersja regulaminu", "Oświadczenie i podpis", "Integralność",
+    "Wersja regulaminu", "Oświadczenie i podpis", "Integralność", "Korekty (pola)",
 ]
 
 
@@ -40,7 +40,8 @@ def entries_xlsx(entries):
             r.number if r else "", str(r.lane) if r else "", e.range_officer.full_name if e.range_officer else "",
             e.get_source_display(), e.created_by.full_name if e.created_by else "",
             e.regulation_version.number if e.regulation_version else "", "złożone (podpis w systemie)",
-            "zgodna" if e.integrity_ok else "NIEZGODNOŚĆ",
+            "zgodna" if getattr(e, "integrity_original", e.integrity_ok) else "NIEZGODNOŚĆ",
+            ", ".join(sorted(getattr(e, "corrected_fields", ()))),
         ]])
     for row in ws.iter_rows(min_row=2, min_col=2, max_col=3):
         for cell in row:

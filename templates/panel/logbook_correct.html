@@ -1,0 +1,12 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Korekta {{ e.number }}{% endblock %}
+{% block panel %}
+<h1>Korekta wpisu {{ e.number }}</h1>
+<p class="muted">Wejście {{ e.entered_at|date:"j.m.Y H:i" }} · {{ e.get_purpose_display }}{% if e.reservation %} · {{ e.reservation.number }}{% endif %}.
+Oryginalny wpis i podpis pozostają bez zmian — korekta zapisze się osobno, z Twoim nazwiskiem, datą i powodem, i będzie widoczna w historii wpisu, na wydruku i w eksporcie.
+Zmień tylko pola, które wymagają poprawy.</p>
+<form method="post" class="card" novalidate>{% csrf_token %}
+  {% include "partials/form.html" %}
+  <div class="actions"><button class="btn" type="submit">Zapisz korektę</button><a class="btn secondary" href="{% url 'panel:logbook_entry' e.pk %}">Anuluj</a></div>
+</form>
+{% endblock %}

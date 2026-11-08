@@ -123,6 +123,7 @@ class Entry(models.Model):
             ("view_logbook", "Może przeglądać i drukować książkę pobytu"),
             ("manage_logbook", "Może zmieniać ustawienia książki pobytu i kod QR wejścia"),
             ("staff_entry", "Może dodawać wpisy w imieniu osób przebywających na strzelnicy"),
+            ("correct_entry", "Może korygować wpisy w książce pobytu (z powodem, oryginał pozostaje)"),
         ]
         constraints = [
             models.CheckConstraint(
@@ -130,8 +131,11 @@ class Entry(models.Model):
                 | (models.Q(has_permit=False) & ~models.Q(address="")),
                 name="entry_permit_or_address",
             ),
+            # Strzelanie bez rezerwacji — tylko wpis w kiosku na strzelnicy (np. strzelanie poza godzinami), z podanym
+            # prowadzącym w opisie celu; zdalnie (kod QR rezerwacji, telefon) zawsze w ramach rezerwacji.
             models.CheckConstraint(
-                condition=~models.Q(purpose="strzelanie") | models.Q(reservation__isnull=False),
+                condition=~models.Q(purpose="strzelanie") | models.Q(reservation__isnull=False)
+                | (models.Q(source="urzadzenie") & ~models.Q(purpose_note="")),
                 name="entry_shooting_needs_reservation",
             ),
         ]
@@ -177,6 +181,34 @@ class Entry(models.Model):
             hashlib.sha256(bytes(self.signature)).hexdigest() == self.signature_sha256
             and self.compute_content_hash() == self.content_sha256
         )
+
+
+class EntryCorrection(models.Model):
+    """Korekta wpisu. Wpis pozostaje niezmieniony (podpis i suma kontrolna), a korekta jest osobnym, niezmienialnym
+    zapisem — jak skreślenie z adnotacją i parafą w papierowej książce. Panel, wydruk i eksport pokazują wartości po
+    korektach z oznaczeniem; historia: pole, było, jest, kto, kiedy i dlaczego."""
+
+    FIELDS = [
+        ("first_name", "imię"), ("last_name", "nazwisko"), ("permit_number", "numer pozwolenia na broń"),
+        ("permit_issuer", "organ, który wydał pozwolenie"), ("address", "adres"),
+        ("purpose_note", "opis celu / prowadzący strzelanie"), ("exited_at", "wyjście"),
+    ]
+
+    entry = models.ForeignKey(Entry, on_delete=models.PROTECT, related_name="corrections", verbose_name="wpis")
+    field = models.CharField("pole", max_length=20, choices=FIELDS)
+    old_value = models.CharField("było", max_length=255, blank=True)
+    new_value = models.CharField("jest", max_length=255, blank=True)
+    reason = models.CharField("powód korekty", max_length=255)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", verbose_name="korygujący")
+    created_at = models.DateTimeField("data korekty", auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        verbose_name = "korekta wpisu"
+        verbose_name_plural = "korekty wpisów"
+
+    def __str__(self):
+        return f"{self.entry.number}: {self.get_field_display()}"
 
 
 class ArchivedEntry(models.Model):

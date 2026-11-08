@@ -22,7 +22,7 @@
   <thead><tr><th>Nr wpisu</th><th>Wejście</th><th>Wyjście</th><th>Imię i nazwisko</th><th>Nr pozwolenia i organ / adres</th><th>Cel pobytu</th><th>Prowadzący strzelanie / oś</th><th>Oświadczenie i podpis</th></tr></thead>
   <tbody>
   {% for e, sig in rows %}
-  <tr><td>{{ e.number }}</td><td>{{ e.entered_at|date:"d.m.Y H:i" }}</td><td>{{ e.exited_at|time:"H:i"|default:"" }}</td>
+  <tr><td>{{ e.number }}{% if e.corrected_fields %}*{% endif %}</td><td>{{ e.entered_at|date:"d.m.Y H:i" }}</td><td>{{ e.exited_at|time:"H:i"|default:"" }}</td>
     <td>{{ e.full_name }}</td>
     <td>{% if e.has_permit %}{{ e.permit_number }}, {{ e.permit_issuer }}{% else %}{{ e.address }}{% endif %}</td>
     <td>{{ e.get_purpose_display }}{% if e.purpose_note %}: {{ e.purpose_note }}{% endif %}</td>
@@ -31,5 +31,6 @@
   {% empty %}<tr><td colspan="8">Brak wpisów w wybranym okresie.</td></tr>{% endfor %}
   </tbody>
 </table>
+<p>* wpis skorygowany przez obsługę — pokazano wartości po korekcie; oryginał wpisu, podpis i historia korekt (kto, kiedy, dlaczego) są przechowywane w systemie.</p>
 <script src="{% static 'js/app.js' %}" defer></script>
 </body></html>

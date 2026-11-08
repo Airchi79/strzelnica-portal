@@ -62,7 +62,7 @@ def verified_flow(device, email="nowy@example.com"):
     return flow
 
 
-def test_new_person_full_flow_waits_for_ps_and_is_confirmed_after_review(device, lane, owner, now):
+def test_new_person_full_flow_waits_for_ps_and_awaits_payment_after_review(device, lane, owner, now):
     flow = verified_flow(device)
     user = User.objects.get(email="nowy@example.com")
     assert flow.user == user and user.email_verified and not user.has_usable_password() and user.phone == "600 700 800"
@@ -79,7 +79,8 @@ def test_new_person_full_flow_waits_for_ps_and_is_confirmed_after_review(device,
     r.refresh_from_db()
     flow.refresh_from_db()
     credential.refresh_from_db()
-    assert r.status == Reservation.Status.CONFIRMED and flow.status == OnsiteBooking.Status.BOOKED
+    # po weryfikacji: termin trzymany do płatności (etap 2), przebieg w kiosku zakończony rezerwacją
+    assert r.status == Reservation.Status.HOLD and flow.status == OnsiteBooking.Status.BOOKED
     assert not credential.scan  # zdjęcie usunięte po weryfikacji
     with pytest.raises(ValidationError, match="już złożona"):
         onsite.book(flow, lane.pk, 12, 13, 1, now=now)
@@ -229,3 +230,108 @@ def test_api_flow_and_isolation(kiosk, owner):
                                                       "end_hour": 11, "persons": 1})
     assert r.status_code == 400 and "oś" in r.json()["error"]
     assert c.post("/kiosk/api/na-miejscu/stan/", "{}", content_type="application/json").status_code == 400  # bez nagłówka
+
+
+# --- etap 2: płatność kodem QR na własnym telefonie ---------------------------------------------------------------
+
+
+def _fake_tpay(monkeypatch, captured):
+    from apps.payments import tpay
+
+    def fake_create(**kw):
+        captured.update(kw)
+        return {"transaction_id": "01K", "title": "TR-K", "payment_url": "https://secure.sandbox.tpay.com/?title=TR-K"}
+
+    monkeypatch.setattr(tpay, "create_transaction", fake_create)
+
+
+def test_after_ps_review_reservation_waits_for_payment_with_qr(device, lane, owner, now, settings):
+    settings.TPAY_ENABLED = True
+    flow = verified_flow(device)
+    credential = onsite.submit_ps(flow, "PS-9", "PZSS", "2020-05-01", "", photo_data_url())
+    r = onsite.book(flow, lane.pk, 10, 12, 2, now=now)
+    credential_services.review(credential, owner, approve=True)
+    r.refresh_from_db()
+    flow.refresh_from_db()
+    assert r.status == Reservation.Status.HOLD and r.pay_by and not r.needs_approval and r.approved_by == owner
+    st = onsite.state(flow)
+    assert flow.status == OnsiteBooking.Status.BOOKED
+    assert st["pay"]["url"].startswith(settings.SITE_URL) and st["pay"]["qr"].startswith("data:image/svg+xml")
+    assert st["pay"]["amount_due"] == r.amount and st["reservation"]["paid"] is False
+
+
+def test_current_hour_onsite_booking_holds_until_end_not_start(device, lane):
+    ps = make_user("ps@example.com")
+    add_credential(ps)
+    approve(ps)
+    day = timezone.localdate() + timedelta(days=7)
+    inside = bookings.local_dt(day, 10) + timedelta(minutes=40)  # trwająca godzina 10–11
+    flow = verified_flow(device, email="ps@example.com")
+    r = onsite.book(flow, lane.pk, 10, 11, 1, now=inside)
+    assert r.status == Reservation.Status.HOLD and r.pay_by > inside  # nie wygasa od razu
+    r = bookings.start_online_payment(r, now=inside)
+    assert inside < r.pay_by <= r.ends_at
+
+
+def test_onsite_approval_allowed_during_reservation(device, lane, owner):
+    day = timezone.localdate() + timedelta(days=7)
+    booked_at = bookings.local_dt(day, 10) + timedelta(minutes=5)
+    flow = verified_flow(device)
+    onsite.submit_ps(flow, "PS-9", "PZSS", "2020-05-01", "", photo_data_url())
+    r = onsite.book(flow, lane.pk, 10, 11, 1, now=booked_at)
+    with pytest.raises(ValidationError, match="minął"):
+        bookings.approve_reservation(r, by=owner, now=booked_at + timedelta(minutes=5))  # zwykłe zatwierdzenie odmawia
+    r = onsite.approve_for_payment(r, owner, now=booked_at + timedelta(minutes=5))
+    assert r.status == Reservation.Status.HOLD and r.pay_by <= r.ends_at
+    with pytest.raises(ValidationError, match="nie czeka"):
+        onsite.approve_for_payment(r, owner, now=booked_at + timedelta(minutes=6))
+
+
+def test_unpaid_after_approval_released(device, lane, owner, now):
+    flow = verified_flow(device)
+    credential = onsite.submit_ps(flow, "PS-9", "PZSS", "2020-05-01", "", photo_data_url())
+    r = onsite.book(flow, lane.pk, 10, 11, 1, now=now)
+    credential_services.review(credential, owner, approve=True)
+    r.refresh_from_db()
+    bookings.expire_unpaid(now=r.pay_by + timedelta(minutes=1))
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CANCELLED
+
+
+def test_guest_pay_link_starts_tpay_without_login(client, device, lane, now, settings, monkeypatch):
+    from apps.payments.models import Payment
+
+    settings.TPAY_ENABLED = True
+    ps = make_user("ps@example.com")
+    add_credential(ps)
+    approve(ps)
+    flow = verified_flow(device, email="ps@example.com")
+    r = onsite.book(flow, lane.pk, 10, 11, 1, now=now)
+    token = onsite.pay_token(r)
+    body = client.get(f"/platnosci/rezerwacja/{token}/").content.decode()
+    assert r.number in body and "Zapłać online" in body and ps.email not in body
+    captured = {}
+    _fake_tpay(monkeypatch, captured)
+    response = client.post(f"/platnosci/rezerwacja/{token}/")
+    assert response.status_code == 302 and response.url.startswith("https://secure.sandbox.tpay.com/")
+    payment = Payment.objects.get()
+    assert payment.user == ps and payment.reservation == r and payment.amount >= r.amount
+    assert captured["success_url"].endswith(f"/platnosci/rezerwacja/{token}/wynik/?wynik=ok")
+    assert client.get(f"/platnosci/rezerwacja/{token}/wynik/?wynik=ok").status_code == 200
+    assert client.get("/platnosci/rezerwacja/zly-token/").status_code == 404
+
+
+def test_guest_pay_refuses_paid_or_cancelled(client, device, lane, now, settings):
+    settings.TPAY_ENABLED = True
+    ps = make_user("ps@example.com")
+    add_credential(ps)
+    approve(ps)
+    flow = verified_flow(device, email="ps@example.com")
+    r = onsite.book(flow, lane.pk, 10, 11, 1, now=now)
+    bookings.cancel_reservation(r, by=ps, as_board=True, reason="test")
+    body = client.get(f"/platnosci/rezerwacja/{onsite.pay_token(r)}/").content.decode()
+    assert "nie czeka na płatność" in body
+    client.post(f"/platnosci/rezerwacja/{onsite.pay_token(r)}/")
+    from apps.payments.models import Payment
+
+    assert not Payment.objects.exists()

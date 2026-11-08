@@ -97,30 +97,14 @@ def tpay_start(request):
             Reservation, pk=request.POST["reservation"], user=request.user, payment_status=Reservation.Payment.DUE,
             status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL, Reservation.Status.HOLD],
         )
-        from apps.bookings.models import BookingSettings
-        from apps.bookings.services import payment_options
-
-        if reservation.status == Reservation.Status.PENDING_APPROVAL and not BookingSettings.load().prepay_before_approval:
-            messages.error(request, "Za tę rezerwację zapłacisz po zatwierdzeniu przez obsługę — dostaniesz e-mail.")
+        try:
+            amount = services.reservation_online_amount(reservation, request.user)
+        except ValidationError as e:
+            messages.error(request, e.messages[0])
             return redirect("bookings:detail", pk=reservation.pk)
-        if not payment_options(reservation)["online"]:
-            messages.error(request, "Dla tej rezerwacji płatność online nie jest dostępna — skorzystaj z instrukcji płatności.")
-            return redirect("bookings:detail", pk=reservation.pk)
-        services.use_wallet_for_reservation(reservation, by=request.user)  # saldo najpierw (gdy włączone)
-        reservation.refresh_from_db()
-        if reservation.status == Reservation.Status.HOLD:
-            from apps.bookings.services import start_online_payment
-
-            if reservation.pay_by and reservation.pay_by < timezone.now() and reservation.pay_method != Reservation.PayMethod.TRANSFER:
-                messages.error(request, "Czas na wybór płatności minął — termin wrócił do puli. Zarezerwuj ponownie.")
-                return redirect("bookings:detail", pk=reservation.pk)
-            reservation = start_online_payment(reservation)  # termin trzymany na czas płatności w Tpay
-        amount = max(reservation.amount - reservation.paid_amount - max(services.balance_of(request.user), 0), 0)
         if amount == 0:
-            services.apply_wallet(request.user, targets=[reservation])
             messages.success(request, "Rezerwacja została opłacona z salda.")
             return redirect("bookings:detail", pk=reservation.pk)
-        amount = max(amount, 100)  # minimalna kwota transakcji
     else:
         if not services.wallet_enabled():
             messages.error(request, "Doładowanie salda jest wyłączone — zapłać za konkretną rezerwację lub składkę.")
@@ -130,34 +114,52 @@ def tpay_start(request):
             messages.error(request, form.errors["amount"][0])
             return redirect("payments:wallet")
         amount = form.cleaned_data["amount"]
-    surcharge = services.online_fee(amount)
-    amount += surcharge
-    payment = Payment.objects.create(
-        user=request.user, amount=amount, surcharge=surcharge, method=Payment.Method.TPAY, reservation=reservation, fee=fee, event_registration=registration,
-        title=reservation.number if reservation else (fee.label if fee else (registration.label if registration else services.topup_code(request.user))),
-        created_by=request.user,
-    )
-    base = settings.SITE_URL
     try:
-        tx = tpay.create_transaction(
-            amount_grosze=amount,
-            description="Strzelnica Sątok — " + (f"rezerwacja {reservation.number}" if reservation else (fee.label if fee else (registration.label if registration else "doładowanie salda")))[:100],
-            hidden_description=str(payment.pk),
-            payer_email=request.user.email,
-            payer_name=request.user.full_name,
-            notification_url=base + reverse("payments:tpay_notify"),
-            success_url=base + reverse("payments:tpay_return", args=[payment.pk]) + "?wynik=ok",
-            error_url=base + reverse("payments:tpay_return", args=[payment.pk]) + "?wynik=blad",
-        )
-    except tpay.TpayError as e:
-        Payment.objects.filter(pk=payment.pk).update(status=Payment.Status.FAILED, note=str(e)[:255])
+        url = services.start_tpay(request.user, amount, reservation=reservation, fee=fee, registration=registration)
+    except tpay.TpayError:
         messages.error(request, "Nie udało się połączyć z Tpay. Spróbuj ponownie później lub zapłać przelewem.")
         return redirect("payments:wallet")
-    Payment.objects.filter(pk=payment.pk).update(
-        external_id=f"tpay:{tx['transaction_id']}", raw={"tpay_title": tx["title"], "sandbox": bool(settings.TPAY_SANDBOX)}
-    )
-    log_event("platnosc.tpay_start", payment, f"{amount / 100:.2f} zł")
-    return redirect(tx["payment_url"])
+    return redirect(url)
+
+
+def guest_pay(request, token):
+    """Płatność za rezerwację na miejscu z kodu QR w kiosku — na telefonie osoby, bez logowania (link podpisany, ważny
+    krótko). Kwota i zasady jak przy płatności z konta (saldo najpierw, opłata za płatność online)."""
+    from apps.kiosk.onsite import payable, reservation_from_pay_token
+
+    reservation = reservation_from_pay_token(token)
+    if reservation is None:
+        return render(request, "payments/guest_pay.html", {"invalid": True}, status=404)
+    ctx = {"r": reservation, "token": token, "tpay_enabled": settings.TPAY_ENABLED, "payable": payable(reservation),
+           "due": max(reservation.amount - reservation.paid_amount, 0), **_online_fee_context()}
+    if request.method == "POST" and ctx["payable"] and settings.TPAY_ENABLED:
+        try:
+            amount = services.reservation_online_amount(reservation, reservation.user)
+        except ValidationError as e:
+            ctx["error"] = e.messages[0]
+            return render(request, "payments/guest_pay.html", ctx, status=400)
+        if amount == 0:
+            return redirect("payments:guest_return", token=token)
+        back = settings.SITE_URL + reverse("payments:guest_return", args=[token])
+        try:
+            url = services.start_tpay(reservation.user, amount, reservation=reservation, success_url=back + "?wynik=ok",
+                                      error_url=back + "?wynik=blad")
+        except tpay.TpayError:
+            ctx["error"] = "Nie udało się połączyć z Tpay. Spróbuj ponownie za chwilę."
+            return render(request, "payments/guest_pay.html", ctx, status=502)
+        return redirect(url)
+    return render(request, "payments/guest_pay.html", ctx)
+
+
+def guest_return(request, token):
+    from apps.kiosk.onsite import reservation_from_pay_token
+
+    reservation = reservation_from_pay_token(token)
+    if reservation is None:
+        return render(request, "payments/guest_pay.html", {"invalid": True}, status=404)
+    paid = reservation.payment_status != Reservation.Payment.DUE or reservation.paid_amount >= reservation.amount
+    return render(request, "payments/guest_return.html", {"r": reservation, "paid": paid, "ok": request.GET.get("wynik") == "ok",
+                                                          "token": token})
 
 
 @login_required

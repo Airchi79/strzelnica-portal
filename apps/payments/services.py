@@ -821,3 +821,67 @@ def refundable_overpayments(user):
         out.append((p, amount))
         balance -= amount
     return out
+
+
+# --- płatność Tpay (wspólne dla konta i linku do płatności z kiosku) --------------------------------------------------
+
+
+def reservation_online_amount(reservation, user, now=None):
+    """Kwota do zapłaty online za rezerwację (po wykorzystaniu salda). 0 — rezerwacja opłacona z salda.
+    ValidationError — płatność online teraz niemożliwa (z powodem dla osoby płacącej)."""
+    from apps.bookings.models import BookingSettings, Reservation
+    from apps.bookings.services import payment_options, start_online_payment
+
+    now = now or timezone.now()
+    if reservation.status == Reservation.Status.PENDING_APPROVAL and not BookingSettings.load().prepay_before_approval:
+        raise ValidationError("Za tę rezerwację zapłacisz po zatwierdzeniu przez obsługę — dostaniesz e-mail.")
+    if not payment_options(reservation)["online"]:
+        raise ValidationError("Dla tej rezerwacji płatność online nie jest dostępna — skorzystaj z instrukcji płatności.")
+    use_wallet_for_reservation(reservation, by=user)  # saldo najpierw (gdy włączone)
+    reservation.refresh_from_db()
+    if reservation.status == Reservation.Status.HOLD:
+        if reservation.pay_by and reservation.pay_by < now and reservation.pay_method != Reservation.PayMethod.TRANSFER:
+            raise ValidationError("Czas na wybór płatności minął — termin wrócił do puli. Zarezerwuj ponownie.")
+        reservation = start_online_payment(reservation)  # termin trzymany na czas płatności w Tpay
+    amount = max(reservation.amount - reservation.paid_amount - max(balance_of(user), 0), 0)
+    if amount == 0:
+        apply_wallet(user, targets=[reservation])
+        return 0
+    return max(amount, 100)  # minimalna kwota transakcji
+
+
+def start_tpay(user, amount, *, reservation=None, fee=None, registration=None, success_url=None, error_url=None):
+    """Nowa płatność Tpay (z doliczoną opłatą za płatność online). Zwraca adres bramki; przy błędzie bramki płatność jest
+    oznaczana jako nieudana i zgłaszany jest tpay.TpayError."""
+    from django.conf import settings
+
+    from . import tpay
+
+    surcharge = online_fee(amount)
+    amount += surcharge
+    label = reservation.number if reservation else (fee.label if fee else (registration.label if registration else topup_code(user)))
+    payment = Payment.objects.create(
+        user=user, amount=amount, surcharge=surcharge, method=Payment.Method.TPAY, reservation=reservation, fee=fee,
+        event_registration=registration, title=label, created_by=user,
+    )
+    base = settings.SITE_URL
+    back = base + reverse("payments:tpay_return", args=[payment.pk])
+    try:
+        tx = tpay.create_transaction(
+            amount_grosze=amount,
+            description="Strzelnica Sątok — " + (f"rezerwacja {reservation.number}" if reservation else (fee.label if fee else (registration.label if registration else "doładowanie salda")))[:100],
+            hidden_description=str(payment.pk),
+            payer_email=user.email,
+            payer_name=user.full_name,
+            notification_url=base + reverse("payments:tpay_notify"),
+            success_url=success_url or back + "?wynik=ok",
+            error_url=error_url or back + "?wynik=blad",
+        )
+    except tpay.TpayError as e:
+        Payment.objects.filter(pk=payment.pk).update(status=Payment.Status.FAILED, note=str(e)[:255])
+        raise
+    Payment.objects.filter(pk=payment.pk).update(
+        external_id=f"tpay:{tx['transaction_id']}", raw={"tpay_title": tx["title"], "sandbox": bool(settings.TPAY_SANDBOX)}
+    )
+    log_event("platnosc.tpay_start", payment, f"{amount / 100:.2f} zł")
+    return tx["payment_url"]

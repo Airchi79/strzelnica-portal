@@ -17,6 +17,7 @@ from io import BytesIO
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core import signing
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.validators import validate_email
 from django.db import transaction
@@ -27,7 +28,8 @@ from apps.accounts import ratelimit
 from apps.audit.services import log_event
 from apps.bookings import services as bookings
 from apps.bookings.models import Reservation
-from apps.core.notifications import _send, notify_board
+from apps.core.notifications import _send, notify_board, notify_user
+from apps.core.qr import qr_svg_data_uri
 from apps.credentials.models import Credential, is_range_officer
 from apps.facilities.models import Lane
 from apps.regulations.models import Acceptance, pending_acceptances
@@ -43,6 +45,8 @@ STARTS_PER_EMAIL_PER_HOUR = 3
 RETENTION_DAYS = 7
 MAX_PHOTO_BYTES = 4 * 1024 * 1024
 MIN_PHOTO_SIDE = 480
+PAY_SALT = "kiosk-onsite-pay"
+PAY_LINK_MINUTES = 120  # link do płatności z kodu QR w kiosku (na telefonie osoby)
 
 # Oświadczenie przed rezerwacją. Celowo bez art. 233 k.k. (fałszywe zeznania) — dotyczy on oświadczeń składanych tylko
 # tam, gdzie ustawa przewiduje odebranie oświadczenia pod rygorem odpowiedzialności karnej, a rezerwacja na strzelnicy
@@ -341,9 +345,74 @@ def state(flow, now=None):
             "number": r.number, "status": r.status, "status_label": r.get_status_display(), "amount": r.amount,
             "label": f"{r.lane} · {timezone.localtime(r.starts_at):%H:%M}–{timezone.localtime(r.ends_at):%H:%M}",
         }
+        out["reservation"]["paid"] = r.payment_status != Reservation.Payment.DUE or r.paid_amount >= r.amount
+        out.update(payment_info(r, now))
     if flow.status == OnsiteBooking.Status.AWAITING and flow.awaiting_until:
         out["seconds_left"] = max(int((flow.awaiting_until - now).total_seconds()), 0)
     return out
+
+
+# --- płatność kodem QR na telefonie osoby -----------------------------------------------------------------------------
+
+
+def pay_token(reservation):
+    return signing.dumps({"r": reservation.pk}, salt=PAY_SALT, compress=True)
+
+
+def reservation_from_pay_token(token):
+    try:
+        data = signing.loads(token, salt=PAY_SALT, max_age=PAY_LINK_MINUTES * 60)
+        return Reservation.objects.select_related("lane", "user").get(pk=data["r"])
+    except (signing.BadSignature, KeyError, TypeError, Reservation.DoesNotExist):
+        return None
+
+
+def payable(reservation):
+    return (reservation.payment_status == Reservation.Payment.DUE and reservation.amount > reservation.paid_amount
+            and reservation.status in (Reservation.Status.HOLD, Reservation.Status.CONFIRMED))
+
+
+def payment_info(reservation, now=None):
+    """Dla kiosku: kod QR z linkiem do płatności na własnym telefonie (BLIK, przelew online) albo informacja,
+    jak zapłacić, gdy płatność online nie jest dostępna dla tej rezerwacji."""
+    if not payable(reservation):
+        return {}
+    due = reservation.amount - reservation.paid_amount
+    until = timezone.localtime(reservation.pay_by).strftime("%H:%M") if reservation.status == Reservation.Status.HOLD and reservation.pay_by else ""
+    if settings.TPAY_ENABLED and bookings.payment_options(reservation, now)["online"]:
+        url = settings.SITE_URL + reverse("payments:guest_pay", args=[pay_token(reservation)])
+        return {"pay": {"url": url, "qr": qr_svg_data_uri(url, box_size=6), "amount_due": due, "until": until}}
+    return {"pay_info": {"amount_due": due, "until": until,
+                         "text": bookings.payment_options(reservation, now)["instructions"] or
+                         "Płatność online jest niedostępna — skontaktuj się z obsługą strzelnicy."}}
+
+
+@transaction.atomic
+def approve_for_payment(reservation, by, now=None):
+    """Zatwierdzenie rezerwacji na miejscu po weryfikacji legitymacji: także w trakcie trwającej godziny (inaczej niż
+    zwykłe zatwierdzenie). Nieopłacona — termin trzymany do płatności online (czas z ustawień); opłacona — potwierdzona."""
+    now = now or timezone.now()
+    cfg = bookings.BookingSettings.load()
+    r = Reservation.objects.select_for_update().get(pk=reservation.pk)
+    if r.status != Reservation.Status.PENDING_APPROVAL:
+        raise ValidationError("Ta rezerwacja nie czeka na zatwierdzenie.")
+    if r.ends_at <= now:
+        raise ValidationError("Rezerwacja już się zakończyła — nie można jej zatwierdzić.")
+    r.approved_at, r.approved_by, r.needs_approval = now, by, False
+    if r.payment_status == Reservation.Payment.DUE and r.amount > r.paid_amount:
+        r.status = Reservation.Status.HOLD
+        r.pay_by = min(now + timedelta(minutes=cfg.online_payment_minutes or 15), bookings.hold_limit(r.starts_at, r.ends_at, now))
+    else:
+        r.status, r.pay_by = Reservation.Status.CONFIRMED, None
+    r.save(update_fields=["approved_at", "approved_by", "needs_approval", "status", "pay_by", "updated_at"])
+    log_event("rezerwacja.zatwierdzenie", r, f"{r} (na miejscu, po weryfikacji legitymacji)", actor=by)
+    if r.status == Reservation.Status.HOLD:
+        info = payment_info(r, now)
+        notify_user(r.user, f"Legitymacja zweryfikowana — opłać rezerwację {r.number}", "emails/onsite_approved.txt",
+                    reservation=r, pay_url=info.get("pay", {}).get("url", ""), pay_until=info.get("pay", {}).get("until", ""))
+    else:
+        bookings._notify_created(r, False)
+    return r
 
 
 # --- po weryfikacji legitymacji i zadania okresowe -----------------------------------------------------------------
@@ -360,7 +429,7 @@ def credential_reviewed(credential, reviewer):
             continue
         if credential.status == Credential.Status.VERIFIED:
             try:
-                bookings.approve_reservation(r, by=reviewer)
+                approve_for_payment(r, by=reviewer)
             except ValidationError as e:  # np. termin już minął — obsługa zobaczy rezerwację w panelu
                 log_event("kiosk.na_miejscu_blad", r, "; ".join(e.messages), actor=reviewer)
                 continue

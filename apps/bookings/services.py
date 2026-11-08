@@ -327,7 +327,7 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
                 ),
                 status=status,
                 needs_approval=pending,
-                pay_by=min(now + timedelta(minutes=cfg.hold_minutes or 5), q["starts_at"]) if hold else None,
+                pay_by=min(now + timedelta(minutes=cfg.hold_minutes or 5), hold_limit(q["starts_at"], q["ends_at"], now)) if hold else None,
                 client_group=group or "",
                 series=series,
             )
@@ -663,6 +663,12 @@ def choose_payment(reservation, user, method, now=None):
     raise ValidationError("Nieznany sposób płatności.")
 
 
+def hold_limit(starts_at, ends_at, now):
+    """Do kiedy najdłużej trzymać termin do płatności: do rozpoczęcia rezerwacji, a dla już trwającej (rezerwacja
+    na miejscu w bieżącej godzinie) — do jej końca."""
+    return starts_at if starts_at > now else ends_at
+
+
 def start_online_payment(reservation, now=None):
     """Wejście do płatności online: termin trzymany dodatkowe minuty (BLIK, logowanie do banku)."""
     now = now or timezone.now()
@@ -670,7 +676,7 @@ def start_online_payment(reservation, now=None):
     if r.status != Reservation.Status.HOLD:
         return r
     cfg = BookingSettings.load()
-    until = min(now + timedelta(minutes=cfg.online_payment_minutes or 15), r.starts_at)
+    until = min(now + timedelta(minutes=cfg.online_payment_minutes or 15), hold_limit(r.starts_at, r.ends_at, now))
     Reservation.objects.filter(pk=r.pk).update(pay_method=Reservation.PayMethod.ONLINE,
                                                pay_by=max(r.pay_by, until) if r.pay_by else until)
     r.refresh_from_db()

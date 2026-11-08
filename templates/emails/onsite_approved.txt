@@ -1,0 +1,12 @@
+{% autoescape off %}Dzień dobry {{ user.first_name }},
+
+Twoja legitymacja prowadzącego strzelanie została zweryfikowana, a rezerwacja {{ reservation.number }}
+({{ reservation.lane }}, {{ reservation.starts_at|date:"j.m.Y H:i" }}–{{ reservation.ends_at|time:"H:i" }}) czeka na płatność.
+{% if pay_url %}
+Zapłać kodem QR na ekranie kiosku albo tym linkiem{% if pay_until %} do {{ pay_until }}{% endif %}:
+{{ pay_url }}
+{% endif %}
+Bez płatności w tym czasie termin wróci do puli.
+
+Stowarzyszenie „STRZELNICA SĄTOK”
+{% endautoescape %}

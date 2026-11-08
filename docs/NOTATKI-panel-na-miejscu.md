@@ -40,5 +40,11 @@ bez opłat; zdjęcie legitymacji usuwane po weryfikacji; tylko dziś, od bieżą
 - Zatwierdzenie legitymacji w module dokumentów potwierdza czekającą rezerwację, odrzucenie ją anuluje
   (`credential_reviewed`). Wygaszanie i czyszczenie danych: `expire_reservations` (co minutę).
 - Treść oświadczenia: `onsite.STATEMENT_TEXT` — do akceptacji przez właściciela.
-- Dalej: etap 2 płatność kodem QR na własnym telefonie, etap 3 ekrany kiosku (ramka kamery, automatyczne zdjęcie),
+- Etap 2 (płatność): po weryfikacji legitymacji `onsite.approve_for_payment` — termin trzymany do płatności online
+  (czas z ustawień „płatność online”), także w trakcie trwającej godziny; kiosk pokazuje kod QR z linkiem
+  `/platnosci/rezerwacja/<token>/` (podpisany, ważny 2 h) — płatność Tpay na telefonie osoby, bez logowania.
+  Wspólna logika z płatnością z konta: `payments.services.reservation_online_amount` i `start_tpay`.
+  Nieopłacona w czasie — zwalniana przez `expire_reservations`. Termin trzymany dla rezerwacji w bieżącej godzinie
+  liczony do jej końca (`bookings.hold_limit`), nie do początku.
+- Dalej: etap 3 ekrany kiosku (ramka kamery, automatyczne zdjęcie),
   etap 4 panel obsługi, etap 5 (propozycja) automatyczne porównanie danych z legitymacji (OCR).

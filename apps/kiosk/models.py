@@ -75,6 +75,8 @@ class OnsiteBooking(models.Model):
     credential = models.ForeignKey("credentials.Credential", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     reservation = models.ForeignKey("bookings.Reservation", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     awaiting_until = models.DateTimeField("czeka na weryfikację do", null=True, blank=True, db_index=True)
+    # Wynik automatycznego porównania danych z legitymacją (bez odczytanego tekstu — legitymacje zawierają PESEL).
+    ocr_result = models.CharField("automatyczne porównanie z legitymacją", max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 

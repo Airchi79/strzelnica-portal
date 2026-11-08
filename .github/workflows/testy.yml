@@ -41,6 +41,8 @@ jobs:
             requirements-dev.txt
       - name: Zależności
         run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Tesseract (odczyt legitymacji w kiosku — jak w obrazie produkcyjnym)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-pol
       - name: Zaległe migracje
         run: python manage.py makemigrations --check --dry-run
       - name: Kontrola konfiguracji

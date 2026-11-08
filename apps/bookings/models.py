@@ -210,6 +210,9 @@ class Reservation(models.Model):
 
     pay_method = models.CharField("wybrany sposób płatności", max_length=10, choices=PayMethod.choices, blank=True)
     needs_approval = models.BooleanField("po opłaceniu czeka na zatwierdzenie", default=False)
+    # Przelew tradycyjny: przypomnienie strzelcowi przed terminem i powiadomienie zarządu po terminie (decyzja obsługi).
+    pay_reminder_sent_at = models.DateTimeField("przypomnienie o przelewie wysłano", null=True, blank=True)
+    overdue_notified_at = models.DateTimeField("zarząd powiadomiony o braku przelewu", null=True, blank=True)
     # Rozliczenie po zakończeniu: dopłata, gdy w książce pobytu było więcej strzelających niż zadeklarowano.
     settled_at = models.DateTimeField("rozliczono po terminie", null=True, blank=True)
     declared_persons = models.PositiveIntegerField("zadeklarowana liczba osób", null=True, blank=True)
@@ -275,8 +278,14 @@ class Reservation(models.Model):
         if self.is_finished and self.status != self.Status.HOLD:
             return "Zakończona"
         if self.status == self.Status.HOLD and self.pay_method == self.PayMethod.TRANSFER:
-            return "Oczekuje na przelew"
+            return "Przelew po terminie — do decyzji obsługi" if self.transfer_overdue else "Oczekuje na przelew"
         return self.get_status_display()
+
+    @property
+    def transfer_overdue(self):
+        """Przelew tradycyjny niezaksięgowany w terminie — rezerwacja czeka na decyzję obsługi (import wyciągu / anulowanie)."""
+        return (self.status == self.Status.HOLD and self.pay_method == self.PayMethod.TRANSFER
+                and self.pay_by is not None and self.pay_by < timezone.now())
 
     @property
     def free_cancel_deadline(self):

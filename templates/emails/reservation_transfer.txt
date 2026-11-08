@@ -1,7 +1,8 @@
 {% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
 
 Twoja rezerwacja czeka na przelew. Termin jest dla Ciebie trzymany do zaksięgowania wpłaty, najpóźniej do {{ reservation.pay_by|date:"j.m.Y H:i" }}.
-Po zaksięgowaniu dostaniesz potwierdzenie rezerwacji. Bez wpłaty w tym terminie rezerwacja zostanie anulowana, a termin wróci do puli.
+Po zaksięgowaniu dostaniesz potwierdzenie rezerwacji. Dzień przed terminem przypomnimy o przelewie. Bez wpłaty w tym terminie
+obsługa może anulować rezerwację, a termin wróci do puli.
 
 {% include "emails/_reservation_summary.txt" %}
 Dane do przelewu:

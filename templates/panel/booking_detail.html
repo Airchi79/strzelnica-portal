@@ -24,6 +24,10 @@
   <tr><th>Płatność</th><td>{{ r.get_payment_status_display }}{% if r.payment_marked_by %}<div class="small muted">{{ r.payment_marked_by.full_name }}, {{ r.payment_marked_at|date:"j.m.Y H:i" }}</div>{% endif %}</td></tr>
   {% if r.notes %}<tr><th>Uwagi</th><td>{{ r.notes }}</td></tr>{% endif %}
   <tr><th>Utworzono</th><td>{{ r.created_at|date:"j.m.Y H:i" }}{% if r.client_group %} · grupa: {{ r.client_group }}{% endif %}{% if r.approved_at %}<div class="small muted">zatwierdzona {{ r.approved_at|date:"j.m.Y H:i" }}{% if r.approved_by %}, {{ r.approved_by.full_name }}{% endif %}</div>{% endif %}</td></tr>
+  {% if r.status == 'oczekuje' and r.pay_by %}<tr><th>{% if r.pay_method == 'przelew' %}Przelew do{% else %}Trzymana do{% endif %}</th><td><span class="badge warn">{{ r.pay_by|date:"j.m.Y H:i" }}</span>
+    {% if r.transfer_overdue %}<span class="small"><strong>termin minął</strong> — zaimportuj wyciąg (po zaksięgowaniu rezerwacja potwierdzi się sama); jeśli wpłaty nie ma, anuluj rezerwację niżej. Bez decyzji zwolni się w chwili rozpoczęcia.</span>
+    {% elif r.pay_method == 'przelew' %}<span class="small muted">— po terminie dostaniesz powiadomienie do decyzji</span>
+    {% else %}<span class="small muted">— potem termin zwolni się automatycznie</span>{% endif %}</td></tr>{% endif %}
   {% if r.pay_by and r.payment_status == 'do_zaplaty' and r.status == 'potwierdzona' %}<tr><th>Opłać do</th><td><span class="badge warn">{{ r.pay_by|date:"j.m.Y H:i" }}</span> <span class="small muted">— potem rezerwacja zwolni się automatycznie</span></td></tr>{% endif %}
 </table></div>
 
@@ -99,6 +103,9 @@
 {% if started %}
 <div class="card"><form method="post">{% csrf_token %}<button class="btn secondary" name="action" value="no_show">Oznacz jako nieodbytą</button></form></div>
 {% endif %}
+{% endif %}
+{% if r.status == 'potwierdzona' or r.status == 'oczekuje' %}
+{% if r.status == 'oczekuje' %}<h2>Anulowanie</h2>{% endif %}
 <div class="card">
   <form method="post" data-confirm="Anulować rezerwację {{ r.number }}? Strzelec otrzyma e-mail.">{% csrf_token %}<input type="hidden" name="action" value="cancel">
     {% include "partials/form.html" with form=cancel_form %}

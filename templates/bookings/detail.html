@@ -6,10 +6,14 @@
   <div class="res-banner gray"><strong>Rezerwacja anulowana</strong>{% if r.cancel_reason %}<span>{{ r.cancel_reason }}</span>{% endif %}</div>
 {% elif r.status == 'nieodbyta' %}
   <div class="res-banner gray"><strong>Rezerwacja nieodbyta</strong></div>
+{% elif r.status == 'oczekuje' and r.pay_method == 'przelew' and r.transfer_overdue %}
+  <div class="res-banner warn"><strong>Termin przelewu minął — do zapłaty {{ remaining|pln }}</strong>
+    <span>{% if r.paid_amount %}Zaksięgowaliśmy {{ r.paid_amount|pln }} z {{ r.amount|pln }}. {% endif %}Jeśli przelew został wysłany, rezerwacja zostanie potwierdzona po jego zaksięgowaniu — termin nadal jest trzymany.
+      Bez wpłaty obsługa może anulować rezerwację. Możesz też zapłacić online poniżej.</span></div>
 {% elif r.status == 'oczekuje' and r.pay_method == 'przelew' %}
   <div class="res-banner warn"><strong>Oczekuje na przelew — {{ remaining|pln }}</strong>
-    <span>Termin jest trzymany dla Ciebie do zaksięgowania przelewu, najpóźniej do {{ r.pay_by|date:"j.m.Y H:i" }}. Potem rezerwacja zostanie potwierdzona e-mailem
-      — a bez wpłaty termin wróci do puli.</span></div>
+    <span>{% if r.paid_amount %}Zaksięgowaliśmy {{ r.paid_amount|pln }} z {{ r.amount|pln }}. {% endif %}Termin jest trzymany dla Ciebie do zaksięgowania przelewu, najpóźniej do {{ r.pay_by|date:"j.m.Y H:i" }}. Potem rezerwacja zostanie potwierdzona e-mailem
+      — a bez wpłaty obsługa może ją anulować i termin wróci do puli.</span></div>
 {% elif r.status == 'oczekuje' %}
   <div class="res-banner warn"><strong>Termin zarezerwowany dla Ciebie — wybierz sposób płatności</strong>
     <span>{% if r.pay_method == 'online' %}Płatność online w toku — termin trzymany do {{ r.pay_by|date:"H:i" }}.{% else %}Masz czas do {{ r.pay_by|date:"H:i" }}{% endif %}

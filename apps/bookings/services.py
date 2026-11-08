@@ -638,7 +638,10 @@ def choose_payment(reservation, user, method, now=None):
         if not options["transfer_deadline"]:
             raise ValidationError("Na przelew tradycyjny jest za późno — zapłać online" + (" albo gotówką na miejscu." if options["cash"] else "."))
         r.pay_method, r.pay_by = method, options["transfer_deadline"]
-        r.save(update_fields=["pay_method", "pay_by", "updated_at"])
+        # Przypomnienie przed terminem tylko wtedy, gdy do terminu zostało więcej niż doba (inaczej wystarczy ten e-mail).
+        r.pay_reminder_sent_at = now if r.pay_by - now <= TRANSFER_REMINDER_BEFORE else None
+        r.overdue_notified_at = None
+        r.save(update_fields=["pay_method", "pay_by", "pay_reminder_sent_at", "overdue_notified_at", "updated_at"])
         log_event("rezerwacja.przelew", r, f"{r.number}: przelew do {timezone.localtime(r.pay_by):%d.%m %H:%M}", actor=user)
         from apps.core.models import AssociationSettings
 
@@ -677,17 +680,94 @@ def confirm_after_payment(reservation, by=None):
     return r
 
 
+TRANSFER_REMINDER_BEFORE = timedelta(hours=24)
+
+
 def _expire_hold(r, now):
-    """Wygasła blokada terminu: anulowanie (wpłata z salda wraca na saldo). Bez trwającej płatności Tpay.
-    Porzucony wybór płatności — bez e-maili; nieopłacony przelew / płatność online — z powiadomieniem."""
+    """Wygasła blokada terminu. Zwraca True, gdy rezerwację zwolniono.
+
+    - Trwająca płatność Tpay (ostatnie 30 min) — czekamy.
+    - Przelew tradycyjny po terminie — NIE zwalniamy automatycznie: przelew mógł zostać wysłany, a księguje go dopiero
+      import wyciągu przez zarząd. Zarząd dostaje powiadomienie (raz) i decyduje; automatycznie zwalnia się dopiero
+      w chwili rozpoczęcia, jeśli nadal nie jest opłacona.
+    - Pozostałe (porzucony wybór płatności, nieopłacona płatność online) — zwolnienie z rozliczeniem wpłat."""
     from apps.payments.models import Payment
 
     if Payment.objects.filter(reservation=r, status=Payment.Status.PENDING, created_at__gte=now - timedelta(minutes=30)).exists():
         return False
-    abandoned = not r.pay_method
-    cancel_reservation(r, None, "Czas na wybór płatności minął" if abandoned else "Nieopłacona w wyznaczonym terminie",
-                       as_board=True, now=now, expired=True, notify=not abandoned)
+    if r.pay_method == Reservation.PayMethod.TRANSFER and r.starts_at > now:
+        _notify_transfer_overdue(r, now)
+        return False
+    _release_hold(r, now)
     return True
+
+
+def _release_hold(r, now):
+    """Zwolnienie wygasłej blokady terminu. Wpłaty za rezerwację (z salda, przelew częściowy, Tpay) są rozliczane jak przy
+    anulowaniu bez opłat: Tpay wraca na kartę / rachunek, reszta na saldo (gdy włączone) albo zarząd dostaje przypomnienie
+    o zwrocie ręcznym. Porzucony wybór płatności bez wpłat — bez e-maili."""
+    from apps.payments.services import wallet_enabled
+
+    if r.pay_method == Reservation.PayMethod.TRANSFER:
+        reason = "Przelew nie został zaksięgowany przed rozpoczęciem"
+    elif r.pay_method:
+        reason = "Nieopłacona w wyznaczonym terminie"
+    else:
+        reason = "Czas na wybór płatności minął"
+    paid = r.paid_amount
+    r = cancel_reservation(r, None, reason, as_board=True, now=now, expired=True, notify=False)
+    refunded = manual = to_wallet = 0
+    if paid:
+        wallet = wallet_enabled()
+        refunded, rest = refund_paid_to_payer(r, paid, None, f"Zwolniono rezerwację {r.number}", remind_manual=not wallet)
+        to_wallet, manual = (rest, 0) if wallet else (0, rest)
+    if r.pay_method or paid:
+        _notify_cancelled(r, expired=True, refunded=refunded, manual=manual, to_wallet=to_wallet)
+    return r
+
+
+def _notify_transfer_overdue(r, now):
+    """Termin przelewu minął: zarząd decyduje (import wyciągu albo anulowanie); strzelec dostaje informację. Raz."""
+    updated = Reservation.objects.filter(pk=r.pk, overdue_notified_at__isnull=True).update(overdue_notified_at=now)
+    if not updated:
+        return
+    r.refresh_from_db()
+    remaining = max(r.amount - r.paid_amount, 0)
+    paid_note = f" Zaksięgowano {r.paid_amount / 100:.2f} zł z {r.amount / 100:.2f} zł." if r.paid_amount else ""
+    url = reverse("panel:reservation", args=[r.pk])
+    title = f"Przelew po terminie: {r.number} ({r.lane}, {timezone.localtime(r.starts_at):%d.%m %H:%M})"
+    notify_board(
+        title, "emails/board_generic.txt", PERM, url=url,
+        body=f"{r.user.full_name}: do zapłaty {remaining / 100:.2f} zł.{paid_note} Zaimportuj wyciąg — po zaksięgowaniu rezerwacja "
+             "potwierdzi się sama. Jeśli wpłaty nie ma, anuluj rezerwację (bez decyzji zwolni się w chwili rozpoczęcia).",
+        event=title,
+        text=f"{r.user.full_name} wybrał przelew tradycyjny z terminem {timezone.localtime(r.pay_by):%d.%m.%Y %H:%M}. Do zapłaty "
+             f"{remaining / 100:.2f} zł.{paid_note}\nZaimportuj wyciąg bankowy (Płatności → Import wyciągu) — po zaksięgowaniu "
+             "rezerwacja potwierdzi się sama. Jeśli wpłaty nie ma, anuluj rezerwację w panelu, żeby zwolnić termin. "
+             "Bez decyzji rezerwacja zwolni się automatycznie w chwili rozpoczęcia.",
+        url_path=url,
+    )
+    notify_user(r.user, f"Rezerwacja {r.number}: termin przelewu minął", "emails/reservation_transfer_overdue.txt",
+                reservation=r, remaining=remaining)
+
+
+def send_transfer_reminders(now=None):
+    """Przypomnienie strzelcowi o przelewie na dobę przed terminem zaksięgowania (raz)."""
+    from apps.core.models import AssociationSettings
+
+    now = now or timezone.now()
+    qs = Reservation.objects.filter(status=Reservation.Status.HOLD, pay_method=Reservation.PayMethod.TRANSFER,
+                                    pay_reminder_sent_at__isnull=True, pay_by__gt=now,
+                                    pay_by__lte=now + TRANSFER_REMINDER_BEFORE).select_related("user", "lane")
+    count = 0
+    for r in qs:
+        with transaction.atomic():
+            if not Reservation.objects.filter(pk=r.pk, pay_reminder_sent_at__isnull=True).update(pay_reminder_sent_at=now):
+                continue
+            notify_user(r.user, f"Przypomnienie: przelew za rezerwację {r.number}", "emails/reservation_transfer_reminder.txt",
+                        reservation=r, options=payment_options(r, now), association=AssociationSettings.load())
+        count += 1
+    return count
 
 
 def release_expired_holds(lane, starts_at, ends_at, now=None):
@@ -937,7 +1017,9 @@ def block_conflicts(lanes, occurrences):
     for start, end in occurrences:
         q |= Q(starts_at__lt=end, ends_at__gt=start)
     return (
-        Reservation.objects.filter(lane__in=lanes, status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL])
+        # także rezerwacje czekające na płatność (przelew trzyma termin do kilku dni) — po zapłacie byłyby potwierdzone w blokadzie
+        Reservation.objects.filter(lane__in=lanes, status__in=[Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL,
+                                                               Reservation.Status.HOLD])
         .filter(q)
         .select_related("lane", "user")
         .order_by("starts_at")

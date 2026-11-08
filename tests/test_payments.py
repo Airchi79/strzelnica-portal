@@ -1206,12 +1206,15 @@ def test_transfer_unavailable_close_to_date_and_expiry(ps):
     assert booking_services.payment_options(r)["transfer_deadline"] is None
     with pytest.raises(ValidationError, match="za późno"):
         booking_services.choose_payment(r, ps, Reservation.PayMethod.TRANSFER)
-    # transfer nieopłacony do terminu → anulowana z powiadomieniem
+    # przelew niezaksięgowany do terminu → NIE zwalnia się sam (decyzja obsługi); zwalnia się dopiero w chwili rozpoczęcia
     r2 = _checkout(ps, days=10, start=13, end=14)
     r2 = booking_services.choose_payment(r2, ps, Reservation.PayMethod.TRANSFER)
-    assert booking_services.expire_unpaid(now=r2.pay_by + timedelta(minutes=1)) >= 1
+    booking_services.expire_unpaid(now=r2.pay_by + timedelta(minutes=1))
     r2.refresh_from_db()
-    assert r2.status == Reservation.Status.CANCELLED
+    assert r2.status == Reservation.Status.HOLD and r2.overdue_notified_at is not None
+    assert booking_services.expire_unpaid(now=r2.starts_at) == 1
+    r2.refresh_from_db()
+    assert r2.status == Reservation.Status.CANCELLED and "przed rozpoczęciem" in r2.cancel_reason
 
 
 def test_checkout_online_confirms_after_payment(client, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
@@ -1282,3 +1285,162 @@ def test_wallet_covers_all_confirmed_immediately_and_partial_hold_refunded_on_ex
     booking_services.expire_unpaid(now=r2.pay_by + timedelta(minutes=1))
     r2.refresh_from_db()
     assert r2.status == Reservation.Status.CANCELLED and services.balance_of(ps) == 7000  # saldo wróciło
+
+
+# --- przelew po terminie (decyzja obsługi), przypomnienie, blokady osi, wpłaty częściowe -----------------------------------
+
+
+def _transfer_hold(ps, days=10, start=13, end=14):
+    r = _checkout(ps, days=days, start=start, end=end)
+    return booking_services.choose_payment(r, ps, Reservation.PayMethod.TRANSFER)
+
+
+def test_transfer_overdue_notifies_board_once_and_keeps_slot(ps, owner, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    from apps.core.models import Notification
+
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r = _transfer_hold(ps)
+    mail.outbox.clear()
+    after = r.pay_by + timedelta(minutes=1)
+    with django_capture_on_commit_callbacks(execute=True):
+        assert booking_services.expire_unpaid(now=after) == 0
+        assert booking_services.expire_unpaid(now=after + timedelta(minutes=5)) == 0  # drugi przebieg — bez ponownych powiadomień
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.HOLD and r.overdue_notified_at == after
+    panel = Notification.objects.filter(channel=Notification.Channel.PANEL, title__startswith="Przelew po terminie")
+    assert panel.count() == Notification.objects.filter(channel="panel").count() == panel.filter(recipient=owner).count() == 1
+    user_mails = [m for m in mail.outbox if m.to == [ps.email]]
+    assert len(user_mails) == 1 and "termin przelewu minął" in user_mails[0].subject
+    # termin nadal zajęty — nikt inny go nie zarezerwuje
+    other = make_user("inny@example.com")
+    add_credential(other, number="PS-2")
+    approve(other)
+    with pytest.raises(ValidationError):
+        booking_services.create_reservation(other, r.lane, timezone.localtime(r.starts_at).date(), 13, 14, 1, now=after)
+    # zaksięgowany przelew po terminie → potwierdzona
+    p = Payment.objects.create(user=ps, amount=r.amount, method=Payment.Method.TRANSFER, reservation=r, title=r.number)
+    services.complete_payment(p, by=owner)
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CONFIRMED and r.payment_status == Reservation.Payment.PAID
+
+
+def test_board_can_cancel_overdue_transfer(client, ps, owner):
+    r = _transfer_hold(ps)
+    Reservation.objects.filter(pk=r.pk).update(pay_by=timezone.now() - timedelta(hours=1))
+    client.force_login(ps)
+    page = client.get(f"/rezerwacje/{r.pk}/").content.decode()
+    assert "Termin przelewu minął" in page and "termin nadal jest trzymany" in page
+    client.logout()
+    login_with_otp(client, owner)
+    page = client.get(f"/panel/rezerwacje/{r.pk}/").content.decode()
+    assert "termin minął" in page and "Anuluj rezerwację" in page
+    client.post(f"/panel/rezerwacje/{r.pk}/", {"action": "cancel", "c-reason": "Brak przelewu", "c-refund_to_payer": "on"})
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CANCELLED
+
+
+def test_transfer_reminder_day_before_deadline(ps, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    r = _transfer_hold(ps)
+    assert r.pay_reminder_sent_at is None
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert booking_services.send_transfer_reminders(now=r.pay_by - timedelta(hours=30)) == 0
+        assert booking_services.send_transfer_reminders(now=r.pay_by - timedelta(hours=20)) == 1
+        assert booking_services.send_transfer_reminders(now=r.pay_by - timedelta(hours=19)) == 0
+    sent = [m for m in mail.outbox if m.to == [ps.email]]
+    assert len(sent) == 1 and r.number in sent[0].body and "Przypomnienie" in sent[0].subject
+
+
+def test_transfer_reminder_skipped_when_deadline_within_a_day(ps):
+    from apps.bookings.models import BookingSettings
+
+    BookingSettings.load()
+    BookingSettings.objects.filter(pk=1).update(transfer_days=1)  # termin przelewu = doba od wyboru — wystarczy e-mail z wyboru
+    r = _transfer_hold(ps)
+    assert r.pay_reminder_sent_at is not None
+    assert booking_services.send_transfer_reminders(now=r.pay_by - timedelta(hours=1)) == 0
+
+
+def test_block_cancels_hold_reservations(ps, owner):
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r = _transfer_hold(ps)
+    lane = r.lane
+    assert [x.pk for x in booking_services.block_conflicts([lane], [(r.starts_at, r.ends_at)])] == [r.pk]
+    booking_services.create_blocks("Zawody", "", [lane], [(r.starts_at, r.ends_at)], owner, cancel_conflicts=True)
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CANCELLED
+
+
+def test_block_without_cancel_notifies_hold_owner(ps, owner, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    r = _transfer_hold(ps)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        booking_services.create_blocks("Prace", "", [r.lane], [(r.starts_at, r.ends_at)], owner, cancel_conflicts=False)
+    assert any(m.to == [ps.email] and "Blokada osi" in m.subject for m in mail.outbox)
+
+
+def test_partial_transfer_counts_towards_hold_and_completes(ps, owner):
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r = _transfer_hold(ps)
+    half = r.amount // 2
+    services.complete_payment(Payment.objects.create(user=ps, amount=half, method=Payment.Method.TRANSFER, reservation=r, title=r.number), by=owner)
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.HOLD and r.paid_amount == half and balance_of(ps) == 0
+    services.complete_payment(Payment.objects.create(user=ps, amount=r.amount - half, method=Payment.Method.TRANSFER, reservation=r,
+                                                     title=r.number), by=owner)
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CONFIRMED and r.payment_status == Reservation.Payment.PAID and r.paid_amount == r.amount
+    assert services.ledger_consistent(ps)
+
+
+def test_partial_transfer_released_at_start_reminds_manual_refund(ps, owner, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    from apps.core.models import Notification
+
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r = _transfer_hold(ps)
+    half = r.amount // 2
+    services.complete_payment(Payment.objects.create(user=ps, amount=half, method=Payment.Method.TRANSFER, reservation=r, title=r.number), by=owner)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert booking_services.expire_unpaid(now=r.starts_at) == 1
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CANCELLED and r.paid_amount == 0 and balance_of(ps) == half
+    assert Notification.objects.filter(channel="panel", title__startswith="Zwrot do wykonania ręcznie").exists()
+    body = [m for m in mail.outbox if m.to == [ps.email] and "anulowana" in m.subject][0].body
+    assert "zwrócimy ręcznie" in body and f"{half // 100}" in body
+    assert services.ledger_consistent(ps)
+
+
+def test_abandoned_hold_with_wallet_part_returns_to_wallet_with_notice(ps, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    services.post(ps, 5000, LedgerEntry.Kind.CORRECTION, "test")
+    r = _checkout(ps)  # saldo włączone: 50 zł pobrane od razu, reszta do zapłaty
+    assert r.status == Reservation.Status.HOLD and r.paid_amount == 5000 and not r.pay_method
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert booking_services.expire_unpaid(now=r.pay_by + timedelta(minutes=1)) == 1
+    r.refresh_from_db()
+    assert r.status == Reservation.Status.CANCELLED and balance_of(ps) == 5000
+    body = [m for m in mail.outbox if m.to == [ps.email]][0].body
+    assert "wróciła na Twoje saldo" in body
+    assert services.ledger_consistent(ps)
+
+
+def test_abandoned_hold_without_money_stays_silent(ps, django_capture_on_commit_callbacks):
+    from django.core import mail
+
+    PaymentSettings.objects.filter(pk=1).update(wallet_enabled=False)
+    r = _checkout(ps)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert booking_services.expire_unpaid(now=r.pay_by + timedelta(minutes=1)) == 1
+    assert not [m for m in mail.outbox if m.to == [ps.email]]

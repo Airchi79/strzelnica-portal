@@ -228,27 +228,37 @@ def _pay_item(user, item, by):
 def use_wallet_for_reservation(reservation, by=None):
     """Saldo najpierw: pobiera z salda strzelca tyle, ile się da (także część należności). Reszta zostaje do zapłaty
     online / przelewem / na miejscu. Tylko przy włączonym saldzie strzelca. Zwraca pobraną kwotę [gr]."""
-    from apps.bookings.models import Reservation
-
     if not wallet_enabled():
         return 0
+    return _apply_to_reservation(reservation, by, "(z salda)", "rezerwacja.z_salda")
+
+
+@transaction.atomic
+def _apply_to_reservation(reservation, by, label, event):
+    """Zalicza środki ze salda strzelca na należność rezerwacji — także częściowo (np. przelew na część kwoty).
+    Opłacona w całości rezerwacja „oczekuje na płatność” zostaje potwierdzona. Zwraca zaliczoną kwotę [gr].
+    Kolejność blokad: rezerwacja, potem saldo (jak przy anulowaniu)."""
+    from apps.bookings.models import Reservation
+
     r = Reservation.objects.select_for_update().get(pk=reservation.pk)
     if r.payment_status != Reservation.Payment.DUE or r.status not in (Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL,
                                                                          Reservation.Status.HOLD):
         return 0
     wallet = _locked_wallet(r.user)
-    part = min(max(wallet.balance, 0), r.amount - r.paid_amount)
-    if part <= 0:
+    part = min(max(wallet.balance, 0), max(r.amount - r.paid_amount, 0))
+    if part > 0:
+        post(r.user, -part, LedgerEntry.Kind.RESERVATION_FEE, f"Opłata za rezerwację {r.number} {label}".strip(), reservation=r, by=by)
+        r.paid_amount += part
+    elif r.paid_amount < r.amount:
         return 0
-    post(r.user, -part, LedgerEntry.Kind.RESERVATION_FEE, f"Opłata za rezerwację {r.number} (z salda)", reservation=r, by=by)
-    r.paid_amount += part
     fields = ["paid_amount", "updated_at"]
     if r.paid_amount >= r.amount:
         r.payment_status = Reservation.Payment.PAID
         r.payment_marked_at, r.payment_marked_by = timezone.now(), by
         fields += ["payment_status", "payment_marked_at", "payment_marked_by"]
     r.save(update_fields=fields)
-    log_event("rezerwacja.z_salda", r, f"{r.number}: z salda {part / 100:.2f} zł", actor=by)
+    log_event(event, r, f"{r.number}: {part / 100:.2f} zł" + ("" if r.payment_status == Reservation.Payment.PAID
+                                                              else f" (zapłacono {r.paid_amount / 100:.2f} z {r.amount / 100:.2f} zł)"), actor=by)
     if r.payment_status == Reservation.Payment.PAID and r.status == Reservation.Status.HOLD:
         from apps.bookings.services import confirm_after_payment
 
@@ -366,8 +376,12 @@ def complete_payment(payment, user=None, by=None, note=""):
             body=f"{payment.user.full_name}: {payment.amount / 100:.2f} zł. Zwróć wpłatę albo utwórz rezerwację ponownie.",
             event="Wpłata za anulowaną rezerwację",
         )
-    elif payment.reservation_id or payment.fee_id or payment.event_registration_id:
-        apply_wallet(payment.user, by=by, targets=[payment.reservation or payment.fee or payment.event_registration])
+    elif payment.reservation_id:
+        # Wpłata za konkretną rezerwację zaliczana na nią także częściowo (przelew na część kwoty) — przy zwolnieniu
+        # lub anulowaniu rezerwacji jest wtedy rozliczana (zwrot / saldo / przypomnienie o zwrocie ręcznym).
+        _apply_to_reservation(payment.reservation, by, "", "rezerwacja.oplacona")
+    elif payment.fee_id or payment.event_registration_id:
+        apply_wallet(payment.user, by=by, targets=[payment.fee or payment.event_registration])
     elif wallet_enabled():
         apply_wallet(payment.user, by=by)
     else:

@@ -1,0 +1,16 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
+
+przypominamy o przelewie za rezerwację {{ reservation.number }}. Wpłata powinna zostać zaksięgowana do {{ reservation.pay_by|date:"j.m.Y H:i" }}.
+Jeśli przelew został już wysłany — nic nie musisz robić, potwierdzenie rezerwacji przyjdzie po jego zaksięgowaniu.
+
+{% include "emails/_reservation_summary.txt" %}
+Dane do przelewu:
+Kwota: {{ reservation.amount|sub:reservation.paid_amount|pln }}
+Tytuł przelewu: {{ reservation.number }}{% if association.bank_account %}
+Rachunek: {{ association.bank_account }}{% endif %}
+{{ options.instructions }}
+
+Wolisz zapłacić od razu? Płatność online jest na stronie rezerwacji: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
+
+Stowarzyszenie „STRZELNICA SĄTOK”
+{% endautoescape %}

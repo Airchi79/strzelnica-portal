@@ -1,0 +1,13 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
+
+termin zaksięgowania przelewu za rezerwację {{ reservation.number }} minął ({{ reservation.pay_by|date:"j.m.Y H:i" }}), a wpłata {{ remaining|pln }} nie została jeszcze zaksięgowana.{% if reservation.paid_amount %}
+Zaksięgowaliśmy dotąd {{ reservation.paid_amount|pln }} z {{ reservation.amount|pln }}.{% endif %}
+
+Jeśli przelew został wysłany, rezerwacja zostanie potwierdzona po jego zaksięgowaniu — termin nadal jest trzymany.
+Jeśli nie — zapłać online na stronie rezerwacji albo skontaktuj się z obsługą. Bez wpłaty obsługa może anulować rezerwację.
+
+{% include "emails/_reservation_summary.txt" %}
+Rezerwacja: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
+
+Stowarzyszenie „STRZELNICA SĄTOK”
+{% endautoescape %}

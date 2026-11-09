@@ -11,14 +11,15 @@ Przed publikacją uzupełnij lub potwierdź punkty z notatki na końcu pliku.
 
 § 2. Jakie dane, w jakim celu i na jakiej podstawie
 
-1. Konto w systemie rezerwacji, rezerwacje, płatności za rezerwacje, zapisy na wydarzenia i powiadomienia o nich — imię, nazwisko, adres e-mail, telefon, adres, historia rezerwacji i wpłat. Podstawa: wykonanie umowy o korzystanie ze strzelnicy i podjęcie działań przed jej zawarciem (art. 6 ust. 1 lit. b RODO).
-2. Weryfikacja uprawnień prowadzącego strzelanie i pozwoleń na broń — rodzaj i numer dokumentu, organ wydający, daty wydania i ważności. Zdjęcie dokumentu (dodane w systemie albo zrobione kamerą kiosku przy rezerwacji na miejscu) służy wyłącznie do weryfikacji i jest usuwane po decyzji obsługi. Jeżeli Stowarzyszenie włączy automatyczne porównanie, tekst ze zdjęcia legitymacji jest odczytywany na serwerze Stowarzyszenia (bez przekazywania do innych podmiotów) i porównywany z imieniem, nazwiskiem, numerem i wystawcą legitymacji; odczytany tekst nie jest zapisywany — zostaje tylko wynik porównania. Podstawa: wykonanie umowy (art. 6 ust. 1 lit. b RODO) oraz prawnie uzasadniony interes Stowarzyszenia — zapewnienie, że strzelanie prowadzi osoba uprawniona (art. 6 ust. 1 lit. f RODO).
+1. Konto w systemie rezerwacji, rezerwacje (także w kiosku przy wejściu, gdzie konto zakładane jest automatycznie po potwierdzeniu adresu e-mail kodem), płatności za rezerwacje, zapisy na wydarzenia i powiadomienia o nich — imię, nazwisko, adres e-mail, telefon, adres, historia rezerwacji i wpłat. Podstawa: wykonanie umowy o korzystanie ze strzelnicy i podjęcie działań przed jej zawarciem (art. 6 ust. 1 lit. b RODO).
+2. Weryfikacja uprawnień prowadzącego strzelanie i pozwoleń na broń — rodzaj i numer dokumentu, organ wydający, daty wydania i ważności. Zdjęcie dokumentu (dodane w systemie albo zrobione kamerą kiosku przy rezerwacji na miejscu) służy wyłącznie do weryfikacji i jest usuwane po decyzji obsługi albo po automatycznym potwierdzeniu. Jeżeli Stowarzyszenie włączy automatyczne porównanie, tekst ze zdjęcia legitymacji jest odczytywany na serwerze Stowarzyszenia (bez przekazywania do innych podmiotów) i porównywany z imieniem, nazwiskiem, numerem i wystawcą legitymacji; odczytany tekst nie jest zapisywany — zostaje tylko wynik porównania. Podstawa: wykonanie umowy (art. 6 ust. 1 lit. b RODO) oraz prawnie uzasadniony interes Stowarzyszenia — zapewnienie, że strzelanie prowadzi osoba uprawniona (art. 6 ust. 1 lit. f RODO).
 3. Książka pobytu na strzelnicy — imię, nazwisko, adres, informacja o posiadaniu pozwolenia na broń, jego numer i organ wydający, czas wejścia i wyjścia, cel pobytu, rezerwacja i prowadzący, podpis oraz oświadczenie o zapoznaniu się z regulaminem. Podstawa: obowiązek prawny prowadzenia ewidencji osób korzystających ze strzelnicy — art. 6 ust. 1 lit. c RODO w związku z ustawą z dnia 21 maja 1999 r. o broni i amunicji oraz rozporządzeniem Ministra Spraw Wewnętrznych i Administracji z dnia 15 marca 2000 r. w sprawie wzorcowego regulaminu strzelnicy, a także prawnie uzasadniony interes Stowarzyszenia — bezpieczeństwo osób przebywających na strzelnicy (art. 6 ust. 1 lit. f RODO).
 4. Rozliczenia i dokumentacja księgowa — dane z wpłat i zwrotów. Podstawa: obowiązki wynikające z przepisów o rachunkowości i podatkowych (art. 6 ust. 1 lit. c RODO).
 5. Członkostwo w Stowarzyszeniu — dane z deklaracji członkowskiej, ewidencja członków, składki. Podstawa: realizacja stosunku członkostwa na podstawie Regulaminu Stowarzyszenia (art. 6 ust. 1 lit. b RODO) oraz obowiązki wynikające z ustawy Prawo o stowarzyszeniach (art. 6 ust. 1 lit. c RODO).
 6. Bezpieczeństwo systemu i rozliczalność — dziennik zdarzeń (kto i kiedy wykonał operację w systemie), adresy IP przy logowaniu, wpisach i akceptacji regulaminów, zapis dostępu obsługi do danych osobowych. Podstawa: prawnie uzasadniony interes Stowarzyszenia — ochrona systemu i danych (art. 6 ust. 1 lit. f RODO).
 7. Ustalenie, dochodzenie i obrona roszczeń. Podstawa: prawnie uzasadniony interes Stowarzyszenia (art. 6 ust. 1 lit. f RODO).
 8. Powiadomienia na telefonie (push) — włączane przez strzelca na wybranym urządzeniu. Podstawa: zgoda (art. 6 ust. 1 lit. a RODO), którą można w każdej chwili wycofać, wyłączając powiadomienia w systemie lub w ustawieniach telefonu.
+9. Kiosk przy wejściu — dane podane w kiosku przy rezerwacji na miejscu (imię, nazwisko, telefon, adres e-mail), sposób potwierdzenia tożsamości (kod z wiadomości e-mail, osobisty kod QR z systemu albo nazwisko i numer legitymacji prowadzącego strzelanie), oświadczenie o prawdziwości danych, oświadczenia o wpłacie gotówki do skarbonki (kwota, rezerwacja, czas, kiosk) i ich rozliczenie przez obsługę, a także zapis zdarzenia „rezygnacja z opłaty / brak opłaty” (dane osoby, rezerwacja, czas). Kamera kiosku służy do odczytu kodów QR i do zdjęcia legitymacji zatwierdzonego przez osobę; obraz z kamery nie jest nagrywany ani zapisywany. Podstawa: wykonanie umowy (art. 6 ust. 1 lit. b RODO) oraz prawnie uzasadniony interes Stowarzyszenia — rozliczenie wpłat gotówkowych, wyjaśnianie niezgodności w skarbonce, bezpieczeństwo i ochrona przed nieuprawnionym korzystaniem ze strzelnicy (art. 6 ust. 1 lit. f RODO).
 
 § 3. Komu przekazujemy dane
 
@@ -38,12 +39,14 @@ Cloudflare, Inc. oraz część operatorów usług powiadomień push mają siedzi
 1. Dane konta — do czasu zamknięcia konta. Po zamknięciu konta dane osobowe są usuwane lub anonimizowane, z wyjątkiem danych, które Stowarzyszenie musi przechowywać dłużej zgodnie z kolejnymi ustępami.
 2. Książka pobytu — 5 lat od dnia wpisu; po tym czasie wpisy są usuwane automatycznie.
 3. Dokumentacja wpłat i zwrotów — 5 lat, licząc od początku roku następującego po roku obrotowym, w którym operacja została zaksięgowana.
-4. Zdjęcia dokumentów do weryfikacji — do czasu decyzji obsługi (usuwane automatycznie po weryfikacji).
+4. Zdjęcia dokumentów do weryfikacji — do czasu decyzji obsługi albo automatycznego potwierdzenia (usuwane automatycznie po weryfikacji).
 5. Powiadomienia w systemie — 1 rok.
 6. Kopie wiadomości e-mail wysłanych przez system (potrzebne do ponowienia wysyłki) — 30 dni od wysyłki.
 7. Kopie zapasowe bazy danych — do 7 dni (kopie są nadpisywane automatycznie).
 8. Ewidencja członków i dokumenty Stowarzyszenia — przez okres członkostwa, a po jego ustaniu przez okres wymagany przepisami i potrzebny do udokumentowania działalności Stowarzyszenia.
-9. Dziennik zdarzeń i dane potrzebne do obrony przed roszczeniami — do upływu terminów przedawnienia roszczeń.
+9. Dziennik zdarzeń (w tym zapis zdarzeń „rezygnacja z opłaty / brak opłaty” z kiosku) i dane potrzebne do obrony przed roszczeniami — do upływu terminów przedawnienia roszczeń.
+10. Dane przebiegu rezerwacji w kiosku (dane podane w kiosku, kod potwierdzający) — niedokończone do 1 doby, pozostałe do 7 dni; dłużej pozostają tylko konto, dokument i rezerwacja.
+11. Oświadczenia o wpłacie gotówki do skarbonki i rozliczenia skarbonki — jak dokumentacja wpłat (ust. 3).
 
 § 6. Prawa osoby, której dane dotyczą
 
@@ -59,7 +62,7 @@ Cloudflare, Inc. oraz część operatorów usług powiadomień push mają siedzi
 
 § 8. Zautomatyzowane decyzje
 
-Stowarzyszenie nie podejmuje decyzji wywołujących wobec strzelców skutki prawne wyłącznie w sposób zautomatyzowany ani nie profiluje strzelców w celach marketingowych. System automatycznie przypisuje strzelca do grupy (np. „nowy”), co może oznaczać, że rezerwacja czeka na zatwierdzenie — decyzję podejmuje wówczas obsługa. Automatyczne porównanie danych z legitymacją prowadzącego strzelanie (§ 2 ust. 2) może wyłącznie potwierdzić zgodność danych; gdy dane się nie zgadzają albo nie da się ich odczytać, decyzję podejmuje obsługa — system nie odmawia automatycznie.
+Stowarzyszenie nie podejmuje decyzji wywołujących wobec strzelców skutki prawne wyłącznie w sposób zautomatyzowany ani nie profiluje strzelców w celach marketingowych. System automatycznie przypisuje strzelca do grupy (np. „nowy”), co może oznaczać, że rezerwacja czeka na zatwierdzenie — decyzję podejmuje wówczas obsługa. Automatyczne porównanie danych z legitymacją prowadzącego strzelanie (§ 2 ust. 2) może wyłącznie potwierdzić zgodność danych; gdy dane się nie zgadzają albo nie da się ich odczytać, decyzję podejmuje obsługa — system nie odmawia automatycznie. Rezerwacja poza godzinami otwarcia jest możliwa tylko przy uprawnieniach już zweryfikowanych albo potwierdzonych automatycznie; jeżeli weryfikacji nie da się wykonać od razu, legitymacja czeka na decyzję obsługi, a rezerwacji można dokonać w godzinach otwarcia.
 
 § 9. Pliki cookies i pamięć przeglądarki
 
@@ -76,4 +79,6 @@ NOTATKA DLA ZARZĄDU (nie wklejać):
 - § 2 ust. 2 i § 8 (automatyczne porównanie legitymacji): zostaw, jeśli w Rezerwacje → Ustawienia włączone jest automatyczne
   porównanie danych z legitymacją PS przy rezerwacji na miejscu; jeśli wyłączone — możesz usunąć zdania o automatycznym porównaniu.
 - § 5 ust. 2: 5 lat to ustawienie w panelu (Książka pobytu → Ustawienia) — jeśli zmienisz, popraw tutaj.
+- § 2 ust. 9 i § 5 ust. 10–11 (kiosk, skarbonka): okresy 1 doby i 7 dni są stałe w Systemie; oświadczenia o wpłacie
+  i rozliczenia skarbonki nie są usuwane automatycznie — jak dokumentacja wpłat, usuwa je Zarząd po upływie okresu z § 5 ust. 3.
 - Projekt przygotowany na podstawie działania Systemu; nie jest opinią prawną.

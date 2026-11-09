@@ -101,8 +101,8 @@ d) jeżeli nie da się ustalić, kto nie dokonał wpłaty, wszystkie osoby, któ
 3. Przed rezerwacją na miejscu osoba akceptuje obowiązujące regulaminy i składa oświadczenie, że podane dane są prawdziwe, a okazana legitymacja prowadzącego strzelanie jest jej własna, autentyczna i ważna.
 4. Osoba, której uprawnienia nie zostały wcześniej zweryfikowane, wpisuje dane legitymacji prowadzącego strzelanie i wykonuje jej zdjęcie kamerą kiosku. System porównuje wpisane dane z tekstem odczytanym ze zdjęcia: jeżeli są zgodne, legitymacja zostaje zatwierdzona automatycznie, w przeciwnym razie sprawdza ją obsługa. Porównanie automatyczne nigdy nie prowadzi do odmowy — o odmowie decyduje wyłącznie obsługa. Jeżeli obsługa nie podejmie decyzji w ciągu 15 minut, rezerwacja zostaje anulowana bez opłat. Zdjęcie legitymacji jest usuwane niezwłocznie po decyzji.
 5. Rezerwację na miejscu opłaca się od razu po jej dokonaniu albo po zatwierdzeniu legitymacji: online (kodem QR wyświetlanym w kiosku, na własnym telefonie) albo — jeżeli System to udostępnia — gotówką do skarbonki (§ 6 ust. 9). Termin nieopłacony w czasie wskazanym w kiosku wraca do puli.
-6. Jeżeli Stowarzyszenie udostępnia strzelanie poza godzinami otwarcia, a Regulamin strzelnicy na nie zezwala, oś zamkniętą według jej godzin otwarcia można zarezerwować wyłącznie w kiosku, od bieżącej pełnej godziny do godziny otwarcia osi, nie dłużej niż do północy. Obowiązują opłaty jak w godzinach otwarcia.
-7. Poza godzinami otwarcia rezerwować może wyłącznie prowadzący, którego uprawnienia zostały wcześniej zweryfikowane albo potwierdzone automatycznie w kiosku; rezerwacja wymagająca zatwierdzenia przez obsługę nie jest wtedy możliwa. Rezerwujący odpowiada za przestrzeganie Regulaminu strzelnicy oraz za to, aby każdy uczestnik wpisał się do książki pobytu.
+6. Jeżeli Stowarzyszenie udostępnia strzelanie poza godzinami otwarcia, oś zamkniętą według jej godzin otwarcia można zarezerwować wyłącznie w kiosku, od bieżącej pełnej godziny do godziny otwarcia osi, nie dłużej niż do północy. Obowiązują opłaty jak w godzinach otwarcia.
+7. Poza godzinami otwarcia rezerwować może wyłącznie prowadzący, którego uprawnienia zostały wcześniej zweryfikowane albo potwierdzone automatycznie w kiosku; rezerwacja wymagająca zatwierdzenia przez obsługę nie jest wtedy możliwa. Strzelanie poza godzinami otwarcia odbywa się wyłącznie pod nadzorem rezerwującego prowadzącego, na zasadach Regulaminu strzelnicy; po zmroku tylko przy oświetleniu pozwalającym prowadzącemu sprawdzić, że w rejonie niebezpiecznym nie ma osób ani zwierząt. Rezerwujący odpowiada za przestrzeganie Regulaminu strzelnicy oraz za to, aby każdy uczestnik wpisał się do książki pobytu.
 8. Strzelanie bez opłaconej rezerwacji jest zabronione. Osoba, która nie opłaciła rezerwacji, jest obowiązana niezwłocznie opuścić teren strzelnicy; zdarzenie jest zapisywane w Systemie i przekazywane obsłudze. Pozostanie na terenie strzelnicy bez strzelania (prace, obserwacja, inny cel) jest możliwe wyłącznie po wpisie do książki pobytu.
 9. Rezerwacja dokonana na podstawie nieprawdziwych danych albo cudzej lub nieważnej legitymacji może zostać anulowana bez zwrotu wpłaty. Strzelanie bez opłaconej rezerwacji, podanie nieprawdziwych danych lub złożenie nieprawdziwego oświadczenia może skutkować zakazem korzystania ze strzelnicy, niezależnie od obowiązku zapłaty należności.
 
@@ -126,9 +126,9 @@ NOTATKA DLA ZARZĄDU (nie wklejać):
 - § 1 ust. 4 i charakter opłat przy stowarzyszeniu zwykłym — do potwierdzenia z księgową / prawnikiem.
 - § 6 ust. 9 i § 11: skarbonka i rezerwacja w kiosku działają od wdrożenia (skarbonkę można wyłączyć w Ustawieniach rezerwacji);
   15 minut w § 11 ust. 4 to stały czas na weryfikację legitymacji przez obsługę.
-- § 11 ust. 6–7 (poza godzinami): przełącznik „strzelanie poza godzinami otwarcia” włącz dopiero po opublikowaniu tej wersji
-  ORAZ po uzupełnieniu Regulaminu strzelnicy (zasady bezpieczeństwa, oświetlenie, nadzór prowadzącego po zmroku) — ten
-  Regulamin odsyła do niego („a Regulamin strzelnicy na nie zezwala”).
+- § 11 ust. 6–7 (poza godzinami): przełącznik „strzelanie poza godzinami otwarcia” włącz dopiero po opublikowaniu tej wersji.
+  Regulamin strzelnicy nie określa godzin strzelań, dlatego warunki (nadzór prowadzącego, oświetlenie po zmroku — § 11
+  Regulaminu strzelnicy: sprawdzenie rejonu niebezpiecznego) są w § 11 ust. 7 tego Regulaminu. Oświetlenie oceń sam.
 - Informacja RODO: sprawdź, czy obejmuje oświadczenia o wpłacie do skarbonki i zapis zdarzeń „brak opłaty” (dane: imię,
   nazwisko, telefon, e-mail, rezerwacja) — w razie potrzeby uzupełnię projekt.
 - Projekt przygotowany na podstawie działania Systemu; nie jest opinią prawną.

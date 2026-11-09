@@ -60,7 +60,7 @@ STATEMENT_TEXT = (
     "Wiem, że używanie dokumentu stwierdzającego uprawnienia innej osoby (art. 275 § 1 Kodeksu karnego) oraz dokumentu "
     "podrobionego lub przerobionego (art. 270 § 1 Kodeksu karnego) jest przestępstwem, a za szkodę wyrządzoną podaniem "
     "nieprawdziwych danych odpowiadam na zasadach ogólnych (art. 415 Kodeksu cywilnego). Podanie nieprawdziwych danych "
-    "oznacza anulowanie rezerwacji bez zwrotu kosztów zgodnie z regulaminem strzelnicy i zgłoszenie sprawy odpowiednim organom."
+    "oznacza anulowanie rezerwacji bez zwrotu kosztów zgodnie z Regulaminem rezerwacji i opłat (§ 11 ust. 9) i zgłoszenie sprawy odpowiednim organom."
 )
 
 

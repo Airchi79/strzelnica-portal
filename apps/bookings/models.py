@@ -70,6 +70,12 @@ class BookingSettings(models.Model):
         "lista oczekujących: termin trzymany [min]", default=30,
         help_text="Po zwolnieniu terminu pierwsza osoba z listy dostaje e-mail; przez ten czas tylko ona może go zarezerwować.",
     )
+    after_hours_kiosk = models.BooleanField(
+        "strzelanie poza godzinami otwarcia (rezerwacja w kiosku)", default=False,
+        help_text="Gdy oś jest zamknięta wg godzin otwarcia, kiosk pozwala zarezerwować ją od bieżącej godziny najwyżej do "
+                  "północy (ta sama stawka). Tylko prowadzący ze zweryfikowaną (także automatycznie) legitymacją PS, "
+                  "płatność od razu. Włącz dopiero, gdy regulamin strzelnicy dopuszcza strzelanie poza godzinami.",
+    )
     onsite_auto_verify = models.BooleanField(
         "rezerwacja na miejscu: automatyczne porównanie danych z legitymacją PS", default=True,
         help_text="Kiosk odczytuje tekst ze zdjęcia legitymacji i porównuje go z wpisanymi danymi (imię i nazwisko, numer, "

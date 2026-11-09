@@ -10,7 +10,7 @@
   const STATE_KEY = "satok_kiosk_state";
   const IDLE_MS = 120000;
   // Dłużej na ekranach rezerwacji na miejscu (kod z e-maila na telefonie, weryfikacja legitymacji, płatność).
-  const IDLE_BY_VIEW = { "os-person": 300000, "os-code": 300000, "os-rules": 300000, "os-ps": 300000, "os-camera": 180000,
+  const IDLE_BY_VIEW = { "os-person": 300000, "os-lookup": 300000, "os-code": 300000, "os-rules": 300000, "os-ps": 300000, "os-camera": 180000,
     "os-preview": 180000, "os-wait": 1500000 };
   const showHooks = [];
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -259,7 +259,9 @@
   });
 
   // --- kody QR: czytnik USB (klawiatura) i kamera ----------------------------------------------------------
+  const codeHooks = []; // np. rezerwacja na miejscu: „Mój kod QR” prowadzącego
   async function handleCode(text) {
+    for (const hook of codeHooks) { if (hook(text)) return; }
     const res = /\/ksiazka\/wpis\/r\/([^/?#\s]+)/.exec(text);
     const person = /\/ksiazka\/osoba\/([^/?#\s]+)/.exec(text);
     if (res) {
@@ -278,13 +280,23 @@
     }
   }
   let buffer = "", bufferTime = 0;
+  // Ekrany, na których skan („Mój kod QR” prowadzącego) jest możliwy także przy kursorze w polu formularza.
+  const SCAN_IN_FIELDS = new Set(["os-person", "os-lookup"]);
   document.addEventListener("keydown", (e) => {
     const typingInField = e.target.matches && e.target.matches("input, select, textarea");
-    if (typingInField && current !== "home") return;
+    if (typingInField && current !== "home" && !SCAN_IN_FIELDS.has(current)) return;
     const now = Date.now();
     if (now - bufferTime > 120) buffer = ""; // czytnik „pisze” bardzo szybko — wolne pisanie to człowiek
     bufferTime = now;
-    if (e.key === "Enter") { if (buffer.length > 10) { e.preventDefault(); handleCode(buffer); } buffer = ""; return; }
+    if (e.key === "Enter") {
+      if (buffer.length > 10 && (!typingInField || /^https?:\/\//.test(buffer))) {
+        e.preventDefault();
+        if (typingInField) e.target.value = e.target.value.replace(buffer, ""); // skan nie zostaje w polu
+        handleCode(buffer);
+      }
+      buffer = "";
+      return;
+    }
     if (e.key.length === 1) buffer += e.key;
   });
 
@@ -318,6 +330,7 @@
   // Interfejs dla modułu rezerwacji na miejscu (kiosk-onsite.js).
   window.SatokKiosk = {
     api, show, done, openForm, refreshState, onShow: (fn) => showHooks.push(fn), startSaver: () => startSaver(),
+    onCode: (fn) => codeHooks.push(fn), scan: () => { if (!scanButton.hidden) scanButton.click(); }, canScan: () => !scanButton.hidden,
     openReservationIds: () => openReservations().map((r) => r.id),
     isOnline: () => online, current: () => current, camera: () => (body.dataset.camera === "environment" ? "environment" : "user"),
   };

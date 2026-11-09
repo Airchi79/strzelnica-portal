@@ -145,7 +145,7 @@ class BookingSettingsForm(forms.ModelForm):
 
     class Meta:
         model = BookingSettings
-        fields = ["free_cancel_hours", "hold_minutes", "online_payment_minutes", "transfer_days", "transfer_cutoff_hours", "max_unpaid_holds", "approval_payment_hours", "offline_instructions", "prepay_before_approval", "min_lead_hours", "waitlist_hold_minutes", "max_advance_days", "max_persons", "officer_service", "onsite_auto_verify"]
+        fields = ["free_cancel_hours", "hold_minutes", "online_payment_minutes", "transfer_days", "transfer_cutoff_hours", "max_unpaid_holds", "approval_payment_hours", "offline_instructions", "prepay_before_approval", "min_lead_hours", "waitlist_hold_minutes", "max_advance_days", "max_persons", "officer_service", "onsite_auto_verify", "after_hours_kiosk"]
         widgets = {"offline_instructions": forms.Textarea(attrs={"rows": 3})}
 
     def __init__(self, *args, **kwargs):

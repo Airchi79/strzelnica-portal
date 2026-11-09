@@ -21,6 +21,7 @@ from django.core import signing
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.validators import validate_email
 from django.db import transaction
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
@@ -82,19 +83,44 @@ def price(lane_id, start_hour, end_hour, persons, now=None):
         start_hour, end_hour, persons = int(start_hour), int(end_hour), int(persons)
     except (Lane.DoesNotExist, TypeError, ValueError):
         raise ValidationError("Wybierz oś i godziny.") from None
-    q = bookings.quote(lane, timezone.localdate(now), start_hour, end_hour, persons, now=now, respect_holds=True)
-    return {"amount": q["amount"], "lane": str(lane), "label": f"{lane} · {start_hour:02d}:00–{end_hour:02d}:00"}
+    after = _after_hours(lane, start_hour, end_hour, now)
+    q = bookings.quote(lane, timezone.localdate(now), start_hour, end_hour, persons, now=now, respect_holds=True, after_hours=after)
+    return {"amount": q["amount"], "lane": str(lane), "label": f"{lane} · {start_hour:02d}:00–{end_hour:02d}:00", "night": after}
+
+
+AFTER_HOURS_PS_MSG = ("Poza godzinami otwarcia rezerwować może tylko prowadzący strzelanie ze zweryfikowaną legitymacją "
+                      "(także potwierdzoną automatycznie ze zdjęcia). Twoja legitymacja czeka na sprawdzenie przez obsługę — "
+                      "zarezerwuj w godzinach otwarcia.")
+
+
+def after_hours_enabled():
+    return bookings.BookingSettings.load().after_hours_kiosk
+
+
+def _after_hours(lane, start_hour, end_hour, now):
+    """Czy wybrany termin to rezerwacja poza godzinami (oś zamknięta wg jej godzin otwarcia). Tylko „teraz”: od bieżącej
+    godziny, w ciągu wolnych godzin zamknięcia (do otwarcia albo do północy)."""
+    if not after_hours_enabled():
+        return False
+    run = bookings.after_hours_run(lane, now)
+    if start_hour not in run:
+        return False
+    if start_hour != run[0] or end_hour > run[-1] + 1:
+        raise ValidationError(f"Poza godzinami otwarcia: od bieżącej godziny, najwyżej do {run[-1] + 1:02d}:00.")
+    return True
 
 
 def free_slots(now=None):
     """Wolne godziny dziś (od bieżącej godziny) na czynnych osiach — do wyboru w kiosku."""
     now = now or timezone.now()
     today = timezone.localdate(now)
+    night_on = after_hours_enabled()
     out = []
     for lane in Lane.objects.filter(is_active=True, facility__is_active=True).select_related("facility").order_by("order"):
-        hours = [s.start for s in bookings.day_slots(lane, today, now=now, holds=True) if s.state == "wolne"]
-        if hours:
-            out.append({"lane": lane.pk, "name": str(lane), "hours": [timezone.localtime(h).hour for h in hours]})
+        hours = [timezone.localtime(s.start).hour for s in bookings.day_slots(lane, today, now=now, holds=True) if s.state == "wolne"]
+        night = bookings.after_hours_run(lane, now) if night_on else []  # oś zamknięta — „teraz”, poza godzinami
+        if hours or night:
+            out.append({"lane": lane.pk, "name": str(lane), "hours": hours, "night": night})
     return out
 
 
@@ -124,11 +150,71 @@ def start(device, email, first_name, last_name, phone):
     flow = OnsiteBooking.objects.create(
         ref=ref, secret_hash=token_hash(secret), device=device, email=email, first_name=first_name, last_name=last_name,
         phone=phone, code_hash=_code_hash(ref, code), code_expires_at=timezone.now() + timedelta(minutes=CODE_MINUTES),
+        identified_by="e-mail",
     )
     _send("Kod do rezerwacji na strzelnicy", "emails/onsite_code.txt", {"first_name": first_name, "code": code,
                                                                        "minutes": CODE_MINUTES}, [email])
     log_event("kiosk.na_miejscu_start", device, device.name)
     return flow, secret
+
+
+@transaction.atomic
+def start_qr(device, token):
+    """Prowadzący z kontem: „Mój kod QR” z telefonu zamiast e-maila i kodu (posiadanie telefonu z kodem konta)."""
+    from apps.logbook.services import user_from_personal_token
+
+    if not ratelimit.allow("kiosk-onsite-device", str(device.pk), STARTS_PER_DEVICE_PER_HOUR):
+        raise ValidationError("Zbyt wiele rozpoczętych rezerwacji w tym kiosku. Spróbuj za godzinę.")
+    user = user_from_personal_token(str(token or ""))
+    if user is None or user.anonymized_at:
+        raise ValidationError("Nieznany kod osobisty. Wygeneruj go ponownie w aplikacji (Mój kod QR) albo podaj e-mail.")
+    secret = secrets.token_urlsafe(24)
+    flow = OnsiteBooking.objects.create(
+        ref=uuid.uuid4(), secret_hash=token_hash(secret), device=device, email=user.email, first_name=user.first_name,
+        last_name=user.last_name, phone=user.phone, user=user, status=OnsiteBooking.Status.VERIFIED, identified_by="kod QR",
+    )
+    log_event("kiosk.na_miejscu_start", device, f"{device.name}: kod QR konta", actor=user)
+    return flow, secret
+
+
+def _mask_email(email):
+    local, _, domain = email.partition("@")
+    return f"{local[:1]}***@{domain}"
+
+
+@transaction.atomic
+def start_ps(device, last_name, number):
+    """Prowadzący z kontem: nazwisko i numer zweryfikowanej legitymacji PS (bez listy osób na ekranie) — kod na e-mail
+    z konta (pokazywany częściowo)."""
+    last_name = _clean_text(last_name, 120)
+    number = " ".join(str(number or "").split()).upper()
+    if not last_name or len(number) < 3:
+        raise ValidationError("Podaj nazwisko i numer legitymacji prowadzącego strzelanie.")
+    if not ratelimit.allow("kiosk-onsite-device", str(device.pk), STARTS_PER_DEVICE_PER_HOUR):
+        raise ValidationError("Zbyt wiele rozpoczętych rezerwacji w tym kiosku. Spróbuj za godzinę.")
+    today = timezone.localdate()
+    credential = (Credential.objects.filter(kind=Credential.Kind.RANGE_OFFICER, status=Credential.Status.VERIFIED, number=number,
+                                            user__last_name__iexact=last_name, user__is_active=True,
+                                            user__anonymized_at__isnull=True)
+                  .filter(Q(valid_until__isnull=True) | Q(valid_until__gte=today)).select_related("user").first())
+    if credential is None:
+        raise ValidationError("Nie znaleziono prowadzącego o tym nazwisku i numerze legitymacji. Jeśli nie masz jeszcze konta — "
+                              "podaj swoje dane i e-mail.")
+    user = credential.user
+    if not ratelimit.allow("kiosk-onsite-email", user.email, STARTS_PER_EMAIL_PER_HOUR):
+        raise ValidationError("Na adres z konta wysłano już kilka kodów. Sprawdź skrzynkę albo spróbuj za godzinę.")
+    secret = secrets.token_urlsafe(24)
+    code = f"{secrets.randbelow(10**6):06d}"
+    ref = uuid.uuid4()
+    flow = OnsiteBooking.objects.create(
+        ref=ref, secret_hash=token_hash(secret), device=device, email=user.email, first_name=user.first_name,
+        last_name=user.last_name, phone=user.phone, code_hash=_code_hash(ref, code),
+        code_expires_at=timezone.now() + timedelta(minutes=CODE_MINUTES), identified_by="nazwisko i nr PS",
+    )
+    _send("Kod do rezerwacji na strzelnicy", "emails/onsite_code.txt", {"first_name": user.first_name, "code": code,
+                                                                       "minutes": CODE_MINUTES}, [user.email])
+    log_event("kiosk.na_miejscu_start", device, f"{device.name}: nazwisko i nr legitymacji")
+    return flow, secret, _mask_email(user.email)
 
 
 def get_flow(device, ref, secret, now=None):
@@ -320,13 +406,29 @@ def book(flow, lane_id, start_hour, end_hour, persons, now=None):
     pending_ps = bool(flow.credential_id and flow.credential.status == Credential.Status.PENDING)
     if not verified and not pending_ps:
         raise ValidationError("Dodaj zdjęcie legitymacji prowadzącego strzelanie.")
+    after = _after_hours(lane, start_hour, end_hour, now)
+    if after:
+        # Poza godzinami nikt z obsługi nie zatwierdzi w kilka minut: tylko legitymacja już zweryfikowana albo
+        # potwierdzona automatycznie, bez zatwierdzania rezerwacji (decyzje właściciela).
+        if not verified and flow.ocr_result != AUTO_OK:
+            raise ValidationError(AFTER_HOURS_PS_MSG)
+        if verified:
+            from apps.bookings.models import GroupRule
+            from apps.clients.services import client_type
+
+            if GroupRule.for_group(client_type(flow.user, now)).requires_approval:
+                raise ValidationError("Twoje rezerwacje wymagają zatwierdzenia przez obsługę — poza godzinami otwarcia nie jest "
+                                      "to możliwe. Zarezerwuj w godzinach otwarcia.")
     day = timezone.localdate(now)
     reservation = bookings.create_reservation(
-        flow.user, lane, day, start_hour, end_hour, persons, notes=f"Rezerwacja na miejscu (kiosk: {flow.device.name})",
-        now=now, channel=bookings.CHANNEL_ONSITE, checkout=verified, ps_pending=not verified,
+        flow.user, lane, day, start_hour, end_hour, persons,
+        notes=f"Rezerwacja na miejscu{' poza godzinami' if after else ''} (kiosk: {flow.device.name})",
+        now=now, channel=bookings.CHANNEL_ONSITE, checkout=verified, ps_pending=not verified, after_hours=after,
         notify=False,  # zamiast ogólnych powiadomień: jedno pilne (poniżej), potwierdzenie e-mail po płatności
     )
     flow.reservation = reservation
+    flow.after_hours = after
+    flow.save(update_fields=["after_hours", "updated_at"])
     if reservation.status == Reservation.Status.PENDING_APPROVAL:
         flow.status = OnsiteBooking.Status.AWAITING
         flow.awaiting_until = now + timedelta(minutes=VERIFY_MINUTES)
@@ -387,6 +489,7 @@ def state(flow, now=None):
                           for v in pending_acceptances(user)]
     out["statement"] = flow.statement_at is not None
     out["statement_text"] = STATEMENT_TEXT
+    out["after_hours"] = flow.after_hours
     if is_range_officer(user):
         out["ps"] = "zweryfikowana"
     elif flow.credential_id and flow.credential.status == Credential.Status.PENDING:
@@ -495,10 +598,54 @@ def credential_reviewed(credential, reviewer):
         flow.save(update_fields=["status", "updated_at"])
 
 
+LEAVE_TEXT = ("Bez opłaconej rezerwacji strzelanie na strzelnicy jest zabronione. Opuść teren strzelnicy — pobyt bez opłaty "
+              "jest nieuprawniony. Zdarzenie zostało zapisane i przekazane obsłudze.")
+
+
+def _notify_refused(flow, how):
+    r = flow.reservation
+    when = f"{timezone.localtime(r.starts_at):%d.%m %H:%M}–{timezone.localtime(r.ends_at):%H:%M}, {r.lane}" if r else "—"
+    url = reverse("panel:kiosks")
+    body = (f"{flow.first_name} {flow.last_name}, tel. {flow.phone or '—'}, e-mail {flow.email}; {when}; kiosk {flow.device.name}. "
+            f"{how}. Kiosk wyświetlił wezwanie do opuszczenia obiektu.")
+    notify_board(
+        f"{'PILNE: ' if flow.after_hours else ''}Rezygnacja z opłaty w kiosku — wezwanie do opuszczenia obiektu",
+        "emails/board_generic.txt", "logbook.view_logbook", url=url, body=body, event="Kiosk: brak opłaty rezerwacji",
+        url_path=url, text=body,
+    )
+    log_event("kiosk.na_miejscu_rezygnacja", flow.device, f"{flow.device.name}: {flow.first_name} {flow.last_name} — {how}",
+              actor=flow.user)
+
+
+@transaction.atomic
+def refuse(flow, now=None):
+    """Osoba rezygnuje z opłaty: rezerwacja anulowana bez opłat, wezwanie do opuszczenia obiektu, zdarzenie dla obsługi."""
+    now = now or timezone.now()
+    flow = OnsiteBooking.objects.select_for_update(of=("self",)).select_related("reservation__lane", "device").get(pk=flow.pk)
+    r = flow.reservation
+    if r is not None and r.payment_status != Reservation.Payment.DUE:
+        raise ValidationError("Rezerwacja jest już opłacona — rezygnacja w kiosku nie jest potrzebna.")
+    if r is not None and r.status in (Reservation.Status.HOLD, Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL):
+        bookings.cancel_reservation(r, by=None, as_board=True, now=now, notify=False, reason="Rezygnacja z opłaty w kiosku")
+    flow.status = OnsiteBooking.Status.REFUSED
+    flow.save(update_fields=["status", "updated_at"])
+    _notify_refused(flow, "Rezygnacja z opłaty")
+    return flow
+
+
 def expire_pending(now=None):
-    """Rezerwacje na miejscu bez weryfikacji w ciągu VERIFY_MINUTES — anulowane bez opłat. Uruchamiać co minutę."""
+    """Rezerwacje na miejscu bez weryfikacji w ciągu VERIFY_MINUTES — anulowane bez opłat; rezerwacje poza godzinami
+    nieopłacone w terminie — zdarzenie „brak opłaty” dla obsługi. Uruchamiać co minutę."""
     now = now or timezone.now()
     count = 0
+    unpaid = OnsiteBooking.objects.filter(status=OnsiteBooking.Status.BOOKED, after_hours=True,
+                                          reservation__status=Reservation.Status.CANCELLED,
+                                          reservation__payment_status=Reservation.Payment.NONE).select_related("reservation__lane", "device")
+    for flow in unpaid:
+        with transaction.atomic():
+            flow.status = OnsiteBooking.Status.REFUSED
+            flow.save(update_fields=["status", "updated_at"])
+            _notify_refused(flow, "Rezerwacja nieopłacona w wyznaczonym czasie")
     for flow in OnsiteBooking.objects.filter(status=OnsiteBooking.Status.AWAITING, awaiting_until__lt=now).select_related("reservation"):
         with transaction.atomic():
             r = flow.reservation

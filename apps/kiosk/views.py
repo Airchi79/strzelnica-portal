@@ -263,12 +263,19 @@ def api_onsite_start(request):
     data = _json(request)
     if data is None:
         return JsonResponse({"error": "Nieprawidłowe dane."}, status=400)
+    masked = ""
     try:
-        flow, secret = onsite.start(request.kiosk_device, data.get("email"), data.get("first_name"), data.get("last_name"),
-                                    data.get("phone"))
+        mode = data.get("mode", "email")
+        if mode == "qr":  # „Mój kod QR” prowadzącego z konta
+            flow, secret = onsite.start_qr(request.kiosk_device, data.get("token"))
+        elif mode == "ps":  # nazwisko i numer legitymacji — kod na e-mail z konta
+            flow, secret, masked = onsite.start_ps(request.kiosk_device, data.get("last_name"), data.get("number"))
+        else:
+            flow, secret = onsite.start(request.kiosk_device, data.get("email"), data.get("first_name"), data.get("last_name"),
+                                        data.get("phone"))
     except ValidationError as e:
         return _error(e)
-    return JsonResponse({"ref": str(flow.ref), "secret": secret, "state": onsite.state(flow)})
+    return JsonResponse({"ref": str(flow.ref), "secret": secret, "masked_email": masked, "state": onsite.state(flow)})
 
 
 @require_POST
@@ -282,7 +289,7 @@ def api_onsite_step(request, step):
     flow = onsite.get_flow(request.kiosk_device, data.get("ref"), data.get("secret"))
     if flow is None:
         return JsonResponse({"error": "Rezerwacja wygasła albo jest nieznana. Zacznij od nowa.", "restart": True}, status=404)
-    if step not in ("kod", "regulamin", "oswiadczenie", "legitymacja", "rezerwacja", "stan"):
+    if step not in ("kod", "regulamin", "oswiadczenie", "legitymacja", "rezerwacja", "rezygnacja", "stan"):
         return JsonResponse({"error": "Nieznany krok."}, status=404)
     try:
         if step == "legitymacja":
@@ -304,6 +311,8 @@ def api_onsite_step(request, step):
                         onsite.accept_statement(flow)
                     elif step == "rezerwacja":
                         onsite.book(flow, data.get("lane"), data.get("start_hour"), data.get("end_hour"), data.get("persons"))
+                    elif step == "rezygnacja":
+                        onsite.refuse(flow)
                 except ValidationError as e:
                     error = e
             if error is not None:
@@ -341,7 +350,14 @@ def panel_list(request):
                 services.revoke(device, request.user)
                 messages.success(request, f"Wyłączono urządzenie {device.name}.")
                 return redirect("panel:kiosks")
+    from datetime import timedelta as _td
+
+    from .models import OnsiteBooking
+
+    refusals = (OnsiteBooking.objects.filter(status=OnsiteBooking.Status.REFUSED, updated_at__gte=timezone.now() - _td(days=7))
+                .select_related("device", "reservation__lane").order_by("-updated_at"))
     return render(request, "panel/kiosks.html", {
+        "refusals": refusals, "after_hours_on": onsite.after_hours_enabled(),
         "devices": KioskDevice.objects.all(), "code": code, "cameras": KioskDevice.Camera.choices, "minutes": services.PAIRING_MINUTES,
         "kiosk_url": settings.SITE_URL + reverse("kiosk:home"),
     })

@@ -24,7 +24,39 @@ PERM = "bookings.manage_reservations"
 
 
 def local_dt(day: date, hour: int) -> datetime:
+    if hour == 24:  # koniec dnia (rezerwacja do północy)
+        return timezone.make_aware(datetime.combine(day + timedelta(days=1), time(0)))
     return timezone.make_aware(datetime.combine(day, time(hour)))
+
+
+def lane_open_now(lane, now=None):
+    """Czy oś jest teraz czynna wg godzin otwarcia z ustawień osi."""
+    now = timezone.localtime(now or timezone.now())
+    hours = lane.hours_for(now.date())
+    return bool(hours) and hours.opens.hour <= now.hour < hours.closes.hour
+
+
+def after_hours_run(lane, now=None):
+    """Rezerwacja poza godzinami (kiosk, „teraz”): kolejne wolne godziny od bieżącej, w których oś jest zamknięta —
+    do najbliższego otwarcia albo do północy. Pusta lista, gdy oś jest teraz czynna albo bieżąca godzina zajęta."""
+    now = now or timezone.now()
+    local = timezone.localtime(now)
+    day, current = local.date(), local.hour
+    hours = lane.hours_for(day)
+    if not lane.is_active or lane_open_now(lane, now):
+        return []
+    limit = hours.opens.hour if hours and current < hours.opens.hour else 24
+    day_start, day_end = local_dt(day, current), local_dt(day, limit)
+    busy = list(Reservation.objects.filter(lane=lane, starts_at__lt=day_end, ends_at__gt=day_start)
+                .exclude(status=Reservation.Status.CANCELLED).values_list("starts_at", "ends_at"))
+    busy += list(Block.objects.filter(lanes=lane, starts_at__lt=day_end, ends_at__gt=day_start).values_list("starts_at", "ends_at"))
+    run = []
+    for h in range(current, limit):
+        start, end = local_dt(day, h), local_dt(day, h + 1)
+        if any(a < end and b > start for a, b in busy):
+            break
+        run.append(h)
+    return run
 
 
 def hour_floor(dt: datetime) -> datetime:
@@ -161,7 +193,7 @@ def booking_readiness(user):
 
 
 def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: int, now=None, enforce_lead=False, user=None,
-                     respect_holds=None):
+                     respect_holds=None, after_hours=False):
     """Sprawdza termin i liczbę osób. Zwraca (starts_at, ends_at, price_rule).
     `enforce_lead` — rezerwacja online przez strzelca: obowiązuje minimalny czas przed terminem z ustawień.
     `respect_holds` — terminy trzymane dla listy oczekujących (domyślnie jak `enforce_lead`; rezerwacja na miejscu: tak,
@@ -177,9 +209,15 @@ def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: i
     if end_hour <= start_hour:
         raise ValidationError("Koniec rezerwacji musi być później niż początek.")
     hours = lane.hours_for(day)
-    if hours is None:
+    if after_hours:  # rezerwacja poza godzinami (kiosk): tylko godziny, w których oś jest zamknięta, najwyżej do północy
+        if start_hour < 0 or end_hour > 24:
+            raise ValidationError("Rezerwacja poza godzinami — najwyżej do północy.")
+        if hours is not None and start_hour < hours.closes.hour and end_hour > hours.opens.hour:
+            raise ValidationError(f"Poza godzinami otwarcia można rezerwować tylko czas, gdy oś jest zamknięta "
+                                  f"(czynna {hours.opens:%H:%M}–{hours.closes:%H:%M}).")
+    elif hours is None:
         raise ValidationError("Oś jest tego dnia zamknięta.")
-    if start_hour < hours.opens.hour or end_hour > hours.closes.hour:
+    elif start_hour < hours.opens.hour or end_hour > hours.closes.hour:
         raise ValidationError(f"Oś jest czynna w godzinach {hours.opens:%H:%M}–{hours.closes:%H:%M}.")
     starts_at, ends_at = local_dt(day, start_hour), local_dt(day, end_hour)
     # Rezerwować można do chwili rozpoczęcia — także bieżącą, już rozpoczętą godzinę (rezerwacja na miejscu).
@@ -213,9 +251,9 @@ def needs_officer(user):
 
 
 def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", user=None, enforce_lead=False, respect_holds=None,
-          ps_pending=False):
+          ps_pending=False, after_hours=False):
     starts_at, ends_at, rule = validate_request(lane, day, start_hour, end_hour, persons, now, enforce_lead=enforce_lead, user=user,
-                                                respect_holds=respect_holds)
+                                                respect_holds=respect_holds, after_hours=after_hours)
     hours = end_hour - start_hour
     base = {"starts_at": starts_at, "ends_at": ends_at, "rule": rule, "code": None, "client_pass": None,
             "with_officer": False, "officer_hourly": 0, "officer_amount": 0}
@@ -255,7 +293,7 @@ CHANNEL_ONLINE, CHANNEL_ONSITE = "online", "na_miejscu"
 
 
 def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="", created_by=None, now=None, access_code="",
-                       series=None, notify=True, channel=CHANNEL_ONLINE, checkout=False, ps_pending=False):
+                       series=None, notify=True, channel=CHANNEL_ONLINE, checkout=False, ps_pending=False, after_hours=False):
     """Rezerwacja. `channel`: "online" (strona — limit czasu przed terminem z ustawień) albo "na_miejscu" (panel na
     strzelnicy — bez limitu czasu, po okazaniu dokumentów). Obsługa w panelu (`created_by` ≠ `user`) — bez limitu.
 
@@ -264,8 +302,8 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
 
     `ps_pending` (tylko na miejscu): legitymacja PS czeka na weryfikację — rezerwacja „do zatwierdzenia”, bez prowadzącego
     od strzelnicy i bez płatności do czasu weryfikacji (decyzja właściciela: najpierw weryfikacja, potem płatność)."""
-    if ps_pending and channel != CHANNEL_ONSITE:
-        raise ValueError("Rezerwacja z legitymacją PS w weryfikacji jest możliwa tylko na miejscu.")
+    if (ps_pending or after_hours) and channel != CHANNEL_ONSITE:
+        raise ValueError("Rezerwacja z legitymacją w weryfikacji albo poza godzinami jest możliwa tylko na miejscu.")
     reasons = check_can_book(user, ps_pending=ps_pending)
     if reasons:
         raise ValidationError(reasons)
@@ -273,7 +311,8 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     if channel not in (CHANNEL_ONLINE, CHANNEL_ONSITE):
         raise ValueError(f"Nieznany kanał rezerwacji: {channel}")
     q = quote(lane, day, start_hour, end_hour, persons, now, access_code=access_code, user=user,
-              enforce_lead=not by_staff and channel == CHANNEL_ONLINE, respect_holds=not by_staff, ps_pending=ps_pending)
+              enforce_lead=not by_staff and channel == CHANNEL_ONLINE, respect_holds=not by_staff, ps_pending=ps_pending,
+              after_hours=after_hours)
     code, client_pass = q["code"], q["client_pass"]
     now = now or timezone.now()
     group = rule = None

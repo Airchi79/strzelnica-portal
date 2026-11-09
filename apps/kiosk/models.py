@@ -58,6 +58,7 @@ class OnsiteBooking(models.Model):
         BOOKED = "zarezerwowano", "Zarezerwowano"
         EXPIRED = "wygasla", "Wygasła (brak weryfikacji)"
         REJECTED = "odrzucona", "Odrzucona"
+        REFUSED = "rezygnacja", "Rezygnacja z opłaty — wezwanie do opuszczenia obiektu"
 
     ref = models.UUIDField(unique=True, editable=False)
     secret_hash = models.CharField(max_length=64)
@@ -77,6 +78,9 @@ class OnsiteBooking(models.Model):
     awaiting_until = models.DateTimeField("czeka na weryfikację do", null=True, blank=True, db_index=True)
     # Wynik automatycznego porównania danych z legitymacją (bez odczytanego tekstu — legitymacje zawierają PESEL).
     ocr_result = models.CharField("automatyczne porównanie z legitymacją", max_length=255, blank=True)
+    after_hours = models.BooleanField("poza godzinami otwarcia", default=False)
+    identified_by = models.CharField("potwierdzenie osoby", max_length=16, blank=True,
+                                     help_text="e-mail (kod), kod QR konta albo nazwisko i numer legitymacji (kod na e-mail konta)")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 

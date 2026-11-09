@@ -1,0 +1,43 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Skarbonka{% endblock %}
+{% block panel %}
+{% include "panel/_payments_tabs.html" %}
+<h1>Skarbonka przy wejściu</h1>
+<p class="muted">Wpłaty gotówki zgłoszone w kiosku (oświadczenie o wrzuceniu do skarbonki). Po opróżnieniu skarbonki wpisz wyjętą kwotę
+i odznacz osoby, których wpłaty brakuje — potwierdzone wpłaty zapiszą się jak zwykła wpłata gotówkowa za rezerwację,
+pozostałe zostaną „do zapłaty” i trafią na listę do kontaktu.</p>
+
+{% if days %}
+<form method="post" class="card">{% csrf_token %}
+  {% for day, items in days %}
+  <h2 class="step-title">{{ day|date:"l, j E Y" }}</h2>
+  <div class="table-wrap"><table>
+    <tr><th></th><th>Godz.</th><th>Osoba</th><th>Kontakt</th><th>Rezerwacja</th><th>Kwota</th></tr>
+    {% for d in items %}<tr>
+      <td><input type="checkbox" name="confirmed" value="{{ d.pk }}" checked aria-label="Wpłata potwierdzona: {{ d.user.full_name }}"></td>
+      <td class="nowrap small">{{ d.declared_at|time:"H:i" }}</td><td>{{ d.user.full_name }}</td>
+      <td class="small">{{ d.user.phone|default:"—" }}<br>{{ d.user.email }}</td>
+      <td class="small"><a href="{% url 'panel:reservation' d.reservation.pk %}">{{ d.reservation.number }}</a> · {{ d.reservation.lane }}</td>
+      <td class="nowrap"><strong>{{ d.amount|pln }}</strong></td></tr>{% endfor %}
+  </table></div>
+  {% endfor %}
+  <p>Razem wg oświadczeń: <strong>{{ expected|pln }}</strong></p>
+  <div class="field"><label for="counted">Wyjęto ze skarbonki [zł]</label><input id="counted" name="counted" inputmode="decimal" required></div>
+  <div class="field"><label for="note">Uwagi</label><input id="note" name="note" maxlength="255"></div>
+  <div class="actions"><button class="btn" type="submit">Zapisz rozliczenie skarbonki</button></div>
+</form>
+{% else %}<div class="card"><p class="muted" style="margin:0">Brak wpłat do rozliczenia.</p></div>{% endif %}
+
+<h2>Ostatnie rozliczenia</h2>
+{% for s in settlements %}
+<div class="card">
+  <p style="margin-top:0"><strong>{{ s.created_at|date:"j.m.Y H:i" }}</strong> · {{ s.created_by.full_name }} ·
+    wyjęto {{ s.counted_amount|pln }}, wg oświadczeń {{ s.expected_amount|pln }}, potwierdzono {{ s.confirmed_amount|pln }}
+    {% if s.difference %}<span class="badge bad">różnica {{ s.difference|pln }}</span>{% else %}<span class="badge ok">zgodne</span>{% endif %}
+    {% if s.note %}<br><span class="small">{{ s.note }}</span>{% endif %}</p>
+  {% with missing=s.declarations.all %}<ul class="small" style="margin:0">{% for d in missing %}{% if d.status == 'brak' %}
+    <li><span class="badge bad">brak wpłaty</span> {{ d.user.full_name }}, tel. {{ d.user.phone|default:"—" }}, {{ d.user.email }} — {{ d.reservation.number }}, {{ d.amount|pln }} ({{ d.declared_at|date:"j.m H:i" }})</li>
+  {% endif %}{% endfor %}</ul>{% endwith %}
+</div>
+{% empty %}<p class="muted">Brak rozliczeń.</p>{% endfor %}
+{% endblock %}

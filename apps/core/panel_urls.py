@@ -104,6 +104,7 @@ urlpatterns = [
     path("ksiazka/<int:pk>/korekta/", logbook_views.panel_correct, name="logbook_correct"),
     path("platnosci/", payments_views.panel_payments, name="payments"),
     path("platnosci/wplata/", payments_views.panel_manual, name="payment_manual"),
+    path("platnosci/skarbonka/", kiosk_views.panel_cashbox, name="cashbox"),
     path("platnosci/import/", payments_views.panel_import, name="payment_import"),
     path("platnosci/ustawienia/", payments_views.panel_settings, name="payment_settings"),
     path("platnosci/<uuid:pk>/", payments_views.panel_payment, name="payment"),

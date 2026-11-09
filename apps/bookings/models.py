@@ -70,6 +70,11 @@ class BookingSettings(models.Model):
         "lista oczekujących: termin trzymany [min]", default=30,
         help_text="Po zwolnieniu terminu pierwsza osoba z listy dostaje e-mail; przez ten czas tylko ona może go zarezerwować.",
     )
+    kiosk_cash_box = models.BooleanField(
+        "gotówka do skarbonki w kiosku", default=True,
+        help_text="Kiosk pozwala zapłacić gotówką do skarbonki przy wejściu — z oświadczeniem o wpłacie (tam, gdzie zasady "
+                  "grupy strzelca dopuszczają gotówkę). Wpłaty rozlicza obsługa w panelu: Płatności → Skarbonka.",
+    )
     after_hours_kiosk = models.BooleanField(
         "strzelanie poza godzinami otwarcia (rezerwacja w kiosku)", default=False,
         help_text="Gdy oś jest zamknięta wg godzin otwarcia, kiosk pozwala zarezerwować ją od bieżącej godziny najwyżej do "

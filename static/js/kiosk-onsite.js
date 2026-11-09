@@ -68,6 +68,7 @@
     flow = null; st = null; pick = {}; psData = null; photo = null;
     stopPolling(); stopCam();
     $$("[data-os-form]").forEach((f) => f.reset());
+    $("[data-os-cash-accept]").checked = false;
     clearErrors();
   }
 
@@ -481,9 +482,22 @@
     const prefill = st ? { first_name: st.first_name, last_name: st.last_name } : {};
     K.openForm({ prefill, info: "Pobyt bez strzelania — wybierz cel: prace, obserwator albo inny." });
   });
+  $("[data-os-cash-confirm]").addEventListener("click", () => {
+    if (!$("[data-os-cash-accept]").checked) { err("cash", "Zaznacz oświadczenie o wpłacie do skarbonki."); return; }
+    run("cash", async () => { await step("gotowka", { accept: true }); render(); });
+  });
   function render() {
     const r = st.reservation || {};
     $("[data-os-refuse]").hidden = true;
+    $("[data-os-cash]").hidden = true;
+    if (st.cash_declared) {
+      stopPolling();
+      $("[data-os-wait-title]").textContent = "Wpłata gotówki zgłoszona";
+      $("[data-os-wait-text]").textContent = `${r.number}: ${r.label}. Dziękujemy — wpłatę rozliczy obsługa po opróżnieniu skarbonki. Teraz wpisz się do książki pobytu.`;
+      $("[data-os-pay]").hidden = true; $("[data-os-countdown]").hidden = true;
+      $("[data-os-entry]").hidden = false;
+      return;
+    }
     if (st.status === "rezygnacja" || (st.after_hours && r.status === "anulowana" && !r.paid)) { showLeave(); return; }
     const title = $("[data-os-wait-title]"), text = $("[data-os-wait-text]");
     const pay = $("[data-os-pay]"), entry = $("[data-os-entry]"), cd = $("[data-os-countdown]");
@@ -519,12 +533,20 @@
       $("[data-os-until]").textContent = st.pay.until ? `Termin jest trzymany do ${st.pay.until}. Po zapłacie ten ekran zmieni się sam.` : "Po zapłacie ten ekran zmieni się sam.";
       pay.hidden = false;
       $("[data-os-refuse]").hidden = false;
+      showCash();
     } else if (st.pay_info) {
       text.textContent = `${r.number}: ${r.label}. Do zapłaty ${pln(st.pay_info.amount_due)}. ${st.pay_info.text}`;
       $("[data-os-refuse]").hidden = false;
+      showCash();
     } else {
       text.textContent = `${r.number}: ${r.label} — ${r.status_label || ""}.`;
     }
+  }
+  function showCash() {
+    if (!st.cash) return;
+    $("[data-os-cash-amount]").textContent = pln(st.cash.amount);
+    $("[data-os-cash-statement]").textContent = st.cash.statement;
+    $("[data-os-cash]").hidden = false;
   }
   $("[data-os-entry]").addEventListener("click", async () => {
     const r = st.reservation;

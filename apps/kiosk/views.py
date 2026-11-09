@@ -289,7 +289,7 @@ def api_onsite_step(request, step):
     flow = onsite.get_flow(request.kiosk_device, data.get("ref"), data.get("secret"))
     if flow is None:
         return JsonResponse({"error": "Rezerwacja wygasła albo jest nieznana. Zacznij od nowa.", "restart": True}, status=404)
-    if step not in ("kod", "regulamin", "oswiadczenie", "legitymacja", "rezerwacja", "rezygnacja", "stan"):
+    if step not in ("kod", "regulamin", "oswiadczenie", "legitymacja", "rezerwacja", "rezygnacja", "gotowka", "stan"):
         return JsonResponse({"error": "Nieznany krok."}, status=404)
     try:
         if step == "legitymacja":
@@ -313,6 +313,10 @@ def api_onsite_step(request, step):
                         onsite.book(flow, data.get("lane"), data.get("start_hour"), data.get("end_hour"), data.get("persons"))
                     elif step == "rezygnacja":
                         onsite.refuse(flow)
+                    elif step == "gotowka":
+                        from . import cashbox
+
+                        cashbox.declare(flow, bool(data.get("accept")))
                 except ValidationError as e:
                     error = e
             if error is not None:
@@ -360,4 +364,40 @@ def panel_list(request):
         "refusals": refusals, "after_hours_on": onsite.after_hours_enabled(),
         "devices": KioskDevice.objects.all(), "code": code, "cameras": KioskDevice.Camera.choices, "minutes": services.PAIRING_MINUTES,
         "kiosk_url": settings.SITE_URL + reverse("kiosk:home"),
+    })
+
+
+
+@panel_required("payments.manage_payments")
+def panel_cashbox(request):
+    """Skarbonka przy wejściu: oświadczenia z kiosku do rozliczenia (wg dni) i rozliczenie po opróżnieniu skarbonki."""
+    from decimal import Decimal, InvalidOperation
+
+    from . import cashbox
+    from .models import CashBoxSettlement, CashDeclaration
+
+    if request.method == "POST":
+        try:
+            counted = int((Decimal(request.POST.get("counted", "").replace(",", ".").replace(" ", "")) * 100).to_integral_value())
+        except (InvalidOperation, ValueError):
+            counted = None
+        try:
+            s = cashbox.settle(counted, request.POST.getlist("confirmed"), request.user, request.POST.get("note", ""))
+        except ValidationError as e:
+            messages.error(request, " ".join(e.messages))
+        else:
+            if s.difference or s.declarations.filter(status=CashDeclaration.Status.MISSING).exists():
+                messages.warning(request, "Zapisano rozliczenie z niezgodnością — lista osób do kontaktu poniżej.")
+            else:
+                messages.success(request, "Zapisano rozliczenie skarbonki — wpłaty potwierdzone.")
+        return redirect("panel:cashbox")
+    pending = list(CashDeclaration.objects.filter(status=CashDeclaration.Status.DECLARED)
+                   .select_related("reservation__lane", "user", "device").order_by("declared_at"))
+    days = {}
+    for d in pending:
+        days.setdefault(timezone.localdate(d.declared_at), []).append(d)
+    settlements = (CashBoxSettlement.objects.select_related("created_by")
+                   .prefetch_related("declarations__user", "declarations__reservation")[:20])
+    return render(request, "panel/cashbox.html", {
+        "days": sorted(days.items()), "expected": sum(d.amount for d in pending), "settlements": settlements,
     })

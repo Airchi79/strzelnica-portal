@@ -243,9 +243,10 @@ def _photo_file(data_url):
     return SimpleUploadedFile("skan.jpg", out.getvalue(), content_type="image/jpeg")
 
 
-@transaction.atomic
 def submit_ps(flow, number, issuer, issued_on, valid_until, photo):
-    """Krok 4: legitymacja PS ze zdjęciem — trafia do weryfikacji (moduł dokumentów, powiadomienie obsługi)."""
+    """Krok 4: legitymacja PS ze zdjęciem — trafia do weryfikacji (moduł dokumentów, powiadomienie obsługi).
+    Odczyt tekstu ze zdjęcia (kilka sekund) odbywa się PRZED transakcją — bez blokad w bazie w tym czasie;
+    w transakcji tylko zapis dokumentu i wyniku porównania."""
     from apps.credentials.forms import CredentialForm
     from apps.credentials.services import submit
 
@@ -265,18 +266,22 @@ def submit_ps(flow, number, issuer, issued_on, valid_until, photo):
         raise ValidationError([m for msgs in form.errors.values() for m in msgs])
     credential = form.save(commit=False)
     credential.user = flow.user
-    submit(credential, changed_fields=form.changed_data + ["scan"], notify=False)  # pilne powiadomienie przy rezerwacji
-    if old_scan and old_scan != credential.scan.name:
-        transaction.on_commit(lambda: Credential.scan.field.storage.delete(old_scan))
-    flow.credential = credential
-    flow.ocr_result = ""
+    ocr_result = ""
     if bookings.BookingSettings.load().onsite_auto_verify:
         from . import ocr
 
         scan.seek(0)
-        flow.ocr_result = ocr.check(scan.read(), flow.user, credential)[:255]
-        log_event("kiosk.na_miejscu_porownanie", credential, f"{credential}: {flow.ocr_result}", actor=flow.user)
-    flow.save(update_fields=["credential", "ocr_result", "updated_at"])
+        ocr_result = ocr.check(scan.read(), flow.user, credential)[:255]
+        scan.seek(0)  # plik zapisze się w transakcji poniżej
+    with transaction.atomic():
+        submit(credential, changed_fields=form.changed_data + ["scan"], notify=False)  # pilne powiadomienie przy rezerwacji
+        if old_scan and old_scan != credential.scan.name:
+            transaction.on_commit(lambda: Credential.scan.field.storage.delete(old_scan))
+        flow.credential = credential
+        flow.ocr_result = ocr_result
+        if ocr_result:
+            log_event("kiosk.na_miejscu_porownanie", credential, f"{credential}: {ocr_result}", actor=flow.user)
+        flow.save(update_fields=["credential", "ocr_result", "updated_at"])
     return credential
 
 

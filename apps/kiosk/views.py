@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -281,6 +281,7 @@ def api_onsite_start(request):
     return JsonResponse({"ref": str(flow.ref), "secret": secret, "state": onsite.state(flow)})
 
 
+@transaction.non_atomic_requests  # odczyt legitymacji trwa kilka sekund — bez transakcji całego żądania (kroki mają własne)
 @require_POST
 @api
 def api_onsite_step(request, step):

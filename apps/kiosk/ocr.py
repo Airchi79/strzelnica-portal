@@ -14,12 +14,14 @@ import logging
 import re
 import shutil
 import subprocess
+import time
 import unicodedata
 from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT_SECONDS = 25
+BUDGET_SECONDS = 20  # łącznie na odczyt (żądanie kiosku; gunicorn przerywa po 60 s) — potem zwykła weryfikacja
+MIN_PASS_SECONDS = 3
 MIN_NUMBER_LEN = 4
 # Wystawcy wybierani w kiosku przyciskami → słowa, które muszą być na legitymacji (wystarczy jedno z grupy).
 ISSUER_WORDS = {
@@ -58,10 +60,14 @@ def read_text(image_bytes):
     except OSError:
         return None
     texts = []
-    for psm in ("6", "11"):
+    deadline = time.monotonic() + BUDGET_SECONDS
+    for psm in ("6", "11"):  # drugi przebieg tylko, jeśli zostało czasu
+        left = deadline - time.monotonic()
+        if left < MIN_PASS_SECONDS:
+            break
         try:
             r = subprocess.run(["tesseract", "stdin", "stdout", "-l", "pol", "--psm", psm], input=data, capture_output=True,
-                               timeout=TIMEOUT_SECONDS, check=False)
+                               timeout=left, check=False)
         except (OSError, subprocess.TimeoutExpired) as e:
             logger.warning("OCR legitymacji: %s", type(e).__name__)
             continue

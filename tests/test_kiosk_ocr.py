@@ -169,3 +169,58 @@ def test_no_ocr_text_stored(device, monkeypatch):
     onsite.submit_ps(flow, "0079/BZGLOK/2022", "LOK (x)", "2022-01-11", "", photo_data_url())
     dump = " ".join(str(v) for v in AuditLog.objects.values_list("summary", "changes"))
     assert "00000000000" not in dump and "PESEL" not in dump and "PISTOL" not in dump
+
+
+# --- budżet czasu odczytu (żądanie kiosku nie może przekroczyć limitu procesu) -------------------------------------
+
+
+def test_read_budget_skips_second_pass_and_gives_unavailable(monkeypatch):
+    import subprocess
+
+    clock = {"t": 1000.0}
+    calls = []
+
+    def fake_run(cmd, input, capture_output, timeout, check):
+        calls.append(timeout)
+        clock["t"] += timeout  # przebieg zajął cały przydzielony czas
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    monkeypatch.setattr(ocr.time, "monotonic", lambda: clock["t"])
+    monkeypatch.setattr(ocr.subprocess, "run", fake_run)
+    img = Image.new("RGB", (800, 500), "white")
+    buf = BytesIO()
+    img.save(buf, "JPEG")
+    assert ocr.read_text(buf.getvalue()) is None
+    assert calls == [ocr.BUDGET_SECONDS]  # drugi przebieg pominięty — brak czasu
+    assert ocr.BUDGET_SECONDS + ocr.MIN_PASS_SECONDS < 60  # mieści się w limicie procesu gunicorn
+
+    class U:
+        first_name, last_name = "Anna", "Nowak"
+
+    class C:
+        number, issuer = "0079/BZGLOK/2022", "LOK (x)"
+
+    assert ocr.check(buf.getvalue(), U, C) == ocr.RESULT_UNAVAILABLE  # → zwykła weryfikacja przez obsługę
+
+
+def test_second_pass_gets_remaining_time(monkeypatch):
+    clock = {"t": 0.0}
+    calls = []
+
+    class R:
+        returncode, stdout = 0, b"TEKST"
+
+    def fake_run(cmd, input, capture_output, timeout, check):
+        calls.append(round(timeout, 1))
+        clock["t"] += 6
+        return R()
+
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    monkeypatch.setattr(ocr.time, "monotonic", lambda: clock["t"])
+    monkeypatch.setattr(ocr.subprocess, "run", fake_run)
+    img = Image.new("RGB", (800, 500), "white")
+    buf = BytesIO()
+    img.save(buf, "JPEG")
+    assert ocr.read_text(buf.getvalue()) == "TEKST\nTEKST"
+    assert calls == [ocr.BUDGET_SECONDS, ocr.BUDGET_SECONDS - 6]

@@ -54,4 +54,4 @@ python -m pytest
 
 ## Zadania okresowe
 
-`send_reminders`, `settle_reservations`, `expire_credentials`, `purge_logbook`, `association_tasks` (polecenia `python manage.py …`) — co godzinę (w Dockerze robi to usługa `cron`).
+`send_reminders`, `settle_reservations`, `expire_credentials`, `purge_logbook`, `daily_logbook_print`, `association_tasks` (polecenia `python manage.py …`) — co godzinę (w Dockerze robi to usługa `cron`).

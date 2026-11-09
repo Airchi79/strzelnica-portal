@@ -1,0 +1,10 @@
+Regulamin strzelnicy — zmiany związane z elektroniczną książką rejestru pobytu
+(do wklejenia w § 3; reszta regulaminu bez zmian)
+
+1. W § 3 zdanie „książka rejestru pobytu na strzelnicy znajduje się u gospodarza strzelnicy.” zastąpić tekstem:
+
+Książka rejestru pobytu na strzelnicy prowadzona jest w postaci elektronicznej, w systemie rezerwacji Stowarzyszenia. Wpis zawiera dane wymienione powyżej, a oświadczenie o zapoznaniu się z regulaminem strzelnicy i przepisami bezpieczeństwa korzystający ze strzelnicy potwierdza własnoręcznym podpisem złożonym na ekranie urządzenia. Wpisu nie można zmienić ani usunąć; korekta jest zapisywana osobno, z podaniem powodu i osoby, która jej dokonała. Książka jest codziennie zapisywana w postaci wydruku (plik PDF) i może zostać wydrukowana w każdej chwili przez gospodarza strzelnicy.
+
+2. Opcjonalnie, na końcu § 3 (wyjaśnienie, kto jest prowadzącym przy rezerwacji osi):
+
+Oś strzelecką rezerwuje osoba posiadająca uprawnienia prowadzącego strzelanie. Rezerwujący jest prowadzącym strzelanie na tej osi przez cały czas rezerwacji i ponosi odpowiedzialność określoną w niniejszym paragrafie, niezależnie od liczby osób strzelających w ramach rezerwacji.

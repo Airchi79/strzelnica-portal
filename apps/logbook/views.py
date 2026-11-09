@@ -543,3 +543,66 @@ def panel_now(request):
     else:
         data["people"] = []  # bez uprawnienia do książki — tylko stan osi
     return render(request, "panel/now.html", data)
+
+
+@panel_required("logbook.view_logbook")
+def panel_daily(request):
+    """Archiwum dziennych wydruków książki pobytu (PDF) z kontrolą łańcucha sum."""
+    from .daily_print import verify_chain
+    from .models import DailyPrint
+
+    today = timezone.localdate()
+    try:
+        month = datetime.strptime(request.GET.get("miesiac", ""), "%Y-%m").date()
+    except ValueError:
+        month = today.replace(day=1)
+    nxt = (month + timedelta(days=32)).replace(day=1)
+    prints = list(DailyPrint.objects.filter(day__gte=month, day__lt=nxt).defer("pdf").order_by("-day", "-version"))
+    checked, problems = verify_chain()
+    months = DailyPrint.objects.dates("day", "month", order="DESC")
+    return render(request, "panel/logbook_daily.html", {
+        "prints": prints, "month": month, "months": months, "checked": checked, "problems": problems,
+        "prev_month": (month - timedelta(days=1)).replace(day=1), "next_month": nxt if nxt <= today else None,
+    })
+
+
+@panel_required("logbook.view_logbook")
+def panel_daily_pdf(request, pk):
+    from .models import DailyPrint
+
+    p = get_object_or_404(DailyPrint, pk=pk)
+    log_sensitive_access(None, f"ksiazka:wydruk_dzienny:{p.day:%Y-%m-%d}:v{p.version}", "pobranie dziennego wydruku książki pobytu")
+    response = HttpResponse(bytes(p.pdf), content_type="application/pdf")
+    disposition = "inline" if request.GET.get("podglad") == "1" else "attachment"
+    response["Content-Disposition"] = f'{disposition}; filename="{p.filename}"'
+    return response
+
+
+@panel_required("logbook.view_logbook")
+def panel_daily_zip(request):
+    """Wszystkie wydruki miesiąca w jednym pliku ZIP (np. do archiwizacji poza systemem) z listą sum SHA-256."""
+    import io
+    import zipfile
+
+    from .models import DailyPrint
+
+    try:
+        month = datetime.strptime(request.GET.get("miesiac", ""), "%Y-%m").date()
+    except ValueError:
+        raise Http404 from None
+    nxt = (month + timedelta(days=32)).replace(day=1)
+    prints = DailyPrint.objects.filter(day__gte=month, day__lt=nxt).order_by("day", "version")
+    buf = io.BytesIO()
+    sums = []
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:  # PDF jest już skompresowany
+        for p in prints.iterator():
+            z.writestr(p.filename, bytes(p.pdf))
+            sums.append(f"{p.pdf_sha256}  {p.filename}")
+        z.writestr("SHA256SUMS.txt", "\n".join(sums) + "\n")
+    if not sums:
+        raise Http404
+    log_sensitive_access(None, f"ksiazka:wydruki_dzienne:{month:%Y-%m}", "pobranie dziennych wydruków książki pobytu (ZIP)")
+    log_event("ksiazka.wydruki_dzienne_zip", summary=f"{month:%m.%Y}, plików: {len(sums)}")
+    response = HttpResponse(buf.getvalue(), content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="ksiazka-pobytu-{month:%Y-%m}.zip"'
+    return response

@@ -36,7 +36,9 @@
     <div class="field"><label>Cel pobytu</label>
       <div class="kiosk-choices">{% for v, l in purposes %}<label><input type="radio" name="purpose" value="{{ v }}"> {{ l }}</label>{% endfor %}</div></div>
     <div class="field" data-field="reservation"><label for="k-res">Rezerwacja (oś i godziny)</label><select id="k-res" name="reservation"></select></div>
-    <div class="field" data-field="purpose_note"><label for="k-note" data-note-label>Krótki opis celu</label><input id="k-note" name="purpose_note" maxlength="160"></div>
+    <div class="msg error kiosk-warning" data-no-shooting hidden role="alert"><strong>Zakaz strzelania.</strong> W tym celu pobytu nie wolno strzelać ani używać broni.
+      Strzelać można wyłącznie w ramach opłaconej rezerwacji, pod nadzorem prowadzącego strzelanie.</div>
+    <div class="field" data-field="purpose_note"><label for="k-note">Krótki opis celu</label><input id="k-note" name="purpose_note" maxlength="160"></div>
     <div class="field"><label for="k-fn">Imię</label><input id="k-fn" name="first_name" maxlength="80"></div>
     <div class="field"><label for="k-ln">Nazwisko</label><input id="k-ln" name="last_name" maxlength="120"></div>
     <div class="field"><label>Czy masz pozwolenie na broń?</label>

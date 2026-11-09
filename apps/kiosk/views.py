@@ -148,7 +148,7 @@ def api_entry(request):
                                             "permit_issuer", "address", "signature")}
     data["reservation"] = payload.get("reservation") or ""
     data["statement"] = "on" if payload.get("statement") else ""
-    form = EntryForm(data, reservations=reservations, shooting_without_reservation=True)
+    form = EntryForm(data, reservations=reservations)
     if not form.is_valid():
         errors = [m for msgs in form.errors.values() for m in msgs]
         return JsonResponse({"error": " ".join(errors), "fields": list(form.errors.keys())}, status=400)
@@ -169,16 +169,6 @@ def api_entry(request):
         if existing:
             return JsonResponse({"ok": True, "number": existing.number, "duplicate": True})
         raise
-    if entry.purpose == Entry.Purpose.SHOOTING and entry.reservation_id is None:
-        from apps.core.notifications import notify_board
-
-        url = reverse("panel:logbook_entry", args=[entry.pk])
-        body = f"{entry.full_name}, wejście {timezone.localtime(entry.entered_at):%d.%m %H:%M}, prowadzący: {entry.purpose_note}."
-        notify_board(
-            f"Strzelanie bez rezerwacji — wpis z kiosku {entry.number}", "emails/board_generic.txt", "logbook.view_logbook",
-            url=url, body=body + " Sprawdź i w razie potrzeby rozlicz pobyt.", event="Strzelanie bez rezerwacji (kiosk)",
-            url_path=url, text=body,
-        )
     return JsonResponse({"ok": True, "number": entry.number, "name": entry.full_name})
 
 

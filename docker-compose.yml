@@ -50,7 +50,7 @@ services:
 
   # Zadania okresowe: co minutę zwalnianie wygasłych blokad terminów i nieopłaconych rezerwacji, lista oczekujących, zwroty Tpay i ponawianie e-maili;
   # co 5 minut wysyłka ogłoszeń; co godzinę przypomnienia, rozliczenia rezerwacji, wygaszanie dokumentów, zamykanie pobytów
-  # i czyszczenie książki pobytu, zadania stowarzyszenia, raporty, kontrola kopii zapasowych.
+  # i czyszczenie książki pobytu, dzienne wydruki książki pobytu, zadania stowarzyszenia, raporty, kontrola kopii zapasowych.
   cron:
     <<: *app
     depends_on:
@@ -70,6 +70,7 @@ services:
           python manage.py settle_reservations;
           python manage.py expire_credentials;
           python manage.py purge_logbook;
+          python manage.py daily_logbook_print;
           python manage.py association_tasks;
           python manage.py sales_reports;
           python manage.py check_backups;

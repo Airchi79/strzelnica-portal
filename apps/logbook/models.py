@@ -246,3 +246,34 @@ class ArchivedEntry(models.Model):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
+
+
+class DailyPrint(models.Model):
+    """Dzienny wydruk książki pobytu (PDF) — archiwum do wydruku w każdej chwili. Tworzony automatycznie po zakończeniu
+    dnia; gdy wpisy tego dnia zmienią się później (korekta, zapisane wyjście), powstaje kolejna wersja, a poprzednia
+    zostaje. Wydruki tworzą łańcuch: każdy zawiera sumę SHA-256 poprzedniego, więc podmiana lub usunięcie pliku ze
+    środka jest wykrywalne. Wydruku nie można zmienić ani usunąć (trigger w bazie), poza czyszczeniem po okresie
+    przechowywania książki pobytu."""
+
+    day = models.DateField("dzień", db_index=True)
+    version = models.PositiveIntegerField("wersja", default=1)
+    created_at = models.DateTimeField("wygenerowano", default=timezone.now)
+    entries_count = models.PositiveIntegerField("liczba wpisów", default=0)
+    reason = models.CharField("powód", max_length=120)
+    data_sha256 = models.CharField("suma kontrolna danych dnia", max_length=64)
+    pdf = models.BinaryField("plik PDF")
+    pdf_sha256 = models.CharField("suma SHA-256 pliku", max_length=64)
+    prev_sha256 = models.CharField("suma SHA-256 poprzedniego wydruku", max_length=64, blank=True)
+
+    class Meta:
+        ordering = ["-day", "-version"]
+        verbose_name = "dzienny wydruk książki pobytu"
+        verbose_name_plural = "dzienne wydruki książki pobytu"
+        constraints = [models.UniqueConstraint(fields=["day", "version"], name="logbook_dailyprint_day_version")]
+
+    def __str__(self):
+        return f"{self.day:%Y-%m-%d} v{self.version}"
+
+    @property
+    def filename(self):
+        return f"ksiazka-pobytu-{self.day:%Y-%m-%d}-v{self.version}.pdf"

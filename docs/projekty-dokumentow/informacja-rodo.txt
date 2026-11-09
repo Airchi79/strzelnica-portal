@@ -37,7 +37,7 @@ Cloudflare, Inc. oraz część operatorów usług powiadomień push mają siedzi
 § 5. Jak długo przechowujemy dane
 
 1. Dane konta — do czasu zamknięcia konta. Po zamknięciu konta dane osobowe są usuwane lub anonimizowane, z wyjątkiem danych, które Stowarzyszenie musi przechowywać dłużej zgodnie z kolejnymi ustępami.
-2. Książka pobytu — 5 lat od dnia wpisu; po tym czasie wpisy są usuwane automatycznie.
+2. Książka pobytu, także jej dzienne wydruki zapisywane w systemie — 5 lat od dnia wpisu; po tym czasie wpisy i wydruki są usuwane automatycznie.
 3. Dokumentacja wpłat i zwrotów — 5 lat, licząc od początku roku następującego po roku obrotowym, w którym operacja została zaksięgowana.
 4. Zdjęcia dokumentów do weryfikacji — do czasu decyzji obsługi albo automatycznego potwierdzenia (usuwane automatycznie po weryfikacji).
 5. Powiadomienia w systemie — 1 rok.

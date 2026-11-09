@@ -1,0 +1,37 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Wydruki dzienne książki pobytu{% endblock %}
+{% block panel %}
+<h1>Wydruki dzienne książki pobytu</h1>
+<p class="muted">Po zakończeniu każdego dnia system zapisuje wydruk książki pobytu (PDF, z podpisami), gotowy do wydrukowania w każdej chwili.
+Gdy dane dnia zmienią się później (korekta, zapisane wyjście), powstaje kolejna wersja — poprzednia zostaje. Wydruków nie można zmienić ani usunąć;
+każdy zawiera sumę SHA-256 poprzedniego, więc zmiana lub usunięcie wydruku jest wykrywalne. Wydruki są usuwane razem z wpisami po okresie przechowywania.</p>
+<div class="actions" style="margin-top:0;margin-bottom:12px">
+  <a class="btn secondary" href="{% url 'panel:logbook' %}">← Książka pobytu</a>
+  {% if prints %}<a class="btn secondary" href="{% url 'panel:logbook_daily_zip' %}?miesiac={{ month|date:'Y-m' }}">Pobierz cały miesiąc (ZIP)</a>{% endif %}
+</div>
+<div class="card">
+  {% if problems %}<p><span class="badge bad">niezgodność</span> Sprawdzono {{ checked }} wydruków — wykryto problemy:</p>
+  <ul>{% for p in problems|slice:":20" %}<li>{{ p }}</li>{% endfor %}</ul>
+  {% else %}<p><span class="badge ok">zgodne</span> Sprawdzono {{ checked }} wydruków: pliki zgodne z zapisanymi sumami, łańcuch nieprzerwany.</p>{% endif %}
+</div>
+<form method="get" class="card filters">
+  <div><label for="f-m">Miesiąc</label><select id="f-m" name="miesiac">
+    {% for m in months %}<option value="{{ m|date:'Y-m' }}"{% if m == month %} selected{% endif %}>{{ m|date:'m.Y' }}</option>
+    {% empty %}<option value="{{ month|date:'Y-m' }}">{{ month|date:'m.Y' }}</option>{% endfor %}</select></div>
+  <div class="actions"><button class="btn" type="submit">Pokaż</button>
+    <a class="btn secondary" href="?miesiac={{ prev_month|date:'Y-m' }}">← poprzedni</a>
+    {% if next_month %}<a class="btn secondary" href="?miesiac={{ next_month|date:'Y-m' }}">następny →</a>{% endif %}</div>
+</form>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Dzień</th><th>Wersja</th><th>Wpisów</th><th>Wygenerowano</th><th>SHA-256 pliku</th><th>Plik</th></tr>
+  {% for p in prints %}<tr>
+    <td>{{ p.day|date:"D j.m.Y" }}</td>
+    <td data-label="Wersja">{{ p.version }}<div class="small muted">{{ p.reason }}</div></td>
+    <td data-label="Wpisów">{{ p.entries_count }}</td>
+    <td data-label="Wygenerowano">{{ p.created_at|date:"j.m.Y H:i" }}</td>
+    <td data-label="SHA-256"><code class="small" title="{{ p.pdf_sha256 }}">{{ p.pdf_sha256|slice:":16" }}…</code></td>
+    <td data-label="Plik"><a href="{% url 'panel:logbook_daily_pdf' p.pk %}?podglad=1" target="_blank" rel="noopener">otwórz</a> ·
+      <a href="{% url 'panel:logbook_daily_pdf' p.pk %}">pobierz</a></td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Brak wydruków w tym miesiącu. Wydruk dnia powstaje automatycznie po jego zakończeniu i zamknięciu pobytów.</td></tr>{% endfor %}
+</table></div></section>
+{% endblock %}

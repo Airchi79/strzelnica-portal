@@ -497,6 +497,11 @@ def purge_expired(now=None):
 
         archived, _ = ArchivedEntry.objects.filter(started_at__lt=cutoff).delete()
         deleted += archived
+        from .daily_print import purge_before
+
+        prints = purge_before(timezone.localdate(cutoff))
+    if prints:
+        log_event("ksiazka.czyszczenie_wydrukow", summary=f"Usunięto {prints} dziennych wydruków starszych niż {years} lat")
     if deleted:
         log_event("ksiazka.czyszczenie", summary=f"Usunięto {deleted} wpisów starszych niż {years} lat")
     return deleted

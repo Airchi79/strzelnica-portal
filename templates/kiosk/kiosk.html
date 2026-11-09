@@ -178,6 +178,13 @@
       <p>Zeskanuj kod aparatem telefonu i zapłać <strong data-os-amount></strong> (BLIK, przelew, karta).</p>
       <p class="small muted" data-os-until></p>
     </div>
+    <div class="card os-cash" data-os-cash hidden>
+      <h2 class="step-title">albo gotówka do skarbonki</h2>
+      <p>Wrzuć <strong data-os-cash-amount></strong> do skarbonki przy wejściu.</p>
+      <label class="small"><input type="checkbox" data-os-cash-accept> <span data-os-cash-statement></span></label>
+      <div class="msg error" data-os-error="cash" hidden></div>
+      <button class="btn kiosk-big" type="button" data-os-cash-confirm>Wrzuciłem(-am) gotówkę — potwierdzam</button>
+    </div>
     <div class="actions" style="justify-content:center"><button class="btn kiosk-big" type="button" data-os-entry hidden>Wpis do książki pobytu</button>
       <button class="btn secondary" type="button" data-os-refuse hidden>Rezygnuję — nie płacę</button>
       <button class="btn secondary" type="button" data-go="home" data-os-close>Zakończ</button></div>

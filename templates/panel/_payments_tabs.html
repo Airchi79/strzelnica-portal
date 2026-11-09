@@ -2,6 +2,7 @@
   {% with u=request.resolver_match.url_name %}
   {% if perms.payments.manage_payments %}<a href="{% url 'panel:payments' %}" class="{% if u == 'payments' or u == 'payment' %}active{% endif %}">Wpłaty</a>
   <a href="{% url 'panel:payment_manual' %}" class="{% if u == 'payment_manual' %}active{% endif %}">Przyjmij wpłatę</a>
+  <a href="{% url 'panel:cashbox' %}" class="{% if u == 'cashbox' %}active{% endif %}">Skarbonka</a>
   <a href="{% url 'panel:payment_import' %}" class="{% if u == 'payment_import' %}active{% endif %}">Import wyciągu</a>
   <a href="{% url 'panel:wallets' %}" class="{% if 'wallet' in u %}active{% endif %}">Salda</a>
   <a href="{% url 'panel:payment_settings' %}" class="{% if u == 'payment_settings' %}active{% endif %}">Ustawienia</a>{% endif %}

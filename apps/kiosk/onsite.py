@@ -490,6 +490,13 @@ def state(flow, now=None):
     out["statement"] = flow.statement_at is not None
     out["statement_text"] = STATEMENT_TEXT
     out["after_hours"] = flow.after_hours
+    if flow.reservation_id:
+        from . import cashbox
+
+        out["cash_declared"] = cashbox.declared(flow.reservation)
+        option = None if out["cash_declared"] else cashbox.cash_option(flow.reservation, now)
+        if option:
+            out["cash"] = {"amount": option["amount"], "statement": option["statement"]}
     if is_range_officer(user):
         out["ps"] = "zweryfikowana"
     elif flow.credential_id and flow.credential.status == Credential.Status.PENDING:
@@ -625,6 +632,10 @@ def refuse(flow, now=None):
     r = flow.reservation
     if r is not None and r.payment_status != Reservation.Payment.DUE:
         raise ValidationError("Rezerwacja jest już opłacona — rezygnacja w kiosku nie jest potrzebna.")
+    from .cashbox import declared
+
+    if r is not None and declared(r):
+        raise ValidationError("Zgłoszono wpłatę gotówki do skarbonki — w sprawie rezygnacji skontaktuj się z obsługą.")
     if r is not None and r.status in (Reservation.Status.HOLD, Reservation.Status.CONFIRMED, Reservation.Status.PENDING_APPROVAL):
         bookings.cancel_reservation(r, by=None, as_board=True, now=now, notify=False, reason="Rezygnacja z opłaty w kiosku")
     flow.status = OnsiteBooking.Status.REFUSED

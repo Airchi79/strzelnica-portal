@@ -91,3 +91,48 @@ class OnsiteBooking(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} · {self.get_status_display()}"
+
+
+
+class CashBoxSettlement(models.Model):
+    """Rozliczenie skarbonki: ile obsługa wyjęła, ile wynikało z oświadczeń, które wpłaty potwierdzono."""
+
+    counted_amount = models.PositiveIntegerField("wyjęto ze skarbonki [gr]")
+    expected_amount = models.PositiveIntegerField("wg oświadczeń [gr]")
+    confirmed_amount = models.PositiveIntegerField("potwierdzone wpłaty [gr]")
+    note = models.CharField("uwagi", max_length=255, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField("rozliczono", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "rozliczenie skarbonki"
+        verbose_name_plural = "rozliczenia skarbonki"
+
+    @property
+    def difference(self):
+        return self.counted_amount - self.confirmed_amount
+
+
+class CashDeclaration(models.Model):
+    """Oświadczenie w kiosku: gotówka wrzucona do skarbonki za rezerwację (strzelcy sobie ufają — rozliczenie skarbonki
+    weryfikuje oświadczenia, a przy niezgodności obsługa ma listę osób z danego dnia do kontaktu)."""
+
+    class Status(models.TextChoices):
+        DECLARED = "zgloszona", "Zgłoszona — do rozliczenia"
+        CONFIRMED = "potwierdzona", "Potwierdzona przy rozliczeniu skarbonki"
+        MISSING = "brak", "Brak wpłaty w skarbonce"
+
+    reservation = models.ForeignKey("bookings.Reservation", on_delete=models.PROTECT, related_name="cash_declarations")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    device = models.ForeignKey(KioskDevice, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    amount = models.PositiveIntegerField("kwota [gr]")
+    statement = models.TextField("treść oświadczenia")
+    declared_at = models.DateTimeField("zgłoszono", auto_now_add=True, db_index=True)
+    status = models.CharField("stan", max_length=12, choices=Status.choices, default=Status.DECLARED, db_index=True)
+    settlement = models.ForeignKey(CashBoxSettlement, null=True, blank=True, on_delete=models.PROTECT, related_name="declarations")
+
+    class Meta:
+        ordering = ["-declared_at"]
+        verbose_name = "wpłata do skarbonki (oświadczenie)"
+        verbose_name_plural = "wpłaty do skarbonki (oświadczenia)"

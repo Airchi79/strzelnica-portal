@@ -200,9 +200,7 @@ def create_entry(
         entered_at = now
     purpose = data["purpose"]
     if purpose == Entry.Purpose.SHOOTING and reservation is None:
-        # Wyjątek: kiosk na strzelnicy (np. strzelanie poza godzinami) — z podanym prowadzącym strzelanie.
-        if source != Entry.Source.DEVICE or not (data.get("purpose_note") or "").strip():
-            raise ValidationError("Przy strzelaniu wybierz rezerwację, w ramach której strzelasz.")
+        raise ValidationError("Przy strzelaniu wybierz rezerwację, w ramach której strzelasz.")
     if reservation is not None:
         reservation = Reservation.objects.select_related("user").get(pk=reservation.pk)
         if not reservation_open_for_entry(reservation, entered_at):

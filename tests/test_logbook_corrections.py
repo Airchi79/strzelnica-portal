@@ -9,7 +9,6 @@ from django.db import DatabaseError, transaction
 from django.test import Client
 from django.utils import timezone
 
-from apps.core.models import OutgoingEmail
 from apps.kiosk import services as kiosk_services
 from apps.logbook import services
 from apps.logbook.models import Entry, EntryCorrection
@@ -122,14 +121,14 @@ def _kiosk_post(c, **kw):
     return c.post("/kiosk/api/wpis/", json.dumps(data), content_type="application/json", HTTP_X_KIOSK="1")
 
 
-def test_kiosk_shooting_without_reservation_with_officer(kiosk):
-    r = _kiosk_post(kiosk)
-    assert r.status_code == 400 and "prowadzi strzelanie" in r.json()["error"]
-    r = _kiosk_post(kiosk, purpose_note="Piotr Prowadzący")
-    assert r.status_code == 200, r.content
-    e = Entry.objects.get()
-    assert e.purpose == "strzelanie" and e.reservation is None and e.source == Entry.Source.DEVICE and e.integrity_ok
-    assert OutgoingEmail.objects.filter(subject__contains="Strzelanie bez rezerwacji").exists()
+def test_kiosk_shooting_without_reservation_rejected(kiosk):
+    """Wyłączone na prośbę właściciela — strzelanie poza godzinami będzie osobnym trybem przez rezerwację."""
+    for note in ("", "Piotr Prowadzący"):
+        r = _kiosk_post(kiosk, purpose_note=note)
+        assert r.status_code == 400 and "rezerwację" in r.json()["error"]
+    assert not Entry.objects.exists()
+    r = _kiosk_post(kiosk, purpose="prace", purpose_note="koszenie trawy")
+    assert r.status_code == 200 and Entry.objects.get().purpose == "prace"  # prace — bez dokumentów, bez rezerwacji
 
 
 def test_remote_shooting_still_needs_reservation(client, sig):

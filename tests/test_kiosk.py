@@ -200,3 +200,9 @@ def test_kiosk_app_manifest_fullscreen_scoped_to_kiosk(paired):
     assert data["start_url"] == "/kiosk/" and data["scope"] == "/kiosk/" and data["display"] == "fullscreen"
     assert 'rel="manifest" href="/kiosk/manifest.webmanifest"' in c.get("/kiosk/").content.decode()
     assert 'rel="manifest" href="/kiosk/manifest.webmanifest"' in Client().get("/kiosk/").content.decode()  # strona parowania
+
+
+def test_kiosk_page_warns_no_shooting_and_has_no_bez_rezerwacji(paired):
+    _, c = paired
+    body = c.get("/kiosk/").content.decode()
+    assert "data-no-shooting" in body and "Zakaz strzelania" in body

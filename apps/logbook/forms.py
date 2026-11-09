@@ -33,11 +33,9 @@ class EntryForm(forms.Form):
     statement = forms.BooleanField(label=STATEMENT_TEXT)
     signature = forms.CharField(widget=forms.HiddenInput, required=False)
 
-    def __init__(self, *args, reservations=None, fixed_reservation=None, purposes=None, shooting_without_reservation=False, **kwargs):
+    def __init__(self, *args, reservations=None, fixed_reservation=None, purposes=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fixed_reservation = fixed_reservation
-        # Kiosk na strzelnicy: strzelanie także bez rezerwacji (np. poza godzinami) — z podanym prowadzącym strzelanie.
-        self.shooting_without_reservation = shooting_without_reservation
         if purposes:
             self.fields["purpose"].choices = [c for c in Entry.Purpose.choices if c[0] in purposes]
             if len(purposes) == 1:
@@ -57,10 +55,7 @@ class EntryForm(forms.Form):
             self.add_error("address", "Bez pozwolenia na broń wymagany jest adres zamieszkania.")
         purpose = data.get("purpose")
         if "reservation" in self.fields and purpose == Entry.Purpose.SHOOTING and not data.get("reservation"):
-            if not self.shooting_without_reservation:
-                self.add_error("reservation", "Przy strzelaniu wybierz rezerwację, w ramach której strzelasz.")
-            elif not data.get("purpose_note", "").strip():
-                self.add_error("purpose_note", "Strzelanie bez rezerwacji: podaj, kto prowadzi strzelanie (imię i nazwisko).")
+            self.add_error("reservation", "Przy strzelaniu wybierz rezerwację, w ramach której strzelasz.")
         if purpose in (Entry.Purpose.WORK, Entry.Purpose.OTHER) and not data.get("purpose_note", "").strip():
             self.add_error("purpose_note", "Opisz krótko cel pobytu.")
         data["has_permit"] = data.get("has_permit") == "tak"

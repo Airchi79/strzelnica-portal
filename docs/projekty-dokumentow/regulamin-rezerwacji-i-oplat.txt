@@ -31,7 +31,7 @@ Publikacja nowej wersji wymaga ponownej akceptacji przez wszystkich strzelców p
 1. Rezerwacja obejmuje całą oś w wybranych pełnych godzinach, w granicach godzin otwarcia osi, z zastrzeżeniem § 11 ust. 6. Godziny otwarcia i opłaty są podane w zakładce „Opłaty”.
 2. Rezerwować można z wyprzedzeniem nie większym niż określone w Systemie. Obsługa może ustalić minimalny czas między rezerwacją online a rozpoczęciem strzelania.
 3. Przy rezerwacji strzelec podaje przewidywaną liczbę osób. Rezerwacja jest potwierdzana w Systemie i wiadomością e-mail na zasadach określonych w § 6.
-4. Rezerwujący odpowiada za to, aby każdy uczestnik przed rozpoczęciem strzelania wpisał się do książki pobytu (kodem QR rezerwacji, w kiosku lub u obsługi).
+4. Rezerwujący jest prowadzącym strzelanie na zarezerwowanej osi przez cały czas rezerwacji, niezależnie od liczby uczestników, i odpowiada za bezpieczeństwo strzelania na zasadach Regulaminu strzelnicy. Odpowiada też za to, aby każdy uczestnik przed rozpoczęciem strzelania wpisał się do książki pobytu (kodem QR rezerwacji, w kiosku lub u obsługi).
 5. Oś może zostać zablokowana przez Stowarzyszenie (zawody, prace, względy bezpieczeństwa). W takim przypadku obsługa może anulować kolidujące rezerwacje — zasady zwrotu określa § 7 ust. 5.
 6. Gdy termin jest zajęty, strzelec może zapisać się na listę oczekujących. Po zwolnieniu terminu pierwsza osoba z listy dostaje wiadomość, a termin jest dla niej zatrzymany przez czas podany w wiadomości.
 

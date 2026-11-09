@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -282,6 +282,7 @@ def api_onsite_start(request):
 
 
 @require_POST
+@transaction.non_atomic_requests  # krok „legitymacja”: odczyt zdjęcia (do kilkunastu s) poza transakcją — pozostałe kroki niżej w transakcji
 @api
 def api_onsite_step(request, step):
     """Kolejne kroki przebiegu: kod, regulamin, oswiadczenie, legitymacja, rezerwacja, stan."""
@@ -291,22 +292,32 @@ def api_onsite_step(request, step):
     flow = onsite.get_flow(request.kiosk_device, data.get("ref"), data.get("secret"))
     if flow is None:
         return JsonResponse({"error": "Rezerwacja wygasła albo jest nieznana. Zacznij od nowa.", "restart": True}, status=404)
+    if step not in ("kod", "regulamin", "oswiadczenie", "legitymacja", "rezerwacja", "stan"):
+        return JsonResponse({"error": "Nieznany krok."}, status=404)
     try:
-        if step == "kod":
-            flow = onsite.verify_code(flow, data.get("code"))
-        elif step == "regulamin":
-            onsite.accept_regulations(flow, ip=client_ip(request))
-        elif step == "oswiadczenie":
-            if not data.get("accept"):
-                raise ValidationError("Zaznacz oświadczenie.")
-            onsite.accept_statement(flow)
-        elif step == "legitymacja":
+        if step == "legitymacja":
+            # zapis legitymacji w krótkiej transakcji, potem automatyczne porównanie bez otwartej transakcji
             onsite.submit_ps(flow, data.get("number"), data.get("issuer"), data.get("issued_on"), data.get("valid_until"),
                              data.get("photo"))
-        elif step == "rezerwacja":
-            onsite.book(flow, data.get("lane"), data.get("start_hour"), data.get("end_hour"), data.get("persons"))
-        elif step != "stan":
-            return JsonResponse({"error": "Nieznany krok."}, status=404)
+        else:
+            # Jak dotąd (transakcja całego żądania): błąd walidacji nie cofa zapisów sprzed niego, np. licznika prób kodu.
+            error = None
+            with transaction.atomic():
+                try:
+                    if step == "kod":
+                        flow = onsite.verify_code(flow, data.get("code"))
+                    elif step == "regulamin":
+                        onsite.accept_regulations(flow, ip=client_ip(request))
+                    elif step == "oswiadczenie":
+                        if not data.get("accept"):
+                            raise ValidationError("Zaznacz oświadczenie.")
+                        onsite.accept_statement(flow)
+                    elif step == "rezerwacja":
+                        onsite.book(flow, data.get("lane"), data.get("start_hour"), data.get("end_hour"), data.get("persons"))
+                except ValidationError as e:
+                    error = e
+            if error is not None:
+                raise error
     except ValidationError as e:
         return _error(e)
     flow.refresh_from_db()

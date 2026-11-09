@@ -243,9 +243,30 @@ def _photo_file(data_url):
     return SimpleUploadedFile("skan.jpg", out.getvalue(), content_type="image/jpeg")
 
 
-@transaction.atomic
 def submit_ps(flow, number, issuer, issued_on, valid_until, photo):
-    """Krok 4: legitymacja PS ze zdjęciem — trafia do weryfikacji (moduł dokumentów, powiadomienie obsługi)."""
+    """Krok 4: legitymacja PS ze zdjęciem — trafia do weryfikacji (moduł dokumentów, powiadomienie obsługi).
+
+    Zapis legitymacji w krótkiej transakcji; automatyczne porównanie (odczyt tekstu, do kilkunastu sekund) PO niej —
+    bez trzymania transakcji i blokad przez czas odczytu. Wynik zapisywany osobno; nieudany odczyt = weryfikacja przez obsługę."""
+    credential, scan_bytes = _save_ps(flow, number, issuer, issued_on, valid_until, photo)
+    if scan_bytes is not None:
+        _compare_ps(flow, credential, scan_bytes)
+    return credential
+
+
+def _compare_ps(flow, credential, scan_bytes):
+    from . import ocr
+
+    result = ocr.check(scan_bytes, flow.user, credential)[:255]
+    with transaction.atomic():
+        OnsiteBooking.objects.filter(pk=flow.pk, credential=credential).update(ocr_result=result, updated_at=timezone.now())
+        log_event("kiosk.na_miejscu_porownanie", credential, f"{credential}: {result}", actor=flow.user)
+    flow.ocr_result = result
+
+
+@transaction.atomic
+def _save_ps(flow, number, issuer, issued_on, valid_until, photo):
+    """Zapis legitymacji ze zdjęciem. Zwraca (legitymacja, bajty zdjęcia do porównania albo None — porównanie wyłączone)."""
     from apps.credentials.forms import CredentialForm
     from apps.credentials.services import submit
 
@@ -270,14 +291,11 @@ def submit_ps(flow, number, issuer, issued_on, valid_until, photo):
         transaction.on_commit(lambda: Credential.scan.field.storage.delete(old_scan))
     flow.credential = credential
     flow.ocr_result = ""
-    if bookings.BookingSettings.load().onsite_auto_verify:
-        from . import ocr
-
-        scan.seek(0)
-        flow.ocr_result = ocr.check(scan.read(), flow.user, credential)[:255]
-        log_event("kiosk.na_miejscu_porownanie", credential, f"{credential}: {flow.ocr_result}", actor=flow.user)
     flow.save(update_fields=["credential", "ocr_result", "updated_at"])
-    return credential
+    if not bookings.BookingSettings.load().onsite_auto_verify:
+        return credential, None
+    scan.seek(0)
+    return credential, scan.read()
 
 
 @transaction.atomic

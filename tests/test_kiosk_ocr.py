@@ -169,3 +169,104 @@ def test_no_ocr_text_stored(device, monkeypatch):
     onsite.submit_ps(flow, "0079/BZGLOK/2022", "LOK (x)", "2022-01-11", "", photo_data_url())
     dump = " ".join(str(v) for v in AuditLog.objects.values_list("summary", "changes"))
     assert "00000000000" not in dump and "PESEL" not in dump and "PISTOL" not in dump
+
+
+# --- czas odczytu: łączny limit, odczyt poza transakcją bazy --------------------------------------------------------------
+
+
+def test_read_text_total_budget_skips_second_pass(monkeypatch):
+    import subprocess
+    import types
+
+    clock = {"t": 1000.0}
+    timeouts = []
+
+    def fake_run(cmd, input, capture_output, timeout, check):
+        timeouts.append(timeout)
+        clock["t"] += 17  # pierwszy przebieg trwa 17 s
+        return types.SimpleNamespace(returncode=0, stdout=b"tekst")
+
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    monkeypatch.setattr(ocr.time, "monotonic", lambda: clock["t"])
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    buf = BytesIO()
+    Image.new("RGB", (400, 250), "white").save(buf, "JPEG")
+    assert ocr.read_text(buf.getvalue()) == "tekst"
+    assert timeouts == [ocr.BUDGET_SECONDS]  # drugi przebieg pominięty: zostały 3 s (< MIN_PASS_SECONDS)
+
+
+def test_read_text_timeout_gives_none(monkeypatch):
+    import subprocess
+
+    def slow(cmd, input, capture_output, timeout, check):
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    monkeypatch.setattr(subprocess, "run", slow)
+    buf = BytesIO()
+    Image.new("RGB", (400, 250), "white").save(buf, "JPEG")
+    assert ocr.read_text(buf.getvalue(), budget=10) is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_kiosk_ocr_runs_outside_db_transaction(owner, monkeypatch):
+    """Krok „legitymacja” przez API kiosku: w chwili odczytu nie ma otwartej transakcji (legitymacja już zapisana),
+    a wynik porównania jest zapisany."""
+    import json
+
+    from django.db import connection
+    from django.test import Client
+
+    from apps.kiosk import services as kiosk_services
+
+    seen = {}
+
+    def fake_read(data):
+        seen["in_atomic"] = connection.in_atomic_block
+        seen["saved"] = Credential.objects.filter(number="0079/BZGLOK/2022").exists()
+        return LOK
+
+    monkeypatch.setattr(ocr, "read_text", fake_read)
+    d, code = kiosk_services.create_device("Kiosk", owner)
+    c = Client()
+    c.post("/kiosk/parowanie/", {"code": code})
+    h = {"HTTP_X_KIOSK": "1"}
+
+    def post(path, data):
+        return c.post(path, json.dumps(data), content_type="application/json", **h)
+
+    r = post("/kiosk/api/na-miejscu/start/", {"email": "anna@example.com", "first_name": "Anna", "last_name": "Nowak", "phone": "600700800"})
+    ref, secret = r.json()["ref"], r.json()["secret"]
+    post("/kiosk/api/na-miejscu/kod/", {"ref": ref, "secret": secret, "code": last_code("anna@example.com")})
+    post("/kiosk/api/na-miejscu/oswiadczenie/", {"ref": ref, "secret": secret, "accept": True})
+    r = post("/kiosk/api/na-miejscu/legitymacja/", {"ref": ref, "secret": secret, "number": "0079/BZGLOK/2022",
+                                                    "issuer": "LOK (Liga Obrony Kraju)", "issued_on": "2022-01-11", "photo": photo_data_url()})
+    assert r.status_code == 200, r.content
+    assert seen == {"in_atomic": False, "saved": True}
+    assert OnsiteBooking.objects.get(ref=ref).ocr_result == "zgodne"
+
+
+def test_wrong_code_attempts_still_counted_via_api(kiosk_client):
+    c, post = kiosk_client
+    r = post("/kiosk/api/na-miejscu/start/", {"email": "b@example.com", "first_name": "B", "last_name": "C", "phone": "600700801"})
+    ref, secret = r.json()["ref"], r.json()["secret"]
+    assert post("/kiosk/api/na-miejscu/kod/", {"ref": ref, "secret": secret, "code": "000000"}).status_code == 400
+    assert OnsiteBooking.objects.get(ref=ref).code_attempts == 1  # błąd walidacji nie cofa licznika prób
+
+
+@pytest.fixture
+def kiosk_client(owner):
+    import json
+
+    from django.test import Client
+
+    from apps.kiosk import services as kiosk_services
+
+    d, code = kiosk_services.create_device("Kiosk", owner)
+    c = Client()
+    c.post("/kiosk/parowanie/", {"code": code})
+
+    def post(path, data):
+        return c.post(path, json.dumps(data), content_type="application/json", HTTP_X_KIOSK="1")
+
+    return c, post

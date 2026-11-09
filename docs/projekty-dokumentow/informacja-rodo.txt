@@ -12,7 +12,7 @@ Przed publikacją uzupełnij lub potwierdź punkty z notatki na końcu pliku.
 § 2. Jakie dane, w jakim celu i na jakiej podstawie
 
 1. Konto w systemie rezerwacji, rezerwacje, płatności za rezerwacje, zapisy na wydarzenia i powiadomienia o nich — imię, nazwisko, adres e-mail, telefon, adres, historia rezerwacji i wpłat. Podstawa: wykonanie umowy o korzystanie ze strzelnicy i podjęcie działań przed jej zawarciem (art. 6 ust. 1 lit. b RODO).
-2. Weryfikacja uprawnień prowadzącego strzelanie i pozwoleń na broń — rodzaj i numer dokumentu, organ wydający, daty wydania i ważności. Zdjęcie dokumentu służy wyłącznie do weryfikacji i jest usuwane po decyzji obsługi. Podstawa: wykonanie umowy (art. 6 ust. 1 lit. b RODO) oraz prawnie uzasadniony interes Stowarzyszenia — zapewnienie, że strzelanie prowadzi osoba uprawniona (art. 6 ust. 1 lit. f RODO).
+2. Weryfikacja uprawnień prowadzącego strzelanie i pozwoleń na broń — rodzaj i numer dokumentu, organ wydający, daty wydania i ważności. Zdjęcie dokumentu (dodane w systemie albo zrobione kamerą kiosku przy rezerwacji na miejscu) służy wyłącznie do weryfikacji i jest usuwane po decyzji obsługi. Jeżeli Stowarzyszenie włączy automatyczne porównanie, tekst ze zdjęcia legitymacji jest odczytywany na serwerze Stowarzyszenia (bez przekazywania do innych podmiotów) i porównywany z imieniem, nazwiskiem, numerem i wystawcą legitymacji; odczytany tekst nie jest zapisywany — zostaje tylko wynik porównania. Podstawa: wykonanie umowy (art. 6 ust. 1 lit. b RODO) oraz prawnie uzasadniony interes Stowarzyszenia — zapewnienie, że strzelanie prowadzi osoba uprawniona (art. 6 ust. 1 lit. f RODO).
 3. Książka pobytu na strzelnicy — imię, nazwisko, adres, informacja o posiadaniu pozwolenia na broń, jego numer i organ wydający, czas wejścia i wyjścia, cel pobytu, rezerwacja i prowadzący, podpis oraz oświadczenie o zapoznaniu się z regulaminem. Podstawa: obowiązek prawny prowadzenia ewidencji osób korzystających ze strzelnicy — art. 6 ust. 1 lit. c RODO w związku z ustawą z dnia 21 maja 1999 r. o broni i amunicji oraz rozporządzeniem Ministra Spraw Wewnętrznych i Administracji z dnia 15 marca 2000 r. w sprawie wzorcowego regulaminu strzelnicy, a także prawnie uzasadniony interes Stowarzyszenia — bezpieczeństwo osób przebywających na strzelnicy (art. 6 ust. 1 lit. f RODO).
 4. Rozliczenia i dokumentacja księgowa — dane z wpłat i zwrotów. Podstawa: obowiązki wynikające z przepisów o rachunkowości i podatkowych (art. 6 ust. 1 lit. c RODO).
 5. Członkostwo w Stowarzyszeniu — dane z deklaracji członkowskiej, ewidencja członków, składki. Podstawa: realizacja stosunku członkostwa na podstawie Regulaminu Stowarzyszenia (art. 6 ust. 1 lit. b RODO) oraz obowiązki wynikające z ustawy Prawo o stowarzyszeniach (art. 6 ust. 1 lit. c RODO).
@@ -59,7 +59,7 @@ Cloudflare, Inc. oraz część operatorów usług powiadomień push mają siedzi
 
 § 8. Zautomatyzowane decyzje
 
-Stowarzyszenie nie podejmuje decyzji wywołujących wobec strzelców skutki prawne wyłącznie w sposób zautomatyzowany ani nie profiluje strzelców w celach marketingowych. System automatycznie przypisuje strzelca do grupy (np. „nowy”), co może oznaczać, że rezerwacja czeka na zatwierdzenie — decyzję podejmuje wówczas obsługa.
+Stowarzyszenie nie podejmuje decyzji wywołujących wobec strzelców skutki prawne wyłącznie w sposób zautomatyzowany ani nie profiluje strzelców w celach marketingowych. System automatycznie przypisuje strzelca do grupy (np. „nowy”), co może oznaczać, że rezerwacja czeka na zatwierdzenie — decyzję podejmuje wówczas obsługa. Automatyczne porównanie danych z legitymacją prowadzącego strzelanie (§ 2 ust. 2) może wyłącznie potwierdzić zgodność danych; gdy dane się nie zgadzają albo nie da się ich odczytać, decyzję podejmuje obsługa — system nie odmawia automatycznie.
 
 § 9. Pliki cookies i pamięć przeglądarki
 
@@ -73,5 +73,7 @@ NOTATKA DLA ZARZĄDU (nie wklejać):
 - § 3 ust. 3: umowa DPA Cloudflare (wersja 6.4 z 3.04.2026) jest pod stałym adresem z tekstu — link prowadzi zawsze do aktualnej wersji, więc nie trzeba trzymać kopii PDF na serwerze. Według DPA obowiązuje ona jako część umowy z Cloudflare (także planu bezpłatnego, Self-Serve Subscription Agreement); jeśli chcesz mieć potwierdzenie na piśmie, pobierz PDF ze strony DPA i dołącz do dokumentacji RODO stowarzyszenia.
 - § 3 ust. 1: dane operatora Tpay — sprawdź aktualną nazwę i adres w umowie z Tpay.
 - Jeśli korzystacie z biura rachunkowego, dopisz je w § 3 jako podmiot przetwarzający dane na zlecenie.
+- § 2 ust. 2 i § 8 (automatyczne porównanie legitymacji): zostaw, jeśli w Rezerwacje → Ustawienia włączone jest automatyczne
+  porównanie danych z legitymacją PS przy rezerwacji na miejscu; jeśli wyłączone — możesz usunąć zdania o automatycznym porównaniu.
 - § 5 ust. 2: 5 lat to ustawienie w panelu (Książka pobytu → Ustawienia) — jeśli zmienisz, popraw tutaj.
 - Projekt przygotowany na podstawie działania Systemu; nie jest opinią prawną.

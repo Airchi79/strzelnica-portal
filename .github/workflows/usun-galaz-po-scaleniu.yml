@@ -1,0 +1,33 @@
+# Po scaleniu pull requestu usuwa jego gałąź (decyzja właściciela: sesja Claude Code scala, ale nie może usuwać gałęzi;
+# ustawienie GitHuba „Automatically delete head branches” nie działało przy scalaniu przez integrację).
+# Tylko scalone pull requesty z tego repozytorium; nigdy gałąź domyślna (main).
+name: Usuń gałąź po scaleniu
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  usun:
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Usuń gałąź
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.event.pull_request.head.ref }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ -z "$REF" ] || [ "$REF" = "$DEFAULT" ]; then
+            echo "Pomijam gałąź: '$REF'"; exit 0
+          fi
+          if gh api -X DELETE "repos/$REPO/git/refs/heads/$REF"; then
+            echo "Usunięto gałąź $REF"
+          else
+            echo "Gałąź $REF już nie istnieje albo nie można jej usunąć — bez błędu"
+          fi

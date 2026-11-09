@@ -21,6 +21,17 @@
       {% if d.is_active %}<button class="btn secondary small-btn" name="action" value="revoke" data-confirm-click="Wyłączyć urządzenie {{ d.name }}?">Wyłącz</button>{% endif %}</form></td></tr>
   {% empty %}<tr><td colspan="6" class="muted">Brak urządzeń.</td></tr>{% endfor %}
 </table></div></section>
+<h2>Rezygnacje z opłaty (7 dni)</h2>
+<p class="small muted">Osoby, które w kiosku nie opłaciły rezerwacji — kiosk wyświetlił wezwanie do opuszczenia obiektu.
+Strzelanie poza godzinami otwarcia: <strong>{% if after_hours_on %}włączone{% else %}wyłączone{% endif %}</strong> (ustawienia rezerwacji).</p>
+<div class="card table-wrap"><table>
+  <tr><th>Kiedy</th><th>Osoba</th><th>Kontakt</th><th>Rezerwacja</th><th>Kiosk</th></tr>
+  {% for f in refusals %}<tr><td class="nowrap small">{{ f.updated_at|date:"j.m H:i" }}{% if f.after_hours %} <span class="badge warn">poza godzinami</span>{% endif %}</td>
+    <td>{{ f.first_name }} {{ f.last_name }}</td><td class="small">{{ f.phone|default:"—" }}<br>{{ f.email }}</td>
+    <td class="small">{% if f.reservation %}{{ f.reservation.number }} · {{ f.reservation.lane }}, {{ f.reservation.starts_at|time:"H:i" }}–{{ f.reservation.ends_at|time:"H:i" }}{% else %}—{% endif %}</td>
+    <td class="small">{{ f.device.name }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Brak.</td></tr>{% endfor %}
+</table></div>
 <h2>Dodaj urządzenie</h2>
 <div class="card"><form method="post" class="actions" style="margin:0">{% csrf_token %}<input type="hidden" name="action" value="add">
   <input name="name" maxlength="80" required placeholder="np. Tablet przy wejściu" aria-label="Nazwa urządzenia"><button class="btn" type="submit">Dodaj i pokaż kod</button></form></div>

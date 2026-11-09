@@ -82,6 +82,12 @@
 
 <section data-view="os-person" hidden>
   <h1>Twoje dane</h1>
+  <div class="card">
+    <p style="margin-top:0"><strong>Masz konto w systemie strzelnicy?</strong></p>
+    <div class="os-choice"><button class="btn secondary" type="button" data-os-qr>Pokaż „Mój kod QR”</button>
+      <button class="btn secondary" type="button" data-go="os-lookup">Nazwisko i nr legitymacji PS</button></div>
+    <p class="small muted" style="margin-bottom:0">Kod QR z aplikacji przyłóż do czytnika albo pokaż kamerze. Bez konta — wpisz dane poniżej.</p>
+  </div>
   <form class="card" data-os-form="person" novalidate autocomplete="off">
     <div class="field"><label for="os-fn">Imię</label><input id="os-fn" name="first_name" maxlength="80" autocapitalize="words"></div>
     <div class="field"><label for="os-ln">Nazwisko</label><input id="os-ln" name="last_name" maxlength="120" autocapitalize="words"></div>
@@ -90,6 +96,17 @@
     <p class="small muted">Dane służą do rezerwacji i książki pobytu (konto w systemie strzelnicy zostanie założone automatycznie, bez hasła). Administrator: Stowarzyszenie „STRZELNICA SĄTOK” — szczegóły w polityce prywatności na stronie strzelnicy.</p>
     <div class="msg error" data-os-error="person" hidden></div>
     <div class="actions"><button class="btn kiosk-big" type="submit">Wyślij kod na e-mail</button><button class="btn secondary" type="button" data-os-back="os-slots">Wróć</button></div>
+  </form>
+</section>
+
+<section data-view="os-lookup" hidden>
+  <h1>Prowadzący z kontem</h1>
+  <form class="card" data-os-form="lookup" novalidate autocomplete="off">
+    <p class="small muted">Wpisz nazwisko i numer legitymacji prowadzącego strzelanie — wyślemy kod na e-mail zapisany w Twoim koncie.</p>
+    <div class="field"><label for="os-l-ln">Nazwisko</label><input id="os-l-ln" name="last_name" maxlength="120" autocapitalize="words"></div>
+    <div class="field"><label for="os-l-nr">Numer legitymacji PS</label><input id="os-l-nr" name="number" maxlength="64" autocapitalize="characters" spellcheck="false"></div>
+    <div class="msg error" data-os-error="lookup" hidden></div>
+    <div class="actions"><button class="btn kiosk-big" type="submit">Wyślij kod</button><button class="btn secondary" type="button" data-os-back="os-person">Wróć</button></div>
   </form>
 </section>
 
@@ -162,8 +179,15 @@
       <p class="small muted" data-os-until></p>
     </div>
     <div class="actions" style="justify-content:center"><button class="btn kiosk-big" type="button" data-os-entry hidden>Wpis do książki pobytu</button>
+      <button class="btn secondary" type="button" data-os-refuse hidden>Rezygnuję — nie płacę</button>
       <button class="btn secondary" type="button" data-go="home" data-os-close>Zakończ</button></div>
   </div>
+</section>
+
+<section data-view="os-leave" hidden>
+  <div class="msg error kiosk-leave" role="alert"><h1>Strzelanie zabronione</h1><p data-os-leave-text></p></div>
+  <div class="actions"><button class="btn secondary kiosk-big" type="button" data-os-stay>Zostaję bez strzelania — wpis do książki</button>
+    <button class="btn secondary" type="button" data-go="home">Zakończ</button></div>
 </section>
 
 <div class="kiosk-saver" data-saver hidden><p data-saver-text>Dotknij ekranu</p></div>

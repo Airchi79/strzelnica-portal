@@ -97,7 +97,8 @@
     renderSlots();
   }
   function contiguous(lane, start) {
-    const free = new Set(lane.hours);
+    const night = lane.night || [];
+    const free = new Set(night.includes(start) ? night : lane.hours); // bez łączenia godzin otwarcia z zamknięciem
     let n = 0;
     while (free.has(start + n) && n < 12) n += 1;
     return n;
@@ -107,7 +108,9 @@
     const lane = slots.find((l) => l.lane === pick.lane);
     $("[data-os-when]").hidden = !lane;
     if (!lane) return;
-    chips($("[data-os-hours]"), lane.hours.map((h) => ({ value: h, label: `${String(h).padStart(2, "0")}:00` })), pick.start,
+    const hourChips = (lane.night || []).slice(0, 1).map((h) => ({ value: h, label: `${String(h).padStart(2, "0")}:00 · teraz, poza godzinami` }))
+      .concat(lane.hours.map((h) => ({ value: h, label: `${String(h).padStart(2, "0")}:00` })));
+    chips($("[data-os-hours]"), hourChips, pick.start,
       (v) => { pick = { lane: pick.lane, start: v, persons: pick.persons }; renderSlots(); });
     const durations = pick.start === undefined ? [] : Array.from({ length: contiguous(lane, pick.start) }, (_, i) => i + 1);
     chips($("[data-os-durations]"), durations.map((d) => ({ value: d, label: `${d} h` })), pick.end !== undefined ? pick.end - pick.start : undefined,
@@ -128,7 +131,8 @@
       const q = await get(`cena/?os=${pick.lane}&od=${pick.start}&do=${pick.end}&osoby=${pick.persons}`);
       if (seq !== priceSeq) return;
       pick.label = q.label;
-      out.textContent = `${q.label} · ${pick.persons} os. · do zapłaty ${pln(q.amount)}`;
+      out.textContent = `${q.label} · ${pick.persons} os. · do zapłaty ${pln(q.amount)}` + (q.night
+        ? " · POZA GODZINAMI OTWARCIA: tylko prowadzący ze zweryfikowaną legitymacją PS, płatność od razu." : "");
       next.disabled = false;
       clearErrors();
     } catch (e) { if (seq === priceSeq) err("slots", e.message); }
@@ -159,6 +163,44 @@
       $("#os-code").focus();
     });
   });
+  let qrWanted = false;
+  $("[data-os-qr]").addEventListener("click", () => {
+    qrWanted = true;
+    if (K.canScan()) K.scan(); // kamera; czytnik USB działa bez tego
+    else err("person", "Przyłóż „Mój kod QR” do czytnika pod ekranem.");
+  });
+  K.onCode((text) => {
+    const m = /\/ksiazka\/osoba\/([^/?#\s]+)/.exec(text);
+    if (!m || !(qrWanted || K.current() === "os-person" || K.current() === "os-lookup")) return false;
+    qrWanted = false;
+    K.show("os-person");
+    run("person", async () => {
+      let res;
+      try { res = await K.api("na-miejscu/start/", { method: "POST", body: JSON.stringify({ mode: "qr", token: m[1] }) }); } catch (x) { throw new Error(NET); }
+      if (res.status !== 200) throw new Error(res.data.error || "Nieznany kod.");
+      flow = { ref: res.data.ref, secret: res.data.secret };
+      st = res.data.state;
+      showRules();
+    });
+    return true;
+  });
+  $("[data-os-form=lookup]").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const f = e.target.elements;
+    const data = { mode: "ps", last_name: f.last_name.value.trim(), number: f.number.value.trim() };
+    if (!data.last_name || !data.number) { err("lookup", "Podaj nazwisko i numer legitymacji."); return; }
+    run("lookup", async () => {
+      let res;
+      try { res = await K.api("na-miejscu/start/", { method: "POST", body: JSON.stringify(data) }); } catch (x) { throw new Error(NET); }
+      if (res.status !== 200) throw new Error(res.data.error || "Nie znaleziono.");
+      flow = { ref: res.data.ref, secret: res.data.secret };
+      st = res.data.state;
+      $("[data-os-email]").textContent = res.data.masked_email;
+      K.show("os-code");
+      $("#os-code").focus();
+    });
+  });
+
   $("[data-os-form=code]").addEventListener("submit", (e) => {
     e.preventDefault();
     const code = e.target.elements.code.value.replace(/\D/g, "");
@@ -425,8 +467,24 @@
     const el = $("[data-os-countdown]");
     el.textContent = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
   }
+  const LEAVE = "Bez opłaconej rezerwacji strzelanie na strzelnicy jest zabronione. Opuść teren strzelnicy — pobyt bez opłaty jest nieuprawniony. Zdarzenie zostało zapisane i przekazane obsłudze.";
+  function showLeave() {
+    stopPolling();
+    $("[data-os-leave-text]").textContent = LEAVE;
+    K.show("os-leave");
+  }
+  $("[data-os-refuse]").addEventListener("click", () => {
+    if (!window.confirm("Zrezygnować z rezerwacji? Bez opłaty strzelanie jest zabronione i trzeba opuścić teren strzelnicy.")) return;
+    run("slots", async () => { await step("rezygnacja"); showLeave(); });
+  });
+  $("[data-os-stay]").addEventListener("click", () => {
+    const prefill = st ? { first_name: st.first_name, last_name: st.last_name } : {};
+    K.openForm({ prefill, info: "Pobyt bez strzelania — wybierz cel: prace, obserwator albo inny." });
+  });
   function render() {
     const r = st.reservation || {};
+    $("[data-os-refuse]").hidden = true;
+    if (st.status === "rezygnacja" || (st.after_hours && r.status === "anulowana" && !r.paid)) { showLeave(); return; }
     const title = $("[data-os-wait-title]"), text = $("[data-os-wait-text]");
     const pay = $("[data-os-pay]"), entry = $("[data-os-entry]"), cd = $("[data-os-countdown]");
     pay.hidden = true; entry.hidden = true; cd.hidden = true;
@@ -460,8 +518,10 @@
       $("[data-os-amount]").textContent = pln(st.pay.amount_due);
       $("[data-os-until]").textContent = st.pay.until ? `Termin jest trzymany do ${st.pay.until}. Po zapłacie ten ekran zmieni się sam.` : "Po zapłacie ten ekran zmieni się sam.";
       pay.hidden = false;
+      $("[data-os-refuse]").hidden = false;
     } else if (st.pay_info) {
       text.textContent = `${r.number}: ${r.label}. Do zapłaty ${pln(st.pay_info.amount_due)}. ${st.pay_info.text}`;
+      $("[data-os-refuse]").hidden = false;
     } else {
       text.textContent = `${r.number}: ${r.label} — ${r.status_label || ""}.`;
     }

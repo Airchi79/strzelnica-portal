@@ -1,7 +1,9 @@
-{% extends "base.html" %}
-{% block title %}Profil{% endblock %}
+{% extends ACCOUNT_BASE|default:"base.html" %}
+{% block title %}{% if PANEL_ACCOUNT %}Moje konto{% else %}Profil{% endif %}{% endblock %}
+{% block appbar_title %}Moje konto{% endblock %}
 {% block content %}
-<h1>Profil</h1>
+<h1>{% if PANEL_ACCOUNT %}Moje konto{% else %}Profil{% endif %}</h1>
+{% if PANEL_ACCOUNT %}<p class="muted">Konto panelu zarządu. Rezerwacje, legitymacje i wpisy do książki pobytu jako strzelec — z osobnego konta strzelca.</p>{% endif %}
 <div class="card">
   <p class="muted small">E-mail: <strong>{{ user.email }}</strong></p>
   <form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Zapisz</button></form>
@@ -13,7 +15,7 @@
     <a class="btn secondary" href="{% url 'accounts:password_change' %}">Zmień hasło</a>
     {% if not has_2fa %}<a class="btn secondary" href="{% url 'accounts:otp_setup' %}">Włącz 2FA</a>{% endif %}
     <a class="btn secondary" href="{% url 'accounts:my_data' %}">Pobierz moje dane (RODO)</a>
-    <a class="btn secondary" href="{% url 'accounts:deactivate' %}">Dezaktywuj konto</a>
+    {% if not PANEL_ACCOUNT %}<a class="btn secondary" href="{% url 'accounts:deactivate' %}">Dezaktywuj konto</a>{% endif %}
   </div>
 </div>
 {% endblock %}

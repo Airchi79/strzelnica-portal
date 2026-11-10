@@ -43,3 +43,20 @@ def test_login_of_panel_account_lands_in_panel(owner):
     c.post("/konto/logowanie/", {"email": owner.email, "password": PASSWORD})
     login_with_otp(c, owner)
     assert c.get("/pulpit/").url == "/panel/"
+
+
+def test_my_account_for_panel_account_in_panel_layout_without_address(owner_client, owner):
+    page = owner_client.get("/konto/profil/").content.decode()
+    assert "Moje konto" in page and "sidebar-nav" in page  # wygląd panelu
+    assert 'name="street"' not in page and 'name="city"' not in page and "Dezaktywuj konto" not in page
+    r = owner_client.post("/konto/profil/", {"first_name": "Adam", "last_name": "Nowy", "phone": "600 100 200"})
+    assert r.status_code == 302
+    owner.refresh_from_db()
+    assert owner.last_name == "Nowy" and owner.phone == "600 100 200"
+    assert "sidebar-nav" in owner_client.get("/konto/profil/haslo/").content.decode()
+
+
+def test_client_profile_keeps_address(client):
+    client.force_login(make_user("strzelec@example.com"))
+    page = client.get("/konto/profil/").content.decode()
+    assert 'name="street"' in page and "sidebar-nav" not in page and "Dezaktywuj konto" in page

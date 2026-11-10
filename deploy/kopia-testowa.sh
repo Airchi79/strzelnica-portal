@@ -11,13 +11,16 @@
 #   sh /share/strzelnica/deploy/kopia-testowa.sh            # pierwsze utworzenie albo odświeżenie danych z produkcji
 #   sh /share/strzelnica/deploy/kopia-testowa.sh --kod      # tylko aktualizacja programu w teście (gałąź main)
 #
-# Zmienne (opcjonalnie): TEST_HOST (test.strzelnicasatok.pl), LAN_IP (adres QNAP w sieci domowej, dla tunelu),
-# TEST_PORT (8001), REDIRECT (adres, na który trafiają WSZYSTKIE e-maile z testu).
+# Zmienne (opcjonalnie): TEST_HOST (test.strzelnicasatok.pl), TEST_PORT (8001, tylko na samym serwerze),
+# REDIRECT (adres, na który trafiają WSZYSTKIE e-maile z testu).
+#
+# Dostęp z internetu: OSOBNY tunel Cloudflare testu (kontener „tunnel” w kopii testowej, trasa test.… → app:8000).
+# Token tunelu testu zapisz raz: cd <folder testu> && sh deploy/ustaw-env.sh TUNNEL_TOKEN — skrypt uruchamia wtedy
+# tunel sam. (Kontenery na QNAP nie łączą się z adresem serwera w sieci domowej, więc tunel produkcji testu nie widzi.)
 set -eu
 PROD=/share/strzelnica
 MIN_FREE_GB=5
 TEST_HOST="${TEST_HOST:-test.strzelnicasatok.pl}"
-LAN_IP="${LAN_IP:-192.168.1.87}"
 TEST_PORT="${TEST_PORT:-8001}"
 REDIRECT="${REDIRECT:-biuro@strzelnicasatok.pl}"
 URL=https://github.com/Airchi79/strzelnica-portal/archive/refs/heads/main.tar.gz
@@ -83,7 +86,7 @@ setvar SITE_URL "https://$TEST_HOST"
 setvar DJANGO_ALLOWED_HOSTS "$TEST_HOST"
 setvar DJANGO_CSRF_TRUSTED_ORIGINS "https://$TEST_HOST"
 setvar IMAGE_NAME strzelnica-portal-test
-setvar APP_BIND "$LAN_IP"
+setvar APP_BIND 127.0.0.1  # z internetu tylko przez tunel testu; z sieci domowej niedostępny
 setvar APP_PORT "$TEST_PORT"
 
 echo "Zrzut bazy produkcji (tylko odczyt)…"
@@ -109,4 +112,11 @@ i=0
 until docker compose exec -T app python manage.py prepare_test_copy; do
   i=$((i + 1)); [ "$i" -lt 30 ] || { echo "Nie udało się przygotować kopii — sprawdź: docker compose logs app"; exit 1; }; sleep 5
 done
-echo "Gotowe: https://$TEST_HOST (po dodaniu trasy w tunelu Cloudflare). E-maile z testu trafiają na $REDIRECT."
+if grep -q '^TUNNEL_TOKEN=.' .env; then
+  docker compose --profile tunel up -d tunnel
+  echo "Gotowe: https://$TEST_HOST (tunel testu uruchomiony). E-maile z testu trafiają na $REDIRECT."
+else
+  echo "Kopia testowa działa, ale nie ma jeszcze tunelu testu. Utwórz w Cloudflare tunel „qnap-test”, zapisz jego token:"
+  echo "  cd $TEST && sh deploy/ustaw-env.sh TUNNEL_TOKEN && docker compose --profile tunel up -d tunnel"
+  echo "i dodaj w nim trasę $TEST_HOST → HTTP → app:8000 (docs/KOPIA-TESTOWA.md). E-maile z testu trafiają na $REDIRECT."
+fi

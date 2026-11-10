@@ -17,7 +17,7 @@ Każda strona kopii testowej ma u góry czerwony pasek **WERSJA TESTOWA**, a tyt
 
 ## Jak pracujemy
 
-1. Zmiany trafiają do gałęzi `main` → aktualizujesz **test**: `sh /share/strzelnica/deploy/kopia-testowa.sh --kod`
+1. Zmiany trafiają do gałęzi `main` → aktualizujesz **test**: `sh /share/CACHEDEV3_DATA/strzelnica-test/deploy/kopia-testowa.sh --kod`
 2. Sprawdzasz na test.strzelnicasatok.pl.
 3. Gdy jest dobrze, piszesz „wdrażamy” → gałąź `produkcja` zostaje przesunięta na sprawdzoną wersję →
    aktualizujesz **produkcję** (polecenie niżej).
@@ -35,19 +35,27 @@ cd /share/strzelnica && wget -O tmp/strzelnica.tar.gz https://github.com/Airchi7
 > **QNAP:** `/share` to mały dysk systemowy w pamięci RAM. Nie zakładaj tam folderów ręcznie (`mkdir /share/…`) —
 > na woluminy danych wskazują tylko foldery udostępnione (np. `/share/strzelnica`). Skrypt sam wybiera właściwy wolumin.
 
-1. **Tunel Cloudflare** (raz): Cloudflare → Networks → Tunnels → **qnap** → Routes → **Add route** → Published application:
-   `test` / `strzelnicasatok.pl`, typ **HTTP**, URL **`192.168.1.87:8001`** (adres QNAP w sieci domowej i port testu).
+1. **Osobny tunel testu** (raz): Cloudflare → Networks → Tunnels → **Create a tunnel** → Cloudflared → nazwa
+   **`qnap-test`**. Skopiuj tylko ciąg po `--token` (nie do czatu). Trasa: Routes → **Add route** → Published application
+   `test` / `strzelnicasatok.pl`, typ **HTTP**, URL **`app:8000`**. Tunel produkcji (`qnap`) nie może być użyty:
+   kontenery na QNAP nie łączą się z adresem serwera w sieci domowej, a tunel produkcji nie widzi sieci testu.
 2. **Zalecane — dostęp tylko dla Ciebie**: Cloudflare → Zero Trust → Access → Applications → Add → Self-hosted →
    `test.strzelnicasatok.pl`, polityka „Allow” dla Twojego adresu e-mail (logowanie kodem z e-maila). Bez tego kopia
    testowa jest dostępna dla każdego, kto zna adres.
 3. **Na QNAP** (zakłada folder, `.env` testu, kopiuje bazę i pliki z produkcji, uruchamia test):
 
 ```
-sh /share/strzelnica/deploy/kopia-testowa.sh
+wget -q -O /share/strzelnica/tmp/kopia-testowa.sh https://raw.githubusercontent.com/Airchi79/strzelnica-portal/main/deploy/kopia-testowa.sh && sh /share/strzelnica/tmp/kopia-testowa.sh
 ```
 
-Jeśli adres QNAP w sieci domowej jest inny niż 192.168.1.87, poprzedź polecenie: `LAN_IP=192.168.1.xx sh …`
-(i ten sam adres wpisz w trasie tunelu).
+4. **Token tunelu testu** (raz) — skrypt zapyta o wklejenie i pokaże tylko początek i koniec:
+
+```
+cd /share/CACHEDEV3_DATA/strzelnica-test && sh deploy/ustaw-env.sh TUNNEL_TOKEN && docker compose --profile tunel up -d tunnel
+```
+
+Przy kolejnych uruchomieniach skrypt sam uruchamia tunel testu.
+
 
 Skrypt:
 - zakłada folder testu na tym samym woluminie co produkcja (fizyczna ścieżka produkcji; przerywa, gdy folder wypadłby
@@ -61,7 +69,7 @@ Skrypt:
 
 ## Odświeżenie danych testu z produkcji
 
-To samo polecenie co przy tworzeniu: `sh /share/strzelnica/deploy/kopia-testowa.sh` — dane testu zostaną
+`sh /share/CACHEDEV3_DATA/strzelnica-test/deploy/kopia-testowa.sh` — dane testu zostaną
 **zastąpione** aktualnymi danymi produkcji (próby z testu znikną). Kiosk testowy trzeba potem sparować ponownie.
 
 ## Logowanie w teście
@@ -75,4 +83,4 @@ potwierdzenie przyjdzie na biuro@ z dopiskiem, do kogo było adresowane.
 ```
 cd /share/CACHEDEV3_DATA/strzelnica-test && docker compose down && cd / && rm -rf /share/CACHEDEV3_DATA/strzelnica-test
 ```
-oraz trasa `test` w tunelu Cloudflare.
+oraz tunel `qnap-test` w Cloudflare.

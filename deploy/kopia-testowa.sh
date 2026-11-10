@@ -1,6 +1,11 @@
 #!/bin/sh
-# Kopia testowa na tym samym serwerze: /share/strzelnica-test (osobna baza, pliki, port, obraz Dockera).
-# Produkcja (/share/strzelnica) jest tylko ODCZYTYWANA: zrzut bazy (pg_dump) i skopiowanie plików prywatnych.
+# Kopia testowa na tym samym serwerze, na TYM SAMYM WOLUMINIE co produkcja (np. /share/CACHEDEV3_DATA/strzelnica-test):
+# osobna baza, pliki, port i obraz Dockera. Produkcja (/share/strzelnica) jest tylko ODCZYTYWANA: zrzut bazy (pg_dump)
+# i skopiowanie plików prywatnych.
+#
+# Uwaga QNAP: /share to mały dysk systemowy w pamięci RAM — na woluminy danych wskazują tylko foldery udostępnione
+# (np. /share/strzelnica → /share/CACHEDEV3_DATA/strzelnica). Dlatego folder testu wyznaczamy z fizycznej ścieżki
+# produkcji i przerywamy, gdy wypadłby na dysku systemowym albo zabrakłoby miejsca.
 #
 # Użycie (na QNAP, jako admin):
 #   sh /share/strzelnica/deploy/kopia-testowa.sh            # pierwsze utworzenie albo odświeżenie danych z produkcji
@@ -10,15 +15,26 @@
 # TEST_PORT (8001), REDIRECT (adres, na który trafiają WSZYSTKIE e-maile z testu).
 set -eu
 PROD=/share/strzelnica
-TEST=/share/strzelnica-test
+MIN_FREE_GB=5
 TEST_HOST="${TEST_HOST:-test.strzelnicasatok.pl}"
 LAN_IP="${LAN_IP:-192.168.1.87}"
 TEST_PORT="${TEST_PORT:-8001}"
 REDIRECT="${REDIRECT:-biuro@strzelnicasatok.pl}"
 URL=https://github.com/Airchi79/strzelnica-portal/archive/refs/heads/main.tar.gz
 
-[ "$PROD" != "$TEST" ] || { echo "Błąd: folder testu nie może być folderem produkcji."; exit 1; }
 [ -f "$PROD/.env" ] || { echo "Brak $PROD/.env — uruchom na serwerze produkcji."; exit 1; }
+PROD_REAL=$(cd "$PROD" && pwd -P)
+VOLUME=$(dirname "$PROD_REAL")
+TEST="$VOLUME/strzelnica-test"
+[ "$PROD_REAL" != "$TEST" ] || { echo "Błąd: folder testu nie może być folderem produkcji."; exit 1; }
+MOUNT=$(df -P "$VOLUME" | awk 'NR == 2 { print $6 }')
+case "$MOUNT" in
+  /|/share|"") echo "Błąd: $VOLUME leży na dysku systemowym ($MOUNT), nie na woluminie danych — przerwano, nic nie zmieniono."; exit 1 ;;
+esac
+FREE_KB=$(df -Pk "$VOLUME" | awk 'NR == 2 { print $4 }')
+[ "$FREE_KB" -ge $((MIN_FREE_GB * 1024 * 1024)) ] || {
+  echo "Błąd: na woluminie $MOUNT jest mniej niż $MIN_FREE_GB GB wolnego miejsca — przerwano, nic nie zmieniono."; exit 1; }
+echo "Folder kopii testowej: $TEST (wolumin $MOUNT, wolne: $((FREE_KB / 1024 / 1024)) GB)"
 
 code() {
   mkdir -p "$TEST/tmp"
@@ -76,7 +92,10 @@ until docker compose exec -T db sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTG
   i=$((i + 1)); [ "$i" -lt 60 ] || { echo "Baza testu nie wystartowała."; exit 1; }; sleep 2
 done
 echo "Wgrywam dane do bazy testu…"
-docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --clean --if-exists' < tmp/produkcja.dump || true
+if ! docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --clean --if-exists' < tmp/produkcja.dump; then
+  rm -f tmp/produkcja.dump
+  echo "Błąd wgrywania danych do bazy testu — sprawdź: cd $TEST && docker compose logs --tail 40 db"; exit 1
+fi
 rm -f tmp/produkcja.dump
 docker compose up -d --build app cron backup
 i=0

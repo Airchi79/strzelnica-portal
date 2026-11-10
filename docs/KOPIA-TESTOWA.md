@@ -5,7 +5,7 @@ Dwie kopie systemu na tym samym QNAP:
 | | Produkcja | Kopia testowa |
 |---|---|---|
 | Adres | rezerwacje.strzelnicasatok.pl | test.strzelnicasatok.pl |
-| Folder | `/share/strzelnica` | `/share/strzelnica-test` |
+| Folder | `/share/strzelnica` (→ `/share/CACHEDEV3_DATA/strzelnica`) | `/share/CACHEDEV3_DATA/strzelnica-test` (ten sam wolumin) |
 | Wersja programu | gałąź **`produkcja`** (tylko sprawdzone zmiany) | gałąź **`main`** (każda nowa zmiana) |
 | Baza i pliki | własne | własne (kopia danych z produkcji z chwili utworzenia / odświeżenia) |
 | E-maile | do adresatów | **wszystkie na biuro@strzelnicasatok.pl** (temat: `[TEST → adresat]`) |
@@ -32,6 +32,9 @@ cd /share/strzelnica && wget -O tmp/strzelnica.tar.gz https://github.com/Airchi7
 
 ## Pierwsze utworzenie kopii testowej
 
+> **QNAP:** `/share` to mały dysk systemowy w pamięci RAM. Nie zakładaj tam folderów ręcznie (`mkdir /share/…`) —
+> na woluminy danych wskazują tylko foldery udostępnione (np. `/share/strzelnica`). Skrypt sam wybiera właściwy wolumin.
+
 1. **Tunel Cloudflare** (raz): Cloudflare → Networks → Tunnels → **qnap** → Routes → **Add route** → Published application:
    `test` / `strzelnicasatok.pl`, typ **HTTP**, URL **`192.168.1.87:8001`** (adres QNAP w sieci domowej i port testu).
 2. **Zalecane — dostęp tylko dla Ciebie**: Cloudflare → Zero Trust → Access → Applications → Add → Self-hosted →
@@ -47,7 +50,9 @@ Jeśli adres QNAP w sieci domowej jest inny niż 192.168.1.87, poprzedź polecen
 (i ten sam adres wpisz w trasie tunelu).
 
 Skrypt:
-- tworzy `/share/strzelnica-test/.env` z ustawień produkcji (bez tokenu tunelu, z nowym kluczem), a przy każdym
+- zakłada folder testu na tym samym woluminie co produkcja (fizyczna ścieżka produkcji; przerywa, gdy folder wypadłby
+  na dysku systemowym QNAP albo na woluminie jest mniej niż 5 GB wolnego miejsca);
+- tworzy `.env` testu z ustawień produkcji (bez tokenu tunelu, z nowym kluczem), a przy każdym
   uruchomieniu wymusza ustawienia testu: `SITE_ENVIRONMENT=test`, `EMAIL_REDIRECT_TO`, `TPAY_SANDBOX=true`, adres
   `test.strzelnicasatok.pl`, osobny obraz (`IMAGE_NAME`) i port 8001;
 - produkcję tylko odczytuje (zrzut bazy, kopia plików prywatnych) — niczego w niej nie zmienia;
@@ -68,6 +73,6 @@ potwierdzenie przyjdzie na biuro@ z dopiskiem, do kogo było adresowane.
 ## Usunięcie kopii testowej
 
 ```
-cd /share/strzelnica-test && docker compose down && cd / && rm -rf /share/strzelnica-test
+cd /share/CACHEDEV3_DATA/strzelnica-test && docker compose down && cd / && rm -rf /share/CACHEDEV3_DATA/strzelnica-test
 ```
 oraz trasa `test` w tunelu Cloudflare.

@@ -83,9 +83,10 @@ def plan(keep_user):
 
 
 def real_tpay_payments():
-    """Płatności Tpay poza środowiskiem testowym (prawdziwe pieniądze) — dokumentacja księgowa."""
+    """Zaksięgowane płatności Tpay poza środowiskiem testowym (prawdziwe pieniądze) — dokumentacja księgowa.
+    Nieudane, anulowane i niedokończone próby nie przenoszą pieniędzy, więc nie blokują czyszczenia."""
     Payment = _m("payments.Payment")
-    return [p for p in Payment.objects.filter(method=Payment.Method.TPAY).exclude(status=Payment.Status.PENDING) if not p.is_test]
+    return [p for p in Payment.objects.filter(method=Payment.Method.TPAY, status=Payment.Status.COMPLETED) if not p.is_test]
 
 
 def check(keep_user, allow_real_tpay=False, backup_state=None):
@@ -102,7 +103,8 @@ def check(keep_user, allow_real_tpay=False, backup_state=None):
     real = real_tpay_payments()
     if real and not allow_real_tpay:
         errors.append(f"W systemie są prawdziwe płatności Tpay ({len(real)}): "
-                      + ", ".join(f"{p.amount / 100:.2f} zł z {p.created_at:%d.%m.%Y}" for p in real[:10])
+                      + ", ".join(f"{p.amount / 100:.2f} zł z {p.created_at:%d.%m.%Y} (zaksięgowana {p.completed_at:%d.%m.%Y %H:%M})"
+                                   if p.completed_at else f"{p.amount / 100:.2f} zł z {p.created_at:%d.%m.%Y}" for p in real[:10])
                       + ". To dokumentacja księgowa — usuń je tylko świadomie (opcja dopuszczająca prawdziwe płatności).")
     Resolution = _m("association.Resolution")
     linked = Resolution.objects.filter(target_applications__isnull=False).distinct()

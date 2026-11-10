@@ -66,7 +66,14 @@ if [ ! -f "$TEST/.env" ]; then
   echo "Tworzę $TEST/.env na podstawie produkcji (z ustawieniami testu)…"
   grep -v '^TUNNEL_TOKEN=' "$PROD/.env" > "$TEST/.env"
   chmod 600 "$TEST/.env"
-  setvar DJANGO_SECRET_KEY "$(head -c 48 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  setvar DJANGO_SECRET_KEY ""  # wymusza nowy klucz poniżej (inny niż na produkcji)
+fi
+# Osobny klucz testu (96 znaków, z jądra Linuksa — działa także w BusyBox na QNAP); uzupełniany, gdy brak lub za krótki.
+if ! grep -q '^DJANGO_SECRET_KEY=.\{50\}' "$TEST/.env"; then
+  KEY=$(cat /proc/sys/kernel/random/uuid /proc/sys/kernel/random/uuid /proc/sys/kernel/random/uuid | tr -d '\n-')
+  [ "${#KEY}" -ge 90 ] || { echo "Błąd: nie udało się wygenerować klucza DJANGO_SECRET_KEY."; exit 1; }
+  setvar DJANGO_SECRET_KEY "$KEY"
+  unset KEY
 fi
 # Ustawienia testu — za każdym razem (bezpieczeństwo ważniejsze niż ręczne zmiany w .env testu)
 setvar SITE_ENVIRONMENT test

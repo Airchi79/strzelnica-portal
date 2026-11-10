@@ -36,7 +36,7 @@
         <div class="msg warning">Obowiązują nowe dokumenty do akceptacji. <a href="{% url 'regulations:accept' %}?next={{ request.get_full_path|urlencode }}">Przeczytaj i zaakceptuj</a></div>
       {% endif %}
       {% for message in messages %}<div class="msg {{ message.tags }}" role="status">{{ message }}</div>{% endfor %}
-      {% block panel %}{% endblock %}
+      {% block panel %}{% block content %}{% endblock %}{% endblock %}
     </main>
   </div>
 </div>

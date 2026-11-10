@@ -71,6 +71,13 @@ class ProfileForm(ProfileFieldsMixin, forms.ModelForm):
         fields = ["first_name", "last_name", "phone", "street", "postal_code", "city"]
 
 
+class PanelProfileForm(ProfileForm):
+    """Konto panelu: bez adresu (potrzebny tylko strzelcowi, np. do wpisu w książce pobytu)."""
+
+    class Meta(ProfileForm.Meta):
+        fields = ["first_name", "last_name", "phone"]
+
+
 class OTPTokenForm(forms.Form):
     token = forms.CharField(
         label="Kod z aplikacji",

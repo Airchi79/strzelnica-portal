@@ -36,6 +36,8 @@ def site(request):
         "SITE_URL": settings.SITE_URL,
         "pending_regulations": pending,
         "PANEL_ACCOUNT": panel_account,
+        # „Moje konto” (profil, zmiana hasła) dla konta panelu — w wyglądzie panelu
+        "ACCOUNT_BASE": "panel/base_panel.html" if panel_account else "base.html",
         "unread_notifications": unread,
         "unread_portal": unread_portal,
     }

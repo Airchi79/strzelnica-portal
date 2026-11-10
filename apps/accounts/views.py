@@ -22,7 +22,7 @@ from apps.core.qr import qr_svg_data_uri
 
 from . import ratelimit
 from .backends import EmailBackend
-from .forms import DeactivateForm, LoginForm, OTPTokenForm, ProfileForm, RegistrationForm, ResendVerificationForm
+from .forms import DeactivateForm, LoginForm, OTPTokenForm, PanelProfileForm, ProfileForm, RegistrationForm, ResendVerificationForm
 from .models import User
 from .tokens import email_verification_token
 
@@ -207,7 +207,10 @@ def logout_view(request):
 @login_required
 def profile(request):
     before = User.objects.get(pk=request.user.pk)
-    form = ProfileForm(request.POST or None, instance=request.user)
+    from apps.core.middleware import is_panel_account
+
+    form_class = PanelProfileForm if is_panel_account(request.user) else ProfileForm
+    form = form_class(request.POST or None, instance=request.user)
     if request.method == "POST" and form.is_valid():
         user = form.save()
         log_event("konto.profil_zmiana", user, changes=diff(before, user, form.Meta.fields))

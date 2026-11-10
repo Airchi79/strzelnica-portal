@@ -1,4 +1,5 @@
 import base64
+import re
 from datetime import timedelta
 from io import BytesIO
 
@@ -537,13 +538,15 @@ def test_my_page_offers_entry_for_own_running_reservation_and_manual_exit(client
     client.force_login(ps)
     token = services.reservation_token(running)
     body = client.get("/ksiazka/moj-kod/").content.decode()
-    assert f"/ksiazka/wpis/r/{token}/" in body
+    # token zawiera znacznik czasu (sekunda podpisu) — porównujemy rezerwację, do której prowadzi link, nie sam tekst
+    links = re.findall(r"/ksiazka/wpis/r/([^/\"]+)/", body)
+    assert [services.reservation_from_token(t) for t in links] == [running]
     client.post(f"/ksiazka/wpis/r/{token}/", {**permit_data(first_name="Piotr", last_name="Prowadzący"), "purpose": "strzelanie",
                                              "signature": sig})
     entry = Entry.objects.get()
     assert entry.user == ps and entry.exited_at is None
     body = client.get("/ksiazka/moj-kod/").content.decode()
-    assert "Zakończ pobyt" in body and f"/ksiazka/wpis/r/{token}/" not in body  # już wpisany — bez ponownego wpisu
+    assert "Zakończ pobyt" in body and "/ksiazka/wpis/r/" not in body  # już wpisany — bez ponownego wpisu
     client.post(f"/ksiazka/moje-wyjscie/{entry.pk}/")
     entry.refresh_from_db()
     assert entry.exited_at is not None

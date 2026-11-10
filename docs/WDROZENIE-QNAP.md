@@ -277,3 +277,34 @@ cd /share/strzelnica && docker compose up -d
 ```
 Po awarii całego QNAP: zainstaluj program według punktów 0–2 i 5 na nowym serwerze, wgraj `.env` z menedżera haseł,
 przywróć z HBS 3 folder `backups` i `data/private`, a potem wykonaj kroki 3–4 powyżej.
+
+## 10. Uruchomienie systemu: usunięcie danych z okresu testów
+
+Przed zastąpieniem GunTrackera usuń wszystko, co powstało podczas prób: rezerwacje, książkę pobytu (wpisy, korekty,
+wydruki dzienne), płatności i salda, raporty wpływów, kiosk i skarbonkę, wydarzenia, ogłoszenia, usterki, blokady osi,
+karnety, kluby i kody, składki, deklaracje członkowskie, powiadomienia, e-maile, dziennik zdarzeń oraz wszystkie konta
+poza Twoim. Numeracja rezerwacji, wpisów i raportów zaczyna się od 1.
+
+**Zostaje:** import z GunTrackera (archiwum książki i rezerwacji z ich blokadami osi, kartoteka osób z importu),
+członkowie, uchwały, zebrania, regulaminy, ustawienia, osie, godziny, cennik, sparowane kioski, FAQ, wygląd oraz Twoje
+konto (uprawnienia, legitymacja, logowanie 2FA, akceptacje regulaminów).
+
+1. Zrób świeżą kopię bazy (bez niej polecenie odmówi): `cd /share/strzelnica && docker compose exec backup sh /backup.sh --once`
+2. Raport — nic nie usuwa, pokazuje liczby i ewentualne przeszkody:
+   ```
+   docker compose exec app python manage.py purge_test_data --zostaw TWOJ@ADRES.pl
+   ```
+3. Usunięcie (można powtarzać, dopóki trwają testy):
+   ```
+   docker compose exec app python manage.py purge_test_data --zostaw TWOJ@ADRES.pl --wykonaj
+   ```
+4. Ostatnie czyszczenie w dniu przejścia z GunTrackera — dodatkowo blokuje polecenie na stałe:
+   ```
+   docker compose exec app python manage.py purge_test_data --zostaw TWOJ@ADRES.pl --wykonaj --koniec-testow
+   ```
+
+Polecenie działa w jednej transakcji: przy jakimkolwiek błędzie nic nie zostaje usunięte. Odmawia, gdy: nie ma świeżej
+kopii bazy, podane konto nie jest kontem właściciela, w bazie są prawdziwe (nie testowe) płatności Tpay (świadome
+usunięcie: `--z-prawdziwymi-platnosciami`) albo uchwała jest powiązana z deklaracją członkowską złożoną w systemie.
+Import z GunTrackera najlepiej wykonać **po** ostatnim czyszczeniu (pkt 4) — import nie jest usuwany, ale tak jest prościej
+sprawdzić, że dane są kompletne.

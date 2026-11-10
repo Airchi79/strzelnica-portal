@@ -143,6 +143,9 @@ def test_refuses_without_backup_non_owner_and_real_tpay(world):
         call_command("purge_test_data", "--zostaw", owner.email, "--wykonaj", stdout=io.StringIO())
     with pytest.raises(CommandError, match="superużytkownik"):
         call_command("purge_test_data", "--zostaw", shooter.email, "--wykonaj", "--bez-kopii", stdout=io.StringIO())
+    # nieudana / anulowana próba poza sandboxem — bez pieniędzy, nie blokuje
+    Payment.objects.create(user=shooter, amount=3500, method=Payment.Method.TPAY, status=Payment.Status.FAILED, raw={"sandbox": False})
+    assert go_live.real_tpay_payments() == []
     Payment.objects.create(user=shooter, amount=1000, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED,
                            raw={"powiadomienie": {"test_mode": "0"}}, completed_at=timezone.now())
     with pytest.raises(CommandError, match="prawdziwe płatności Tpay"):

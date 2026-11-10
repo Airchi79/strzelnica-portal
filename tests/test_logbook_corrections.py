@@ -139,14 +139,14 @@ def test_remote_shooting_still_needs_reservation(client, sig):
     assert not Entry.objects.exists()
 
 
-# --- „Wpis obsługi” w panelu klienta --------------------------------------------------------------------------------
+# --- konto panelu = tylko panel; „Wpis obsługi” w panelu -------------------------------------------------------------
 
 
-def test_staff_entry_button_only_with_permission(owner_client):
+def test_panel_account_uses_staff_entry_in_panel(owner_client):
     plain = Client()
     plain.force_login(make_user("p@example.com"))
     assert "Wpis obsługi" not in plain.get("/ksiazka/moj-kod/").content.decode()
-    body = owner_client.get("/ksiazka/moj-kod/").content.decode()
-    assert "/panel/ksiazka/nowy-wpis/?cel=prace" in body
+    r = owner_client.get("/ksiazka/moj-kod/")
+    assert r.status_code == 302 and r.url == "/panel/"  # konto panelu nie ma „Mojego kodu QR”
     form = owner_client.get("/panel/ksiazka/nowy-wpis/?cel=prace").content.decode()
     assert "obsługa strzelnicy" in form  # cel „prace” i opis ustawione z góry

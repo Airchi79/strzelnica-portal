@@ -107,9 +107,9 @@ def test_purge_removes_test_data_and_keeps_imports_and_owner(world):
     for model in (Reservation, Entry, EntryCorrection, DailyPrint, Payment, LedgerEntry, Wallet, SalesReport, OnsiteBooking,
                   CashDeclaration, Event, Announcement, Issue, Club, AccessCode, Fee, Notification, OutgoingEmail, SensitiveAccessLog):
         assert not model.objects.exists(), model
-    # konta: tylko właściciel, z legitymacją; członkowie zostają (bez powiązania z usuniętym kontem)
+    # konta: tylko właściciel (bez danych strzelca); członkowie zostają (bez powiązania z usuniętym kontem)
     assert list(User.objects.all()) == [owner]
-    assert Credential.objects.filter(user=owner).exists() and Credential.objects.count() == 1
+    assert not Credential.objects.exists()  # legitymacja właściciela też — konto panelu nie jest kontem strzelca
     world["member_shooter"].refresh_from_db()
     assert world["member_shooter"].user is None and Member.objects.get(pk=world["member_owner"].pk).user == owner
     # import GunTrackera i jego blokady zostają; kartoteka z panelu znika
@@ -121,7 +121,10 @@ def test_purge_removes_test_data_and_keeps_imports_and_owner(world):
     assert list(AuditLog.objects.values_list("action", flat=True)) == [go_live.PURGE_EVENT]
     # numeracja od nowa, a blokady w bazie znów działają
     lane = Lane.objects.get(name="Oś 100 m")
-    r = bookings.create_reservation(owner, lane, timezone.localdate() + timedelta(days=10), 10, 11, 1)
+    newcomer = make_user("nowy@example.com")  # pierwszy prawdziwy strzelec po uruchomieniu
+    add_credential(newcomer, number="PS 1")
+    approve(newcomer)
+    r = bookings.create_reservation(newcomer, lane, timezone.localdate() + timedelta(days=10), 10, 11, 1)
     assert r.number.endswith("-0001")
     from django.db import DatabaseError, transaction
 

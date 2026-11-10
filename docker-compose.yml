@@ -9,7 +9,7 @@
 
 x-app: &app
   build: .
-  image: strzelnica-portal:latest
+  image: ${IMAGE_NAME:-strzelnica-portal}:latest   # kopia testowa: IMAGE_NAME=strzelnica-portal-test (osobny obraz)
   restart: unless-stopped
   env_file: .env
   user: "${PUID:-99}:${PGID:-100}"

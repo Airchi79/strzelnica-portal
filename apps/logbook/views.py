@@ -154,7 +154,7 @@ def my_qr(request):
     url = _absolute(request, reverse("logbook:personal", args=[services.personal_token(request.user)]))
     entries = services.apply_corrections(request.user.log_entries.select_related("reservation__lane").order_by("-entered_at")[:50])
     return render(request, "logbook/my_qr.html", {
-        "qr": qr_svg_data_uri(url, box_size=10), "entries": entries, "staff_entry": request.user.has_perm("logbook.staff_entry"),
+        "qr": qr_svg_data_uri(url, box_size=10), "entries": entries,
         "open_stays": services.my_open_stays(request.user), "my_reservations": services.my_reservations_for_entry(request.user),
     })
 

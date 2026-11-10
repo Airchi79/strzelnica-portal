@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#2f5d3a">
-  <title>{% block title %}{{ SITE_NAME }}{% endblock %} · {{ SITE_NAME }}</title>
+  <title>{% if TEST_COPY %}[TEST] {% endif %}{% block title %}{{ SITE_NAME }}{% endblock %} · {{ SITE_NAME }}</title>{% if TEST_COPY %}<meta name="robots" content="noindex">{% endif %}
   <link rel="manifest" href="{% url 'manifest' %}">
   <link rel="icon" type="image/png" href="{{ BRAND.icon_192 }}">
   <link rel="apple-touch-icon" href="{{ BRAND.icon_maskable }}">
@@ -13,6 +13,7 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}"{% if user.is_authenticated %} data-unread="{{ unread_portal|add:unread_notifications|stringformat:"d" }}" data-push-url="{% url 'core:push_subscribe' %}"{% endif %}>
+{% if TEST_COPY %}<div class="test-copy-bar" role="note" style="position:sticky;top:0;z-index:10000;background:#b3261e;color:#fff;text-align:center;font:600 13px/1.6 system-ui,sans-serif;padding:3px 8px">WERSJA TESTOWA — próby bez skutków: płatności testowe Tpay, e-maile trafiają tylko na adres testowy</div>{% endif %}
 <a class="skip-link" href="#tresc">Przejdź do treści</a>
 {% block shell %}
 <header class="topbar{% if user.is_staff %} has-panel{% endif %}">
@@ -21,8 +22,8 @@
     {% if user.is_authenticated %}<div class="top-icons">
       {% if header_balance is not None %}<a class="balance-chip{% if header_balance < 0 %} neg{% endif %}" href="{% url 'payments:wallet' %}" title="Saldo i płatności"
          aria-label="Saldo: {{ header_balance|pln }}">{% icon "wallet" 18 %}<span>{{ header_balance|pln }}</span></a>{% endif %}
-      <a class="bell" href="{% url 'core:notifications' %}" title="Powiadomienia"
-         aria-label="Powiadomienia{% if unread_portal %}: {{ unread_portal }} nowe{% endif %}">{% icon "bell" 22 %}{% if unread_portal %}<span class="dot-count">{{ unread_portal|stringformat:"d" }}</span>{% endif %}</a>
+      {% if not PANEL_ACCOUNT %}<a class="bell" href="{% url 'core:notifications' %}" title="Powiadomienia"
+         aria-label="Powiadomienia{% if unread_portal %}: {{ unread_portal }} nowe{% endif %}">{% icon "bell" 22 %}{% if unread_portal %}<span class="dot-count">{{ unread_portal|stringformat:"d" }}</span>{% endif %}</a>{% endif %}
     </div>{% endif %}
     <nav class="nav">
       <a href="{% url 'core:now' %}">Teraz</a>
@@ -32,7 +33,7 @@
       <a href="{% url 'regulations:list' %}">Regulamin</a>
       <a href="{% url 'core:faq' %}">Pytania</a>
       {% if user.is_authenticated %}
-        <a href="{% url 'core:dashboard' %}">Mój pulpit</a>
+        {% if not PANEL_ACCOUNT %}<a href="{% url 'core:dashboard' %}">Mój pulpit</a>{% endif %}
         {% if user.is_staff %}<a href="{% url 'panel:home' %}">Panel zarządu{% if unread_notifications %} ({{ unread_notifications }}){% endif %}</a>{% endif %}
         <form class="inline-form" method="post" action="{% url 'accounts:logout' %}" data-push-logout="{% url 'core:push_subscribe' %}">{% csrf_token %}<button type="submit">Wyloguj</button></form>
       {% else %}

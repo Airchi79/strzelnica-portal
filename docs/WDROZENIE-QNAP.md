@@ -182,10 +182,11 @@ Po tym czasie Unraid można wyłączyć.
 - **Wyłącz SSH** na QNAP.
 - **Kopia poza QNAP** — rozdział 9 poniżej.
 - Migawki woluminu `DataVol1` (codziennie 3:00) dodatkowo chronią przed przypadkowym usunięciem i ransomware.
-- Aktualizacja programu na QNAP (zamiast poleceń z instrukcji Unraid):
+- Aktualizacja programu na QNAP — produkcja pobiera wyłącznie gałąź `produkcja` (sprawdzoną w kopii testowej,
+  zob. `docs/KOPIA-TESTOWA.md`):
 
 ```bash
-cd /share/strzelnica && wget -O tmp/strzelnica.tar.gz https://github.com/Airchi79/strzelnica-portal/archive/refs/heads/main.tar.gz && tar -xzf tmp/strzelnica.tar.gz -C tmp && cp -a tmp/strzelnica-portal-main/. /share/strzelnica/ && docker compose up -d --build
+cd /share/strzelnica && wget -O tmp/strzelnica.tar.gz https://github.com/Airchi79/strzelnica-portal/archive/refs/heads/produkcja.tar.gz && tar -xzf tmp/strzelnica.tar.gz -C tmp && cp -a tmp/strzelnica-portal-produkcja/. /share/strzelnica/ && docker compose up -d --build
 ```
 
 ## 9. Kopia zapasowa poza QNAP (Hybrid Backup Sync)
@@ -283,11 +284,12 @@ przywróć z HBS 3 folder `backups` i `data/private`, a potem wykonaj kroki 3–
 Przed zastąpieniem GunTrackera usuń wszystko, co powstało podczas prób: rezerwacje, książkę pobytu (wpisy, korekty,
 wydruki dzienne), płatności i salda, raporty wpływów, kiosk i skarbonkę, wydarzenia, ogłoszenia, usterki, blokady osi,
 karnety, kluby i kody, składki, deklaracje członkowskie, powiadomienia, e-maile, dziennik zdarzeń oraz wszystkie konta
-poza Twoim. Numeracja rezerwacji, wpisów i raportów zaczyna się od 1.
+poza Twoim. Z Twojego konta znikają dane strzelca (legitymacje, kartoteka, akceptacje regulaminów) — konto panelu
+działa wyłącznie jako panel. Numeracja rezerwacji, wpisów i raportów zaczyna się od 1.
 
 **Zostaje:** import z GunTrackera (archiwum książki i rezerwacji z ich blokadami osi, kartoteka osób z importu),
 członkowie, uchwały, zebrania, regulaminy, ustawienia, osie, godziny, cennik, sparowane kioski, FAQ, wygląd oraz Twoje
-konto (uprawnienia, legitymacja, logowanie 2FA, akceptacje regulaminów).
+konto panelu (uprawnienia, logowanie 2FA, powiązanie z członkiem stowarzyszenia — głosowania zarządu).
 
 1. Zrób świeżą kopię bazy (bez niej polecenie odmówi): `cd /share/strzelnica && docker compose exec backup sh /backup.sh --once`
 2. Raport — nic nie usuwa, pokazuje liczby i ewentualne przeszkody:

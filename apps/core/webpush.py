@@ -175,7 +175,15 @@ def _deliver(user_ids, message):
     from .models import PushSubscription
 
     try:
-        subs = list(PushSubscription.objects.filter(user_id__in=user_ids, user__is_active=True))
+        subs = PushSubscription.objects.filter(user_id__in=user_ids, user__is_active=True)
+        if getattr(settings, "IS_TEST_COPY", False):
+            # Kopia testowa: tylko urządzenia zarejestrowane w niej po przygotowaniu kopii (prepare_test_copy) —
+            # nigdy telefony członków skopiowane z produkcji.
+            from apps.audit.models import AuditLog
+
+            prepared = AuditLog.objects.filter(action="system.kopia_testowa").order_by("-at").values_list("at", flat=True).first()
+            subs = subs.filter(created_at__gt=prepared) if prepared else subs.none()
+        subs = list(subs)
         if not subs:
             return
         key = _private_key()

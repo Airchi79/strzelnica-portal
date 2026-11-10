@@ -314,7 +314,10 @@ def test_observers_do_not_count(ps, sig):
 # --- panel ---------------------------------------------------------------------------
 
 
-def test_panel_logbook_permissions_and_access_log(client, owner_client, running, sig):
+def test_panel_logbook_permissions_and_access_log(owner_client, running, sig):
+    from django.test import Client
+
+    client = Client()  # osoba wpisująca się (bez konta) — osobna przeglądarka niż panel
     client.post(f"/ksiazka/wpis/r/{services.reservation_token(running)}/", {**permit_data(), "purpose": "strzelanie", "signature": sig})
     entry = Entry.objects.get()
     body = owner_client.get("/panel/ksiazka/").content.decode()
@@ -326,8 +329,6 @@ def test_panel_logbook_permissions_and_access_log(client, owner_client, running,
     printed = owner_client.get("/panel/ksiazka/druk/").content.decode()
     assert "Książka rejestru pobytu" in printed and "AB 123" in printed
     assert SensitiveAccessLog.objects.filter(resource__startswith="ksiazka:").count() >= 3
-
-    from django.test import Client
 
     staff = grant(make_user("z@example.com"), "credentials.review_credential")
     c = Client()

@@ -70,6 +70,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django_otp.middleware.OTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "apps.core.middleware.PanelOnlyAccountMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.audit.middleware.RequestContextMiddleware",
 ]
@@ -167,6 +168,19 @@ EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", not EMAIL_USE_SSL) and not EMAIL_USE_S
 EMAIL_TIMEOUT = 20
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Strzelnica Sątok <no-reply@localhost>")
 
+# Kopia testowa (SITE_ENVIRONMENT=test): pasek „WERSJA TESTOWA”, wszystkie e-maile na jeden adres (EMAIL_REDIRECT_TO),
+# tylko testowe Tpay, push wyłącznie do urządzeń zarejestrowanych w kopii testowej. Brak tych ustawień = błąd startu.
+SITE_ENVIRONMENT = env("SITE_ENVIRONMENT", "produkcja").strip().lower()
+if SITE_ENVIRONMENT not in {"produkcja", "test"}:
+    raise ImproperlyConfigured("SITE_ENVIRONMENT: dozwolone wartości to „produkcja” albo „test”.")
+IS_TEST_COPY = SITE_ENVIRONMENT == "test"
+EMAIL_REDIRECT_TO = env("EMAIL_REDIRECT_TO", "").strip()
+if IS_TEST_COPY and not EMAIL_REDIRECT_TO:
+    raise ImproperlyConfigured("Kopia testowa wymaga EMAIL_REDIRECT_TO — inaczej e-maile z testów trafiłyby do członków.")
+if EMAIL_REDIRECT_TO:
+    EMAIL_INNER_BACKEND = EMAIL_BACKEND
+    EMAIL_BACKEND = "apps.core.mail_redirect.RedirectingEmailBackend"
+
 # Ochrona przed zgadywaniem haseł
 LOGIN_RATE_LIMIT_ATTEMPTS = 5
 LOGIN_RATE_LIMIT_WINDOW = 15 * 60
@@ -210,4 +224,6 @@ TPAY_CLIENT_ID = env("TPAY_CLIENT_ID", "")
 TPAY_CLIENT_SECRET = env("TPAY_CLIENT_SECRET", "")
 TPAY_SECURITY_CODE = env("TPAY_SECURITY_CODE", "")
 TPAY_SANDBOX = env_bool("TPAY_SANDBOX", True)
+if IS_TEST_COPY and not TPAY_SANDBOX:
+    raise ImproperlyConfigured("Kopia testowa może używać wyłącznie testowego Tpay (TPAY_SANDBOX=true).")
 TPAY_ENABLED = bool(TPAY_CLIENT_ID and TPAY_CLIENT_SECRET and TPAY_SECURITY_CODE)

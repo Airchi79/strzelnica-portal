@@ -3,11 +3,12 @@
 Usuwa wszystko, co powstało w tym systemie podczas prób: rezerwacje, książkę pobytu (wpisy, korekty, wydruki dzienne),
 płatności i salda, raporty wpływów, kiosk (rezerwacje na miejscu, skarbonka), wydarzenia, ogłoszenia, usterki, blokady
 osi, karnety, kluby i kody, składki, deklaracje członkowskie, powiadomienia i e-maile, dziennik zdarzeń oraz konta
-użytkowników — poza jednym wskazanym kontem właściciela. Numeracja rezerwacji, wpisów i raportów zaczyna się od nowa.
+użytkowników — poza jednym wskazanym kontem właściciela, z którego usuwane są dane strzelca (legitymacje, kartoteka,
+akceptacje regulaminów), bo konto panelu nie jest kontem strzelca. Numeracja rezerwacji, wpisów i raportów zaczyna się od nowa.
 
 Zostaje: dane zaimportowane z GunTrackera (archiwum książki pobytu i rezerwacji wraz z ich blokadami osi, kartoteka
 osób z importu), członkowie, uchwały, zebrania i głosowania, regulaminy i ich wersje, ustawienia, osie, godziny otwarcia,
-cennik, kioski (sparowane urządzenia), FAQ, wygląd, konto właściciela z jego uprawnieniami, legitymacją i logowaniem 2FA.
+cennik, kioski (sparowane urządzenia), FAQ, wygląd, konto właściciela z jego uprawnieniami, logowaniem 2FA i powiązaniem z członkiem.
 
 Bezpieczniki: bez `wykonaj` tylko raport; całość w jednej transakcji (błąd = nic nie usunięto); wymagana świeża,
 sprawdzona kopia bazy; prawdziwe płatności Tpay (nie testowe) blokują czyszczenie, chyba że jawnie dopuszczone;
@@ -74,6 +75,10 @@ def plan(keep_user):
         ("Zgłoszenia usterek", _m("facilities.Issue").objects.all()),
         ("Raporty wpływów", _m("reports.SalesReport").objects.all()),
         ("Numeracja raportów", _m("reports.ReportSequence").objects.all()),
+        # Konto właściciela zostaje jako konto panelu — bez danych strzelca (legitymacje, kartoteka, akceptacje regulaminów).
+        ("Konto właściciela: legitymacje i dokumenty", _m("credentials.Credential").objects.filter(user=keep_user)),
+        ("Konto właściciela: kartoteka strzelca", _m("clients.ClientProfile").objects.filter(user=keep_user)),
+        ("Konto właściciela: akceptacje regulaminów", _m("regulations.Acceptance").objects.filter(user=keep_user)),
         ("Konta użytkowników (poza kontem właściciela)", User.objects.exclude(pk=keep_user.pk)),
         ("Dziennik panelu administracyjnego Django", _m("admin.LogEntry").objects.all()),
         ("Rejestr dostępu do danych", _m("audit.SensitiveAccessLog").objects.all()),
@@ -142,7 +147,7 @@ def run(keep_user, by=None, end_of_tests=False, allow_real_tpay=False, backup_st
         _m("association.Resolution").objects.filter(created_by__in=others).update(created_by=None)
         # Pliki na dysku (zdjęcia legitymacji, usterek) — usuwane po zatwierdzeniu transakcji.
         Credential = _m("credentials.Credential")
-        files += [c.scan for c in Credential.objects.filter(user__in=others).exclude(scan="")]
+        files += [c.scan for c in Credential.objects.exclude(scan="")]  # wszystkie: także legitymacje właściciela
         files += [i.photo for i in _m("facilities.Issue").objects.exclude(photo="")]
         for label, qs in plan(keep_user).items():
             n = qs.count()

@@ -402,7 +402,7 @@ def test_csv_export_escapes_formulas(owner_client, lane):
 def test_notifications_panel(owner_client, owner, ps, lane, django_capture_on_commit_callbacks):
     r = book(ps, lane)
     n = Notification.objects.get(recipient=owner)
-    assert "(1)" in owner_client.get("/pulpit/").content.decode()
+    assert "Panel zarządu (1)" in owner_client.get("/").content.decode()
     response = owner_client.get(f"/panel/powiadomienia/{n.pk}/")
     assert response.url == f"/panel/rezerwacje/{r.pk}/"
     n.refresh_from_db()

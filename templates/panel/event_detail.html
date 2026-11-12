@@ -30,7 +30,7 @@
         {% if r.payment_status == 'do_zaplaty' %}{% if perms.payments.manage_payments or perms.payments.accept_onsite %}<button class="btn secondary small-btn" name="action" value="cash" data-confirm-click="Przyjąć {{ r.amount|sub:r.paid_amount|pln }} gotówką od {{ r.user.full_name }}?">Gotówka</button>
         <button class="btn secondary small-btn" name="action" value="blik" data-confirm-click="Przyjąć {{ r.amount|sub:r.paid_amount|pln }} BLIK-iem od {{ r.user.full_name }}?">BLIK</button>{% endif %}
         <button class="btn secondary small-btn" name="action" value="waive" data-confirm-click="Zwolnić {{ r.user.full_name }} z opłaty?">Zwolnij</button>{% endif %}
-        <button class="btn secondary small-btn" name="action" value="withdraw" data-confirm-click="Wycofać {{ r.user.full_name }}?{% if r.paid_amount %} Wpłata online {{ r.paid_amount|pln }} wróci przez Tpay (bez opłaty za płatność online).{% endif %} Miejsce dostanie pierwsza osoba z listy rezerwowej.">Wycofaj</button>
+        <button class="btn secondary small-btn" name="action" value="withdraw" data-confirm-click="Wycofać {{ r.user.full_name }}?{% if r.paid_amount %} Wpłata online {{ r.paid_amount|pln }} wróci przez operatora płatności (bez opłaty za płatność online).{% endif %} Miejsce dostanie pierwsza osoba z listy rezerwowej.">Wycofaj</button>
         {% if r.paid_amount %}<button class="btn secondary small-btn" name="action" value="withdraw_keep" data-confirm-click="Wycofać {{ r.user.full_name }} BEZ zwrotu? Wpłata {{ r.paid_amount|pln }} zostanie nadpłatą do decyzji zarządu.">Wycofaj bez zwrotu</button>{% endif %}</form></td>
     </tr>{% empty %}<tr><td colspan="5" class="muted">Nikt się jeszcze nie zapisał.</td></tr>{% endfor %}
   </table>
@@ -42,7 +42,7 @@
 <details class="card revoke-box no-print"><summary>Odwołaj wydarzenie</summary>
   <form method="post" data-confirm="Odwołać „{{ event.title }}”? Wszyscy zapisani dostaną e-mail, blokada osi zniknie.">{% csrf_token %}<input type="hidden" name="action" value="cancel_event">
     <div class="field"><label for="reason">Powód (trafi do uczestników) <span class="req">*</span></label><input id="reason" name="reason" maxlength="255" required></div>
-    <div class="field"><label><input type="checkbox" name="refund" value="1" checked> Zwróć wpłaty przez Tpay na rachunek / kartę uczestników</label>
+    <div class="field"><label><input type="checkbox" name="refund" value="1" checked> Zwróć wpłaty online na rachunek / kartę uczestników</label>
       <div class="small muted">Bez opłaty za płatność online. Wpłaty gotówką i przelewem trafią na listę zwrotów ręcznych. Bez zaznaczenia wpłaty zostaną nadpłatami.</div></div>
     <button class="btn danger" type="submit">Odwołaj wydarzenie</button></form></details>
 {% endif %}

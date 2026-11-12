@@ -36,6 +36,7 @@ from apps.facilities.models import Lane
 from apps.regulations.models import Acceptance, pending_acceptances
 
 from .models import OnsiteBooking, token_hash
+from apps.payments.gateway import online_enabled as online_payments_enabled
 
 VERIFY_MINUTES = 15  # decyzja właściciela: tyle czeka rezerwacja na weryfikację legitymacji
 AUTO_OK = "zgodne"  # = ocr.RESULT_OK
@@ -543,7 +544,7 @@ def payment_info(reservation, now=None):
         return {}
     due = reservation.amount - reservation.paid_amount
     until = timezone.localtime(reservation.pay_by).strftime("%H:%M") if reservation.status == Reservation.Status.HOLD and reservation.pay_by else ""
-    if settings.TPAY_ENABLED and bookings.payment_options(reservation, now)["online"]:
+    if online_payments_enabled() and bookings.payment_options(reservation, now)["online"]:
         url = settings.SITE_URL + reverse("payments:guest_pay", args=[pay_token(reservation)])
         return {"pay": {"url": url, "qr": qr_svg_data_uri(url, box_size=6), "amount_due": due, "until": until}}
     return {"pay_info": {"amount_due": due, "until": until,

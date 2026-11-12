@@ -6,7 +6,7 @@ Było: {{ old.oś }}, {{ old.od }}–{{ old.do }}{% endif %}
 Aktualne dane:
 {% include "emails/_reservation_summary.txt" %}{% if surcharge %}
 Do dopłaty: {{ surcharge|pln }}{% if options.online %} — możesz zapłacić online na stronie rezerwacji{% endif %}.{% endif %}{% if refunded %}
-Zwrot różnicy {{ refunded|pln }} został zlecony na rachunek / kartę, z której płaciłeś (Tpay).{% endif %}{% if manual %}
+Zwrot różnicy {{ refunded|pln }} został zlecony na rachunek / kartę, z której płaciłeś ({{ online_provider }}).{% endif %}{% if manual %}
 Różnicę {{ manual|pln }} zwrócimy ręcznie.{% endif %}{% if overpaid %}
 Różnica {{ overpaid|pln }} została zapisana na Twoim koncie jako nadpłata.{% endif %}
 Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}

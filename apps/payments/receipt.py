@@ -82,7 +82,7 @@ def to_pdf(payment, association):
     if payment.surcharge:
         rows.insert(-1, ["Opłata za płatność online", f"{format_pln(payment.surcharge)} — wliczona w kwotę, bezzwrotna"])
     if payment.method == payment.Method.TPAY and payment.external_id:
-        rows.insert(3, ["Identyfikator transakcji", payment.external_id.replace("tpay:", "")])
+        rows.insert(3, ["Identyfikator transakcji", f"{payment.external_id.split(':', 1)[-1]} ({payment.provider_name or 'online'})"])
     table = Table(rows, colWidths=[42 * mm, doc.width - 42 * mm])
     table.setStyle(TableStyle([
         ("FONT", (0, 0), (-1, -1), "DejaVu", 9.5), ("FONT", (0, 0), (0, -1), "DejaVu-Bold", 9.5),

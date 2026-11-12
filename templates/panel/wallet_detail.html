@@ -9,11 +9,11 @@
   <div class="card"><span class="muted small">Rezerwacje do zapłaty</span><div class="stat">{{ due|length }}</div>
     {% for r in due %}<div class="small"><a href="{% url 'panel:reservation' r.pk %}">{{ r.number }}</a> · {{ r.amount|sub:r.paid_amount|pln }}</div>{% endfor %}</div>
 </div>
-{% if refundable %}<div class="card"><h2 style="margin-top:0">Nadpłata do zwrotu przez Tpay</h2>
+{% if refundable %}<div class="card"><h2 style="margin-top:0">Nadpłata do zwrotu online (na kartę / rachunek)</h2>
   {% for p, amount in refundable %}<form method="post" class="actions" style="margin:0 0 8px;align-items:center" data-confirm="Zwrócić {{ amount|pln }} na rachunek / kartę płacącego?">{% csrf_token %}
     <input type="hidden" name="action" value="refund_tpay"><input type="hidden" name="payment" value="{{ p.pk }}">
     <span>Wpłata online {{ p.completed_at|date:"j.m.Y H:i" }} za anulowaną rezerwację <a href="{% url 'panel:reservation' p.reservation_id %}">{{ p.reservation.number }}</a> — <strong>{{ amount|pln }}</strong></span>
-    <button class="btn secondary" type="submit">Zwróć przez Tpay</button></form>{% endfor %}
+    <button class="btn secondary" type="submit">Zwróć przez operatora</button></form>{% endfor %}
   <p class="small muted">Pieniądze wracają na rachunek / kartę, z której strzelec płacił; operacja „zwrot do wpłacającego” zmniejszy saldo.</p></div>{% endif %}
 <div class="actions" style="margin-top:0;margin-bottom:16px"><a class="btn" href="{% url 'panel:payment_manual' %}?user={{ subject.pk }}">Przyjmij wpłatę</a></div>
 <h2>Historia</h2>
@@ -27,8 +27,8 @@
 {% if balance > 0 %}<h2>Zwrot ręczny do strzelca</h2>
 <div class="card"><form method="post" novalidate data-confirm="Zaksięgować zwrot ręczny? Zmniejszy nadpłatę strzelca.">{% csrf_token %}<input type="hidden" name="action" value="manual_refund">
   {% include "partials/form.html" with form=refund_form %}<button class="btn secondary" type="submit">Zaksięguj zwrot</button></form>
-<p class="small muted">Gdy oddałeś pieniądze poza systemem (przelewem, gotówką albo zwrotem w panelu Tpay). Zwrot trafi do raportu wpływów.
-  Nie używaj go po „Zwróć przez Tpay” — tamten zwrot księguje się sam.</p></div>{% endif %}
+<p class="small muted">Gdy oddałeś pieniądze poza systemem (przelewem, gotówką albo zwrotem w panelu operatora płatności). Zwrot trafi do raportu wpływów.
+  Nie używaj go po „Zwróć przez operatora” — tamten zwrot księguje się sam.</p></div>{% endif %}
 <h2>Korekta salda</h2>
 <div class="card"><form method="post" novalidate data-confirm="Zaksięgować korektę salda?">{% csrf_token %}{% include "partials/form.html" %}<button class="btn secondary" type="submit">Zaksięguj korektę</button></form>
 <p class="small muted">Korekta jest nową operacją w historii — wcześniejszych operacji nie można zmienić ani usunąć.</p></div>

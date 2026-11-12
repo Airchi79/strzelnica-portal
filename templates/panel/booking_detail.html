@@ -53,7 +53,7 @@
 <h2>Zatwierdzenie</h2>
 <div class="card">
   <p>{% if r.with_officer %}Rezerwacja z prowadzącym od strzelnicy — {% if r.officer %}prowadzący przydzielony, możesz zatwierdzić{% else %}<strong>najpierw przydziel prowadzącego</strong> (wyżej){% endif %}. {% else %}Nowy strzelec — {% endif %}<a href="{% url 'panel:user' r.user_id %}">karta strzelca</a>.
-    {% if r.paid_amount %}<span class="badge ok">opłacona z góry: {{ r.paid_amount|pln }}</span> Po zatwierdzeniu strzelec dostanie potwierdzenie; po odrzuceniu wpłata Tpay <strong>wróci automatycznie</strong> na jego rachunek / kartę (inne wpłaty — zwrot ręczny, dostaniesz przypomnienie).
+    {% if r.paid_amount %}<span class="badge ok">opłacona z góry: {{ r.paid_amount|pln }}</span> Po zatwierdzeniu strzelec dostanie potwierdzenie; po odrzuceniu wpłata online <strong>wróci automatycznie</strong> na jego rachunek / kartę (inne wpłaty — zwrot ręczny, dostaniesz przypomnienie).
     {% else %}Strzelec jeszcze nie zapłacił. Po zatwierdzeniu dostanie e-mail z informacją o płatności.{% endif %}</p>
   <form method="post" class="actions" style="margin-top:0">{% csrf_token %}<button class="btn" name="action" value="approve"{% if r.with_officer and not r.officer %} disabled{% endif %}>Zatwierdź rezerwację</button></form>
   <form method="post" data-confirm="Odrzucić rezerwację {{ r.number }}? Strzelec otrzyma e-mail z powodem{% if r.paid_amount %}, a wpłata {{ r.paid_amount|pln }} zostanie zwrócona{% endif %}.">{% csrf_token %}<input type="hidden" name="action" value="reject">

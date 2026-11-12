@@ -60,7 +60,7 @@ class Payment(models.Model):
 
     class Method(models.TextChoices):
         TRANSFER = "przelew", "Przelew na rachunek"
-        TPAY = "tpay", "Płatność online (Tpay)"
+        TPAY = "tpay", "Płatność online"  # operator (Tpay / Axepta) — z prefiksu external_id (apps/payments/gateway.py)
         CASH = "gotowka", "Gotówka"
         BLIK_PHONE = "blik", "BLIK na telefon"
 
@@ -111,8 +111,15 @@ class Payment(models.Model):
         return f"{self.get_method_display()} {self.amount / 100:.2f} zł ({self.get_status_display()})"
 
     @property
+    def provider_name(self):
+        """Operator płatności online (np. „Tpay”, „Axepta BNP Paribas”) albo "" dla innych wpłat."""
+        from .gateway import NAMES, provider_of
+
+        return NAMES.get(provider_of(self), "") if self.method == self.Method.TPAY else ""
+
+    @property
     def is_test(self):
-        """Płatność w środowisku testowym Tpay (sandbox) — bez prawdziwych pieniędzy; nie wchodzi do raportów sprzedaży."""
+        """Płatność w środowisku testowym operatora (sandbox Tpay / Axepty) — bez prawdziwych pieniędzy; nie wchodzi do raportów."""
         raw = self.raw or {}
         return self.method == self.Method.TPAY and (raw.get("sandbox") is True or (raw.get("powiadomienie") or {}).get("test_mode") == "1")
 

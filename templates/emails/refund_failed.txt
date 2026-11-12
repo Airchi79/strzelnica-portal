@@ -1,6 +1,6 @@
 {% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
 
-operator płatności (Tpay) nie przyjął zleconego zwrotu {{ amount|pln }} na Twoją kartę / rachunek ({{ payment.title|default:"wpłata online" }}).
+operator płatności ({{ online_provider }}) nie przyjął zleconego zwrotu {{ amount|pln }} na Twoją kartę / rachunek ({{ payment.title|default:"wpłata online" }}).
 {% if wallet %}Kwota jest na Twoim saldzie w portalu — możesz ją wykorzystać na kolejną rezerwację albo poczekać, aż ponowimy zwrot.{% else %}Ponowimy zwrot albo skontaktujemy się w sprawie innego sposobu zwrotu — nie musisz nic robić.{% endif %}
 
 Saldo i historia wpłat: {{ site_url }}{% url 'payments:wallet' %}

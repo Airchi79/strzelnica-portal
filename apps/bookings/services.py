@@ -19,6 +19,7 @@ from apps.regulations.models import pending_acceptances
 from apps.payments.services import apply_wallet, reconcile_reservation, refund_reservation, use_wallet_for_reservation
 
 from .models import Block, BookingSettings, GroupRule, NumberSequence, Reservation
+from apps.payments.gateway import online_enabled as online_payments_enabled
 
 PERM = "bookings.manage_reservations"
 
@@ -405,7 +406,7 @@ def _notify_created(reservation, pending):
     user, persons = reservation.user, reservation.persons
     if pending:
         notify_user(user, f"Rezerwacja {reservation.number} czeka na zatwierdzenie", "emails/reservation_pending.txt", reservation=reservation,
-                    options=payment_options(reservation), tpay=dj_settings.TPAY_ENABLED and BookingSettings.load().prepay_before_approval)
+                    options=payment_options(reservation), tpay=online_payments_enabled() and BookingSettings.load().prepay_before_approval)
     else:
         notify_user(user, f"Rezerwacja {reservation.number} potwierdzona", "emails/reservation_created.txt", reservation=reservation,
                     options=payment_options(reservation))
@@ -539,7 +540,7 @@ def payment_deadline(reservation, start, after_approval=False):
     rule = group_rule(reservation)
     if rule is None or not rule.online_only or reservation.payment_status != Reservation.Payment.DUE:
         return None
-    if not dj_settings.TPAY_ENABLED:
+    if not online_payments_enabled():
         return None  # bez działających płatności online nie zwalniamy rezerwacji automatycznie
     cfg = BookingSettings.load()
     delta = timedelta(hours=cfg.approval_payment_hours) if after_approval else timedelta(minutes=cfg.online_payment_minutes)

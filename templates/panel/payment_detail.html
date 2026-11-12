@@ -1,7 +1,7 @@
 {% extends "panel/base_panel.html" %}{% load satok %}
 {% block title %}Wpłata{% endblock %}
 {% block panel %}
-<h1>Wpłata {{ p.amount|pln }}{% if p.is_test %} <span class="badge warn">TEST — sandbox Tpay, bez prawdziwych pieniędzy</span>{% endif %}</h1>
+<h1>Wpłata {{ p.amount|pln }}{% if p.is_test %} <span class="badge warn">TEST — sandbox {{ p.provider_name }}, bez prawdziwych pieniędzy</span>{% endif %}</h1>
 {% include "panel/_payments_tabs.html" %}
 <div class="card"><table>
   <tr><th>Sposób</th><td>{{ p.get_method_display }}</td></tr>
@@ -17,7 +17,7 @@
 {% if p.status == 'zaksiegowana' %}<div class="actions"><a class="btn secondary small-btn" href="{% url 'panel:payment_receipt' p.pk %}" target="_blank" rel="noopener">Potwierdzenie wpłaty (PDF)</a></div>{% endif %}
 </div>
 {% if refunds %}
-<h2>Zwroty przez Tpay</h2>
+<h2>Zwroty online ({{ p.provider_name|default:"operator płatności" }})</h2>
 <div class="card"><table>
   <tr><th>Zlecono</th><th>Kwota</th><th>Status</th><th>Powód</th></tr>
   {% for z in refunds %}<tr>
@@ -28,10 +28,10 @@
       {% if z.resolved_by %}<div class="small muted">oznaczył: {{ z.resolved_by.full_name }}</div>{% endif %}
       {% if z.status == 'do_sprawdzenia' %}
       <form method="post" class="actions" style="margin-top:6px">{% csrf_token %}<input type="hidden" name="refund" value="{{ z.pk }}">
-        <button class="btn small-btn" name="action" value="refund_done" data-confirm-click="Potwierdzasz, że w panelu Tpay jest zwrot {{ z.amount|pln }} dla tej transakcji?">Zwrot wykonany</button>
-        <button class="btn secondary small-btn" name="action" value="refund_missing" data-confirm-click="Potwierdzasz, że w panelu Tpay NIE ma tego zwrotu? Kwota wróci na saldo strzelca.">Zwrotu nie ma</button>
+        <button class="btn small-btn" name="action" value="refund_done" data-confirm-click="Potwierdzasz, że w panelu {{ p.provider_name }} jest zwrot {{ z.amount|pln }} dla tej transakcji?">Zwrot wykonany</button>
+        <button class="btn secondary small-btn" name="action" value="refund_missing" data-confirm-click="Potwierdzasz, że w panelu {{ p.provider_name }} NIE ma tego zwrotu? Kwota wróci na saldo strzelca.">Zwrotu nie ma</button>
       </form>
-      <div class="small muted">Sprawdź w panelu Tpay (transakcja {{ p.external_id|slice:"5:" }}) — system nie ponawia takiego zwrotu sam.</div>{% endif %}</td>
+      <div class="small muted">Sprawdź w panelu {{ p.provider_name }} (identyfikator {{ p.external_id }}) — system nie ponawia takiego zwrotu sam.</div>{% endif %}</td>
     <td>{{ z.reason }}</td>
   </tr>{% endfor %}
 </table></div>

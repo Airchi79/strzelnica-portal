@@ -3,7 +3,7 @@
 niestety rezerwacja {{ reservation.number }} ({{ reservation.lane }}, {{ reservation.starts_at|date:"j.m.Y H:i" }}) nie została zatwierdzona.
 {% if reservation.cancel_reason %}Powód: {{ reservation.cancel_reason }}
 {% endif %}{% if refunded %}
-Zwrot {{ refunded|pln }} został zlecony na rachunek / kartę, z której płaciłeś (Tpay). Pieniądze zwykle docierają w ciągu kilku dni roboczych.
+Zwrot {{ refunded|pln }} został zlecony na rachunek / kartę, z której płaciłeś ({{ online_provider }}). Pieniądze zwykle docierają w ciągu kilku dni roboczych.
 {% endif %}{% if manual %}
 Kwotę {{ manual|pln }} zwrócimy ręcznie — skontaktujemy się w sprawie sposobu zwrotu.
 {% endif %}{% if fee_kept %}

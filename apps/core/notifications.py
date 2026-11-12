@@ -22,7 +22,9 @@ def _send(subject, template, context, recipients):
     recipients = sorted({r for r in recipients if r})
     if not recipients:
         return
-    context = {"site_url": settings.SITE_URL, **context}
+    from apps.payments.gateway import active_name
+
+    context = {"site_url": settings.SITE_URL, "online_provider": active_name(), **context}
     body = render_to_string(template, context)
     msg = OutgoingEmail.objects.create(recipients=recipients, subject=f"[Strzelnica Sątok] {subject}", body=body)
     transaction.on_commit(lambda: deliver(msg.pk))

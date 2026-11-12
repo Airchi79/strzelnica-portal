@@ -12,6 +12,7 @@ from apps.core.permissions import panel_required
 from . import services
 from .forms import EventForm, RegisterForm
 from .models import Event, Registration
+from apps.payments.gateway import online_enabled as online_payments_enabled
 
 PERM = services.PERM
 
@@ -66,7 +67,7 @@ def detail(request, pk):
 
     return render(request, "events/detail.html", {
         "event": event, "reg": reg, "form": form, "reasons": reasons, "taken": event.taken(), "free": event.free_places(),
-        "tpay_enabled": dj_settings.TPAY_ENABLED, "association": AssociationSettings.load(),
+        "tpay_enabled": online_payments_enabled(), "association": AssociationSettings.load(),
     })
 
 

@@ -5,7 +5,7 @@
 <div class="card">
   <p>Rezerwacja <strong>{{ r.number }}</strong> · {{ r.lane }}, {{ r.starts_at|time:"H:i" }}–{{ r.ends_at|time:"H:i" }}.</p>
   {% if paid %}<p>Wróć do kiosku i wpisz się do książki pobytu.</p>
-  {% elif ok %}<p>Tpay potwierdzi płatność w ciągu kilku chwil — kiosk pokaże to automatycznie.</p>
+  {% elif ok %}<p>Operator płatności potwierdzi płatność w ciągu kilku chwil — kiosk pokaże to automatycznie.</p>
   {% else %}<p><a class="btn" href="{% url 'payments:guest_pay' token %}">Spróbuj ponownie</a></p>{% endif %}
 </div>
 {% endblock %}

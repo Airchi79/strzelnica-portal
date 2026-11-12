@@ -39,6 +39,7 @@ from .forms import (
     active_lanes,
 )
 from .models import Block, BookingSettings, GroupRule, Reservation
+from apps.payments.gateway import online_enabled as online_payments_enabled
 
 PERM = services.PERM
 
@@ -285,7 +286,7 @@ def detail(request, pk):
             "map_url": AssociationSettings.load().map_url,
             "cancel_hours": BookingSettings.load().free_cancel_hours,
             "log_entries": reservation.log_entries.order_by("entered_at"),
-            "tpay_enabled": settings.TPAY_ENABLED,
+            "tpay_enabled": online_payments_enabled(),
             "prepay": BookingSettings.load().prepay_before_approval,
             **_payment_context(reservation),
             **reservation_qr_context(request, reservation),
@@ -611,7 +612,7 @@ def panel_settings(request):
         log_event("rezerwacje.ustawienia", obj, changes=changes)
         messages.success(request, "Zapisano ustawienia rezerwacji.")
         return redirect("panel:booking_settings")
-    return render(request, "panel/booking_settings.html", {"form": form, "rule_forms": rule_forms, "tpay_enabled": settings.TPAY_ENABLED})
+    return render(request, "panel/booking_settings.html", {"form": form, "rule_forms": rule_forms, "tpay_enabled": online_payments_enabled()})
 
 
 @panel_required()

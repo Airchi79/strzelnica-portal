@@ -23,7 +23,7 @@ class Command(BaseCommand):
         parser.add_argument("--koniec-testow", action="store_true",
                             help="Po usunięciu oznacz koniec testów — kolejne czyszczenie będzie niemożliwe")
         parser.add_argument("--z-prawdziwymi-platnosciami", action="store_true",
-                            help="Dopuść usunięcie prawdziwych (nie testowych) płatności Tpay")
+                            help="Dopuść usunięcie prawdziwych (nie testowych) płatności online (Tpay / Axepta)")
         parser.add_argument("--bez-kopii", action="store_true", help="Nie wymagaj świeżej kopii zapasowej (tylko poza serwerem)")
 
     def handle(self, *args, zostaw, wykonaj, koniec_testow, z_prawdziwymi_platnosciami, bez_kopii, **options):

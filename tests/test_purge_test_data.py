@@ -151,7 +151,7 @@ def test_refuses_without_backup_non_owner_and_real_tpay(world):
     assert go_live.real_tpay_payments() == []
     Payment.objects.create(user=shooter, amount=1000, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED,
                            raw={"powiadomienie": {"test_mode": "0"}}, completed_at=timezone.now())
-    with pytest.raises(CommandError, match="prawdziwe płatności Tpay"):
+    with pytest.raises(CommandError, match="prawdziwe płatności online"):
         call_command("purge_test_data", "--zostaw", owner.email, "--wykonaj", "--bez-kopii", stdout=io.StringIO())
     assert Reservation.objects.exists() and User.objects.count() == 2  # nic nie usunięto
     call_command("purge_test_data", "--zostaw", owner.email, "--wykonaj", "--bez-kopii", "--z-prawdziwymi-platnosciami",

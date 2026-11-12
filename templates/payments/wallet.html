@@ -32,7 +32,7 @@
 <h2>Doładuj saldo</h2>
 <div class="card">
   <form method="post" action="{% url 'payments:tpay_start' %}" novalidate>{% csrf_token %}{% include "partials/form.html" %}
-    <button class="btn" type="submit">Zapłać online (BLIK, przelew, karta — Tpay)</button></form>
+    <button class="btn" type="submit">Zapłać online (BLIK, przelew, karta — {{ ONLINE_PROVIDER }})</button></form>
   {% if online_fee_on %}<p class="small muted">Do doładowania online doliczamy opłatę za płatność online{% if online_fee_desc %} ({{ online_fee_desc }}){% endif %}. Przelewem tradycyjnym — bez opłaty.</p>{% endif %}
 </div>
 {% endif %}
@@ -48,7 +48,7 @@
 <div class="card"><strong>Na miejscu</strong><p class="small">Gotówka lub BLIK na telefon — wpłatę rejestruje zarząd.</p></div>
 
 {% if pending %}<h2>Płatności w toku</h2>
-<div class="card">{% for p in pending %}<div class="small">{{ p.created_at|date:"j.m.Y H:i" }} · {{ p.amount|pln }} · oczekuje na potwierdzenie z Tpay</div>{% endfor %}</div>{% endif %}
+<div class="card">{% for p in pending %}<div class="small">{{ p.created_at|date:"j.m.Y H:i" }} · {{ p.amount|pln }} · oczekuje na potwierdzenie od operatora płatności</div>{% endfor %}</div>{% endif %}
 
 <h2>Historia</h2>
 <div class="card table-wrap"><table>

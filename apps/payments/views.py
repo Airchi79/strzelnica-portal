@@ -1,3 +1,4 @@
+import json
 import logging
 
 from django.conf import settings
@@ -8,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -21,9 +22,10 @@ from apps.core.models import AssociationSettings
 from apps.core.permissions import panel_required
 from apps.facilities.models import format_pln
 
-from . import services, tpay
+from . import axepta, gateway, services, tpay
 from .forms import AssignForm, BankImportForm, CorrectionForm, ManualPaymentForm, ManualRefundForm, PaymentSettingsForm, TopupForm
-from .models import BankImport, LedgerEntry, Payment, PaymentSettings, Wallet
+from .models import BankImport, LedgerEntry, Payment, PaymentSettings, TpayRefund, Wallet
+from .gateway import online_enabled as online_payments_enabled
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -61,7 +63,7 @@ def wallet(request):
             "pending": pending,
             "topup_code": services.topup_code(request.user),
             "association": AssociationSettings.load(),
-            "tpay_enabled": settings.TPAY_ENABLED,
+            "tpay_enabled": online_payments_enabled(),
             "form": TopupForm(),
             **_online_fee_context(),
         },
@@ -71,8 +73,9 @@ def wallet(request):
 @login_required
 @require_POST
 def tpay_start(request):
-    """Rozpoczęcie płatności Tpay: doładowanie salda albo zapłata za konkretną rezerwację (kwota trafia na saldo)."""
-    if not settings.TPAY_ENABLED:
+    """Rozpoczęcie płatności online (Tpay albo Axepta): doładowanie salda albo zapłata za rezerwację, składkę lub zapis
+    (kwota trafia na saldo)."""
+    if not online_payments_enabled():
         messages.error(request, "Płatności online są chwilowo niedostępne.")
         return redirect("payments:wallet")
     reservation = fee = registration = None
@@ -115,9 +118,9 @@ def tpay_start(request):
             return redirect("payments:wallet")
         amount = form.cleaned_data["amount"]
     try:
-        url = services.start_tpay(request.user, amount, reservation=reservation, fee=fee, registration=registration)
-    except tpay.TpayError:
-        messages.error(request, "Nie udało się połączyć z Tpay. Spróbuj ponownie później lub zapłać przelewem.")
+        url = services.start_online(request.user, amount, reservation=reservation, fee=fee, registration=registration)
+    except gateway.GatewayError:
+        messages.error(request, f"Nie udało się połączyć z {gateway.active_name()}. Spróbuj ponownie później lub zapłać przelewem.")
         return redirect("payments:wallet")
     return redirect(url)
 
@@ -130,9 +133,9 @@ def guest_pay(request, token):
     reservation = reservation_from_pay_token(token)
     if reservation is None:
         return render(request, "payments/guest_pay.html", {"invalid": True}, status=404)
-    ctx = {"r": reservation, "token": token, "tpay_enabled": settings.TPAY_ENABLED, "payable": payable(reservation),
+    ctx = {"r": reservation, "token": token, "tpay_enabled": online_payments_enabled(), "payable": payable(reservation),
            "due": max(reservation.amount - reservation.paid_amount, 0), **_online_fee_context()}
-    if request.method == "POST" and ctx["payable"] and settings.TPAY_ENABLED:
+    if request.method == "POST" and ctx["payable"] and online_payments_enabled():
         try:
             amount = services.reservation_online_amount(reservation, reservation.user)
         except ValidationError as e:
@@ -142,10 +145,10 @@ def guest_pay(request, token):
             return redirect("payments:guest_return", token=token)
         back = settings.SITE_URL + reverse("payments:guest_return", args=[token])
         try:
-            url = services.start_tpay(reservation.user, amount, reservation=reservation, success_url=back + "?wynik=ok",
-                                      error_url=back + "?wynik=blad")
-        except tpay.TpayError:
-            ctx["error"] = "Nie udało się połączyć z Tpay. Spróbuj ponownie za chwilę."
+            url = services.start_online(reservation.user, amount, reservation=reservation, success_url=back + "?wynik=ok",
+                                        error_url=back + "?wynik=blad")
+        except gateway.GatewayError:
+            ctx["error"] = f"Nie udało się połączyć z {gateway.active_name()}. Spróbuj ponownie za chwilę."
             return render(request, "payments/guest_pay.html", ctx, status=502)
         return redirect(url)
     return render(request, "payments/guest_pay.html", ctx)
@@ -157,6 +160,9 @@ def guest_return(request, token):
     reservation = reservation_from_pay_token(token)
     if reservation is None:
         return render(request, "payments/guest_pay.html", {"invalid": True}, status=404)
+    for p in reservation.payments.filter(status=Payment.Status.PENDING, external_id__startswith="axepta:")[:3]:
+        services.sync_axepta(p)  # powiadomienie mogło jeszcze nie dotrzeć — stan z API Axepty
+    reservation.refresh_from_db()
     paid = reservation.payment_status != Reservation.Payment.DUE or reservation.paid_amount >= reservation.amount
     return render(request, "payments/guest_return.html", {"r": reservation, "paid": paid, "ok": request.GET.get("wynik") == "ok",
                                                           "token": token})
@@ -165,6 +171,7 @@ def guest_return(request, token):
 @login_required
 def tpay_return(request, pk):
     payment = get_object_or_404(Payment, pk=pk, user=request.user)
+    payment = services.sync_axepta(payment)  # Axepta: stan z API, jeśli powiadomienie jeszcze nie dotarło
     return render(request, "payments/tpay_return.html", {"payment": payment, "ok": request.GET.get("wynik") == "ok"})
 
 
@@ -212,6 +219,52 @@ def tpay_notify(request):
             services.post(payment.user, -payment.amount, LedgerEntry.Kind.CHARGEBACK, f"Zwrot płatności Tpay {fields.get('tr_id', '')}", payment=payment)
             log_event("platnosc.zwrot_tpay", payment, str(payment))
     return HttpResponse("TRUE")
+
+
+@csrf_exempt
+@require_POST
+@transaction.non_atomic_requests
+def axepta_notify(request):
+    """Powiadomienie Axepta o zmianie stanu płatności. Odpowiedź 200 {"status":"ok"} kończy ponawianie;
+    błędny podpis → 400 (Axepta ponowi). Zmiany stanu wyłącznie po poprawnej weryfikacji podpisu."""
+    if not settings.AXEPTA_ENABLED:
+        return HttpResponse(status=404)
+    if not axepta.verify_notification(request.headers.get("X-Axepta-Signature", ""), request.body):
+        logger.warning("Odrzucono powiadomienie Axepta (podpis)")
+        return HttpResponseBadRequest("INVALID")
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        payment_data = data["payment"]
+        payment_id = str(payment_data["id"])
+    except (ValueError, KeyError, TypeError, UnicodeDecodeError):
+        logger.warning("Powiadomienie Axepta: niepoprawna treść")
+        return JsonResponse({"status": "ok"})
+    payment = Payment.objects.filter(external_id=f"axepta:{payment_id}", method=Payment.Method.TPAY).first()
+    if payment is None:
+        logger.warning("Powiadomienie Axepta dla nieznanej płatności: %s", payment_id)
+        return JsonResponse({"status": "ok"})
+    notified = payment_data.get("notifyTransactionData") or {}
+    if notified.get("type") == "refund":
+        _axepta_refund_notification(payment, payment_data, notified.get("id"))
+    else:
+        services.apply_axepta_state(payment, payment_data)
+    return JsonResponse({"status": "ok"})
+
+
+def _axepta_refund_notification(payment, payment_data, transaction_id):
+    """Powiadomienie o transakcji zwrotu: zapis w danych wpłaty; zwrot odrzucony przez Axeptę → kwota wraca na saldo."""
+    tx = next((t for t in payment_data.get("transactions") or [] if t.get("id") == transaction_id), {})
+    status = str(tx.get("status", "")).lower()
+    with transaction.atomic():
+        p = Payment.objects.select_for_update().get(pk=payment.pk)
+        refunds = {**((p.raw or {}).get("zwroty_axepta") or {}), str(transaction_id): status}
+        p.raw = {**(p.raw or {}), "zwroty_axepta": refunds}
+        p.save(update_fields=["raw"])
+    if status in axepta.FINAL_FAILED:
+        refund = next((r for r in p.tpay_refunds.filter(status=TpayRefund.Status.DONE)
+                       if (r.response or {}).get("transactionId") == transaction_id), None)
+        if refund is not None:
+            services._refund_failed(refund.pk, f"Axepta: zwrot {status}", after_acceptance=True)
 
 
 def services_amount(text):

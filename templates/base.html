@@ -13,7 +13,7 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}"{% if user.is_authenticated %} data-unread="{{ unread_portal|add:unread_notifications|stringformat:"d" }}" data-push-url="{% url 'core:push_subscribe' %}"{% endif %}>
-{% if TEST_COPY %}<div class="test-copy-bar" role="note" style="position:sticky;top:0;z-index:10000;background:#b3261e;color:#fff;text-align:center;font:600 13px/1.6 system-ui,sans-serif;padding:3px 8px">WERSJA TESTOWA — próby bez skutków: płatności testowe Tpay, e-maile trafiają tylko na adres testowy</div>{% endif %}
+{% if TEST_COPY %}<div class="test-copy-bar" role="note" style="position:sticky;top:0;z-index:10000;background:#b3261e;color:#fff;text-align:center;font:600 13px/1.6 system-ui,sans-serif;padding:3px 8px">WERSJA TESTOWA — próby bez skutków: płatności testowe, e-maile trafiają tylko na adres testowy</div>{% endif %}
 <a class="skip-link" href="#tresc">Przejdź do treści</a>
 {% block shell %}
 <header class="topbar{% if user.is_staff %} has-panel{% endif %}">

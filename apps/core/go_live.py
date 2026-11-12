@@ -11,7 +11,7 @@ osób z importu), członkowie, uchwały, zebrania i głosowania, regulaminy i ic
 cennik, kioski (sparowane urządzenia), FAQ, wygląd, konto właściciela z jego uprawnieniami, logowaniem 2FA i powiązaniem z członkiem.
 
 Bezpieczniki: bez `wykonaj` tylko raport; całość w jednej transakcji (błąd = nic nie usunięto); wymagana świeża,
-sprawdzona kopia bazy; prawdziwe płatności Tpay (nie testowe) blokują czyszczenie, chyba że jawnie dopuszczone;
+sprawdzona kopia bazy; prawdziwe płatności online (nie testowe) blokują czyszczenie, chyba że jawnie dopuszczone;
 po oznaczeniu końca testów (`koniec_testow`) czyszczenia nie da się już uruchomić.
 """
 
@@ -51,7 +51,7 @@ def plan(keep_user):
         ("Książka pobytu: wydruki dzienne", _m("logbook.DailyPrint").objects.all()),
         ("Książka pobytu: wpisy", _m("logbook.Entry").objects.all()),
         ("Książka pobytu: numeracja wpisów", _m("logbook.EntrySequence").objects.all()),
-        ("Zwroty Tpay", _m("payments.TpayRefund").objects.all()),
+        ("Zwroty online", _m("payments.TpayRefund").objects.all()),
         ("Operacje na saldach", _m("payments.LedgerEntry").objects.all()),
         ("Wpłaty", _m("payments.Payment").objects.all()),
         ("Importy wyciągów bankowych", _m("payments.BankImport").objects.all()),
@@ -88,7 +88,7 @@ def plan(keep_user):
 
 
 def real_tpay_payments():
-    """Zaksięgowane płatności Tpay poza środowiskiem testowym (prawdziwe pieniądze) — dokumentacja księgowa.
+    """Zaksięgowane płatności online (Tpay / Axepta) poza środowiskiem testowym (prawdziwe pieniądze) — dokumentacja księgowa.
     Nieudane, anulowane i niedokończone próby nie przenoszą pieniędzy, więc nie blokują czyszczenia."""
     Payment = _m("payments.Payment")
     return [p for p in Payment.objects.filter(method=Payment.Method.TPAY, status=Payment.Status.COMPLETED) if not p.is_test]
@@ -107,7 +107,7 @@ def check(keep_user, allow_real_tpay=False, backup_state=None):
         errors.append("Brak świeżej, sprawdzonej kopii zapasowej bazy (panel → Przegląd). Najpierw wykonaj kopię.")
     real = real_tpay_payments()
     if real and not allow_real_tpay:
-        errors.append(f"W systemie są prawdziwe płatności Tpay ({len(real)}): "
+        errors.append(f"W systemie są prawdziwe płatności online ({len(real)}): "
                       + ", ".join(f"{p.amount / 100:.2f} zł z {p.created_at:%d.%m.%Y} (zaksięgowana {p.completed_at:%d.%m.%Y %H:%M})"
                                    if p.completed_at else f"{p.amount / 100:.2f} zł z {p.created_at:%d.%m.%Y}" for p in real[:10])
                       + ". To dokumentacja księgowa — usuń je tylko świadomie (opcja dopuszczająca prawdziwe płatności).")

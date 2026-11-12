@@ -882,14 +882,14 @@ def test_panel_refund_overpayment_via_tpay(client, owner, ps, tpay_keys, monkeyp
     client.logout()
     login_with_otp(client, owner)
     page = client.get(f"/panel/salda/{ps.pk}/").content.decode()
-    assert "Zwróć przez Tpay" in page and r.number in page
+    assert "Zwróć przez operatora" in page and r.number in page
     with django_capture_on_commit_callbacks(execute=True):
         client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})
     with django_capture_on_commit_callbacks(execute=True):
         client.post(f"/panel/salda/{ps.pk}/", {"action": "refund_tpay", "payment": str(payment.pk)})  # drugi raz — nic
     assert calls == [("01CANC", None)] and balance_of(ps) == 0
     assert services.refundable_overpayments(ps) == []
-    assert "Zwróć przez Tpay" not in client.get(f"/panel/salda/{ps.pk}/").content.decode()
+    assert "Zwróć przez operatora" not in client.get(f"/panel/salda/{ps.pk}/").content.decode()
 
 
 def test_client_cancel_with_wallet_still_refunds_online_payment(client, owner, ps, tpay_keys, monkeypatch, django_capture_on_commit_callbacks):
@@ -1008,7 +1008,7 @@ def test_manual_refund_and_sales_report(owner_client, owner, ps):
     owner_client.post(url, {"action": "manual_refund", "zwrot-method": "tpay_panel", "zwrot-amount": "272,28", "zwrot-reason": "SATOK-R-1"})
     assert balance_of(ps) == 2772 and services.ledger_consistent(ps)
     e = LedgerEntry.objects.get(user=ps, kind=LedgerEntry.Kind.CHARGEBACK)
-    assert e.amount == -27228 and "panel Tpay" in e.description
+    assert e.amount == -27228 and "panel operatora płatności" in e.description
     # korekta salda dalej działa (bez pola action)
     owner_client.post(url, {"direction": "minus", "amount": "27,72", "reason": "prowizja"})
     assert balance_of(ps) == 0

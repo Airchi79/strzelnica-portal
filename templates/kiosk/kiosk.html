@@ -3,7 +3,7 @@
 <title>{% if TEST_COPY %}[TEST] {% endif %}Kiosk · {{ SITE_NAME }}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#2f5d3a">
 <link rel="stylesheet" href="{% static 'css/app.css' %}"><link rel="manifest" href="{% url 'kiosk:manifest' %}"><link rel="icon" href="{{ BRAND.icon_192 }}"></head>
 <body class="kiosk" data-kiosk data-api="{% url 'kiosk:home' %}api/" data-camera="{{ device.camera }}">
-{% if TEST_COPY %}<div class="test-copy-bar" role="note" style="position:sticky;top:0;z-index:10000;background:#b3261e;color:#fff;text-align:center;font:600 13px/1.6 system-ui,sans-serif;padding:3px 8px">WERSJA TESTOWA — próby bez skutków: płatności testowe Tpay, e-maile trafiają tylko na adres testowy</div>{% endif %}
+{% if TEST_COPY %}<div class="test-copy-bar" role="note" style="position:sticky;top:0;z-index:10000;background:#b3261e;color:#fff;text-align:center;font:600 13px/1.6 system-ui,sans-serif;padding:3px 8px">WERSJA TESTOWA — próby bez skutków: płatności testowe, e-maile trafiają tylko na adres testowy</div>{% endif %}
 <header class="topbar"><div class="wrap"><span class="brand"><img class="brand-logo" src="{{ BRAND.logo_small }}" alt="" width="34" height="34" data-hide-broken>{{ SITE_NAME }} · książka pobytu</span>
   <span class="kiosk-status" data-status>…</span></div></header>
 <main class="wrap">

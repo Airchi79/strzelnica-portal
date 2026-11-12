@@ -8,7 +8,7 @@ PERMISSIONS_POLICY = "camera=(self), microphone=(), geolocation=(), payment=(), 
 
 # Content-Security-Policy: skrypty wyłącznie z plików naszej domeny (żadnych wbudowanych) — blokuje wstrzyknięty kod (XSS).
 # Style wbudowane dozwolone (atrybuty style=""), obrazki także data:/blob: (podgląd zdjęć, kody QR, podpis).
-# form-action: nasze formularze i przekierowanie do bramki Tpay po „Zapłać online”.
+# form-action: nasze formularze i przekierowanie do bramki płatności (Tpay, Axepta) po „Zapłać online”.
 CSP = "; ".join([
     "default-src 'self'",
     "script-src 'self'",
@@ -22,7 +22,7 @@ CSP = "; ".join([
     "frame-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self' https://*.tpay.com",
+    "form-action 'self' https://*.tpay.com https://*.axepta.pl",
 ])
 
 

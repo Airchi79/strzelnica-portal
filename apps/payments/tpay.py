@@ -22,6 +22,8 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from django.conf import settings
 from django.core.cache import cache
 
+from .gateway import GatewayError
+
 logger = logging.getLogger(__name__)
 
 TIMEOUT = 20
@@ -29,7 +31,7 @@ TIMEOUT = 20
 USER_AGENT = "StrzelnicaSatok-Rezerwacje/1.0 (+https://github.com/Airchi79/strzelnica-portal)"
 
 
-class TpayError(Exception):
+class TpayError(GatewayError):
     pass
 
 

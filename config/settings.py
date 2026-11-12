@@ -227,3 +227,20 @@ TPAY_SANDBOX = env_bool("TPAY_SANDBOX", True)
 if IS_TEST_COPY and not TPAY_SANDBOX:
     raise ImproperlyConfigured("Kopia testowa może używać wyłącznie testowego Tpay (TPAY_SANDBOX=true).")
 TPAY_ENABLED = bool(TPAY_CLIENT_ID and TPAY_CLIENT_SECRET and TPAY_SECURITY_CODE)
+
+# Axepta BNP Paribas (RESTful API, api.axepta.pl). Dane z panelu Axepta: identyfikator klienta (merchantId),
+# identyfikator sklepu (serviceId), token API (Ustawienia → Klucze API) i klucz sklepu do podpisu powiadomień.
+AXEPTA_MERCHANT_ID = env("AXEPTA_MERCHANT_ID", "")
+AXEPTA_SERVICE_ID = env("AXEPTA_SERVICE_ID", "")
+AXEPTA_API_TOKEN = env("AXEPTA_API_TOKEN", "")
+AXEPTA_SERVICE_KEY = env("AXEPTA_SERVICE_KEY", "")
+AXEPTA_SANDBOX = env_bool("AXEPTA_SANDBOX", True)
+if IS_TEST_COPY and not AXEPTA_SANDBOX:
+    raise ImproperlyConfigured("Kopia testowa może używać wyłącznie testowej Axepty (AXEPTA_SANDBOX=true).")
+AXEPTA_ENABLED = bool(AXEPTA_MERCHANT_ID and AXEPTA_SERVICE_ID and AXEPTA_API_TOKEN and AXEPTA_SERVICE_KEY)
+
+# Operator NOWYCH płatności online: „tpay” albo „axepta”. Powiadomienia i zwroty dla wcześniejszych płatności działają
+# u operatora, przez którego przeszły (o ile jego dane zostają w .env).
+ONLINE_PAYMENTS_PROVIDER = env("ONLINE_PAYMENTS_PROVIDER", "tpay").strip().lower()
+if ONLINE_PAYMENTS_PROVIDER not in {"tpay", "axepta"}:
+    raise ImproperlyConfigured("ONLINE_PAYMENTS_PROVIDER: dozwolone wartości to „tpay” albo „axepta”.")

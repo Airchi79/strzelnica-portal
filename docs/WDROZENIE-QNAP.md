@@ -306,7 +306,7 @@ konto panelu (uprawnienia, logowanie 2FA, powiązanie z członkiem stowarzyszeni
    ```
 
 Polecenie działa w jednej transakcji: przy jakimkolwiek błędzie nic nie zostaje usunięte. Odmawia, gdy: nie ma świeżej
-kopii bazy, podane konto nie jest kontem właściciela, w bazie są prawdziwe (nie testowe) płatności Tpay (świadome
+kopii bazy, podane konto nie jest kontem właściciela, w bazie są prawdziwe (nie testowe) płatności online (świadome
 usunięcie: `--z-prawdziwymi-platnosciami`) albo uchwała jest powiązana z deklaracją członkowską złożoną w systemie.
 Import z GunTrackera najlepiej wykonać **po** ostatnim czyszczeniu (pkt 4) — import nie jest usuwany, ale tak jest prościej
 sprawdzić, że dane są kompletne.

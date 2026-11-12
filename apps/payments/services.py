@@ -14,7 +14,7 @@ from decimal import ROUND_CEILING, Decimal, InvalidOperation
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.urls import reverse
 from django.utils import timezone
 
@@ -144,7 +144,9 @@ def online_fee_rule_text(cfg=None):
         parts.append(format_pln(cfg.online_fee_fixed))
     if not parts:
         return ""
-    return ("Do płatności online (Tpay: BLIK, przelew online, karta) doliczana jest opłata za obsługę płatności odpowiadająca "
+    from . import gateway
+
+    return (f"Do płatności online ({gateway.active_name()}: BLIK, przelew online, karta) doliczana jest opłata za obsługę płatności odpowiadająca "
             f"prowizji operatora płatności (obecnie {' + '.join(parts)}), widoczna przed zapłatą. Opłata ta nie podlega zwrotowi przy anulowaniu, wycofaniu lub odrzuceniu "
             "rezerwacji albo zapisu — zwracana jest opłata za rezerwację lub opłata startowa. Płatność przelewem tradycyjnym "
             "lub na miejscu jest wolna od tej opłaty.")
@@ -442,7 +444,7 @@ def correction(user, amount, reason, by):
     return entry
 
 
-MANUAL_REFUND_METHODS = {"przelew": "przelew", "gotowka": "gotówka", "tpay_panel": "panel Tpay", "blik": "BLIK na telefon"}
+MANUAL_REFUND_METHODS = {"przelew": "przelew", "gotowka": "gotówka", "tpay_panel": "panel operatora płatności", "blik": "BLIK na telefon"}
 
 
 @transaction.atomic
@@ -647,14 +649,18 @@ def refund_to_payer(payment, amount, by=None, reason="Zwrot"):
     powiadomienie. Zwraca True, gdy zwrot zlecono (albo był już zlecony); False — wpłata poza Tpay (zwrot ręczny)."""
     if amount <= 0:
         return True
-    if payment.method != Payment.Method.TPAY or payment.status != Payment.Status.COMPLETED or not (payment.external_id or "").startswith("tpay:"):
-        return False
+    from . import gateway
+
+    provider = gateway.provider_of(payment)
+    if payment.method != Payment.Method.TPAY or payment.status != Payment.Status.COMPLETED or not provider:
+        return False  # wpłata poza operatorem online — zwrot ręczny
     with transaction.atomic():
         p = Payment.objects.select_for_update().get(pk=payment.pk)
         if refund_outstanding(p) or (p.raw or {}).get("zwrot_api"):
             return True  # już zwrócone albo w toku
         refund = TpayRefund.objects.create(payment=p, amount=amount, reason=reason[:255], created_by=by)
-        post(p.user, -amount, LedgerEntry.Kind.CHARGEBACK, f"{reason} — zwrot na rachunek płacącego (Tpay)", payment=p, by=by)
+        post(p.user, -amount, LedgerEntry.Kind.CHARGEBACK, f"{reason} — zwrot na rachunek płacącego ({gateway.NAMES[provider]})",
+             payment=p, by=by)
         log_event("platnosc.zwrot_zlecony", p, f"{p}: zwrot {amount / 100:.2f} zł", actor=by)
         transaction.on_commit(lambda: execute_refund(refund.pk))
     return True
@@ -664,11 +670,16 @@ REFUND_RESEND_AFTER = timedelta(minutes=2)   # zlecenie niewysłane (np. restart
 REFUND_STUCK_AFTER = timedelta(minutes=10)   # „wysyłane” bez wyniku — do sprawdzenia przez zarząd (bez ponawiania)
 
 
-def execute_refund(refund_pk):
-    """Wysyła zlecony zwrot do Tpay. Uruchamiane po zatwierdzeniu transakcji, która go zleciła (albo przez harmonogram).
-    Musi działać poza transakcją: status „wysyłane” jest zapisywany PRZED wywołaniem API."""
-    from . import tpay
+def execute_refund(refund_pk, from_queue=False):
+    """Wysyła zlecony zwrot do operatora płatności (Tpay albo Axepta). Uruchamiane po zatwierdzeniu transakcji, która go
+    zleciła (albo przez harmonogram). Musi działać poza transakcją: status „wysyłane” jest zapisywany PRZED wywołaniem API.
+    Axepta: kolejne zwroty co najmniej 5 s — gdy odstęp nie minął, zwrot zostaje w kolejce dla harmonogramu."""
+    from . import axepta, gateway, tpay
 
+    provider = TpayRefund.objects.filter(pk=refund_pk).values_list("payment__external_id", flat=True).first()
+    provider = (provider or "").split(":", 1)[0]
+    if provider == "axepta" and not axepta.take_refund_slot(wait=from_queue):
+        return None
     with transaction.atomic():
         refund = TpayRefund.objects.select_for_update().select_related("payment").filter(pk=refund_pk, status=TpayRefund.Status.QUEUED).first()
         if refund is None:
@@ -677,8 +688,13 @@ def execute_refund(refund_pk):
         refund.save(update_fields=["status", "sent_at"])
     p = refund.payment
     try:
-        resp = tpay.refund_transaction(p.external_id.split(":", 1)[1], None if refund.amount >= p.amount else refund.amount) or {}
-    except tpay.TpayError as e:
+        if provider == "axepta":
+            resp = axepta.refund_payment(gateway.external_ref(p), refund.amount) or {}
+            resp = {"result": "success", "paymentRefundId": resp.get("paymentRefundId"), "status": resp.get("status"),
+                    "transactionId": next((t.get("transaction", {}).get("id") for t in resp.get("transactions") or []), None)}
+        else:
+            resp = tpay.refund_transaction(gateway.external_ref(p), None if refund.amount >= p.amount else refund.amount) or {}
+    except gateway.GatewayError as e:
         _refund_failed(refund.pk, str(e))
         return False
     except Exception as e:  # nieprzewidziany błąd (np. sieć) — wynik nieznany: do sprawdzenia, bez ponawiania
@@ -696,25 +712,29 @@ def execute_refund(refund_pk):
         p.raw = {**(p.raw or {}), "zwrot_api": {"kwota_gr": refund.amount, "kiedy": refund.finished_at.isoformat(),
                                                "powod": refund.reason[:120], "odpowiedz": refund.response}}
         p.save(update_fields=["raw"])
-        log_event("platnosc.zwrot_tpay", p, f"{p}: zwrot {refund.amount / 100:.2f} zł przyjęty przez Tpay", actor=refund.created_by)
+        log_event("platnosc.zwrot_tpay", p, f"{p}: zwrot {refund.amount / 100:.2f} zł przyjęty przez {gateway.NAMES.get(provider, 'operatora')}",
+                  actor=refund.created_by)
     return True
 
 
 @transaction.atomic
-def _refund_failed(refund_pk, error, by=None):
-    """Tpay odrzucił zwrot: kwota wraca na saldo strzelca, zarząd dostaje powiadomienie (ponowienie w panelu)."""
+def _refund_failed(refund_pk, error, by=None, after_acceptance=False):
+    """Operator odrzucił zwrot: kwota wraca na saldo strzelca, zarząd dostaje powiadomienie (ponowienie w panelu).
+    `after_acceptance` — Axepta przyjęła zwrot, a potem zgłosiła w powiadomieniu, że go nie wykonała."""
     refund = TpayRefund.objects.select_for_update(of=("self",)).select_related("payment__user").get(pk=refund_pk)
-    if refund.status not in (TpayRefund.Status.SENDING, TpayRefund.Status.UNKNOWN):
+    allowed = (TpayRefund.Status.SENDING, TpayRefund.Status.UNKNOWN) + ((TpayRefund.Status.DONE,) if after_acceptance else ())
+    if refund.status not in allowed:
         return refund
     refund.status, refund.finished_at, refund.error, refund.resolved_by = TpayRefund.Status.FAILED, timezone.now(), error[:255], by
     refund.save(update_fields=["status", "finished_at", "error", "resolved_by"])
     p = refund.payment
-    post(p.user, refund.amount, LedgerEntry.Kind.CHARGEBACK, f"Zwrot Tpay nieudany — kwota wraca na saldo ({refund.reason})"[:255],
+    name = _operator_name(p)
+    post(p.user, refund.amount, LedgerEntry.Kind.CHARGEBACK, f"Zwrot {name} nieudany — kwota wraca na saldo ({refund.reason})"[:255],
          payment=p, by=by)
     log_event("platnosc.zwrot_nieudany", p, f"{p}: {error}", actor=by)
     _notify_tpay_refund_failed(p, refund.amount, error)
-    notify_user(p.user, "Zwrot przez Tpay nie powiódł się", "emails/refund_failed.txt", payment=p, amount=refund.amount,
-                wallet=wallet_enabled())
+    notify_user(p.user, f"Zwrot przez {name} nie powiódł się", "emails/refund_failed.txt", payment=p, amount=refund.amount,
+                wallet=wallet_enabled(), online_provider=name)
     return refund
 
 
@@ -738,7 +758,7 @@ def process_refund_queue(now=None):
     now = now or timezone.now()
     sent = 0
     for pk in TpayRefund.objects.filter(status=TpayRefund.Status.QUEUED, created_at__lte=now - REFUND_RESEND_AFTER).values_list("pk", flat=True):
-        if execute_refund(pk) is not None:
+        if execute_refund(pk, from_queue=True) is not None:
             sent += 1
     stuck = 0
     for refund in TpayRefund.objects.filter(status=TpayRefund.Status.SENDING, sent_at__lte=now - REFUND_STUCK_AFTER).select_related("payment__user"):
@@ -749,30 +769,38 @@ def process_refund_queue(now=None):
     return sent, stuck
 
 
+def _operator_name(payment):
+    from . import gateway
+
+    return gateway.NAMES.get(gateway.provider_of(payment) or gateway.active(), "operator płatności")
+
+
 def _notify_refund_unknown(refund):
     p = refund.payment
+    name = _operator_name(p)
     url = reverse("panel:payment", args=[p.pk])
     what = f"{p.user.full_name}: {refund.amount / 100:.2f} zł"
-    notify_board(f"Zwrot Tpay do sprawdzenia — {p.user.full_name}", "emails/board_generic.txt", "payments.manage_payments", url=url,
-                 body=f"{what}: brak potwierdzenia od Tpay. Sprawdź w panelu Tpay, czy zwrot jest wykonany, i oznacz wynik w panelu.",
-                 event=f"Zwrot Tpay do sprawdzenia — {p.user.full_name}",
-                 text=f"{what} — wysyłanie zwrotu zostało przerwane i nie wiadomo, czy Tpay go przyjął. System NIE ponawia zwrotu "
-                      "automatycznie (ryzyko podwójnego zwrotu). Sprawdź w panelu Tpay (transakcja " + p.external_id.split(":", 1)[-1] +
+    notify_board(f"Zwrot {name} do sprawdzenia — {p.user.full_name}", "emails/board_generic.txt", "payments.manage_payments", url=url,
+                 body=f"{what}: brak potwierdzenia od operatora ({name}). Sprawdź w panelu {name}, czy zwrot jest wykonany, i oznacz wynik w panelu.",
+                 event=f"Zwrot {name} do sprawdzenia — {p.user.full_name}",
+                 text=f"{what} — wysyłanie zwrotu zostało przerwane i nie wiadomo, czy {name} go przyjął. System NIE ponawia zwrotu "
+                      f"automatycznie (ryzyko podwójnego zwrotu). Sprawdź w panelu {name} (transakcja " + p.external_id.split(":", 1)[-1] +
                       ") i oznacz wynik: Płatności → wpłata → „Zwrot wykonany” albo „Zwrotu nie ma”.",
                  url_path=url)
 
 
 def _notify_tpay_refund_failed(payment, amount, error):
     user = payment.user
+    name = _operator_name(payment)
     url = reverse("panel:wallet", args=[user.pk])
     what = f"{user.full_name}: {amount / 100:.2f} zł"
-    notify_board(f"Zwrot Tpay nie powiódł się — {user.full_name}", "emails/board_generic.txt", "payments.manage_payments", url=url,
-                 body=f"{what} wróciło na saldo strzelca zamiast na kartę / rachunek ({error}). Ponów: Salda → „Zwróć przez Tpay” "
+    notify_board(f"Zwrot {name} nie powiódł się — {user.full_name}", "emails/board_generic.txt", "payments.manage_payments", url=url,
+                 body=f"{what} wróciło na saldo strzelca zamiast na kartę / rachunek ({error}). Ponów: Salda → „Zwróć przez operatora” "
                       "albo zwróć ręcznie.",
-                 event=f"Zwrot Tpay nie powiódł się — {user.full_name}",
-                 text=f"{what} — Tpay odrzucił zwrot ({error}). Strzelec dostał informację, że zwrot zlecono; kwota jest na jego "
-                      "saldzie. Ponów zwrot w panelu: Płatności → Salda → strzelec → „Zwróć przez Tpay” (np. po uzupełnieniu środków "
-                      "na koncie Tpay) albo zwróć ręcznie i zaksięguj zwrot ręczny.",
+                 event=f"Zwrot {name} nie powiódł się — {user.full_name}",
+                 text=f"{what} — {name} odrzucił zwrot ({error}). Strzelec dostał informację, że zwrot zlecono; kwota jest na jego "
+                      "saldzie. Ponów zwrot w panelu: Płatności → Salda → strzelec → „Zwróć przez operatora” (np. po uzupełnieniu środków "
+                      "u operatora) albo zwróć ręcznie i zaksięguj zwrot ręczny.",
                  url_path=url)
 
 
@@ -794,9 +822,9 @@ def remind_manual_refund(user, amount, label):
     """Przypomnienie dla zarządu: kwotę trzeba zwrócić ręcznie (wpłata poza Tpay albo Tpay odrzucił zwrot)."""
     url = reverse("panel:wallet", args=[user.pk])
     notify_board(f"Zwrot do wykonania ręcznie: {label}", "emails/board_generic.txt", "payments.manage_payments", url=url,
-                 body=f"{user.full_name}: {amount / 100:.2f} zł (wpłata poza Tpay albo zwrot Tpay nie powiódł się).",
+                 body=f"{user.full_name}: {amount / 100:.2f} zł (wpłata poza operatorem płatności online albo zwrot online nie powiódł się).",
                  event=f"Zwrot do wykonania ręcznie: {label}",
-                 text=f"{user.full_name}: {amount / 100:.2f} zł — zwróć przelewem/gotówką albo w panelu Tpay.", url_path=url)
+                 text=f"{user.full_name}: {amount / 100:.2f} zł — zwróć przelewem/gotówką albo w panelu operatora płatności.", url_path=url)
 
 
 def surcharge_of(payments):
@@ -809,8 +837,9 @@ def refundable_overpayments(user):
     nadpłata strzelca, którą zarząd może zwrócić jednym kliknięciem. [(wpłata, kwota_do_zwrotu)]"""
     balance = balance_of(user)
     out = []
-    qs = (Payment.objects.filter(user=user, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED, external_id__startswith="tpay:",
-                                 reservation__status="anulowana", reservation__late_cancellation=False)
+    qs = (Payment.objects.filter(user=user, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED)
+          .filter(Q(external_id__startswith="tpay:") | Q(external_id__startswith="axepta:"))
+          .filter(reservation__status="anulowana", reservation__late_cancellation=False)
           .select_related("reservation").order_by("completed_at"))
     for p in qs:
         if refund_outstanding(p) or (p.raw or {}).get("zwrot_api") or balance <= 0:
@@ -848,6 +877,113 @@ def reservation_online_amount(reservation, user, now=None):
         apply_wallet(user, targets=[reservation])
         return 0
     return max(amount, 100)  # minimalna kwota transakcji
+
+
+def start_online(user, amount, *, reservation=None, fee=None, registration=None, success_url=None, error_url=None):
+    """Nowa płatność online u operatora z ustawienia ONLINE_PAYMENTS_PROVIDER. Zwraca adres bramki płatności;
+    przy błędzie operatora płatność jest oznaczana jako nieudana i zgłaszany jest gateway.GatewayError."""
+    from . import gateway
+
+    start = start_axepta if gateway.active() == "axepta" else start_tpay
+    return start(user, amount, reservation=reservation, fee=fee, registration=registration, success_url=success_url,
+                 error_url=error_url)
+
+
+def _online_label(user, reservation, fee, registration):
+    return reservation.number if reservation else (fee.label if fee else (registration.label if registration else topup_code(user)))
+
+
+def _online_description(reservation, fee, registration):
+    what = f"rezerwacja {reservation.number}" if reservation else (fee.label if fee else (registration.label if registration else "doładowanie salda"))
+    return ("Strzelnica Sątok — " + what)[:100]
+
+
+AXEPTA_LINK_VALID = timedelta(hours=2)
+
+
+def start_axepta(user, amount, *, reservation=None, fee=None, registration=None, success_url=None, error_url=None):
+    """Nowa płatność Axepta (link płatności z doliczoną opłatą za płatność online). Zwraca adres strony płatności."""
+    from django.conf import settings
+
+    from . import axepta
+
+    surcharge = online_fee(amount)
+    amount += surcharge
+    payment = Payment.objects.create(
+        user=user, amount=amount, surcharge=surcharge, method=Payment.Method.TPAY, reservation=reservation, fee=fee,
+        event_registration=registration, title=_online_label(user, reservation, fee, registration), created_by=user,
+    )
+    back = settings.SITE_URL + reverse("payments:tpay_return", args=[payment.pk])
+    try:
+        link = axepta.create_payment_link(
+            amount_grosze=amount, order_id=str(payment.pk), title=_online_description(reservation, fee, registration),
+            first_name=user.first_name, last_name=user.last_name, email=user.email, phone=user.phone,
+            success_url=success_url or back + "?wynik=ok", failure_url=error_url or back + "?wynik=blad",
+            return_url=success_url or back, active_to=(timezone.now() + AXEPTA_LINK_VALID).timestamp(),
+        )
+    except axepta.AxeptaError as e:
+        Payment.objects.filter(pk=payment.pk).update(status=Payment.Status.FAILED, note=str(e)[:255])
+        raise
+    Payment.objects.filter(pk=payment.pk).update(
+        external_id=f"axepta:{link['payment_id']}", raw={"axepta_url": link["url"], "sandbox": bool(settings.AXEPTA_SANDBOX)}
+    )
+    log_event("platnosc.tpay_start", payment, f"{amount / 100:.2f} zł (Axepta)")
+    return link["url"]
+
+
+@transaction.atomic
+def apply_axepta_state(payment, data, source="powiadomienie"):
+    """Stan płatności z Axepty (z podpisanego powiadomienia albo z API) → wpłata w systemie. Idempotentne.
+    Zaksięgowanie tylko przy zgodnym identyfikatorze, kwocie i walucie; rozbieżność → „nieprzypisana” do decyzji zarządu."""
+    from . import gateway
+
+    payment = Payment.objects.select_for_update().get(pk=payment.pk)
+    status = str(data.get("status", "")).lower()
+    payment.raw = {**(payment.raw or {}), source: {k: data.get(k) for k in (
+        "id", "status", "amount", "amountPaid", "amountRefunded", "amountSubmittedRefund", "currency", "orderId", "modified",
+        "modifiedAt", "notifyTransactionData") if k in data}}
+    payment.save(update_fields=["raw"])
+    if data.get("id") != gateway.external_ref(payment) or str(data.get("orderId", "")) != str(payment.pk):
+        mismatch = "Dane z Axepty nie pasują do wpłaty (identyfikator lub numer zamówienia)"
+    elif str(data.get("currency", "PLN")).upper() != "PLN":
+        mismatch = f"Waluta z Axepty ({data.get('currency')}) inna niż PLN"
+    else:
+        mismatch = None
+    if status == "settled":
+        paid = _int(data.get("amountPaid", data.get("amount")))
+        if mismatch is None and paid != payment.amount:
+            mismatch = f"Kwota z Axepty ({paid / 100:.2f} zł) różni się od oczekiwanej"
+        if mismatch:
+            if payment.status != Payment.Status.COMPLETED:
+                payment.note, payment.status = mismatch[:255], Payment.Status.UNMATCHED
+                payment.save(update_fields=["note", "status"])
+            logger.warning("Wpłata Axepta %s do sprawdzenia: %s", payment.pk, mismatch)
+            return payment
+        return complete_payment(payment)
+    if status in {"rejected", "error", "cancelled"} and payment.status == Payment.Status.PENDING:
+        payment.status, payment.note = Payment.Status.FAILED, f"Axepta: {status}"
+        payment.save(update_fields=["status", "note"])
+    return payment
+
+
+def _int(value):
+    try:
+        return int(Decimal(str(value)))
+    except (InvalidOperation, ValueError, TypeError):
+        return -1
+
+
+def sync_axepta(payment):
+    """Sprawdza stan płatności w API Axepty (np. po powrocie strzelca z bramki, gdy powiadomienie jeszcze nie dotarło)."""
+    from . import axepta, gateway
+
+    if gateway.provider_of(payment) != "axepta" or payment.status != Payment.Status.PENDING or not gateway.configured("axepta"):
+        return payment
+    try:
+        data = axepta.get_payment(gateway.external_ref(payment))
+    except axepta.AxeptaError:
+        return payment
+    return apply_axepta_state(payment, data, source="sprawdzenie")
 
 
 def start_tpay(user, amount, *, reservation=None, fee=None, registration=None, success_url=None, error_url=None):

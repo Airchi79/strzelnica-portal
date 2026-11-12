@@ -2,6 +2,12 @@ from django.conf import settings
 from django.db.models import Count
 
 
+def _online_provider():
+    from apps.payments.gateway import active_name
+
+    return active_name()
+
+
 def site(request):
     pending, unread, unread_portal = [], 0, 0
     user = getattr(request, "user", None)
@@ -33,6 +39,7 @@ def site(request):
         "header_balance": header_balance,
         "SITE_NAME": "Strzelnica Sątok",
         "TEST_COPY": settings.IS_TEST_COPY,
+        "ONLINE_PROVIDER": _online_provider(),
         "SITE_URL": settings.SITE_URL,
         "pending_regulations": pending,
         "PANEL_ACCOUNT": panel_account,

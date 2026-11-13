@@ -67,7 +67,7 @@ class PassPaidForm(forms.Form):
 class PersonForm(forms.ModelForm):
     class Meta:
         model = Person
-        fields = ["first_name", "last_name", "permit_number", "permit_issuer", "address", "phone", "note"]
+        fields = ["first_name", "last_name", "permit_number", "permit_issuer", "address", "phone", "email", "note"]
 
     def clean_permit_number(self):
         from .importer import normalize_permit

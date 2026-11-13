@@ -8,7 +8,7 @@
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
     <label for="plik">Plik XLSX</label>
     <input type="file" id="plik" name="plik" accept=".xlsx" required>
-    <div class="field"><label><input type="checkbox" name="osoby" value="1" checked> dodaj nowe osoby do kartoteki „Osoby bez konta”</label></div>
+    <div class="field"><label><input type="checkbox" name="osoby" value="1" checked> dodaj nowe osoby do kartoteki „Osoby bez konta” (osobom już w kartotece uzupełnia brakujące dane)</label></div>
     <div class="actions"><button class="btn secondary" type="submit" name="tryb" value="podglad">Podgląd (bez zapisu)</button>
       <button class="btn" type="submit" name="tryb" value="importuj" data-confirm-click="Zaimportować wpisy do archiwum?">Importuj</button></div>
   </form>
@@ -19,6 +19,7 @@
   <tr><th>{% if preview %}Wpisy do dodania{% else %}Dodane wpisy{% endif %}</th><td>{{ result.dodane }}</td></tr>
   <tr><th>Pominięte (już w archiwum)</th><td>{{ result.pominiete }}</td></tr>
   <tr><th>{% if preview %}Nowe osoby do kartoteki{% else %}Dodane osoby do kartoteki{% endif %}</th><td>{{ result.osoby }}</td></tr>
+  <tr><th>{% if preview %}Osoby do uzupełnienia danych{% else %}Uzupełnione osoby w kartotece{% endif %}</th><td>{{ result.osoby_uzupelnione }}</td></tr>
   {% if result.zakres %}<tr><th>Zakres dat w pliku</th><td>{{ result.zakres.0|date:"j.m.Y" }} – {{ result.zakres.1|date:"j.m.Y" }}</td></tr>{% endif %}
 </table>
 {% if not preview %}<div class="actions"><a class="btn" href="{% url 'panel:logbook_archive' %}">Przejdź do archiwum</a></div>{% endif %}</div>

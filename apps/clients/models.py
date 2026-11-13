@@ -112,6 +112,7 @@ class Person(models.Model):
     permit_issuer = models.CharField("organ, który wydał pozwolenie", max_length=160, blank=True)
     address = models.CharField("adres", max_length=255, blank=True)
     phone = models.CharField("telefon", max_length=32, blank=True)
+    email = models.EmailField("e-mail", blank=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="konto", null=True, blank=True, on_delete=models.SET_NULL,
                              related_name="kartoteka_persons")
     source = models.CharField("pochodzenie", max_length=12, choices=Source.choices, default=Source.PANEL)

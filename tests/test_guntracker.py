@@ -50,6 +50,16 @@ def test_logbook_archive_import_preview_import_dedupe_and_persons(owner_client):
         ArchivedEntry.objects.filter(pk=e.pk).delete()
 
 
+def test_logbook_archive_import_fills_missing_person_data(owner_client):
+    Person.objects.create(first_name="Łukasz", last_name="Archiwalny", permit_number="AA0286992", source="guntracker")
+    Person.objects.create(first_name="Joanna", last_name="Bezpozwolenia", address="Stary adres 1", source="panel")
+    body = owner_client.post("/panel/ksiazka/archiwum/import/", {"plik": book_file(), "tryb": "importuj", "osoby": "1"}).content.decode()
+    lukasz = Person.objects.get(last_name="Archiwalny")
+    assert lukasz.permit_issuer == "KSP WARSZAWA" and lukasz.address == "Kasprowicza 9"  # puste pola uzupełnione
+    assert Person.objects.get(last_name="Bezpozwolenia").address == "Stary adres 1"  # inny adres — bez nadpisania
+    assert Person.objects.count() == 2 and "Uzupełnione osoby" in body
+
+
 def test_logbook_archive_list_masked_reveal_and_print(owner_client):
     owner_client.post("/panel/ksiazka/archiwum/import/", {"plik": book_file(), "tryb": "importuj"})
     body = owner_client.get("/panel/ksiazka/archiwum/").content.decode()
@@ -135,3 +145,16 @@ def test_reservations_import_fills_person_phones(owner_client):
     assert Person.objects.get(last_name="Prowadzący").phone == "+48 111 222 333"  # bez nadpisywania
     body = owner_client.get("/panel/uzytkownicy/osoby/").content.decode()
     assert "600 333 444" not in body and "tel. ukryty" in body
+
+
+def test_old_persons_without_account_are_purged_with_logbook(owner):
+    from datetime import timedelta
+
+    from apps.logbook.services import purge_expired
+
+    old = Person.objects.create(first_name="Stary", last_name="Wpis", address="x")
+    linked = Person.objects.create(first_name="Z", last_name="Kontem", address="x", user=owner)
+    fresh = Person.objects.create(first_name="Nowy", last_name="Wpis", address="x")
+    Person.objects.filter(pk__in=[old.pk, linked.pk]).update(created_at=timezone.now() - timedelta(days=6 * 366))
+    purge_expired()
+    assert set(Person.objects.values_list("pk", flat=True)) == {linked.pk, fresh.pk}

@@ -126,7 +126,8 @@ def persons_list(request):
     q = params.get("q", "").strip()
     qs = Person.objects.all()
     if q:
-        qs = qs.filter(Q(last_name__icontains=q) | Q(first_name__icontains=q) | Q(permit_number__icontains=q.replace(" ", "").upper()))
+        qs = qs.filter(Q(last_name__icontains=q) | Q(first_name__icontains=q) | Q(permit_number__icontains=q.replace(" ", "").upper())
+                       | Q(email__iexact=q))
     if params.get("niepelne") == "1":
         qs = qs.filter((Q(permit_number="") & Q(address="")) | (~Q(permit_number="") & Q(permit_issuer="")))
     page = Paginator(qs, 50).get_page(params.get("page"))
@@ -176,7 +177,7 @@ def persons_import(request):
             messages.error(request, "Wybierz plik XLSX.")
         else:
             try:
-                report = importer.run(uploaded, by=request.user, preview=preview)
+                report = importer.run(uploaded, by=request.user, preview=preview, overwrite=request.POST.get("nadpisz") == "1")
             except ValidationError as e:
                 messages.error(request, " ".join(e.messages))
             else:
@@ -185,4 +186,5 @@ def persons_import(request):
     counts = {}
     for status, _ in report or []:
         counts[status] = counts.get(status, 0) + 1
-    return render(request, "panel/persons_import.html", {"report": report, "preview": preview, "counts": counts})
+    return render(request, "panel/persons_import.html", {"report": report, "preview": preview, "counts": counts,
+                                                         "overwrite": request.POST.get("nadpisz") == "1"})

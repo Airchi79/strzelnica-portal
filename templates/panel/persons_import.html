@@ -4,20 +4,29 @@
 <h1>Strzelcy</h1>
 {% include "panel/_clients_tabs.html" %}
 <div class="card">
-  <p>Wgraj eksport <strong>„Klienci”</strong> z GunTrackera (XLSX z kolumnami: Imię, Nazwisko, Numer pozwolenia, Organ wydający, Adres).
-  Osoby trafią do kartoteki „Osoby bez konta”. Osoby, które już są w kartotece (ten sam nr pozwolenia albo imię i nazwisko), są pomijane.</p>
+  <p>Wgraj eksport <strong>„Klienci”</strong> z GunTrackera (XLSX z kolumnami: Imię, Nazwisko, Numer pozwolenia, Organ wydający, Adres;
+  opcjonalnie <strong>E-mail</strong> i <strong>Telefon</strong>). Nowe osoby trafią do kartoteki „Osoby bez konta”.</p>
+  <p class="small muted">Osoba, która już jest w kartotece (ten sam nr pozwolenia albo imię i nazwisko), nie jest dodawana drugi raz —
+  import <strong>uzupełnia jej brakujące dane</strong> (np. e-mail, telefon, organ wydający). Dane różniące się od kartoteki są tylko
+  pokazywane (mogły być poprawione w panelu) — zastąpią kartotekę dopiero po zaznaczeniu opcji poniżej.</p>
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
     <label for="plik">Plik XLSX</label>
     <input type="file" id="plik" name="plik" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+    <div class="field"><label><input type="checkbox" name="nadpisz" value="1"{% if overwrite %} checked{% endif %}>
+      nadpisz różniące się dane danymi z pliku (imię i nazwisko zostają)</label></div>
     <div class="actions"><button class="btn secondary" type="submit" name="tryb" value="podglad">Podgląd (bez zapisu)</button>
       <button class="btn" type="submit" name="tryb" value="importuj" data-confirm-click="Zaimportować osoby do kartoteki?">Importuj</button></div>
   </form>
 </div>
 {% if report is not None %}
 <h2>{% if preview %}Podgląd — nic nie zapisano{% else %}Wynik importu{% endif %}</h2>
-<p>{% if preview %}Zostanie dodanych{% else %}Dodano{% endif %}: <strong>{{ counts.ok|default:0 }}</strong> · z uwagami: <strong>{{ counts.blad|default:0 }}</strong> · pominięto: <strong>{{ counts.pominieto|default:0 }}</strong></p>
+<p>{% if preview %}Zostanie dodanych{% else %}Dodano{% endif %}: <strong>{{ counts.ok|default:0 }}</strong>
+  · {% if preview %}do uzupełnienia{% else %}uzupełniono{% endif %}: <strong>{{ counts.uzupelniono|default:0 }}</strong>
+  {% if counts.nadpisano %}· {% if preview %}do nadpisania{% else %}nadpisano{% endif %}: <strong>{{ counts.nadpisano }}</strong>{% endif %}
+  · inne dane w pliku: <strong>{{ counts.roznica|default:0 }}</strong>
+  · bez zmian: <strong>{{ counts.bez_zmian|default:0 }}</strong> · z uwagami: <strong>{{ counts.blad|default:0 }}</strong></p>
 <div class="card"><table>
-  {% for status, line in report %}<tr><td><span class="badge {% if status == 'ok' %}ok{% elif status == 'blad' %}warn{% endif %}">{% if status == 'ok' %}{% if preview %}do dodania{% else %}dodano{% endif %}{% elif status == 'blad' %}uwaga{% else %}pominięto{% endif %}</span></td><td>{{ line }}</td></tr>
+  {% for status, line in report %}<tr><td><span class="badge {% if status == 'ok' or status == 'uzupelniono' %}ok{% elif status == 'blad' or status == 'roznica' or status == 'nadpisano' %}warn{% endif %}">{% if status == 'ok' %}{% if preview %}do dodania{% else %}dodano{% endif %}{% elif status == 'uzupelniono' %}{% if preview %}do uzupełnienia{% else %}uzupełniono{% endif %}{% elif status == 'nadpisano' %}{% if preview %}do nadpisania{% else %}nadpisano{% endif %}{% elif status == 'roznica' %}inne dane{% elif status == 'blad' %}uwaga{% else %}bez zmian{% endif %}</span></td><td>{{ line }}</td></tr>
   {% empty %}<tr><td class="muted">Arkusz nie zawiera osób.</td></tr>{% endfor %}
 </table></div>
 {% endif %}

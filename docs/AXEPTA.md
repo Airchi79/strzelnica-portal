@@ -75,11 +75,23 @@ w panelu, postać powiadomienia o zwrocie (`notifyTransactionData.type = "refund
 2. Na produkcji zapisz dane jak wyżej (w `/share/strzelnica`), ustaw `AXEPTA_SANDBOX=false`
    i `ONLINE_PAYMENTS_PROVIDER=axepta`, potem `docker compose up -d app cron`.
 3. Dane Tpay zostaw w `.env`, dopóki wszystkie wcześniejsze płatności i zwroty Tpay nie zostaną rozliczone.
-4. **Dokumenty** (przed przełączeniem):
-   - Informacja RODO § 3 ust. 1 — operator płatności: **BNP Paribas Bank Polska S.A.** (Axepta) zamiast / obok
-     Krajowego Integratora Płatności S.A. (Tpay),
-   - Regulamin rezerwacji i opłat § 6 ust. 1 lit. a i § 7 ust. 3 — „Tpay” → „Axepta BNP Paribas”
-     (przygotuję gotowe teksty przed przełączeniem).
+4. **Dokumenty** (opublikuj nowe wersje w dniu przełączenia):
+   - Informacja RODO § 3 ust. 1:
+     > 1. BNP Paribas Bank Polska S.A. z siedzibą w Warszawie (operator płatności Axepta BNP Paribas) — w zakresie płatności
+     > online (BLIK, szybki przelew, karta, Google Pay, Apple Pay) i zwrotów. Operator przetwarza dane płatności jako odrębny
+     > administrator, na zasadach swojej polityki prywatności. Przy płatności Google Pay lub Apple Pay dane płatności
+     > przetwarzają także Google lub Apple — na zasadach regulaminu wybranej usługi.
+
+     Jeżeli przed przełączeniem przez Tpay przechodziły prawdziwe płatności, dopisz jako ust. 2 (do czasu rozliczenia
+     ich zwrotów): „Krajowy Integrator Płatności S.A. (operator płatności Tpay) — w zakresie płatności online dokonanych
+     przed zmianą operatora płatności i ich zwrotów. Operator przetwarza dane płatności jako odrębny administrator, na
+     zasadach swojej polityki prywatności.” (kolejne ustępy przesuń o jeden).
+   - Regulamin rezerwacji i opłat § 6 ust. 1 lit. a:
+     > a) online przez operatora płatności Axepta BNP Paribas (BLIK, szybki przelew, karta, Google Pay, Apple Pay),
+   - Regulamin rezerwacji i opłat § 7 ust. 3:
+     > 3. Przy anulowaniu bez opłat wpłata online wraca automatycznie na rachunek lub kartę, z których dokonano płatności,
+     > za pośrednictwem tego samego operatora płatności — zwykle w ciągu kilku dni roboczych. Wpłaty gotówką i przelewem
+     > tradycyjnym zwraca obsługa w uzgodniony sposób.
 5. Zapytaj bank o: prowizje (do ustawienia „opłaty za płatność online” w panelu), termin wypłat na rachunek,
    możliwość zwrotów przez API na koncie produkcyjnym.
 

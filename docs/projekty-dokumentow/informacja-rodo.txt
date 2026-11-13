@@ -20,6 +20,7 @@ Przed publikacją uzupełnij lub potwierdź punkty z notatki na końcu pliku.
 7. Ustalenie, dochodzenie i obrona roszczeń. Podstawa: prawnie uzasadniony interes Stowarzyszenia (art. 6 ust. 1 lit. f RODO).
 8. Powiadomienia na telefonie (push) — włączane przez strzelca na wybranym urządzeniu. Podstawa: zgoda (art. 6 ust. 1 lit. a RODO), którą można w każdej chwili wycofać, wyłączając powiadomienia w systemie lub w ustawieniach telefonu.
 9. Kiosk przy wejściu — dane podane w kiosku przy rezerwacji na miejscu (imię, nazwisko, telefon, adres e-mail), sposób potwierdzenia tożsamości (kod z wiadomości e-mail, osobisty kod QR z systemu albo nazwisko i numer legitymacji prowadzącego strzelanie), oświadczenie o prawdziwości danych, oświadczenia o wpłacie gotówki do skarbonki (kwota, rezerwacja, czas, kiosk) i ich rozliczenie przez obsługę, a także zapis zdarzenia „rezygnacja z opłaty / brak opłaty” (dane osoby, rezerwacja, czas). Kamera kiosku służy do odczytu kodów QR i do zdjęcia legitymacji zatwierdzonego przez osobę; obraz z kamery nie jest nagrywany ani zapisywany. Podstawa: wykonanie umowy (art. 6 ust. 1 lit. b RODO) oraz prawnie uzasadniony interes Stowarzyszenia — rozliczenie wpłat gotówkowych, wyjaśnianie niezgodności w skarbonce, bezpieczeństwo i ochrona przed nieuprawnionym korzystaniem ze strzelnicy (art. 6 ust. 1 lit. f RODO).
+10. Kartoteka osób bez konta w systemie (m.in. strzelcy przeniesieni z poprzedniego systemu rezerwacji GunTracker) — imię, nazwisko, numer pozwolenia na broń i organ, który je wydał, adres, telefon, adres e-mail — w celu sprawnego wpisu do książki pobytu przez obsługę oraz kontaktu w sprawach rezerwacji i pobytu na strzelnicy. Podgląd tych danych przez obsługę jest rejestrowany. Podstawa: prawnie uzasadniony interes Stowarzyszenia — obsługa osób korzystających ze strzelnicy (art. 6 ust. 1 lit. f RODO).
 
 § 3. Komu przekazujemy dane
 
@@ -47,6 +48,7 @@ Cloudflare, Inc. oraz część operatorów usług powiadomień push mają siedzi
 9. Dziennik zdarzeń (w tym zapis zdarzeń „rezygnacja z opłaty / brak opłaty” z kiosku) i dane potrzebne do obrony przed roszczeniami — do upływu terminów przedawnienia roszczeń.
 10. Dane przebiegu rezerwacji w kiosku (dane podane w kiosku, kod potwierdzający) — niedokończone do 1 doby, pozostałe do 7 dni; dłużej pozostają tylko konto, dokument i rezerwacja.
 11. Oświadczenia o wpłacie gotówki do skarbonki i rozliczenia skarbonki — jak dokumentacja wpłat (ust. 3).
+12. Kartoteka osób bez konta (§ 2 ust. 10) — do czasu wniesienia sprzeciwu, nie dłużej niż 5 lat od wprowadzenia osoby do kartoteki; po tym czasie dane są usuwane automatycznie.
 
 § 6. Prawa osoby, której dane dotyczą
 

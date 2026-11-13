@@ -62,11 +62,11 @@ def parse(uploaded):
 
 
 def run(uploaded, *, by=None, preview=False, add_persons=True):
-    from apps.clients.importer import find_existing
+    from apps.clients.importer import find_existing, merge
     from apps.clients.models import Person
 
     items = parse(uploaded)
-    stats = {"dodane": 0, "pominiete": 0, "osoby": 0}
+    stats = {"dodane": 0, "pominiete": 0, "osoby": 0, "osoby_uzupelnione": 0}
     with transaction.atomic():
         existing = set(ArchivedEntry.objects.filter(row_hash__in=[i["row_hash"] for _, i in items]).values_list("row_hash", flat=True))
         for _, item in items:
@@ -78,12 +78,16 @@ def run(uploaded, *, by=None, preview=False, add_persons=True):
             stats["dodane"] += 1
             if add_persons:
                 person = {k: item[k] for k in ("first_name", "last_name", "permit_number", "permit_issuer", "address")}
-                if not find_existing(person):
+                known = find_existing(person)
+                if known is None:
                     Person.objects.create(**person, source=Person.Source.GUNTRACKER, created_by=by)
                     stats["osoby"] += 1
+                elif merge(known, person)[0]:  # tylko uzupełnienie pustych pól — bez nadpisywania
+                    stats["osoby_uzupelnione"] += 1
         if preview:
             transaction.set_rollback(True)
     stats["zakres"] = (min(i["started_at"] for _, i in items), max(i["started_at"] for _, i in items)) if items else None
     if not preview and stats["dodane"]:
-        log_event("ksiazka.import_archiwum", summary=f"{uploaded.name}: {stats['dodane']} wpisów archiwalnych, {stats['osoby']} nowych osób", actor=by)
+        log_event("ksiazka.import_archiwum", summary=f"{uploaded.name}: {stats['dodane']} wpisów archiwalnych, {stats['osoby']} nowych osób, "
+                                                       f"{stats['osoby_uzupelnione']} uzupełnionych", actor=by)
     return stats

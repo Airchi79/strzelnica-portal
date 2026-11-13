@@ -237,7 +237,42 @@ def test_persons_import_preview_import_and_duplicates(owner_client):
     assert p.permit_number == "BB0030709" and p.source == "guntracker" and p.complete_for_logbook
     assert not Person.objects.get(last_name="Bezorganu").complete_for_logbook
     body = owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": _gt_xlsx(GT_ROWS), "tryb": "importuj"}).content.decode()
-    assert Person.objects.count() == 3 and "już w kartotece" in body
+    assert Person.objects.count() == 3 and "już w kartotece, bez zmian" in body
+
+
+GT_HEADER_FULL = ("Imię", "Nazwisko", "Numer pozwolenia", "Organ wydający", "Adres", "E-mail", "Telefon")
+
+
+def test_persons_import_reads_email_and_phone(owner_client):
+    from apps.clients.models import Person
+
+    rows = [("Marek", "Testowy", "bb 0030709", "KWP Wrocław", "Główna 1, Wójcice", "Marek@Example.com", 600700800),
+            ("Ewa", "Zlymail", "", "", "Polna 2, Oleśnica", "to-nie-mail", "")]
+    body = owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": _gt_xlsx(rows, header=GT_HEADER_FULL), "tryb": "importuj"}).content.decode()
+    p = Person.objects.get(last_name="Testowy")
+    assert p.email == "marek@example.com" and p.phone == "+48 600 700 800"
+    assert Person.objects.get(last_name="Zlymail").email == "" and "niepoprawny e-mail" in body
+
+
+def test_persons_reimport_fills_missing_and_reports_differences(owner_client):
+    from apps.clients.models import Person
+
+    owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": _gt_xlsx(GT_ROWS), "tryb": "importuj"})
+    Person.objects.filter(last_name="Testowy").update(phone="+48 500 000 000")  # np. poprawione w panelu
+    rows = [("Marek", "Testowy", "BB0030709", "KWP Wrocław", "Inna 5, Wrocław", "marek@example.com", "600700800"),
+            ("Jan", "Bezorganu", "LB123", "KPP Oleśnica", "", "", "")]
+    file = lambda: _gt_xlsx(rows, header=GT_HEADER_FULL)  # noqa: E731
+    body = owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": file(), "tryb": "podglad"}).content.decode()
+    assert "do uzupełnienia" in body and Person.objects.get(last_name="Bezorganu").permit_issuer == ""  # podgląd nic nie zapisuje
+    body = owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": file(), "tryb": "importuj"}).content.decode()
+    marek = Person.objects.get(last_name="Testowy")
+    assert marek.email == "marek@example.com"  # puste pole uzupełnione
+    assert marek.address == "Główna 1, Wójcice" and marek.phone == "+48 500 000 000"  # różnice — bez nadpisania
+    assert "inne dane niż w kartotece (adres, telefon)" in body
+    assert Person.objects.get(last_name="Bezorganu").permit_issuer == "KPP Oleśnica" and Person.objects.count() == 3
+    owner_client.post("/panel/uzytkownicy/osoby/import/", {"plik": file(), "tryb": "importuj", "nadpisz": "1"})
+    marek.refresh_from_db()
+    assert marek.address == "Inna 5, Wrocław" and marek.phone == "+48 600 700 800" and marek.first_name == "Marek"
 
 
 def test_persons_import_rejects_bad_files(owner_client):

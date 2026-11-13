@@ -63,7 +63,7 @@ def export_data(user):
         "członkostwo": [{"numer": m.number, "status": m.get_status_display(), "od": str(m.joined_on) if m.joined_on else None,
                          "adres": m.address, "e-mail": m.email} for m in Member.objects.filter(user=user)],
         "deklaracje": [{"złożono": _dt(a.submitted_at), "status": a.get_status_display()} for a in MembershipApplication.objects.filter(user=user)],
-        "kartoteka_osób": [{"imię": p.first_name, "nazwisko": p.last_name, "telefon": p.phone, "adres": p.address,
+        "kartoteka_osób": [{"imię": p.first_name, "nazwisko": p.last_name, "telefon": p.phone, "e-mail": p.email, "adres": p.address,
                             "pozwolenie": p.permit_number} for p in Person.objects.filter(user=user)],
         "kto_oglądał_moje_dane": [{"kiedy": _dt(s.at), "kto": s.actor.full_name if s.actor else "system", "co": s.resource, "cel": s.reason}
                                   for s in SensitiveAccessLog.objects.filter(subject=user).select_related("actor")],

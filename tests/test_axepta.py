@@ -205,3 +205,24 @@ def test_provider_of_and_disabled_endpoint(client, settings):
     assert gateway.provider_of(p) == "tpay" and gateway.provider_of(Payment(external_id="bank:1")) is None
     settings.AXEPTA_ENABLED = False
     assert client.post("/platnosci/axepta/powiadomienie/", b"{}", content_type="application/json").status_code == 404
+
+
+def test_panel_list_shows_refund_and_filters(owner_client, ps, api, owner, django_capture_on_commit_callbacks):  # noqa: F811
+    client = owner_client
+    p1 = axepta_payment(ps)
+    p2 = Payment.objects.create(user=ps, amount=3000, method=Payment.Method.TPAY, external_id="axepta:pay-2", title="bez zwrotu")
+    services.complete_payment(p1)
+    services.complete_payment(p2)
+    p1.refresh_from_db()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert services.refund_to_payer(p1, 2000, by=owner, reason="Anulowanie")
+    page = client.get("/panel/platnosci/").content.decode()
+    assert page.count("zwrot 20\xa0zł") == 1 and "w toku" not in page  # tylko wpłata ze zwrotem, zwrot przyjęty
+    only = client.get("/panel/platnosci/?zwrot=zwrocone").content.decode()
+    assert "zwrot 20\xa0zł" in only and "bez zwrotu" not in only
+    assert "zwrot 20\xa0zł" not in client.get("/panel/platnosci/?zwrot=do_sprawdzenia").content.decode()
+    TpayRefund.objects.filter(payment=p1).update(status=TpayRefund.Status.UNKNOWN)
+    pending = client.get("/panel/platnosci/?zwrot=do_sprawdzenia").content.decode()
+    assert "zwrot 20\xa0zł do sprawdzenia" in pending and "bez zwrotu" not in pending
+    detail = client.get(f"/panel/platnosci/{p1.pk}/").content.decode()
+    assert "Do sprawdzenia w panelu operatora płatności" in detail and "Tpay" not in detail

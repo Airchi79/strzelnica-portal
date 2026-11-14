@@ -177,6 +177,6 @@ def attention(user, now=None):
         from apps.payments.models import TpayRefund
 
         unknown = TpayRefund.objects.filter(status=TpayRefund.Status.UNKNOWN).count()
-        tiles.append(("Zwroty Tpay do sprawdzenia", "Sprawdź w panelu Tpay i oznacz wynik", unknown, reverse("panel:payments")))
+        tiles.append(("Zwroty online do sprawdzenia", "Sprawdź w panelu operatora płatności i oznacz wynik", unknown, reverse("panel:payments") + "?zwrot=do_sprawdzenia"))
         tiles.append(("Wpłaty do przypisania", "Przelewy bez rozpoznanego tytułu", Payment.objects.filter(status=Payment.Status.UNMATCHED).count(), reverse("panel:payments") + "?status=nieprzypisana"))
     return tiles

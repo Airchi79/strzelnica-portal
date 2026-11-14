@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -279,9 +279,21 @@ def services_amount(text):
 @panel_required(PERM)
 def panel_payments(request):
     status = request.GET.get("status", "")
-    qs = Payment.objects.select_related("user", "reservation")
+    # Zwrot przez operatora (najwyżej jeden aktywny na wpłatę — ograniczenie w bazie); nieudane zwroty pomijane.
+    active_refund = TpayRefund.objects.filter(payment=OuterRef("pk")).exclude(status=TpayRefund.Status.FAILED)
+    qs = Payment.objects.select_related("user", "reservation").annotate(
+        refund_amount=Subquery(active_refund.values("amount")[:1]),
+        refund_status=Subquery(active_refund.values("status")[:1]),
+    )
     if status in Payment.Status.values:
         qs = qs.filter(status=status)
+    refund_filter = request.GET.get("zwrot", "")
+    if refund_filter == "do_sprawdzenia":
+        qs = qs.filter(refund_status=TpayRefund.Status.UNKNOWN)
+    elif refund_filter == "zwrocone":
+        qs = qs.filter(refund_status__isnull=False)
+    else:
+        refund_filter = ""
     q = request.GET.get("q", "").strip()
     if q:
         qs = qs.filter(Q(title__icontains=q) | Q(payer_name__icontains=q) | Q(user__last_name__icontains=q) | Q(user__email__icontains=q))
@@ -289,7 +301,7 @@ def panel_payments(request):
     return render(
         request,
         "panel/payments_list.html",
-        {"page": page, "status": status, "statuses": Payment.Status.choices, "q": q,
+        {"page": page, "status": status, "statuses": Payment.Status.choices, "q": q, "refund_filter": refund_filter,
          "unmatched": Payment.objects.filter(status=Payment.Status.UNMATCHED).count()},
     )
 

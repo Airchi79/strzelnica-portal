@@ -1518,7 +1518,7 @@ def test_stuck_refund_goes_to_board_and_is_not_retried(client, owner, ps, tpay_k
     client.logout()
     login_with_otp(client, owner)
     page = client.get(f"/panel/platnosci/{payment.pk}/").content.decode()
-    assert "Do sprawdzenia w panelu Tpay" in page and "Zwrotu nie ma" in page
+    assert "Do sprawdzenia w panelu operatora płatności" in page and "Zwrotu nie ma" in page
     ref = TpayRefund.objects.get()
     client.post(f"/panel/platnosci/{payment.pk}/", {"action": "refund_missing", "refund": ref.pk})
     ref.refresh_from_db()

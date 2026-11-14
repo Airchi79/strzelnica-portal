@@ -68,6 +68,15 @@ def world(owner):
     p = payments.register_manual_payment(shooter, 5000, "gotowka", owner)
     Payment.objects.filter(pk=p.pk).update(completed_at=timezone.now() - timedelta(days=2))
     reports.generate_missing()
+    # księgowość: przychód z raportu wpływów (testowy) i koszt wpisany ręcznie przez zarząd (prawdziwy — zostaje)
+    from apps.accounting import services as accounting
+    from apps.accounting.models import AccountingSettings
+
+    AccountingSettings.objects.update_or_create(pk=1, defaults={"auto_from": timezone.localdate() - timedelta(days=30)})
+    auto = accounting.sync_from_sales_reports()[0]
+    accounting.correct(auto, reason="próba korekty", by=owner)
+    accounting.add_record(kind="koszt", day=timezone.localdate(), document="FV 1", description="Energia", amount=1000,
+                          column="cost_deductible", by=owner)
     # pozostałe moduły
     club = Club.objects.create(name="Klub Testowy")
     AccessCode.objects.create(club=club, valid_from=timezone.localdate(), valid_until=timezone.localdate() + timedelta(days=60))
@@ -117,6 +126,9 @@ def test_purge_removes_test_data_and_keeps_imports_and_owner(world):
     assert list(Block.objects.all()) == [world["archived_block"]]
     assert list(Person.objects.values_list("last_name", flat=True)) == ["Zimportowana"]
     assert RegulationVersion.objects.count() == regs
+    from apps.accounting.models import Record
+
+    assert list(Record.objects.values_list("description", flat=True)) == ["Energia"]
     # dziennik: tylko zapis o czyszczeniu
     assert list(AuditLog.objects.values_list("action", flat=True)) == [go_live.PURGE_EVENT]
     # numeracja od nowa, a blokady w bazie znów działają

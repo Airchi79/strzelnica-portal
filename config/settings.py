@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "apps.association",
     "apps.clients",
     "apps.reports",
+    "apps.accounting",
     "apps.kiosk",
     "apps.events",
 ]

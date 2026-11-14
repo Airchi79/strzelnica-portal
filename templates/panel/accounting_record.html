@@ -1,0 +1,30 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Zapis {{ r.lp }}{% endblock %}
+{% block panel %}
+<h1>Zapis Lp. {{ r.lp }}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<div class="card"><table>
+  <tr><th>Rodzaj</th><td>{{ r.get_kind_display }}</td></tr>
+  <tr><th>Data zdarzenia</th><td>{{ r.date|date:"j.m.Y" }}</td></tr>
+  <tr><th>Nr dowodu księgowego</th><td class="code">{% if r.sales_report %}<a href="{% url 'panel:sales_report' r.sales_report.pk %}">{{ r.document }}</a>{% else %}{{ r.document }}{% endif %}</td></tr>
+  <tr><th>Opis zdarzenia</th><td>{{ r.description }}</td></tr>
+  {% if r.counterparty %}<tr><th>Kontrahent / wystawca</th><td>{{ r.counterparty }}</td></tr>{% endif %}
+  {% if r.revenue %}<tr><th>Przychody (kol. 5)</th><td>{{ r.revenue|pln }}</td></tr>{% endif %}
+  {% if r.cost_deductible %}<tr><th>Koszty uzyskania przychodów (kol. 6)</th><td>{{ r.cost_deductible|pln }}</td></tr>{% endif %}
+  {% if r.cost_other %}<tr><th>Koszty niestanowiące KUP (kol. 7)</th><td>{{ r.cost_other|pln }}</td></tr>{% endif %}
+  {% if r.notes %}<tr><th>Uwagi (kol. 8)</th><td>{{ r.notes }}</td></tr>{% endif %}
+  {% if r.corrects %}<tr><th>Koryguje zapis</th><td><a href="{% url 'panel:accounting_record' r.corrects.pk %}">Lp. {{ r.corrects.lp }}</a></td></tr>{% endif %}
+  {% if correction %}<tr><th>Skorygowany zapisem</th><td><a href="{% url 'panel:accounting_record' correction.pk %}">Lp. {{ correction.lp }}</a> — {{ correction.notes }}</td></tr>{% endif %}
+  {% if r.attachment %}<tr><th>Skan dowodu</th><td><a href="{% url 'panel:accounting_attachment' r.pk %}">Pobierz</a><div class="small muted code">SHA-256: {{ r.attachment_sha256 }}</div></td></tr>{% endif %}
+  <tr><th>Zapisano</th><td>{{ r.created_at|date:"j.m.Y H:i" }} — {% if r.created_by %}{{ r.created_by.full_name }}{% else %}automatycznie z raportu wpływów{% endif %}</td></tr>
+</table>
+<div class="actions"><a class="btn secondary" href="{% url 'panel:accounting' %}?rok={{ r.year }}&miesiac={{ r.date.month }}">Wróć do zestawienia</a></div></div>
+{% if form %}
+<h2>Korekta zapisu</h2>
+<form method="post" action="{% url 'panel:accounting_correct' r.pk %}" class="card" novalidate>{% csrf_token %}
+  <p class="small muted">Korekta dopisze nowy zapis z przeciwnymi kwotami (storno), wskazujący ten zapis. Oryginał pozostaje bez zmian. Potem, jeśli trzeba, wprowadź zapis z poprawną treścią.</p>
+  {% include "partials/form.html" %}
+  <div class="actions"><button class="btn danger" type="submit">Dodaj zapis korygujący</button></div>
+</form>
+{% endif %}
+{% endblock %}

@@ -41,6 +41,7 @@ SECTIONS = [
         ("Wpłaty", "panel:payments", "receipt", "payments.manage_payments", ["payment*"]),
         ("Salda", "panel:wallets", "wallet", "payments.manage_payments", ["wallet*"]),
         ("Raporty wpływów", "panel:sales_reports", "chart", "reports.view_salesreport", ["sales_report*"]),
+        ("Księgowość", "panel:accounting", "book", "accounting.manage_accounting", ["accounting*"]),
     ]),
     ("Stowarzyszenie", [
         ("Członkowie", "panel:members", "landmark", "association.manage_members", ["member*", "association_import*"]),

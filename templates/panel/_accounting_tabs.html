@@ -1,0 +1,8 @@
+<div class="tabs">
+  {% with u=request.resolver_match.url_name %}
+  <a href="{% url 'panel:accounting' %}" class="{% if u == 'accounting' or u == 'accounting_record' %}active{% endif %}">Zestawienie przychodów i kosztów</a>
+  <a href="{% url 'panel:accounting_add' 'przychod' %}" class="{% if u == 'accounting_add' and kind == 'przychod' %}active{% endif %}">Dodaj przychód</a>
+  <a href="{% url 'panel:accounting_add' 'koszt' %}" class="{% if u == 'accounting_add' and kind == 'koszt' %}active{% endif %}">Dodaj koszt</a>
+  <a href="{% url 'panel:accounting_settings' %}" class="{% if u == 'accounting_settings' %}active{% endif %}">Ustawienia</a>
+  {% endwith %}
+</div>

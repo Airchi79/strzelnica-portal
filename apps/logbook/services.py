@@ -114,6 +114,33 @@ def open_reservations(now=None):
     )
 
 
+SUGGEST_PER_HOUR = 60  # zapytań o podpowiedź osi z jednego adresu / kiosku
+
+
+def _name_key(value):
+    return " ".join(str(value or "").split()).casefold()
+
+
+def suggest_reservation(first_name, last_name, now=None):
+    """Podpowiedź osi przy wpisie bez logowania: trwająca (otwarta do wpisu) rezerwacja, której rezerwujący ma dokładnie
+    to imię i nazwisko. Tylko gdy pasuje dokładnie jedna — inaczej None. Wynik to sama rezerwacja (oś i godziny są i tak
+    na liście w formularzu); nazwiska nigdy nie trafiają na ekran."""
+    first, last = _name_key(first_name), _name_key(last_name)
+    if len(first) < 2 or len(last) < 2:
+        return None
+    hits = [r for r in open_reservations(now) if _name_key(r.user.first_name) == first and _name_key(r.user.last_name) == last]
+    return hits[0] if len(hits) == 1 else None
+
+
+def suggest_allowed(key):
+    """Limit zapytań o podpowiedź (ochrona przed sprawdzaniem po kolei, kto ma teraz rezerwację)."""
+    if not key:
+        return True
+    from apps.accounts.ratelimit import allow
+
+    return allow("logbook-suggest", key, SUGGEST_PER_HOUR, 3600)
+
+
 # --- dane podpowiadane z konta ------------------------------------------------------
 
 

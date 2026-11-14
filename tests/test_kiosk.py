@@ -206,3 +206,11 @@ def test_kiosk_page_warns_no_shooting_and_has_no_bez_rezerwacji(paired):
     _, c = paired
     body = c.get("/kiosk/").content.decode()
     assert "data-no-shooting" in body and "Zakaz strzelania" in body
+
+
+def test_kiosk_suggests_reservation_by_holder_name(paired, running):
+    _, c = paired
+    r = c.get("/kiosk/api/podpowiedz-osi/", {"imie": "Piotr", "nazwisko": "Prowadzący"}, **H)
+    assert r.status_code == 200 and r.json() == {"reservation": running.pk}
+    assert c.get("/kiosk/api/podpowiedz-osi/", {"imie": "Anna", "nazwisko": "Nowak"}, **H).json() == {"reservation": None}
+    assert Client().get("/kiosk/api/podpowiedz-osi/", {"imie": "Piotr", "nazwisko": "Prowadzący"}, **H).status_code == 401

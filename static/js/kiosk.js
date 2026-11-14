@@ -183,6 +183,26 @@
     show("form");
     sizeCanvas();
   }
+  // Podpowiedź osi: po wpisaniu imienia i nazwiska rezerwującego zaznacza jego trwającą rezerwację (tylko gdy pole
+  // rezerwacji jest puste i pasuje dokładnie jedna). Bez sieci — po prostu brak podpowiedzi.
+  async function suggestReservation() {
+    const select = field("reservation"), first = field("first_name").value.trim(), last = field("last_name").value.trim();
+    const purpose = radio("purpose");
+    if (select.value || first.length < 2 || last.length < 2 || purpose === "prace" || purpose === "inne") return;
+    try {
+      const { status, data } = await api(`podpowiedz-osi/?imie=${encodeURIComponent(first)}&nazwisko=${encodeURIComponent(last)}`);
+      if (status !== 200 || !data.reservation || select.value) return;
+      const option = [...select.options].find((o) => o.value === String(data.reservation));
+      if (!option) return;
+      select.value = option.value;
+      if (!radio("purpose")) form.querySelector('input[name=purpose][value="strzelanie"]').checked = true;
+      const info = $("[data-form-info]");
+      info.textContent = `Zaznaczono rezerwację: ${option.textContent} — sprawdź, czy to Twoja.`;
+      info.hidden = false;
+      toggleFields();
+    } catch (e) { /* brak sieci — bez podpowiedzi */ }
+  }
+  ["first_name", "last_name"].forEach((n) => field(n).addEventListener("change", suggestReservation));
   function validate() {
     const errors = [];
     const purpose = radio("purpose"), permit = radio("has_permit");

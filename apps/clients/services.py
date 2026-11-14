@@ -215,8 +215,32 @@ def pass_remaining(p):
     return None if p.entries_limit is None else max(0, p.entries_limit - pass_uses(p))
 
 
+def pass_extra_hourly(rule, persons, client_pass):
+    """Dopłata za godzinę za osoby ponad limit kodu wejścia: cena osi za wszystkie osoby minus cena za osoby objęte
+    kodem (decyzja właściciela, listopad 2026). Z kodem nigdy nie płaci się więcej niż bez kodu; oś rozliczana tylko
+    ryczałtem (cena niezależna od liczby osób) — bez dopłaty."""
+    covered = min(persons, client_pass.max_persons)
+    return max(rule.hourly_amount(persons) - rule.hourly_amount(covered), 0)
+
+
+def usable_passes(user, day=None):
+    """Aktywne, opłacone kody wejścia strzelca ważne w danym dniu (domyślnie od dziś) z wolnymi wejściami —
+    do podpowiedzi w formularzu rezerwacji."""
+    from django.utils import timezone
+
+    day = day or timezone.localdate()
+    out = []
+    for p in ClientPass.objects.filter(user=user, is_active=True, valid_until__gte=day).order_by("valid_until", "pk"):
+        remaining = pass_remaining(p)
+        if p.is_paid and remaining != 0:
+            p.remaining = remaining
+            out.append(p)
+    return out
+
+
 def find_client_pass(raw, user, lane, day, hours, persons, lock=False, exclude_reservation=None):
-    """Zwraca ClientPass dla kodu albo None, gdy to nie jest kod wejścia. Zgłasza ValidationError, gdy kod nie pasuje."""
+    """Zwraca ClientPass dla kodu albo None, gdy to nie jest kod wejścia. Zgłasza ValidationError, gdy kod nie pasuje.
+    Osoby ponad limit kodu nie blokują rezerwacji — płaci się za nie dopłatę (`pass_extra_hourly`)."""
     raw = (raw or "").strip().upper()
     qs = ClientPass.objects.filter(code=raw)
     if lock:
@@ -236,8 +260,6 @@ def find_client_pass(raw, user, lane, day, hours, persons, lock=False, exclude_r
         raise ValidationError("Ten kod wejścia nie obejmuje wybranej osi.")
     if hours > p.max_hours:
         raise ValidationError(f"Jedno wejście z tego kodu obejmuje najwyżej {p.max_hours} h.")
-    if persons > p.max_persons:
-        raise ValidationError(f"Jedno wejście z tego kodu obejmuje najwyżej {p.max_persons} os.")
     if p.entries_limit is not None and pass_uses(p, exclude_reservation) >= p.entries_limit:
         raise ValidationError("Wykorzystano już wszystkie wejścia z tego kodu.")
     return p

@@ -47,7 +47,7 @@
     {% if r.with_officer %}<div><dt>Prowadzący</dt><dd>{% if r.officer %}{{ r.officer.full_name }}{% else %}<span class="muted">przydzieli obsługa</span>{% endif %}</dd></div>{% endif %}
     <div><dt>Numer</dt><dd class="code">{{ r.number }}</dd></div>
     <div><dt>{% if r.access_code or r.client_pass %}Rozliczenie{% else %}Należność{% endif %}</dt>
-      <dd>{% if r.access_code %}wg umowy klubu {{ r.access_code.club }}{% elif r.client_pass %}kod {{ r.client_pass.code }}{% else %}<strong>{{ r.amount|pln }}</strong> <span class="small muted">({{ r.hourly_amount|pln }}/h{% if r.officer_hourly %} + prowadzący {{ r.officer_hourly|pln }}/h{% endif %})</span>{% endif %}</dd></div>
+      <dd>{% if r.access_code %}wg umowy klubu {{ r.access_code.club }}{% elif r.client_pass and not r.amount %}kod {{ r.client_pass.code }}{% else %}{% if r.client_pass %}kod {{ r.client_pass.code }} + dopłata za osoby ponad limit kodu: {% endif %}<strong>{{ r.amount|pln }}</strong> <span class="small muted">({{ r.hourly_amount|pln }}/h{% if r.officer_hourly %} + prowadzący {{ r.officer_hourly|pln }}/h{% endif %})</span>{% endif %}</dd></div>
   </dl>
   {% if r.notes %}<p class="small muted">Uwagi: {{ r.notes }}</p>{% endif %}
   {% if receipts %}<p class="small">Potwierdzenie wpłaty: {% for p in receipts %}<a href="{% url 'payments:receipt' p.pk %}" target="_blank" rel="noopener">PDF {{ p.amount|pln }} ({{ p.completed_at|date:"j.m" }})</a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}

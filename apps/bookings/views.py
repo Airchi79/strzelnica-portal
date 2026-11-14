@@ -18,7 +18,7 @@ from django.views.decorators.http import require_POST
 from apps.audit.services import log_event
 from apps.core.models import AssociationSettings, Notification
 from apps.core.permissions import panel_required
-from apps.facilities.models import Lane
+from apps.facilities.models import Lane, format_pln
 
 from apps.logbook.views import reservation_qr_context
 
@@ -177,7 +177,7 @@ def new(request):
             from apps.payments.services import balance_of, wallet_enabled
 
             # saldo najpierw: ile pokryje saldo, ile zostanie do zapłaty online / offline
-            on_wallet = max(balance_of(request.user), 0) if wallet_enabled() and not preview["code"] and not preview["client_pass"] else 0
+            on_wallet = max(balance_of(request.user), 0) if wallet_enabled() and not preview["code"] else 0
             preview["wallet_use"] = min(on_wallet, preview["amount"])
             preview["to_pay"] = preview["amount"] - preview["wallet_use"]
             preview["free_cancel_until"] = preview["starts_at"] - timedelta(hours=BookingSettings.load().free_cancel_hours)
@@ -196,8 +196,11 @@ def new(request):
     slots = services.day_slots(lane, day, lead_hours=min_lead, holds=True, viewer=request.user) if lane else []
     lane_cards = [(l, l.price_rule_for(day)) for l in active_lanes().order_by("facility__order", "order")]
     week = [timezone.localdate() + timedelta(days=i) for i in range(7)]
+    from apps.clients.services import usable_passes
+
     return render(request, "bookings/new.html", {"form": form, "preview": preview, "slots": slots, "lane": lane, "day": day,
                                                  "lane_cards": lane_cards, "week": week, "min_lead": min_lead,
+                                                 "my_passes": usable_passes(request.user),
                                                  "association": AssociationSettings.load()})
 
 
@@ -685,7 +688,7 @@ def panel_days(request):
         if r.access_code_id:
             r.pay_label = f"Kod klubu {r.access_code.club}"
         elif r.client_pass_id:
-            r.pay_label = f"Kod wejścia {r.client_pass.code}"
+            r.pay_label = f"Kod wejścia {r.client_pass.code}" + (f" + dopłata {format_pln(r.amount)}" if r.amount else "")
         elif pay:
             r.pay_label = PAYMENT_LABELS.get(pay.method, pay.get_method_display())
         else:

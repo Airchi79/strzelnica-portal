@@ -80,8 +80,6 @@ def test_pass_limits(ps):
         book(other, p.code)
     with pytest.raises(ValidationError, match="1 h"):
         book(ps, p.code, end=12)
-    with pytest.raises(ValidationError, match="2 os"):
-        book(ps, p.code, persons=3)
     with pytest.raises(ValidationError, match="osi"):
         book(ps, p.code, lane="Oś 100 m")
     with pytest.raises(ValidationError, match="ważny"):
@@ -105,14 +103,75 @@ def test_single_and_subscription_kinds(ps):
     assert services.pass_uses(sub) == 4 and services.pass_remaining(sub) is None
 
 
-def test_change_persons_respects_pass(ps, owner):
+def _rule(lane=LANE):
+    return Lane.objects.get(name=lane).price_rule_for(day())
+
+
+def test_pass_extra_persons_pay_difference(ps):
+    """Kod na 1 os., rezerwacja na kilka: dopłata = cena za wszystkich − cena za osoby z kodu (nie więcej niż bez kodu)."""
+    rule = _rule()
+    assert rule.per_person_hourly and rule.flat_hourly < 4 * rule.per_person_hourly  # cennik osi: za osobę z ryczałtem
+    p = issue(ps, max_persons=1)
+    q = booking_services.quote(Lane.objects.get(name=LANE), day(), 10, 12, 2, access_code=p.code, user=ps)
+    assert q["client_pass"] == p and q["pass_persons"] == 1
+    assert q["hourly"] == rule.hourly_amount(2) - rule.hourly_amount(1) and q["amount"] == q["hourly"] * 2
+    r = book(ps, p.code, start=10, end=12, persons=4)
+    assert r.client_pass == p and r.payment_status == Reservation.Payment.DUE
+    assert r.hourly_amount == rule.flat_hourly - rule.per_person_hourly and r.amount == r.hourly_amount * 2
+    assert services.pass_uses(p) == 1  # nadal jedno wejście z kodu
+    # oś rozliczana tylko ryczałtem — cena nie zależy od liczby osób, kod pokrywa całość
+    p2 = issue(ps, max_persons=1)
+    flat_only = "Oś dynamiczno-myśliwska"
+    r2 = book(ps, p2.code, persons=3, lane=flat_only)
+    assert _rule(flat_only).per_person_hourly is None
+    assert r2.amount == 0 and r2.payment_status == Reservation.Payment.PASS
+
+
+def test_change_persons_with_pass_adds_and_removes_surcharge(ps, owner):
+    rule = _rule()
     p = issue(ps, max_persons=2)
     r = book(ps, p.code)
     booking_services.change_persons(r, 2, owner)
-    with pytest.raises(ValidationError, match="najwyżej 2"):
-        booking_services.change_persons(r, 3, owner)
     r.refresh_from_db()
     assert r.amount == 0 and r.payment_status == Reservation.Payment.PASS
+    booking_services.change_persons(r, 3, owner)
+    r.refresh_from_db()
+    assert r.amount == rule.hourly_amount(3) - rule.hourly_amount(2) and r.payment_status == Reservation.Payment.DUE
+    booking_services.change_persons(r, 1, owner)
+    r.refresh_from_db()
+    assert r.amount == 0 and r.payment_status == Reservation.Payment.PASS
+
+
+def test_logbook_settlement_charges_shooters_over_pass_limit(ps):
+    from apps.logbook import services as logbook
+    from apps.logbook.models import Entry
+    from apps.logbook.services import settle_finished_reservations
+
+    from .test_logbook import permit_data, signature_data_url
+
+    rule = _rule()
+    p = issue(ps, max_persons=1)
+    r = book(ps, p.code, offset=2)
+    for n in range(3):
+        logbook.create_entry(data={**permit_data(), "purpose": Entry.Purpose.SHOOTING, "has_permit": True, "last_name": f"Strzelec{n}"},
+                             signature_png=logbook.decode_signature(signature_data_url()), source=Entry.Source.GATE_QR,
+                             reservation=r, now=r.starts_at + timedelta(minutes=5))
+    settle_finished_reservations(now=r.ends_at + timedelta(minutes=1))
+    r.refresh_from_db()
+    assert r.persons == 3 and r.declared_persons == 1 and r.payment_status == Reservation.Payment.DUE
+    assert r.amount == rule.hourly_amount(3) - rule.hourly_amount(1)
+
+
+def test_booking_form_suggests_own_passes(client, ps):
+    p = issue(ps, max_persons=1)
+    issue(ps, paid_with="")  # nieopłacony — bez podpowiedzi
+    other = make_user("obcy@example.com")
+    add_credential(other)
+    foreign = issue(other)
+    client.force_login(ps)
+    page = client.get("/rezerwacje/nowa/").content.decode()
+    assert f'data-pass-code="{p.code}"' in page and "zostało wejść: 2" in page
+    assert page.count("data-pass-code=") == 1 and foreign.code not in page
 
 
 def test_logbook_settlement_skips_pass(ps):

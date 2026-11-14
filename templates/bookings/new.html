@@ -11,10 +11,11 @@
     <tr><th>Liczba osób</th><td>{{ form.cleaned_data.persons }}</td></tr>
     {% if preview.code %}
     <tr><th>Rozliczenie</th><td><strong>wg umowy klubu {{ preview.code.club }}</strong> (kod {{ preview.code.code }}) — bez płatności w systemie</td></tr>
-    {% elif preview.client_pass %}
+    {% elif preview.client_pass and not preview.amount %}
     <tr><th>Rozliczenie</th><td><strong>kod wejścia {{ preview.client_pass.code }}</strong> — wykorzystuje 1 wejście, bez dopłaty</td></tr>
     {% else %}
-    <tr><th>Opłata za godzinę</th><td>{{ preview.hourly|pln }} / h</td></tr>
+    {% if preview.client_pass %}<tr><th>Kod wejścia</th><td><strong>{{ preview.client_pass.code }}</strong> — 1 wejście obejmuje {{ preview.pass_persons }} os.; za pozostałe osoby dopłata wg cennika</td></tr>{% endif %}
+    <tr><th>{% if preview.client_pass %}Dopłata za godzinę{% else %}Opłata za godzinę{% endif %}</th><td>{{ preview.hourly|pln }} / h</td></tr>
     {% if preview.with_officer %}<tr><th>Prowadzący od strzelnicy</th><td>{% if preview.officer_hourly %}{{ preview.officer_hourly|pln }} / h — razem {{ preview.officer_amount|pln }}{% else %}bez dopłaty{% endif %}</td></tr>{% endif %}
     <tr><th>Należność</th><td><strong>{{ preview.amount|pln }}</strong></td></tr>
     {% if preview.wallet_use %}<tr><th>Z Twojego salda</th><td>− {{ preview.wallet_use|pln }}</td></tr>
@@ -28,7 +29,7 @@
   <div class="msg warning">Jesteś nowym strzelcem — rezerwacja zablokuje termin i będzie czekać na zatwierdzenie przez obsługę strzelnicy. Dostaniesz e-mail.</div>{% endif %}
   <ul class="small">
     <li>Rezerwacja obejmuje <strong>całą oś</strong>.</li>
-    {% if not preview.code and not preview.client_pass %}<li>Płatność:
+    {% if not preview.code and preview.amount %}<li>Płatność:
       {% if preview.rule.pay_online %}online{% endif %}{% if preview.rule.pay_online and preview.rule.pay_offline %} albo {% endif %}{% if preview.rule.pay_offline %}przelewem z numerem rezerwacji w tytule lub na miejscu{% endif %}.
       {% if preview.rule.pay_online and preview.to_pay %}{% with fee=preview.to_pay|online_fee %}{% if fee %}Przy płatności online doliczamy {{ fee|pln }} opłaty za płatność online (bezzwrotnej){% if preview.rule.pay_offline %}; przelew i płatność na miejscu bez opłaty{% endif %}.{% endif %}{% endwith %}{% endif %}
       {% if preview.rule.pay_online and not preview.rule.pay_offline %}Nieopłacona rezerwacja może zostać zwolniona — termin płatności zobaczysz po zarezerwowaniu.{% endif %}</li>{% endif %}
@@ -93,7 +94,11 @@
     </div>
     <p class="small" data-price-info></p>
     <details class="book-extra"{% if form.access_code.value %} open{% endif %}><summary>Mam kod klubu lub kod wejścia (karnet)</summary>
-      <div class="field"><label for="{{ form.access_code.id_for_label }}" class="sr-only">{{ form.access_code.label }}</label>{{ form.access_code }}<span class="helptext">{{ form.access_code.help_text }}</span></div></details>
+      <div class="field"><label for="{{ form.access_code.id_for_label }}" class="sr-only">{{ form.access_code.label }}</label>{{ form.access_code }}<span class="helptext">{{ form.access_code.help_text }}</span></div>
+      {% if my_passes %}<div class="small">Twoje kody wejścia:
+        {% for p in my_passes %}<button type="button" class="btn secondary small-btn" data-pass-code="{{ p.code }}" data-for="{{ form.access_code.id_for_label }}">{{ p.code }}</button>
+          <span class="muted">{{ p.get_kind_display|lower }}, do {{ p.max_persons }} os. i {{ p.max_hours }} h{% if p.remaining is not None %}, zostało wejść: {{ p.remaining }}{% endif %}, ważny do {{ p.valid_until|date:"j.m.Y" }}</span>{% if not forloop.last %} · {% endif %}{% endfor %}
+        <span class="muted">— osoby ponad limit kodu: dopłata wg cennika.</span></div>{% endif %}</details>
     <details class="book-extra"{% if form.notes.value %} open{% endif %}><summary>Uwagi dla obsługi</summary>
       <div class="field"><label for="{{ form.notes.id_for_label }}" class="sr-only">{{ form.notes.label }}</label>{{ form.notes }}</div></details>
   </section>

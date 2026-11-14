@@ -285,18 +285,62 @@ def test_settlement_no_change_when_flat_or_fewer(ps, sig):
     assert flat.settled_at and fewer.settled_at
 
 
-def test_settlement_of_paid_reservation_only_flags(ps, owner, sig):
+def test_settlement_of_paid_reservation_charges_surcharge(ps, owner, sig):
+    from apps.core.models import OutgoingEmail
+
     r = _reservation(ps, "Oś 25 m nr 1", 1)
     from apps.payments.services import register_manual_payment
 
     register_manual_payment(ps, r.amount, "gotowka", owner, reservation=r)
     _shooters(r, 2, sig)
+    OutgoingEmail.objects.all().delete()
     services.settle_finished_reservations(now=r.ends_at + timedelta(minutes=1))
     r.refresh_from_db()
-    assert r.persons == 1 and r.amount == 2 * 3500 and r.payment_status == Reservation.Payment.PAID
+    # opłacone 1 os. × 2 h; strzelało 2 → dopłata 2 × 35 zł „do zapłaty” (decyzja właściciela: automatycznie)
+    assert (r.persons, r.declared_persons, r.amount, r.paid_amount) == (2, 1, 4 * 3500, 2 * 3500)
+    assert r.payment_status == Reservation.Payment.DUE
+    mail = OutgoingEmail.objects.get(recipients=[ps.email])
+    assert "Rozliczenie rezerwacji" in mail.subject and "Dopłata: 70" in mail.body and "Do zapłaty: 70" in mail.body
+
+
+def test_settlement_of_waived_reservation_only_flags(ps, owner, sig):
+    r = _reservation(ps, "Oś 25 m nr 1", 1)
+    Reservation.objects.filter(pk=r.pk).update(payment_status=Reservation.Payment.WAIVED)
+    _shooters(r, 2, sig)
+    services.settle_finished_reservations(now=r.ends_at + timedelta(minutes=1))
+    r.refresh_from_db()
+    assert r.persons == 1 and r.amount == 2 * 3500 and r.payment_status == Reservation.Payment.WAIVED
     from apps.core.models import Notification
 
     assert Notification.objects.filter(recipient=owner, title__contains="Rozbieżność").exists()
+
+
+def test_holder_notified_during_reservation_once_per_new_count(ps, sig, mailoutbox, django_capture_on_commit_callbacks):
+    r = _reservation(ps, "Oś 25 m nr 2", 1)  # 1 × 35 zł/h, 2 h
+    subject = "więcej strzelających niż zadeklarowano"
+    with django_capture_on_commit_callbacks(execute=True):
+        _shooters(r, 1, sig)  # zgodnie z deklaracją — bez wiadomości
+    assert not [m for m in mailoutbox if subject in m.subject]
+    with django_capture_on_commit_callbacks(execute=True):
+        _shooters(r, 1, sig)  # 2 strzelających
+    mails = [m for m in mailoutbox if subject in m.subject]
+    assert len(mails) == 1 and mails[0].to == [ps.email]
+    assert "wpisało się 2 strzelających" in mails[0].body and "dopłata przy obecnej liczbie strzelających: 70" in mails[0].body
+    r.refresh_from_db()
+    assert r.overflow_notified == 2 and r.persons == 1  # w trakcie tylko informacja — należność przeliczy rozliczenie
+    with django_capture_on_commit_callbacks(execute=True):
+        _shooters(r, 1, sig)  # 3 strzelających: 3 × 35 = 105 → ryczałt 100 zł/h, dopłata rośnie
+    assert len([m for m in mailoutbox if subject in m.subject]) == 2
+    with django_capture_on_commit_callbacks(execute=True):
+        _shooters(r, 1, sig)  # 4 — ryczałt osiągnięty, dopłata już nie rośnie → bez kolejnej wiadomości
+    assert len([m for m in mailoutbox if subject in m.subject]) == 2
+
+
+def test_no_overflow_notice_for_flat_rate_lane(ps, sig, mailoutbox, django_capture_on_commit_callbacks):
+    r = _reservation(ps, "Oś 100 m", 4)  # 4 × 60 = 240 → ryczałt 200 zł/h
+    with django_capture_on_commit_callbacks(execute=True):
+        _shooters(r, 6, sig)
+    assert not [m for m in mailoutbox if "więcej strzelających" in m.subject]
 
 
 def test_observers_do_not_count(ps, sig):

@@ -1,0 +1,14 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block panel %}
+<h1>{{ title }}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<p class="muted">{% if kind == 'przychod' %}Przychód wpisany ręcznie (kol. 5): np. darowizna, dotacja, składki wpłacone poza systemem, przychody z okresu przed uruchomieniem systemu (zestawienie z GunTrackera lub wyciągu jako dowód zbiorczy). Wpłat przyjętych w systemie nie wpisuj — trafiają do ewidencji same z raportów wpływów.{% else %}Koszt wpisuje się na podstawie dowodu (faktura, rachunek, wyciąg; przy drobnych zakupach bez faktury i opłatach — dowód wewnętrzny, § 9 rozporządzenia), najpóźniej do 20. dnia następnego miesiąca. Kol. 6 — koszty uzyskania przychodów (art. 15 ustawy o CIT); kol. 7 — wydatki niebędące kosztami uzyskania przychodów (art. 16 ust. 1), w tym pokryte z dochodu wolnego od podatku.{% endif %}
+Zapisu nie da się potem zmienić ani usunąć — sprawdź dane przed zapisaniem.</p>
+<form method="post" enctype="multipart/form-data" class="card" novalidate>{% csrf_token %}
+  {% include "partials/form.html" %}
+  <datalist id="opisy">{% for h in hints %}<option value="{{ h }}">{% endfor %}</datalist>
+  <div class="actions"><button class="btn" type="submit">Zapisz</button><button class="btn secondary" type="submit" name="jeszcze" value="1">Zapisz i dodaj następny</button><a class="btn secondary" href="{% url 'panel:accounting' %}">Anuluj</a></div>
+</form>
+<script>document.querySelector('[name=description]').setAttribute('list', 'opisy');</script>
+{% endblock %}

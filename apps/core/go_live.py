@@ -32,6 +32,7 @@ GUARDED = [
     ("audit_sensitiveaccesslog", "sensitiveaccesslog_append_only"),
     ("payments_ledgerentry", "ledgerentry_append_only"),
     ("reports_salesreport", "sales_report_guard"),
+    ("accounting_record", "accounting_record_guard"),
 ]
 
 
@@ -73,6 +74,9 @@ def plan(keep_user):
         ("Powiadomienia", _m("core.Notification").objects.all()),
         ("Kopie wysłanych e-maili", _m("core.OutgoingEmail").objects.all()),
         ("Zgłoszenia usterek", _m("facilities.Issue").objects.all()),
+        # Ewidencja księgowa: tylko zapisy przychodów z testowych raportów wpływów (i ich korekty) — zapisy ręczne zarządu zostają.
+        ("Księgowość: korekty zapisów z raportów wpływów", _m("accounting.Record").objects.filter(corrects__sales_report__isnull=False)),
+        ("Księgowość: przychody z raportów wpływów", _m("accounting.Record").objects.filter(sales_report__isnull=False)),
         ("Raporty wpływów", _m("reports.SalesReport").objects.all()),
         ("Numeracja raportów", _m("reports.ReportSequence").objects.all()),
         # Konto właściciela zostaje jako konto panelu — bez danych strzelca (legitymacje, kartoteka, akceptacje regulaminów).

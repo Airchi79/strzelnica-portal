@@ -11,7 +11,7 @@ from apps.audit.models import AuditLog
 # Grupy zdarzeń w strumieniu (prefiks akcji z dziennika → filtr).
 FEED_GROUPS = {
     "rezerwacje": ("rezerwacja.", "blokada."),
-    "platnosci": ("platnosc.", "platnosci.", "skladka.", "saldo.", "raport."),
+    "platnosci": ("platnosc.", "platnosci.", "skladka.", "saldo.", "raport.", "ksiegowosc."),
     "ksiega": ("ksiazka.",),
     "strzelcy": ("konto.rejestracja", "dokument.", "deklaracja.", "czlonek.", "klient.", "kod_wejscia."),
 }
@@ -86,6 +86,7 @@ _URLS = {
     "association.fee": ("panel:fees", False),
     "accounts.user": ("panel:user", True),
     "reports.salesreport": ("panel:sales_report", True),
+    "accounting.record": ("panel:accounting_record", True),
 }
 
 

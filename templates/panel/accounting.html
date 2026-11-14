@@ -1,0 +1,39 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Księgowość — {{ period_label }}{% endblock %}
+{% block panel %}
+<h1>Zestawienie przychodów i kosztów — {{ period_label }}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<div class="card">
+  <form method="get" class="actions" style="margin:0">
+    <select name="rok" aria-label="Rok">{% for y in years %}<option value="{{ y }}"{% if y == st.year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select>
+    <select name="miesiac" aria-label="Okres"><option value="0"{% if not st.month %} selected{% endif %}>cały rok</option>
+      {% for n, name in months %}<option value="{{ n }}"{% if n == st.month %} selected{% endif %}>{{ name }}</option>{% endfor %}</select>
+    <button class="btn secondary" type="submit">Pokaż</button>
+    <a class="btn" href="{% url 'panel:accounting_export' 'pdf' %}?rok={{ st.year }}&miesiac={{ st.month|default:0 }}">Wydruk PDF</a>
+    <a class="btn secondary" href="{% url 'panel:accounting_export' 'xlsx' %}?rok={{ st.year }}&miesiac={{ st.month|default:0 }}">Arkusz XLSX</a>
+  </form>
+  <p class="small muted">Uproszczona ewidencja przychodów i kosztów (art. 10a ustawy o działalności pożytku publicznego i o wolontariacie; wzór z załącznika nr 1 do rozporządzenia z 22.12.2025, Dz. U. poz. 1880). Zapisów nie można zmienić ani usunąć — błąd poprawia się zapisem korygującym w karcie zapisu. Koszty wpisuje się najpóźniej do 20. dnia następnego miesiąca.</p>
+  {% if settings_obj.auto_from %}
+  <form method="post" action="{% url 'panel:accounting_sync' %}" class="actions" style="margin:0">{% csrf_token %}
+    <span class="small muted">Przychody z systemu (raporty wpływów) dopisują się co godzinę od {{ settings_obj.auto_from|date:"j.m.Y" }}.</span>
+    <button class="btn secondary" type="submit">Uzupełnij teraz</button></form>
+  {% else %}
+  <p class="small"><span class="badge warn">zasilanie wyłączone</span> Przychody z systemu nie trafiają jeszcze do ewidencji — ustaw dzień uruchomienia systemu w <a href="{% url 'panel:accounting_settings' %}">ustawieniach</a>. Do tego czasu przychody wpisuj ręcznie (np. zestawienie z GunTrackera lub z wyciągu jako dowód zbiorczy).</p>
+  {% endif %}
+</div>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Lp.</th><th>Data zdarzenia</th><th>Nr dowodu</th><th>Opis zdarzenia</th><th>Przychody (5)</th><th>Koszty uzyskania przychodów (6)</th><th>Koszty niestanowiące KUP (7)</th><th>Uwagi (8)</th></tr>
+  {% for r in st.records %}<tr>
+    <td><a href="{% url 'panel:accounting_record' r.pk %}"><strong class="code">{{ r.lp }}</strong></a></td>
+    <td data-label="Data">{{ r.date|date:"j.m.Y" }}</td>
+    <td data-label="Nr dowodu" class="code">{{ r.document }}{% if r.attachment %} <span title="jest skan dowodu">📎</span>{% endif %}</td>
+    <td data-label="Opis">{{ r.description }}{% if r.kind == kinds.CORRECTION %} <span class="badge warn">korekta</span>{% endif %}</td>
+    <td data-label="Przychody" style="text-align:right">{% if r.revenue %}{{ r.revenue|pln }}{% endif %}</td>
+    <td data-label="Koszty (6)" style="text-align:right">{% if r.cost_deductible %}{{ r.cost_deductible|pln }}{% endif %}</td>
+    <td data-label="Koszty (7)" style="text-align:right">{% if r.cost_other %}{{ r.cost_other|pln }}{% endif %}</td>
+    <td data-label="Uwagi" class="small">{{ r.notes }}{% for fix in r.corrections.all %}{% if r.notes %}; {% endif %}skorygowany zapisem {{ fix.lp }}{% endfor %}</td></tr>
+  {% empty %}<tr><td colspan="8" class="muted">Brak zapisów w okresie.</td></tr>{% endfor %}
+  <tr><th colspan="4">Razem w okresie sprawozdawczym</th><th style="text-align:right">{{ st.period.revenue|pln }}</th><th style="text-align:right">{{ st.period.cost_deductible|pln }}</th><th style="text-align:right">{{ st.period.cost_other|pln }}</th><th></th></tr>
+  <tr><th colspan="4">Razem od początku roku</th><th style="text-align:right">{{ st.ytd.revenue|pln }}</th><th style="text-align:right">{{ st.ytd.cost_deductible|pln }}</th><th style="text-align:right">{{ st.ytd.cost_other|pln }}</th><th></th></tr>
+</table></div></section>
+{% endblock %}

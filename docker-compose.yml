@@ -73,6 +73,7 @@ services:
           python manage.py daily_logbook_print;
           python manage.py association_tasks;
           python manage.py sales_reports;
+          python manage.py accounting_sync;
           python manage.py check_backups;
         fi;
         n=$$((n + 1));

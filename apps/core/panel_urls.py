@@ -9,6 +9,7 @@ from apps.facilities import views as facilities_views
 from apps.clients import views as clients_views
 from apps.kiosk import views as kiosk_views
 from apps.logbook import views as logbook_views
+from apps.accounting import views as accounting_views
 from apps.reports import views as reports_views
 from apps.payments import views as payments_views
 from apps.regulations import views as regulations_views
@@ -90,6 +91,14 @@ urlpatterns = [
     path("raporty-wplywow/<int:pk>/", reports_views.panel_detail, name="sales_report"),
     path("raporty-wplywow/<int:pk>/csv/", reports_views.panel_csv, name="sales_report_csv"),
     path("raporty-wplywow/<int:pk>/pdf/", reports_views.panel_pdf, name="sales_report_pdf"),
+    path("ksiegowosc/", accounting_views.panel_list, name="accounting"),
+    path("ksiegowosc/dodaj/<str:kind>/", accounting_views.panel_add, name="accounting_add"),
+    path("ksiegowosc/zapis/<int:pk>/", accounting_views.panel_detail, name="accounting_record"),
+    path("ksiegowosc/zapis/<int:pk>/korekta/", accounting_views.panel_correct, name="accounting_correct"),
+    path("ksiegowosc/zapis/<int:pk>/dowod/", accounting_views.panel_attachment, name="accounting_attachment"),
+    path("ksiegowosc/uzupelnij/", accounting_views.panel_sync, name="accounting_sync"),
+    path("ksiegowosc/ustawienia/", accounting_views.panel_settings, name="accounting_settings"),
+    path("ksiegowosc/wydruk.<str:fmt>", accounting_views.panel_export, name="accounting_export"),
     path("ksiazka/", logbook_views.panel_list, name="logbook"),
     path("ksiazka/kioski/", kiosk_views.panel_list, name="kiosks"),
     path("rezerwacje/archiwum/", bookings_views.panel_archive, name="reservations_archive"),

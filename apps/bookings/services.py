@@ -934,7 +934,7 @@ def _notify_cancelled(reservation, expired=False, refunded=0, manual=0, overpaid
         PERM,
         url=reverse("panel:reservation", args=[reservation.pk]),
         body=f"{reservation.user.full_name}" + (" — z zachowaniem należności" if late else "") + (" — nieopłacona w terminie" if expired else "")
-        + (f" — zwrot {refunded / 100:.2f} zł przez Tpay" if refunded else ""),
+        + (f" — zwrot {refunded / 100:.2f} zł przez operatora płatności" if refunded else ""),
         reservation=reservation,
         event="Anulowanie rezerwacji",
     )

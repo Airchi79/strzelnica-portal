@@ -64,7 +64,7 @@ class BookingSettings(models.Model):
     )
     prepay_before_approval = models.BooleanField(
         "nowy strzelec może zapłacić online przed zatwierdzeniem", default=True,
-        help_text="Po odrzuceniu wpłata wraca automatycznie na rachunek / kartę strzelca (Tpay). Wyłączone: płatność dopiero po zatwierdzeniu.",
+        help_text="Po odrzuceniu wpłata wraca automatycznie na rachunek / kartę strzelca (przez operatora płatności). Wyłączone: płatność dopiero po zatwierdzeniu.",
     )
     waitlist_hold_minutes = models.PositiveIntegerField(
         "lista oczekujących: termin trzymany [min]", default=30,
@@ -120,7 +120,7 @@ class GroupRule(models.Model):
 
     group = models.CharField("grupa", max_length=12, choices=Group.choices, unique=True)
     requires_approval = models.BooleanField("rezerwacja wymaga zatwierdzenia przez obsługę", default=False)
-    pay_online = models.BooleanField("płatność online (Tpay)", default=True)
+    pay_online = models.BooleanField("płatność online (BLIK, szybki przelew, karta)", default=True)
     pay_transfer = models.BooleanField("przelew tradycyjny", default=True)
     pay_cash = models.BooleanField("gotówka na miejscu", default=True)
     pay_pass = models.BooleanField("kody wejścia (karnety, abonamenty)", default=False)
@@ -227,7 +227,7 @@ class Reservation(models.Model):
     pay_by = models.DateTimeField("opłać do (inaczej rezerwacja się zwalnia)", null=True, blank=True)
 
     class PayMethod(models.TextChoices):
-        ONLINE = "online", "Online (Tpay)"
+        ONLINE = "online", "Online (BLIK, szybki przelew, karta)"
         TRANSFER = "przelew", "Przelew tradycyjny"
         CASH = "gotowka", "Gotówka na miejscu"
 

@@ -1,7 +1,7 @@
 # Płatności online przez Axepta BNP Paribas
 
 System obsługuje dwóch operatorów płatności online: **Tpay** i **Axepta BNP Paribas**. Operatora nowych płatności
-wybiera jedno ustawienie w `.env`: `ONLINE_PAYMENTS_PROVIDER=tpay` albo `axepta`. Wszystko inne działa tak samo
+wybiera jedno ustawienie w `.env`: `ONLINE_PAYMENTS_PROVIDER=axepta` (domyślnie, gdy brak ustawienia) albo `tpay`. Wszystko inne działa tak samo
 dla obu operatorów: rezerwacje, kiosk (płatność kodem QR na telefonie), składki, opłaty startowe, doładowanie salda,
 zwroty, raporty wpływów, potwierdzenia wpłat i opłata za płatność online.
 

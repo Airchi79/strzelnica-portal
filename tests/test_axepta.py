@@ -226,3 +226,29 @@ def test_panel_list_shows_refund_and_filters(owner_client, ps, api, owner, djang
     assert "zwrot 20\xa0zł do sprawdzenia" in pending and "bez zwrotu" not in pending
     detail = client.get(f"/panel/platnosci/{p1.pk}/").content.decode()
     assert "Do sprawdzenia w panelu operatora płatności" in detail and "Tpay" not in detail
+
+
+def test_faq_migration_replaces_tpay_mentions():
+    from importlib import import_module
+
+    from django.apps import apps as django_apps
+
+    from apps.core.models import FaqItem
+
+    item = FaqItem.objects.create(question="Jak zapłacić?", answer="Online (BLIK, szybki przelew, karta — przez Tpay), przelewem.")
+    other = FaqItem.objects.create(question="Inne", answer="Bez operatora.")
+    import_module("apps.core.migrations.0015_faq_axepta").forward(django_apps, None)
+    item.refresh_from_db()
+    other.refresh_from_db()
+    assert "Tpay" not in item.answer and "przez Axepta BNP Paribas" in item.answer and "Google Pay" in item.answer
+    assert other.answer == "Bez operatora."
+    assert not FaqItem.objects.filter(answer__contains="Tpay").exists()
+
+
+def test_default_provider_is_axepta():
+    """Bez ustawienia w .env operatorem nowych płatności jest Axepta (bez kluczy płatności online są wyłączone)."""
+    import re
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parent.parent / "config" / "settings.py").read_text(encoding="utf-8")
+    assert re.search(r'env\("ONLINE_PAYMENTS_PROVIDER", "axepta"\)', source)

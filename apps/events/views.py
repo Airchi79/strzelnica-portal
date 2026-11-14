@@ -122,7 +122,7 @@ def panel_detail(request, pk):
                     reg = services.cancel_registration(reg, request.user, by_staff=True, reason=request.POST.get("reason", ""),
                                                        refund=action == "withdraw")
                     info = reg.refund_info
-                    extra = "".join([f" Zwrot przez Tpay: {info['refunded'] / 100:.2f} zł." if info["refunded"] else "",
+                    extra = "".join([f" Zwrot przez operatora płatności: {info['refunded'] / 100:.2f} zł." if info["refunded"] else "",
                                      f" Do zwrotu ręcznie: {info['manual'] / 100:.2f} zł." if info["manual"] else "",
                                      f" Nadpłata: {info['overpaid'] / 100:.2f} zł." if info["overpaid"] else ""])
                     messages.success(request, f"Wycofano: {reg.user.full_name}.{extra}")

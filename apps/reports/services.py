@@ -24,8 +24,8 @@ CATEGORY_LABELS = {
     "zwrot": "Zwroty do wpłacających",
 }
 METHOD_LABELS = {
-    "tpay": "Online (Tpay / Axepta)", "przelew": "Przelew", "gotowka": "Gotówka", "blik": "BLIK na telefon", "karta": "Karta",
-    "zwrot": "Zwrot przez Tpay", "zwrot_reczny": "Zwrot ręczny",
+    "tpay": "Płatność online", "przelew": "Przelew", "gotowka": "Gotówka", "blik": "BLIK na telefon", "karta": "Karta",
+    "zwrot": "Zwrot online (przez operatora płatności)", "zwrot_reczny": "Zwrot ręczny",
 }
 
 

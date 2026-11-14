@@ -174,7 +174,9 @@
   <div class="card kiosk-done">
     <p data-os-wait-text></p>
     <p class="os-countdown" data-os-countdown hidden></p>
-    <div data-os-pay hidden>
+    <div class="os-pay-options">
+    <div class="os-pay" data-os-pay hidden>
+      <h2 class="step-title">telefonem (kod QR)</h2>
       <img class="os-qr" data-os-qr alt="Kod QR do płatności">
       <p>Zeskanuj kod aparatem telefonu i zapłać <strong data-os-amount></strong> (BLIK, przelew, karta).</p>
       <p class="small muted" data-os-until></p>
@@ -185,6 +187,7 @@
       <label class="small"><input type="checkbox" data-os-cash-accept> <span data-os-cash-statement></span></label>
       <div class="msg error" data-os-error="cash" hidden></div>
       <button class="btn kiosk-big" type="button" data-os-cash-confirm>Wrzuciłem(-am) gotówkę — potwierdzam</button>
+    </div>
     </div>
     <div class="actions" style="justify-content:center"><button class="btn kiosk-big" type="button" data-os-entry hidden>Wpis do książki pobytu</button>
       <button class="btn secondary" type="button" data-os-refuse hidden>Rezygnuję — nie płacę</button>

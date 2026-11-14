@@ -239,8 +239,9 @@ if IS_TEST_COPY and not AXEPTA_SANDBOX:
     raise ImproperlyConfigured("Kopia testowa może używać wyłącznie testowej Axepty (AXEPTA_SANDBOX=true).")
 AXEPTA_ENABLED = bool(AXEPTA_MERCHANT_ID and AXEPTA_SERVICE_ID and AXEPTA_API_TOKEN and AXEPTA_SERVICE_KEY)
 
-# Operator NOWYCH płatności online: „tpay” albo „axepta”. Powiadomienia i zwroty dla wcześniejszych płatności działają
-# u operatora, przez którego przeszły (o ile jego dane zostają w .env).
-ONLINE_PAYMENTS_PROVIDER = env("ONLINE_PAYMENTS_PROVIDER", "tpay").strip().lower()
+# Operator NOWYCH płatności online: „axepta” (domyślnie — decyzja właściciela, listopad 2026) albo „tpay”. Bez kompletu
+# danych operatora płatności online są wyłączone (System pokazuje przelew / gotówkę). Powiadomienia i zwroty dla
+# wcześniejszych płatności działają u operatora, przez którego przeszły (o ile jego dane zostają w .env).
+ONLINE_PAYMENTS_PROVIDER = env("ONLINE_PAYMENTS_PROVIDER", "axepta").strip().lower()
 if ONLINE_PAYMENTS_PROVIDER not in {"tpay", "axepta"}:
     raise ImproperlyConfigured("ONLINE_PAYMENTS_PROVIDER: dozwolone wartości to „tpay” albo „axepta”.")

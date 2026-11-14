@@ -243,3 +243,12 @@ def test_faq_migration_replaces_tpay_mentions():
     assert "Tpay" not in item.answer and "przez Axepta BNP Paribas" in item.answer and "Google Pay" in item.answer
     assert other.answer == "Bez operatora."
     assert not FaqItem.objects.filter(answer__contains="Tpay").exists()
+
+
+def test_default_provider_is_axepta():
+    """Bez ustawienia w .env operatorem nowych płatności jest Axepta (bez kluczy płatności online są wyłączone)."""
+    import re
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parent.parent / "config" / "settings.py").read_text(encoding="utf-8")
+    assert re.search(r'env\("ONLINE_PAYMENTS_PROVIDER", "axepta"\)', source)

@@ -14,6 +14,13 @@ PASSWORD = "Bardzo-Dlugie-Haslo-2026"
 
 
 @pytest.fixture(autouse=True)
+def _tpay_tests_use_tpay(settings):
+    """Domyślnym operatorem jest Axepta; testy płatności online pisane dla Tpay ustawiają go jawnie.
+    Testy Axepty (tests/test_axepta.py) nadpisują to ustawienie własnym fixture."""
+    settings.ONLINE_PAYMENTS_PROVIDER = "tpay"
+
+
+@pytest.fixture(autouse=True)
 def _clear_cache(db):
     cache.clear()
     yield

@@ -262,8 +262,20 @@ def create_entry(
     )
     entry.content_sha256 = entry.compute_content_hash()
     entry.save()
+    if reservation is not None and purpose == Entry.Purpose.SHOOTING:
+        transaction.on_commit(lambda pk=reservation.pk: _notify_overflow_safely(pk))
     log_event("ksiazka.wpis", entry, f"{entry.number} ({entry.get_purpose_display()})", actor=created_by or user)
     return entry
+
+
+def _notify_overflow_safely(reservation_pk):
+    """Powiadomienie o liczbie strzelających nie może zablokować wpisu do książki (wpis jest już zapisany)."""
+    try:
+        notify_shooters_over_declared(reservation_pk)
+    except Exception:  # noqa: BLE001 — błąd wysyłki nie cofa wpisu; rozliczenie po rezerwacji i tak nastąpi
+        import logging
+
+        logging.getLogger(__name__).exception("Powiadomienie o liczbie strzelających (rezerwacja %s)", reservation_pk)
 
 
 def _current_range_rules():
@@ -458,10 +470,51 @@ def masked_identity(entry):
 # --- rozliczenie rezerwacji wg książki pobytu -------------------------------------
 
 
+def _book_hourly(r, shooters):
+    """Opłata za godzinę wg liczby strzelających z książki: cennik z chwili rezerwacji (nie ponad ryczałt), a przy kodzie
+    wejścia — dopłata tylko za osoby ponad jego limit."""
+    if r.client_pass_id:
+        from apps.clients.services import pass_extra_hourly
+
+        return pass_extra_hourly(r.price_rule, shooters, r.client_pass)
+    return r.price_rule.hourly_amount(shooters)
+
+
+# rozliczenie wg książki: należność rośnie (także przy rezerwacji już opłaconej — dopłata, decyzja właściciela)
+BOOK_SURCHARGE = (Reservation.Payment.DUE, Reservation.Payment.PASS, Reservation.Payment.PAID)
+
+
+def notify_shooters_over_declared(reservation_pk):
+    """W trakcie rezerwacji: strzelających w książce jest więcej, niż zadeklarowano, i należność wzrośnie — powiadomienie
+    rezerwującego (raz na każdą nową, wyższą liczbę). Bez dopłaty (ryczałt, kod klubu, zwolnienie z opłaty) — bez wiadomości."""
+    with transaction.atomic():
+        r = (Reservation.objects.select_for_update().select_related("price_rule", "user", "lane")
+             .filter(pk=reservation_pk, status=Reservation.Status.CONFIRMED, settled_at__isnull=True).first())
+        if r is None or r.access_code_id or r.payment_status not in BOOK_SURCHARGE:
+            return False
+        shooters = r.log_entries.filter(purpose=Entry.Purpose.SHOOTING).count()
+        if shooters <= r.persons or shooters <= r.overflow_notified:
+            return False
+        new_hourly = _book_hourly(r, shooters)
+        # dopłata liczona od ostatniej zgłoszonej liczby — po osiągnięciu ryczałtu kolejne osoby nie zmieniają kwoty
+        before = _book_hourly(r, r.overflow_notified) if r.overflow_notified > r.persons else r.hourly_amount
+        r.overflow_notified = shooters
+        r.save(update_fields=["overflow_notified"])
+        if new_hourly <= max(before, r.hourly_amount):
+            return False
+    surcharge = (new_hourly - r.hourly_amount) * r.hours
+    log_event("rezerwacja.ksiazka_ponad_deklaracje", r, str(r), changes={"strzelajacy": shooters, "zadeklarowano": r.persons,
+                                                                          "doplata_gr": surcharge})
+    notify_user(r.user, f"Rezerwacja {r.number}: więcej strzelających niż zadeklarowano", "emails/reservation_overflow.txt",
+                reservation=r, shooters=shooters, surcharge=surcharge)
+    return True
+
+
 def settle_finished_reservations(now=None):
     """Po zakończeniu rezerwacji: jeśli strzelających wpisów jest więcej niż zadeklarowanych osób,
-    należność rośnie wg cennika z chwili rezerwacji, ale nie ponad ryczałt (reguła „mniejsza z kwot”).
-    Mniej wpisów nie obniża opłaty. Rezerwacje opłacone lub zwolnione są tylko oznaczane do decyzji zarządu."""
+    należność rośnie wg cennika z chwili rezerwacji, ale nie ponad ryczałt (reguła „mniejsza z kwot”); przy kodzie
+    wejścia — dopłata za osoby ponad jego limit. Rezerwacja już opłacona dostaje dopłatę „do zapłaty” (najpierw z salda).
+    Mniej wpisów nie obniża opłaty. Rezerwacje zwolnione z opłaty są tylko oznaczane do decyzji zarządu."""
     now = now or timezone.now()
     count = 0
     for r in Reservation.objects.filter(status=Reservation.Status.CONFIRMED, ends_at__lte=now, settled_at__isnull=True):
@@ -473,20 +526,15 @@ def settle_finished_reservations(now=None):
                 r.save(update_fields=["settled_at"])
                 continue
             if shooters > r.persons:
-                if r.client_pass_id:  # kod wejścia: dopłata tylko za osoby ponad limit kodu
-                    from apps.clients.services import pass_extra_hourly
-
-                    new_hourly = pass_extra_hourly(r.price_rule, shooters, r.client_pass)
-                else:
-                    new_hourly = r.price_rule.hourly_amount(shooters)
+                new_hourly = _book_hourly(r, shooters)
                 if new_hourly > r.hourly_amount:
-                    if r.payment_status in (Reservation.Payment.DUE, Reservation.Payment.PASS):
-                        r.payment_status = Reservation.Payment.DUE
+                    if r.payment_status in BOOK_SURCHARGE:
                         before = (r.persons, r.amount)
                         r.declared_persons = r.persons
                         r.persons = shooters
                         r.hourly_amount = new_hourly
                         r.recompute_amount()
+                        r.payment_status = Reservation.Payment.PAID if r.paid_amount >= r.amount else Reservation.Payment.DUE
                         r.save()
                         log_event(
                             "rezerwacja.rozliczenie_ksiazka",
@@ -496,7 +544,8 @@ def settle_finished_reservations(now=None):
                         )
                         apply_wallet(r.user, targets=[r])
                         r.refresh_from_db()
-                        notify_user(r.user, f"Rozliczenie rezerwacji {r.number}", "emails/reservation_settled.txt", reservation=r)
+                        notify_user(r.user, f"Rozliczenie rezerwacji {r.number}", "emails/reservation_settled.txt", reservation=r,
+                                    surcharge=r.amount - before[1], due=max(r.amount - r.paid_amount, 0))
                     else:
                         r.save(update_fields=["settled_at"])
                         notify_board(
@@ -504,7 +553,8 @@ def settle_finished_reservations(now=None):
                             "emails/reservation_board.txt",
                             "bookings.manage_reservations",
                             url=reverse("panel:reservation", args=[r.pk]),
-                            body=f"W książce {shooters} strzelających, zadeklarowano {r.persons}; rezerwacja jest już rozliczona.",
+                            body=f"W książce {shooters} strzelających, zadeklarowano {r.persons}; rezerwacja jest "
+                                 f"{r.get_payment_status_display().lower()} — decyzja zarządu.",
                             reservation=r,
                             event=f"Rozbieżność: w książce pobytu {shooters} strzelających, zadeklarowano {r.persons}",
                         )

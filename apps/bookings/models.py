@@ -239,6 +239,9 @@ class Reservation(models.Model):
     # Rozliczenie po zakończeniu: dopłata, gdy w książce pobytu było więcej strzelających niż zadeklarowano.
     settled_at = models.DateTimeField("rozliczono po terminie", null=True, blank=True)
     declared_persons = models.PositiveIntegerField("zadeklarowana liczba osób", null=True, blank=True)
+    overflow_notified = models.PositiveIntegerField(
+        "powiadomiono o liczbie strzelających", default=0,
+        help_text="Ostatnia liczba strzelających z książki pobytu, o której rezerwujący dostał powiadomienie (ponad deklarację).")
     series = models.UUIDField("seria (rezerwacja cykliczna)", null=True, blank=True, db_index=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     created_at = models.DateTimeField("utworzono", auto_now_add=True)

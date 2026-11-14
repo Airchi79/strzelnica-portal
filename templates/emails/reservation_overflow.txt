@@ -1,0 +1,17 @@
+{% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
+
+w książce pobytu do Twojej rezerwacji wpisało się {{ shooters }} strzelających, a przy rezerwacji zadeklarowano {{ reservation.persons }} os.
+{% if reservation.client_pass %}Kod wejścia {{ reservation.client_pass.code }} obejmuje {{ reservation.client_pass.max_persons }} os. — za pozostałe osoby należna jest dopłata wg cennika.
+{% endif %}
+Po zakończeniu rezerwacji należność zostanie przeliczona według książki pobytu (cennik z chwili rezerwacji, nie więcej niż ryczałt za oś).
+Przewidywana dopłata przy obecnej liczbie strzelających: {{ surcharge|pln }}.
+Jeżeli masz środki na saldzie, dopłata zostanie z nich pobrana; pozostałą kwotę opłacisz w Systemie (Zapłać online),
+przelewem z numerem rezerwacji w tytule albo u obsługi na miejscu.
+
+Jeżeli ktoś wpisał się do tej rezerwacji przez pomyłkę, zgłoś to obsłudze strzelnicy.
+
+{% include "emails/_reservation_summary.txt" %}
+Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
+
+Stowarzyszenie „STRZELNICA SĄTOK”
+{% endautoescape %}

@@ -1,8 +1,10 @@
 {% autoescape off %}{% load satok %}Dzień dobry {{ user.first_name }},
 
 po zakończeniu rezerwacji rozliczyliśmy ją według książki pobytu: strzelało {{ reservation.persons }} os.
-(zadeklarowano {{ reservation.declared_persons }}). Opłata nie przekracza ryczałtu za oś.
-
+(zadeklarowano {{ reservation.declared_persons }}). {% if reservation.client_pass %}Dopłata dotyczy osób ponad liczbę objętą kodem wejścia {{ reservation.client_pass.code }}.{% else %}Opłata nie przekracza ryczałtu za oś.{% endif %}
+{% if surcharge %}
+Dopłata: {{ surcharge|pln }}.{% if due %} Do zapłaty: {{ due|pln }} — zapłać w Systemie (Zapłać online), przelewem z numerem rezerwacji w tytule albo u obsługi na miejscu.{% else %} Dopłata została pobrana z Twojego salda — nic więcej nie musisz robić.{% endif %}
+{% endif %}
 {% include "emails/_reservation_summary.txt" %}
 Szczegóły: {{ site_url }}{% url 'bookings:detail' reservation.pk %}
 

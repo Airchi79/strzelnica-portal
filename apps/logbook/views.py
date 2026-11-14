@@ -23,7 +23,7 @@ from apps.core.qr import qr_svg_data_uri
 
 from . import services
 from .forms import EntryCorrectionForm, EntryForm, LogbookSettingsForm, StaffEntryForm
-from .models import Entry, LogbookSettings
+from .models import STATEMENT_TEXT, Entry, LogbookSettings
 
 SESSION_RECENT = "logbook_recent_entries"
 
@@ -168,7 +168,38 @@ def my_qr(request):
     return render(request, "logbook/my_qr.html", {
         "qr": qr_svg_data_uri(url, box_size=10), "entries": entries,
         "open_stays": services.my_open_stays(request.user), "my_reservations": services.my_reservations_for_entry(request.user),
+        "to_sign": _to_sign(request.user),
     })
+
+
+def _to_sign(user):
+    from .models import EntrySignatureRequest
+
+    now = timezone.now()
+    return [q for q in EntrySignatureRequest.objects.filter(user=user, status=EntrySignatureRequest.Status.PENDING,
+                                                            expires_at__gt=now).select_related("reservation__lane")]
+
+
+@login_required
+def sign_remote(request, pk):
+    """Rezerwujący podpisuje wpis przygotowany przez obsługę (link z e-maila / powiadomienia)."""
+    from .models import EntrySignatureRequest
+
+    req = get_object_or_404(EntrySignatureRequest.objects.select_related("reservation__lane", "created_by"), pk=pk, user=request.user)
+    error = None
+    if request.method == "POST":
+        try:
+            services.check_rate_limit(client_ip(request))
+            entry = services.sign_request(req, user=request.user, signature_png=services.decode_signature(request.POST.get("signature")),
+                                          statement=request.POST.get("statement") == "on", ip=client_ip(request),
+                                          user_agent=request.META.get("HTTP_USER_AGENT", ""))
+        except ValidationError as e:
+            error = e.messages[0]
+        else:
+            messages.success(request, f"Podpisano wpis {entry.number} — jest w książce pobytu.")
+            return redirect("logbook:my_qr")
+    return render(request, "logbook/sign_remote.html", {"req": req, "open": req.is_open(), "error": error,
+                                                        "statement_text": STATEMENT_TEXT}, status=400 if error else 200)
 
 
 @login_required
@@ -402,7 +433,22 @@ def panel_add(request):
                            has_permit="tak" if chosen.permit_number else "nie", permit_number=chosen.permit_number,
                            permit_issuer=chosen.permit_issuer)
     form = StaffEntryForm(request.POST or None, initial=initial, reservations=_staff_reservations(now))
-    if request.method == "POST" and form.is_valid():
+    remote = request.method == "POST" and "do_podpisu" in request.POST
+    if remote:  # oświadczenie potwierdzi i podpisze sam rezerwujący (link)
+        form.fields["statement"].required = False
+    if remote and form.is_valid():
+        d = form.cleaned_data
+        try:
+            req = services.request_signature(reservation=d.get("reservation"), data=d, entered_at=d["entered_at"], by=request.user,
+                                             now=now)
+        except ValidationError as e:
+            for m in e.messages:
+                form.add_error(None, m)
+        else:
+            messages.success(request, f"Wysłano {req.user.full_name} link do podpisania wpisu (ważny "
+                                      f"{services.REMOTE_LINK_HOURS} h). Wpis pojawi się w książce po podpisaniu.")
+            return redirect("panel:reservation", pk=req.reservation_id)
+    elif request.method == "POST" and form.is_valid():
         d = form.cleaned_data
         try:
             entry = services.create_entry(

@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Podpisz wpis do książki pobytu{% endblock %}
+{% block content %}
+<h1>Podpisz wpis do książki pobytu</h1>
+{% if not open %}
+<div class="card"><p>{% if req.status == 'podpisany' %}Ten wpis jest już podpisany i znajduje się w książce pobytu.{% else %}Ten link jest nieaktualny — wygasł albo obsługa wysłała nowy. W razie pytań skontaktuj się z obsługą strzelnicy.{% endif %}</p>
+  <a class="btn secondary" href="{% url 'logbook:my_qr' %}">Książka pobytu</a></div>
+{% else %}
+<p class="muted">Obsługa strzelnicy{% if req.created_by %} ({{ req.created_by.full_name }}){% endif %} przygotowała wpis Twojego pobytu. Sprawdź dane — jeśli się zgadzają, potwierdź oświadczenie i podpisz się palcem. Wpis trafi do książki pobytu z godziną wejścia podaną poniżej. Link jest ważny do {{ req.expires_at|date:"j.m.Y H:i" }}.</p>
+<div class="card"><table>
+  <tr><th>Rezerwacja</th><td>{{ req.reservation.number }} · {{ req.reservation.lane }}, {{ req.reservation.starts_at|date:"j.m.Y" }} {{ req.reservation.starts_at|time:"H:i" }}–{{ req.reservation.ends_at|time:"H:i" }}</td></tr>
+  <tr><th>Wejście</th><td>{{ req.entered_at|date:"j.m.Y H:i" }}</td></tr>
+  <tr><th>Imię i nazwisko</th><td>{{ req.data.first_name }} {{ req.data.last_name }}</td></tr>
+  {% if req.data.has_permit %}<tr><th>Pozwolenie na broń</th><td>{{ req.data.permit_number }} · {{ req.data.permit_issuer }}</td></tr>
+  {% else %}<tr><th>Adres</th><td>{{ req.data.address }}</td></tr>{% endif %}
+</table>
+<p class="small muted">Dane się nie zgadzają? Nie podpisuj — skontaktuj się z obsługą strzelnicy.</p></div>
+<form method="post" novalidate data-entry-form class="card">{% csrf_token %}
+  {% if error %}<div class="msg error">{{ error }}</div>{% endif %}
+  <div class="field checkbox"><label><input type="checkbox" name="statement" required> {{ statement_text }}</label></div>
+  <input type="hidden" name="signature" id="id_signature">
+  <div class="field">
+    <label>Podpis</label>
+    <div class="sigbox" data-signature="id_signature">
+      <canvas aria-label="Pole podpisu — podpisz się palcem"></canvas>
+      <button type="button" class="btn secondary small-btn" data-signature-clear>Wyczyść</button>
+    </div>
+  </div>
+  <button class="btn" type="submit">Podpisuję wpis</button>
+</form>
+<script src="{% static 'js/signature.js' %}" defer></script>
+{% endif %}
+{% endblock %}

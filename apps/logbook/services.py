@@ -207,6 +207,67 @@ def check_rate_limit(ip):
 STAFF_BACKDATE_HOURS = 24
 
 
+REMOTE_LINK_HOURS = 72  # link do zdalnego podpisu wpisu
+REMOTE_BACKDATE_HOURS = STAFF_BACKDATE_HOURS + REMOTE_LINK_HOURS  # wejście najwyżej 24 h wstecz + czas na podpis
+SIGNATURE_REQUEST_FIELDS = ["purpose", "purpose_note", "first_name", "last_name", "has_permit", "permit_number", "permit_issuer",
+                            "address"]
+
+
+def request_signature(*, reservation, data, entered_at, by, now=None):
+    """Obsługa przygotowuje wpis rezerwującego, który podpisze go zdalnie (link w e-mailu i powiadomieniu). Tylko dla
+    rezerwującego tej rezerwacji (imię i nazwisko jak w koncie) i w oknie wpisu obsługi; poprzedni niepodpisany link
+    tej osoby do tej rezerwacji zostaje anulowany."""
+    from .models import EntrySignatureRequest
+
+    now = now or timezone.now()
+    if reservation is None:
+        raise ValidationError("Wybierz rezerwację — link do podpisu dostaje rezerwujący.")
+    holder = reservation.user
+    if " ".join(data.get("first_name", "").split()).casefold() != " ".join(holder.first_name.split()).casefold() or \
+            " ".join(data.get("last_name", "").split()).casefold() != " ".join(holder.last_name.split()).casefold():
+        raise ValidationError(f"Link do podpisu można wysłać tylko rezerwującemu ({holder.full_name}) — wpisz jego imię i nazwisko.")
+    if not staff_can_add_entry(reservation, now):
+        raise ValidationError("Do tej rezerwacji obsługa nie może już dodać wpisu (najwyżej 24 h po jej zakończeniu).")
+    if entered_at > now + timedelta(minutes=2) or entered_at < now - timedelta(hours=STAFF_BACKDATE_HOURS):
+        raise ValidationError(f"Godzina wejścia musi mieścić się w ostatnich {STAFF_BACKDATE_HOURS} godzinach.")
+    if not reservation_open_for_entry(reservation, min(entered_at, now)):
+        raise ValidationError("Godzina wejścia nie mieści się w czasie wybranej rezerwacji.")
+    clean = {k: data.get(k) for k in SIGNATURE_REQUEST_FIELDS}
+    clean["has_permit"] = bool(clean["has_permit"])
+    for k in SIGNATURE_REQUEST_FIELDS:
+        if k != "has_permit":
+            clean[k] = " ".join(str(clean[k] or "").split())
+    with transaction.atomic():
+        EntrySignatureRequest.objects.filter(reservation=reservation, user=holder, status=EntrySignatureRequest.Status.PENDING).update(
+            status=EntrySignatureRequest.Status.CANCELLED)
+        req = EntrySignatureRequest.objects.create(reservation=reservation, user=holder, created_by=by, data=clean,
+                                                   entered_at=min(entered_at, now), expires_at=now + timedelta(hours=REMOTE_LINK_HOURS))
+        log_event("ksiazka.wpis_do_podpisu", reservation, f"{reservation.number}: link do podpisu dla rezerwującego", actor=by)
+        notify_user(holder, f"Podpisz wpis do książki pobytu ({reservation.number})", "emails/logbook_sign_request.txt",
+                    link=reverse("logbook:sign_remote", args=[req.pk]), reservation=reservation, req=req)
+    return req
+
+
+@transaction.atomic
+def sign_request(req, *, user, signature_png, statement, ip=None, user_agent="", now=None):
+    """Rezerwujący podpisuje przygotowany wpis — powstaje wpis w książce (źródło „podpisany zdalnie”)."""
+    from .models import EntrySignatureRequest
+
+    now = now or timezone.now()
+    req = EntrySignatureRequest.objects.select_for_update().select_related("reservation").get(pk=req.pk)
+    if req.user_id != user.pk:
+        raise ValidationError("Ten wpis jest przeznaczony dla innej osoby.")
+    if not req.is_open(now):
+        raise ValidationError("Ten link jest już nieaktualny (podpisany, wygasł albo obsługa wysłała nowy).")
+    if not statement:
+        raise ValidationError("Potwierdź oświadczenie.")
+    entry = create_entry(data=dict(req.data), signature_png=signature_png, source=Entry.Source.REMOTE, reservation=req.reservation,
+                         user=user, created_by=req.created_by, ip=ip, user_agent=user_agent, now=now, entered_at=req.entered_at)
+    req.status, req.entry, req.signed_at = EntrySignatureRequest.Status.SIGNED, entry, now
+    req.save(update_fields=["status", "entry", "signed_at"])
+    return entry
+
+
 def staff_can_add_entry(reservation, now=None):
     """Obsługa może dopisać wpis do rezerwacji: potwierdzona, trwa albo skończyła się w ostatnich 24 h (limit wpisu wstecz),
     zaczyna się najpóźniej za godzinę — ten sam zakres co lista rezerwacji w formularzu wpisu obsługi."""
@@ -225,7 +286,8 @@ def create_entry(
     przez obsługę (najwyżej 24 h wstecz) i z kiosku, który zapisał wpis bez połączenia (najwyżej 72 h wstecz)."""
     now = now or timezone.now()
     if entered_at is not None:
-        limits = {Entry.Source.STAFF: STAFF_BACKDATE_HOURS, Entry.Source.DEVICE: DEVICE_BACKDATE_HOURS}
+        limits = {Entry.Source.STAFF: STAFF_BACKDATE_HOURS, Entry.Source.DEVICE: DEVICE_BACKDATE_HOURS,
+                  Entry.Source.REMOTE: REMOTE_BACKDATE_HOURS}
         if source not in limits:
             raise ValidationError("Godzinę wejścia może podać tylko obsługa.")
         if entered_at > now + timedelta(minutes=2) or entered_at < now - timedelta(hours=limits[source]):
@@ -591,6 +653,10 @@ def purge_expired(now=None):
         from .daily_print import purge_before
 
         prints = purge_before(timezone.localdate(cutoff))
+    # Wpisy do zdalnego podpisu: po podpisaniu dane są w książce, niepodpisane — niepotrzebne; usuwane po 30 dniach.
+    from .models import EntrySignatureRequest
+
+    EntrySignatureRequest.objects.filter(created_at__lt=now - timedelta(days=30)).delete()
     # Kartoteka osób bez konta (np. z GunTrackera) — ten sam okres przechowywania, liczony od wprowadzenia do kartoteki.
     from apps.clients.models import Person
 

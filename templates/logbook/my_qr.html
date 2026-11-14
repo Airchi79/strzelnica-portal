@@ -10,7 +10,8 @@
       <span>Wejście {{ e.entered_at|date:"j.m H:i" }} · {{ e.get_purpose_display }}{% if e.reservation %} · {{ e.reservation.lane }}{% endif %} · nr {{ e.number }}</span>
       <button class="btn" type="submit">Zakończ pobyt — zapisz wyjście</button>
     </form></li>{% endfor %}</ul>
-</div>{% endif %}
+</div>{% else %}<div class="card"><h2 class="step-title">Zakończenie pobytu</h2>
+  <p class="small muted" style="margin:0">Nie masz teraz otwartego pobytu na strzelnicy — nie ma czego zakończyć. Wyjście zapisuje się tu po wpisie do książki pobytu z konta.</p></div>{% endif %}
 
 <div class="card">
   <h2 class="step-title">Wpis do książki pobytu</h2>

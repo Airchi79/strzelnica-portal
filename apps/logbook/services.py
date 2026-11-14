@@ -205,6 +205,14 @@ def check_rate_limit(ip):
 
 
 STAFF_BACKDATE_HOURS = 24
+
+
+def staff_can_add_entry(reservation, now=None):
+    """Obsługa może dopisać wpis do rezerwacji: potwierdzona, trwa albo skończyła się w ostatnich 24 h (limit wpisu wstecz),
+    zaczyna się najpóźniej za godzinę — ten sam zakres co lista rezerwacji w formularzu wpisu obsługi."""
+    now = now or timezone.now()
+    return (reservation.status == Reservation.Status.CONFIRMED and reservation.ends_at >= now - timedelta(hours=STAFF_BACKDATE_HOURS)
+            and reservation.starts_at <= now + timedelta(hours=1))
 DEVICE_BACKDATE_HOURS = 72  # wpisy z kolejki offline kiosku
 
 

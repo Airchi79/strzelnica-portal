@@ -652,3 +652,34 @@ def test_gate_suggest_rate_limited(client, running, monkeypatch):
     for _ in range(2):
         assert client.get(url, {"imie": "Jan", "nazwisko": "Kowalski"}).status_code == 200
     assert client.get(url, {"imie": "Piotr", "nazwisko": "Prowadzący"}).status_code == 429
+
+
+# --- szybkie akcje w pulpicie i „+ Dodaj wpis” rezerwującego w panelu ------------------------
+
+
+def test_dashboard_quick_logbook_actions(client, ps, running, sig):
+    client.force_login(ps)
+    page = client.get("/pulpit/").content.decode()
+    token = services.reservation_token(running)
+    assert "Zarezerwuj oś" in page and f'href="/ksiazka/wpis/r/{token}/"' in page  # jedna trwająca rezerwacja → od razu wpis
+    assert 'href="/ksiazka/moj-kod/">Zakończ pobyt' in page  # bez otwartego pobytu → strona książki z informacją
+    assert "Nie masz teraz otwartego pobytu" in client.get("/ksiazka/moj-kod/").content.decode()
+    entry = services.create_entry(data={**permit_data(), "purpose": "strzelanie", "has_permit": True},
+                                  signature_png=services.decode_signature(sig), source="qr_rezerwacji", reservation=running, user=ps)
+    page = client.get("/pulpit/").content.decode()
+    assert f'action="/ksiazka/moje-wyjscie/{entry.pk}/"' in page  # jeden otwarty pobyt → przycisk od razu zapisuje wyjście
+    client.post(f"/ksiazka/moje-wyjscie/{entry.pk}/")
+    entry.refresh_from_db()
+    assert entry.exited_at is not None
+
+
+def test_panel_add_entry_prefilled_with_holder(owner_client, ps, running):
+    add_credential(ps, kind="pozwolenie", number="AB 777")
+    page = owner_client.get(f"/panel/ksiazka/nowy-wpis/?rezerwacja={running.pk}&rezerwujacy=1").content.decode()
+    assert 'value="Piotr"' in page and 'value="Prowadzący"' in page and 'value="AB 777"' in page
+    assert SensitiveAccessLog.objects.filter(subject=ps, reason__contains="wpisu rezerwującego").exists()
+    # przycisk przy rezerwacji bez wpisu (lista dniami i szczegóły rezerwacji)
+    days = owner_client.get(f"/panel/rezerwacje/dniami/?od={timezone.localdate():%Y-%m-%d}").content.decode()
+    assert f"?rezerwacja={running.pk}&amp;rezerwujacy=1" in days
+    detail = owner_client.get(f"/panel/rezerwacje/{running.pk}/").content.decode()
+    assert "+ Dodaj wpis rezerwującego" in detail

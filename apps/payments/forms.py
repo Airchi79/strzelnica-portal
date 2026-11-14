@@ -117,8 +117,12 @@ class PaymentSettingsForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["online_fee_percent"].required = False
-        self.fields["online_fee_percent"].localize = True
-        self.fields["online_fee_percent"].widget.is_localized = True
+        # Pole tekstowe, nie liczbowe: przeglądarka nie pokazuje w <input type="number"> wartości z przecinkiem („0,99”),
+        # więc zapisana opłata wyglądała na pustą (a zapis formularza ją zerował).
+        field = self.fields["online_fee_percent"]
+        field.localize = True
+        field.widget = forms.TextInput(attrs={"inputmode": "decimal", "autocomplete": "off"})
+        field.widget.is_localized = True
         if self.instance.online_fee_fixed:
             self.initial["online_fee_fixed_pln"] = Decimal(self.instance.online_fee_fixed) / 100
 

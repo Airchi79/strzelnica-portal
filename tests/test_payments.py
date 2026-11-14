@@ -968,7 +968,10 @@ def test_online_fee_settings_form_and_receipt(owner_client, ps, owner):
     assert response.status_code == 302
     cfg = PaymentSettings.load()
     assert str(cfg.online_fee_percent) == "1.59" and cfg.online_fee_fixed == 30
-    assert "0,30" in owner_client.get("/panel/platnosci/ustawienia/").content.decode()
+    page = owner_client.get("/panel/platnosci/ustawienia/").content.decode()
+    assert "0,30" in page
+    # zapisany procent widoczny w polu tekstowym (w <input type="number"> przeglądarka nie pokaże „1,59” — pole wyglądało na puste)
+    assert 'type="text" name="online_fee_percent" value="1,59"' in page and 'type="number" name="online_fee_percent"' not in page
     assert owner_client.post("/panel/platnosci/ustawienia/", {"online_fee_percent": "11"}).status_code == 200  # ponad 10%
     from apps.core.models import AssociationSettings
     from apps.payments.receipt import to_pdf

@@ -16,7 +16,7 @@ class PaymentSettings(models.Model):
     online_fee_percent = models.DecimalField(
         "opłata za płatność online — prowizja operatora [%]", max_digits=4, decimal_places=2, default=0,
         validators=[MinValueValidator(0), MaxValueValidator(10)],
-        help_text="Wpisz prowizję Tpay z umowy (np. 0,99). Opłata jest wyliczana tak, żeby po potrąceniu prowizji od całej płatności "
+        help_text="Wpisz prowizję operatora płatności z umowy (np. 0,99). Opłata jest wyliczana tak, żeby po potrąceniu prowizji od całej płatności "
                   "stowarzyszeniu została pełna cena — wtedy zwrot zawsze ma pokrycie. Nie wraca przy anulowaniu; przelewem lub "
                   "na miejscu bez opłaty. 0 = bez opłaty.",
     )

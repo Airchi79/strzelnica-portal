@@ -110,6 +110,10 @@
   }));
   persons.addEventListener("input", update);
   form.elements.access_code.addEventListener("input", update);
+  // Podpowiedź własnych kodów wejścia: kliknięcie wpisuje kod do pola.
+  form.querySelectorAll("[data-pass-code]").forEach((b) => b.addEventListener("click", () => {
+    form.elements.access_code.value = b.dataset.passCode; update();
+  }));
 
   selectFromFields();
   load();

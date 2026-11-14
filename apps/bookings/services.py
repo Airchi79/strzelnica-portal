@@ -267,11 +267,13 @@ def quote(lane, day, start_hour, end_hour, persons, now=None, access_code="", us
                 "officer_hourly": officer_hourly, "officer_amount": officer_hourly * hours}
     if access_code:
         # Kod wejścia strzelca (przedpłacony karnet/abonament): rezerwacja bez osobnej należności.
-        from apps.clients.services import find_client_pass
+        from apps.clients.services import find_client_pass, pass_extra_hourly
 
         client_pass = find_client_pass(access_code, user, lane, day, hours, persons)
         if client_pass is not None:
-            return {**base, "hourly": 0, "amount": 0, "client_pass": client_pass}
+            extra = pass_extra_hourly(rule, persons, client_pass)  # osoby ponad limit kodu — dopłata wg cennika
+            return {**base, "hourly": extra, "amount": extra * hours, "client_pass": client_pass,
+                    "pass_persons": min(persons, client_pass.max_persons)}
         # Kod klubu: rozliczenie wg umowy z klubem, poza płatnościami strzelca. Kwota tylko informacyjnie (stawka umowna).
         from apps.association.services import find_access_code
 
@@ -328,7 +330,7 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
     # prowadzący od strzelnicy: zawsze do zatwierdzenia (obsługa przydziela prowadzącego)
     pending = bool(ps_pending or q["with_officer"] or (rule and rule.requires_approval and code is None and client_pass is None))
     cfg = BookingSettings.load()
-    hold = bool(checkout and not by_staff and code is None and client_pass is None and q["amount"] > 0
+    hold = bool(checkout and not by_staff and code is None and q["amount"] > 0
                 and (not pending or cfg.prepay_before_approval))
     if hold:
         if cfg.max_unpaid_holds and Reservation.objects.filter(user=user, status=Reservation.Status.HOLD,
@@ -363,7 +365,8 @@ def create_reservation(user, lane, day, start_hour, end_hour, persons, notes="",
                 access_code=code,
                 client_pass=client_pass,
                 payment_status=(
-                    Reservation.Payment.CONTRACT if code else Reservation.Payment.PASS if client_pass else Reservation.Payment.DUE
+                    Reservation.Payment.CONTRACT if code
+                    else Reservation.Payment.PASS if client_pass is not None and q["amount"] == 0 else Reservation.Payment.DUE
                 ),
                 status=status,
                 needs_approval=pending,
@@ -937,6 +940,25 @@ def _notify_cancelled(reservation, expired=False, refunded=0, manual=0, overpaid
     )
 
 
+def _priced_hourly(reservation, rule, persons):
+    """Opłata za godzinę rezerwacji bez kodu klubu: cennik, a przy kodzie wejścia — dopłata za osoby ponad jego limit."""
+    if reservation.client_pass_id:
+        from apps.clients.services import pass_extra_hourly
+
+        return pass_extra_hourly(rule, persons, reservation.client_pass)
+    return rule.hourly_amount(persons)
+
+
+def _reconcile_priced(reservation, by):
+    """Rozliczenie po zmianie należności; rezerwacja z kodem wejścia bez dopłaty i bez wpłat — „opłacona kodem”."""
+    if reservation.client_pass_id and reservation.amount == 0 and reservation.paid_amount == 0:
+        if reservation.payment_status != Reservation.Payment.PASS:
+            reservation.payment_status = Reservation.Payment.PASS
+            reservation.save(update_fields=["payment_status", "updated_at"])
+        return reservation
+    return reconcile_reservation(reservation, by=by)
+
+
 @transaction.atomic
 def change_persons(reservation, persons, by):
     """Zmiana liczby osób przez zarząd — należność liczona według cennika z chwili rezerwacji."""
@@ -946,15 +968,13 @@ def change_persons(reservation, persons, by):
     if persons < 1 or persons > BookingSettings.load().max_persons:
         raise ValidationError("Nieprawidłowa liczba osób.")
     before = (reservation.persons, reservation.amount)
-    if reservation.client_pass_id and persons > reservation.client_pass.max_persons:
-        raise ValidationError(f"Kod wejścia obejmuje najwyżej {reservation.client_pass.max_persons} os. — anuluj i zarezerwuj bez kodu.")
     reservation.persons = persons
-    if reservation.access_code_id is None and reservation.client_pass_id is None:
-        reservation.hourly_amount = reservation.price_rule.hourly_amount(persons)
+    if reservation.access_code_id is None:
+        reservation.hourly_amount = _priced_hourly(reservation, reservation.price_rule, persons)
         reservation.recompute_amount()
     reservation.save()
-    if reservation.access_code_id is None and reservation.client_pass_id is None:
-        reservation = reconcile_reservation(reservation, by=by)
+    if reservation.access_code_id is None:
+        reservation = _reconcile_priced(reservation, by)
     log_event(
         "rezerwacja.zmiana_osob",
         reservation,
@@ -990,9 +1010,9 @@ def change_term(reservation, lane, day, start_hour, end_hour, by, refund_differe
         freed = (r.lane, r.starts_at, r.ends_at)
         paid_before = r.paid_amount
         r.lane, r.starts_at, r.ends_at = lane, starts_at, ends_at
-        if r.access_code_id is None and r.client_pass_id is None:
+        if r.access_code_id is None:
             r.price_rule = rule
-            r.hourly_amount = rule.hourly_amount(r.persons)
+            r.hourly_amount = _priced_hourly(r, rule, r.persons)
             r.amount = (r.hourly_amount + r.officer_hourly) * hours
         elif r.access_code_id:
             r.hourly_amount = r.access_code.contract_hourly or 0
@@ -1003,8 +1023,8 @@ def change_term(reservation, lane, day, start_hour, end_hour, by, refund_differe
                 r.save()
         except IntegrityError as e:
             raise ValidationError("Nowy termin został właśnie zajęty. Wybierz inny.") from e
-        if r.access_code_id is None and r.client_pass_id is None:
-            r = reconcile_reservation(r, by=by)
+        if r.access_code_id is None:
+            r = _reconcile_priced(r, by)
         log_event("rezerwacja.zmiana_terminu", r, str(r), actor=by,
                   changes={"przed": old, "po": {"oś": str(lane), "od": timezone.localtime(starts_at).strftime("%d.%m.%Y %H:%M"),
                                                 "do": timezone.localtime(ends_at).strftime("%H:%M"), "kwota_gr": r.amount}})
@@ -1015,7 +1035,7 @@ def change_term(reservation, lane, day, start_hour, end_hour, by, refund_differe
             offer_freed(*freed)
 
         transaction.on_commit(_offer)
-    excess = max(paid_before - r.amount, 0) if r.access_code_id is None and r.client_pass_id is None else 0
+    excess = max(paid_before - r.amount, 0) if r.access_code_id is None else 0
     refunded = manual = 0
     if excess and refund_difference:
         refunded, manual = refund_paid_to_payer(r, excess, by, f"Zmiana rezerwacji {r.number} — zwrot różnicy")

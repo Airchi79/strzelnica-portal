@@ -442,13 +442,19 @@ def settle_finished_reservations(now=None):
             r = Reservation.objects.select_for_update().select_related("price_rule", "user", "lane").get(pk=r.pk)
             shooters = r.log_entries.filter(purpose=Entry.Purpose.SHOOTING).count()
             r.settled_at = now
-            if r.access_code_id or r.client_pass_id:  # kod klubu (umowa) lub kod wejścia (przedpłata) — bez dopłat
+            if r.access_code_id:  # kod klubu — rozliczenie wg umowy, bez dopłat
                 r.save(update_fields=["settled_at"])
                 continue
             if shooters > r.persons:
-                new_hourly = r.price_rule.hourly_amount(shooters)
+                if r.client_pass_id:  # kod wejścia: dopłata tylko za osoby ponad limit kodu
+                    from apps.clients.services import pass_extra_hourly
+
+                    new_hourly = pass_extra_hourly(r.price_rule, shooters, r.client_pass)
+                else:
+                    new_hourly = r.price_rule.hourly_amount(shooters)
                 if new_hourly > r.hourly_amount:
-                    if r.payment_status == Reservation.Payment.DUE:
+                    if r.payment_status in (Reservation.Payment.DUE, Reservation.Payment.PASS):
+                        r.payment_status = Reservation.Payment.DUE
                         before = (r.persons, r.amount)
                         r.declared_persons = r.persons
                         r.persons = shooters

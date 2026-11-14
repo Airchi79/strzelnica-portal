@@ -52,7 +52,7 @@
       <td class="nowrap">{% if r.no_log %}<span class="badge bad">brak</span>{% elif r.shooters %}<span class="badge ok">{{ r.shooters }}/{{ r.persons }}</span>{% elif r.started %}—{% else %}<span class="muted small">później</span>{% endif %}</td>
       <td class="nowrap">{% if r.due %}<span class="badge warn">do zapłaty {{ r.due|pln }}</span>
         {% elif r.access_code %}<span class="small">klub {{ r.access_code.club }}</span>
-        {% elif r.client_pass %}<span class="small">kod {{ r.client_pass.code }}</span>
+        {% elif r.client_pass and not r.amount %}<span class="small">kod {{ r.client_pass.code }}</span>
         {% else %}<span class="badge {% if r.payment_status == 'oplacona' %}ok{% endif %}">{{ r.get_payment_status_display }}</span>{% endif %}</td>
     </tr>
     {% empty %}<tr><td colspan="6" class="muted">Brak rezerwacji tego dnia.</td></tr>{% endfor %}

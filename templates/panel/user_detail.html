@@ -53,7 +53,7 @@
   <div class="table-wrap"><table class="days">
     <tr class="head"><th>Rezerwacja</th><th>Oś</th><th>Status</th><th>Rozliczenie</th></tr>
     {% for r in reservations %}<tr><td><a href="{% url 'panel:reservation' r.pk %}">{{ r.starts_at|date:"j.m.Y H:i" }}</a><div class="small muted code">{{ r.number }}</div></td><td data-label="Oś">{{ r.lane }}</td><td data-label="Status">{{ r.display_status }}</td>
-      <td data-label="Rozliczenie">{% if r.client_pass %}kod {{ r.client_pass.code }}{% elif r.access_code %}klub {{ r.access_code.club }}{% else %}{{ r.amount|pln }} · {{ r.get_payment_status_display|lower }}{% endif %}</td></tr>
+      <td data-label="Rozliczenie">{% if r.client_pass and not r.amount %}kod {{ r.client_pass.code }}{% elif r.access_code %}klub {{ r.access_code.club }}{% else %}{{ r.amount|pln }} · {{ r.get_payment_status_display|lower }}{% endif %}</td></tr>
     {% empty %}<tr><td colspan="4" class="muted">Brak rezerwacji.</td></tr>{% endfor %}
   </table></div>
   {% if perms.logbook.view_logbook %}<h3>Wpisy w książce pobytu (na konto)</h3>

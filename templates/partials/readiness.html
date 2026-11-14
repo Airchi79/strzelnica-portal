@@ -18,5 +18,14 @@
     </li>
     {% endfor %}
   </ol>
-  {% if readiness.ready %}<div class="actions" style="margin-top:8px"><a class="btn" href="{% url 'bookings:new' %}">Zarezerwuj oś</a></div>{% endif %}
+  {% if readiness.ready or logbook_actions %}<div class="actions quick-actions" style="margin-top:8px">
+    {% if readiness.ready %}<a class="btn" href="{% url 'bookings:new' %}">Zarezerwuj oś</a>{% endif %}
+    {% if logbook_actions %}
+      <a class="btn secondary" href="{% if logbook_actions.entry_token %}{% url 'logbook:by_reservation' logbook_actions.entry_token %}{% else %}{% url 'logbook:my_qr' %}{% endif %}">Wpis do książki pobytu</a>
+      {% with stays=logbook_actions.open_stays %}{% if stays|length == 1 %}
+      <form method="post" action="{% url 'logbook:my_exit' stays.0.pk %}" class="inline-form" data-confirm="Zakończyć pobyt na strzelnicy (wejście {{ stays.0.entered_at|time:'H:i' }})? Zapiszemy godzinę wyjścia.">{% csrf_token %}
+        <button class="btn secondary" type="submit">Zakończ pobyt <span class="small">(wejście {{ stays.0.entered_at|time:"H:i" }})</span></button></form>
+      {% else %}<a class="btn secondary" href="{% url 'logbook:my_qr' %}">Zakończ pobyt</a>{% endif %}{% endwith %}
+    {% endif %}
+  </div>{% endif %}
 </div>

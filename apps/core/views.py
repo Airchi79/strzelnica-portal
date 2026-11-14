@@ -143,9 +143,12 @@ def dashboard(request):
     from apps.bookings.services import booking_readiness
     from apps.clients.services import pass_uses
 
+    from apps.logbook.services import my_open_stays, my_reservations_for_entry
+
     passes = list(request.user.client_passes.filter(is_active=True, valid_until__gte=timezone.localdate()))
     for p in passes:
         p.remaining = None if p.entries_limit is None else max(0, p.entries_limit - pass_uses(p))
+    entry_targets = my_reservations_for_entry(request.user)
     return render(
         request,
         "core/dashboard.html",
@@ -153,6 +156,10 @@ def dashboard(request):
             "credentials": credentials,
             "passes": passes,
             "readiness": booking_readiness(request.user),
+            # szybkie akcje książki pobytu obok „Zarezerwuj oś”: wpis (jedna trwająca rezerwacja → od razu formularz)
+            # i zakończenie pobytu (jeden otwarty pobyt → od razu zapis wyjścia)
+            "logbook_actions": {"entry_token": entry_targets[0][1] if len(entry_targets) == 1 else None,
+                                "open_stays": list(my_open_stays(request.user)[:2])},
             "is_ps": is_range_officer(request.user),
             "missing_profile": not (request.user.phone and request.user.city),
             "balance": balance_of(request.user),

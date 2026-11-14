@@ -19,6 +19,7 @@ from apps.audit.services import log_event
 from apps.core.models import AssociationSettings, Notification
 from apps.core.permissions import panel_required
 from apps.facilities.models import Lane, format_pln
+from apps.logbook.services import staff_can_add_entry
 
 from apps.logbook.views import reservation_qr_context
 
@@ -498,6 +499,8 @@ def panel_detail(request, pk):
             "remaining_pln": f"{(r.amount - r.paid_amount) / 100:.2f}".replace(".", ","),
             "remaining": r.amount - r.paid_amount,
             "log_entries": list(r.log_entries.order_by("entered_at")) if request.user.has_perm("logbook.view_logbook") else None,
+            "can_add_entry": staff_can_add_entry(r),
+            "holder_entered": r.log_entries.filter(user=r.user).exists(),
             "series": _series_info(r),
             "officers": list(range_officers().exclude(pk=r.user_id)) if r.with_officer else [],
         },
@@ -694,6 +697,7 @@ def panel_days(request):
         else:
             r.pay_label = ""
         r.missing_entries = r.status == Reservation.Status.CONFIRMED and r.starts_at <= timezone.now() and r.shooters == 0
+        r.can_add_entry = r.missing_entries and staff_can_add_entry(r)
         days.setdefault(timezone.localtime(r.starts_at).date(), []).append(r)
     if ranged:
         groups = [(start + timedelta(days=i), days.get(start + timedelta(days=i), [])) for i in range(span)]

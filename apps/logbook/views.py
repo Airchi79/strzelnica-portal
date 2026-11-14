@@ -375,6 +375,14 @@ def panel_add(request):
     initial = {"entered_at": timezone.localtime(now).replace(second=0, microsecond=0)}
     if request.GET.get("rezerwacja", "").isdigit():
         initial.update(purpose=Entry.Purpose.SHOOTING, reservation=int(request.GET["rezerwacja"]))
+        holder_res = _staff_reservations(now).filter(pk=int(request.GET["rezerwacja"])).first()
+        if holder_res is not None:
+            # godzina wejścia w czasie rezerwacji (rezerwacja już zakończona → jej początek, nie wcześniej niż 24 h wstecz)
+            entered = now if now <= holder_res.ends_at else max(holder_res.starts_at, now - timedelta(hours=services.STAFF_BACKDATE_HOURS))
+            initial["entered_at"] = timezone.localtime(entered).replace(second=0, microsecond=0)
+            if request.GET.get("rezerwujacy") == "1":  # „+ Dodaj wpis” przy rezerwacji bez wpisu — dane rezerwującego
+                log_sensitive_access(holder_res.user, f"rezerwacja:{holder_res.number}", "uzupełnienie wpisu rezerwującego w książce pobytu")
+                initial.update(services.prefill_for(holder_res.user))
     elif request.GET.get("cel") in Entry.Purpose.values:  # np. „Wpis obsługi” z panelu klienta: cel „prace”
         initial["purpose"] = request.GET["cel"]
         if request.GET["cel"] == Entry.Purpose.WORK:

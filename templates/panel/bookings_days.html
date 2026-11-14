@@ -38,6 +38,7 @@
       <td class="hide-sm">{{ r.user.full_name }}<div class="small muted">PS</div></td>
       <td data-label="Księga">{% if r.entries %}<a class="badge {% if r.missing_entries %}bad{% else %}ok{% endif %}" href="{% url 'panel:logbook' %}?q={{ r.number }}&amp;od={{ r.starts_at|date:'Y-m-d' }}&amp;do={{ r.starts_at|date:'Y-m-d' }}">wpisy: {{ r.entries }}</a>
           {% elif r.missing_entries %}<span class="badge bad">brak wpisu</span>
+            {% if r.can_add_entry and perms.logbook.staff_entry %}<div><a class="btn secondary small-btn" href="{% url 'panel:logbook_add' %}?rezerwacja={{ r.pk }}&amp;rezerwujacy=1">+ Dodaj wpis</a></div>{% endif %}
           {% else %}<span class="muted small">—</span>{% endif %}</td>
       <td data-label="Płatność">{% if r.payment_status == 'oplacona' %}<span class="badge ok">opłacona</span>{% elif r.payment_status == 'do_zaplaty' %}<span class="badge warn">do zapłaty {{ r.amount|sub:r.paid_amount|pln }}</span>{% elif r.payment_status == 'umowa' %}<span class="badge">wg umowy</span>{% elif r.payment_status == 'zwolniona' %}<span class="badge">zwolniona</span>{% else %}<span class="muted small">—</span>{% endif %}
         {% if r.pay_label %}<div class="small muted">{{ r.pay_label }}</div>{% endif %}</td>

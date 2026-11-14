@@ -318,7 +318,7 @@ def panel_payment(request, pk):
         except ValidationError as e:
             messages.error(request, e.messages[0])
         else:
-            messages.success(request, "Zapisano: zwrot wykonany w Tpay." if request.POST["action"] == "refund_done"
+            messages.success(request, f"Zapisano: zwrot wykonany w {payment.provider_name or 'panelu operatora'}." if request.POST["action"] == "refund_done"
                              else "Zapisano: zwrotu nie ma — kwota wróciła na saldo strzelca; możesz go ponowić lub zwrócić ręcznie.")
         return redirect("panel:payment", pk=payment.pk)
     form = AssignForm(request.POST or None)
@@ -411,10 +411,11 @@ def panel_wallet(request, user_pk):
             messages.error(request, "Tej wpłaty nie można już zwrócić (zwrócona wcześniej albo brak nadpłaty).")
         elif services.refund_to_payer(match[0][0], match[0][1], by=request.user,
                                       reason=f"Zwrot nadpłaty za anulowaną rezerwację {match[0][0].reservation.number}"):
-            messages.success(request, f"Zlecono zwrot {match[0][1] / 100:.2f} zł przez Tpay na rachunek / kartę płacącego. "
-                                      "Jeśli Tpay go odrzuci, dostaniesz powiadomienie, a kwota wróci na saldo.")
+            operator = match[0][0].provider_name or "operatora płatności"
+            messages.success(request, f"Zlecono zwrot {match[0][1] / 100:.2f} zł przez {operator} na rachunek / kartę płacącego. "
+                                      "Jeśli operator go odrzuci, dostaniesz powiadomienie, a kwota wróci na saldo.")
         else:
-            messages.error(request, "Tej wpłaty nie można zwrócić przez Tpay — zwróć ręcznie i zaksięguj zwrot ręczny.")
+            messages.error(request, "Tej wpłaty nie można zwrócić przez operatora płatności — zwróć ręcznie i zaksięguj zwrot ręczny.")
         return redirect("panel:wallet", user_pk=subject.pk)
     refund_form = ManualRefundForm(request.POST if request.POST.get("action") == "manual_refund" else None, prefix="zwrot")
     if request.method == "POST" and request.POST.get("action") == "manual_refund":

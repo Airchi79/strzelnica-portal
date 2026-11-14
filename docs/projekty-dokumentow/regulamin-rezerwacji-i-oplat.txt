@@ -1,7 +1,7 @@
-PROJEKT — Regulamin rezerwacji i opłat (wersja robocza do akceptacji Zarządu)
+Regulamin rezerwacji i opłat — wersja z operatorem płatności Axepta BNP Paribas (bez Tpay i bez opłaty za płatność online), stan na 14.11.2026
 Wklej tekst spod linii „=====” w panelu: Regulaminy → „Regulamin rezerwacji i opłat” → Nowa wersja.
-Przed publikacją sprawdź liczby z ustawień (Rezerwacje → Ustawienia rezerwacji) i fragmenty opisane w notatce na końcu pliku.
-Publikacja nowej wersji wymaga ponownej akceptacji przez wszystkich strzelców przy następnym logowaniu.
+Publikuj W DNIU przełączenia produkcji na Axeptę (nie wcześniej), razem z nową Informacją RODO.
+Przed publikacją sprawdź w panelu: Wpłaty → Ustawienia → opłata za płatność online = 0 (pola puste).
 
 =====
 
@@ -31,7 +31,7 @@ Publikacja nowej wersji wymaga ponownej akceptacji przez wszystkich strzelców p
 1. Rezerwacja obejmuje całą oś w wybranych pełnych godzinach, w granicach godzin otwarcia osi, z zastrzeżeniem § 11 ust. 6. Godziny otwarcia i opłaty są podane w zakładce „Opłaty”.
 2. Rezerwować można z wyprzedzeniem nie większym niż określone w Systemie. Obsługa może ustalić minimalny czas między rezerwacją online a rozpoczęciem strzelania.
 3. Przy rezerwacji strzelec podaje przewidywaną liczbę osób. Rezerwacja jest potwierdzana w Systemie i wiadomością e-mail na zasadach określonych w § 6.
-4. Rezerwujący jest prowadzącym strzelanie na zarezerwowanej osi przez cały czas rezerwacji, niezależnie od liczby uczestników, i odpowiada za bezpieczeństwo strzelania na zasadach Regulaminu strzelnicy. Odpowiada też za to, aby każdy uczestnik przed rozpoczęciem strzelania wpisał się do książki pobytu (kodem QR rezerwacji, w kiosku lub u obsługi).
+4. Rezerwujący jest prowadzącym strzelanie na zarezerwowanej osi przez cały czas rezerwacji, niezależnie od liczby uczestników, i odpowiada za bezpieczeństwo strzelania na zasadach Regulaminu strzelnicy. Odpowiada też za to, aby każdy uczestnik przed rozpoczęciem strzelania wpisał się do książki pobytu (kodem QR rezerwacji, w kiosku lub u obsługi). Jeżeli rezerwujący nie wpisał się na miejscu, obsługa może przygotować jego wpis na podstawie danych z konta i przesłać mu w Systemie odnośnik do podpisania; wpis trafia do książki pobytu dopiero po jego podpisaniu przez rezerwującego.
 5. Oś może zostać zablokowana przez Stowarzyszenie (zawody, prace, względy bezpieczeństwa). W takim przypadku obsługa może anulować kolidujące rezerwacje — zasady zwrotu określa § 7 ust. 5.
 6. Gdy termin jest zajęty, strzelec może zapisać się na listę oczekujących. Po zwolnieniu terminu pierwsza osoba z listy dostaje wiadomość, a termin jest dla niej zatrzymany przez czas podany w wiadomości.
 
@@ -39,17 +39,17 @@ Publikacja nowej wersji wymaga ponownej akceptacji przez wszystkich strzelców p
 
 1. Opłata za godzinę korzystania z osi jest mniejszą z kwot: liczba osób pomnożona przez opłatę za osobę albo ryczałt za oś. Należność to opłata za godzinę pomnożona przez liczbę godzin rezerwacji.
 2. Należność ustalana jest według opłat obowiązujących w chwili dokonania rezerwacji. Późniejsza zmiana wysokości opłat nie dotyczy rezerwacji już dokonanych.
-3. Jeżeli na strzelnicy, według książki pobytu, strzela więcej osób niż zadeklarowano, należność zostaje powiększona według opłat z chwili rezerwacji, nie więcej jednak niż do wysokości ryczałtu za oś.
-4. Rezerwacje z kodem klubu rozliczane są według umowy Stowarzyszenia z klubem. Rezerwacja z kodem wejścia (karnet, abonament) wykorzystuje wejście z kodu bez osobnej należności.
+3. Jeżeli na strzelnicy, według książki pobytu, strzela więcej osób niż zadeklarowano, należność zostaje powiększona według opłat z chwili rezerwacji, nie więcej jednak niż do wysokości ryczałtu za oś; przy rezerwacji z kodem wejścia — o dopłatę za osoby ponad liczbę objętą kodem (ust. 4). Dotyczy to także rezerwacji już opłaconej — dopłata staje się należnością do zapłaty (w pierwszej kolejności ze środków na saldzie). O większej liczbie strzelających niż zadeklarowano System informuje rezerwującego w trakcie rezerwacji, a o przeliczonej należności — po jej zakończeniu.
+4. Rezerwacje z kodem klubu rozliczane są według umowy Stowarzyszenia z klubem. Rezerwacja z kodem wejścia (karnet, abonament) wykorzystuje jedno wejście z kodu, które obejmuje liczbę osób określoną przy wydaniu kodu. Jeżeli w rezerwacji jest więcej osób, należna jest dopłata równa różnicy między opłatą za wszystkie osoby a opłatą za osoby objęte kodem, ustalonymi według ust. 1; na osi rozliczanej wyłącznie ryczałtem dopłata nie występuje.
 5. Obsługa może zmienić liczbę osób, oś lub termin rezerwacji na prośbę strzelca. Należność zostaje wówczas przeliczona: wyższa kwota oznacza dopłatę, a nadwyżkę zwraca się zgodnie z § 7.
 
 § 6. Płatności i potwierdzenie rezerwacji
 
 1. Należność można zapłacić:
-a) online przez operatora płatności Tpay (BLIK, szybki przelew, karta),
+a) online przez operatora płatności Axepta BNP Paribas (BLIK, szybki przelew, karta, Google Pay, Apple Pay),
 b) przelewem tradycyjnym na rachunek Stowarzyszenia, z numerem rezerwacji w tytule,
-c) gotówką na miejscu u obsługi albo — przy rezerwacji w kiosku, jeżeli System to udostępnia — do skarbonki przy wejściu na zasadach ust. 9.
-Dostępne sposoby płatności zależą od grupy strzelca i są pokazywane przy rezerwacji. Jeżeli strzelec ma środki na saldzie (§ 7 ust. 7), są one wykorzystywane w pierwszej kolejności.
+c) gotówką na miejscu u obsługi albo — przy rezerwacji w kiosku, jeżeli System to udostępnia — do skarbonki przy wejściu na zasadach ust. 8.
+Dostępne sposoby płatności zależą od grupy strzelca i są pokazywane przy rezerwacji. Jeżeli strzelec ma środki na saldzie (§ 7 ust. 6), są one wykorzystywane w pierwszej kolejności.
 2. Po wybraniu terminu w Systemie termin jest zatrzymywany dla strzelca na 5 minut na wybór sposobu płatności. Jeżeli w tym czasie sposób płatności nie zostanie wybrany, termin wraca do puli.
 3. Rezerwacja dokonana w Systemie zostaje potwierdzona:
 a) przy płatności online — po zaksięgowaniu wpłaty; na dokonanie płatności strzelec ma 15 minut od jej rozpoczęcia, po czym nieopłacony termin wraca do puli,
@@ -58,10 +58,9 @@ c) przy przelewie tradycyjnym — po zaksięgowaniu wpłaty na rachunku Stowarzy
 Rezerwacja opłacona w całości ze środków na saldzie jest potwierdzana od razu.
 4. Przelew tradycyjny można wybrać, jeżeli do rozpoczęcia strzelania pozostały co najmniej 4 dni. Wpłata powinna zostać zaksięgowana w ciągu 3 dni od wyboru tego sposobu płatności — termin jest podany w Systemie i w wiadomości e-mail, a dzień wcześniej System przypomina o przelewie. Do czasu zaksięgowania wpłaty termin jest zatrzymany dla strzelca. Jeżeli wpłata nie zostanie zaksięgowana w terminie, obsługa może anulować rezerwację; rezerwacja nieopłacona do rozpoczęcia strzelania zostaje anulowana automatycznie.
 5. Rezerwacja wymagająca zatwierdzenia (§ 3 ust. 3 i 4) jest potwierdzana po decyzji obsługi. Jeżeli System na to pozwala, można ją opłacić online przed decyzją obsługi; jeżeli rezerwacja nie zostanie zatwierdzona, wpłata wraca zgodnie z § 7 ust. 4. Jeżeli dla grupy strzelca dostępna jest wyłącznie płatność online, rezerwację zatwierdzoną przez obsługę należy opłacić w ciągu 24 godzin od zatwierdzenia, nie później niż do rozpoczęcia strzelania; nieopłacona w tym czasie zwalnia się automatycznie.
-6. Wpłaty dokonane za rezerwację, która została zwolniona albo anulowana na zasadach ust. 2–5, zwraca się zgodnie z § 7 ust. 3 i 7.
-7. Do płatności online może być doliczana opłata za obsługę płatności. Jej wysokość jest widoczna przed zapłatą. Opłata ta pokrywa koszt operatora płatności i nie podlega zwrotowi. Płatność przelewem tradycyjnym lub gotówką na miejscu jest wolna od tej opłaty.
-8. Po zaksięgowaniu wpłaty strzelec może pobrać w Systemie potwierdzenie wpłaty. Potwierdzenie nie jest fakturą ani rachunkiem.
-9. Wpłata do skarbonki przy wejściu:
+6. Wpłaty dokonane za rezerwację, która została zwolniona albo anulowana na zasadach ust. 2–5, zwraca się zgodnie z § 7 ust. 3 i 6.
+7. Po zaksięgowaniu wpłaty strzelec może pobrać w Systemie potwierdzenie wpłaty. Potwierdzenie nie jest fakturą ani rachunkiem.
+8. Wpłata do skarbonki przy wejściu:
 a) strzelec wrzuca do skarbonki kwotę należności podaną w kiosku i składa w kiosku oświadczenie o dokonaniu wpłaty; oświadczenie jest zapisywane w Systemie wraz z kwotą, numerem rezerwacji i godziną,
 b) obsługa opróżnia skarbonkę i porównuje wyjętą kwotę z oświadczeniami; potwierdzone wpłaty są księgowane jako zapłata za rezerwację,
 c) w razie niezgodności obsługa kontaktuje się z osobami, które w danym dniu złożyły oświadczenie; rezerwacja bez potwierdzonej wpłaty pozostaje nieopłacona, a strzelec jest obowiązany niezwłocznie ją opłacić,
@@ -71,11 +70,10 @@ d) jeżeli nie da się ustalić, kto nie dokonał wpłaty, wszystkie osoby, któ
 
 1. Strzelec może samodzielnie anulować rezerwację bez opłat najpóźniej 24 godziny przed jej rozpoczęciem. Później rezerwację może anulować wyłącznie obsługa.
 2. W przypadku anulowania później niż w terminie z ust. 1 albo niestawienia się na strzelnicy obsługa może zachować należność w całości.
-3. Przy anulowaniu bez opłat wpłata online wraca automatycznie na rachunek lub kartę, z których dokonano płatności, za pośrednictwem Tpay — zwykle w ciągu kilku dni roboczych. Wpłaty gotówką i przelewem tradycyjnym zwraca obsługa w uzgodniony sposób.
+3. Przy anulowaniu bez opłat wpłata online wraca automatycznie na rachunek lub kartę, z których dokonano płatności, za pośrednictwem operatora płatności Axepta BNP Paribas — zwykle w ciągu kilku dni roboczych. Wpłaty gotówką i przelewem tradycyjnym zwraca obsługa w uzgodniony sposób.
 4. Jeżeli rezerwacja nie zostanie zatwierdzona, wpłata wraca na zasadach z ust. 3.
 5. Jeżeli rezerwację anuluje Stowarzyszenie z przyczyn niezależnych od strzelca (w szczególności blokada osi, awaria, względy bezpieczeństwa), strzelec otrzymuje zwrot całej wpłaty za rezerwację na zasadach z ust. 3.
-6. Zwrot nie obejmuje opłaty za obsługę płatności online, o której mowa w § 6 ust. 7.
-7. Jeżeli w Systemie włączone jest saldo strzelca, wpłaty, których nie można zwrócić automatycznie (gotówka, przelew tradycyjny), wracają na saldo strzelca i mogą zostać wykorzystane na kolejne opłaty. Na życzenie strzelca obsługa zwraca środki z salda w uzgodniony sposób.
+6. Jeżeli w Systemie włączone jest saldo strzelca, wpłaty, których nie można zwrócić automatycznie (gotówka, przelew tradycyjny), wracają na saldo strzelca i mogą zostać wykorzystane na kolejne opłaty. Na życzenie strzelca obsługa zwraca środki z salda w uzgodniony sposób.
 
 § 8. Wydarzenia i zawody
 
@@ -96,11 +94,11 @@ d) jeżeli nie da się ustalić, kto nie dokonał wpłaty, wszystkie osoby, któ
 
 § 11. Rezerwacja na miejscu (kiosk) i strzelanie poza godzinami otwarcia
 
-1. Przy wejściu na strzelnicę działa kiosk, w którym można wpisać się do książki pobytu, zapisać wyjście, zarezerwować oś na bieżący dzień (rezerwacja na miejscu) i zapłacić za nią.
+1. Przy wejściu na strzelnicę działa kiosk, w którym można wpisać się do książki pobytu (także osobistym kodem QR z Systemu albo kartą z kodem QR wydaną przez Stowarzyszenie osobie bez konta), zapisać wyjście, zarezerwować oś na bieżący dzień (rezerwacja na miejscu) i zapłacić za nią.
 2. Rezerwacja na miejscu wymaga podania imienia, nazwiska, numeru telefonu i adresu e-mail, który potwierdza się kodem wysłanym w wiadomości e-mail. Jeżeli osoba nie ma konta w Systemie, konto zakładane jest automatycznie. Osoba mająca konto może zamiast tego potwierdzić tożsamość osobistym kodem QR z Systemu („Mój kod QR”) albo nazwiskiem i numerem legitymacji prowadzącego strzelanie — wtedy kod wysyłany jest na adres e-mail zapisany w koncie.
 3. Przed rezerwacją na miejscu osoba akceptuje obowiązujące regulaminy i składa oświadczenie, że podane dane są prawdziwe, a okazana legitymacja prowadzącego strzelanie jest jej własna, autentyczna i ważna.
 4. Osoba, której uprawnienia nie zostały wcześniej zweryfikowane, wpisuje dane legitymacji prowadzącego strzelanie i wykonuje jej zdjęcie kamerą kiosku. System porównuje wpisane dane z tekstem odczytanym ze zdjęcia: jeżeli są zgodne, legitymacja zostaje zatwierdzona automatycznie, w przeciwnym razie sprawdza ją obsługa. Porównanie automatyczne nigdy nie prowadzi do odmowy — o odmowie decyduje wyłącznie obsługa. Jeżeli obsługa nie podejmie decyzji w ciągu 15 minut, rezerwacja zostaje anulowana bez opłat. Zdjęcie legitymacji jest usuwane niezwłocznie po decyzji.
-5. Rezerwację na miejscu opłaca się od razu po jej dokonaniu albo po zatwierdzeniu legitymacji: online (kodem QR wyświetlanym w kiosku, na własnym telefonie) albo — jeżeli System to udostępnia — gotówką do skarbonki (§ 6 ust. 9). Termin nieopłacony w czasie wskazanym w kiosku wraca do puli.
+5. Rezerwację na miejscu opłaca się od razu po jej dokonaniu albo po zatwierdzeniu legitymacji: online (kodem QR wyświetlanym w kiosku, na własnym telefonie) albo — jeżeli System to udostępnia — gotówką do skarbonki (§ 6 ust. 8). Termin nieopłacony w czasie wskazanym w kiosku wraca do puli.
 6. Jeżeli Stowarzyszenie udostępnia strzelanie poza godzinami otwarcia, oś zamkniętą według jej godzin otwarcia można zarezerwować wyłącznie w kiosku, od bieżącej pełnej godziny do godziny otwarcia osi, nie dłużej niż do północy. Obowiązują opłaty jak w godzinach otwarcia.
 7. Poza godzinami otwarcia rezerwować może wyłącznie prowadzący, którego uprawnienia zostały wcześniej zweryfikowane albo potwierdzone automatycznie w kiosku; rezerwacja wymagająca zatwierdzenia przez obsługę nie jest wtedy możliwa. Strzelanie poza godzinami otwarcia odbywa się wyłącznie pod nadzorem rezerwującego prowadzącego, na zasadach Regulaminu strzelnicy; po zmroku tylko przy oświetleniu pozwalającym prowadzącemu sprawdzić, że w rejonie niebezpiecznym nie ma osób ani zwierząt. Rezerwujący odpowiada za przestrzeganie Regulaminu strzelnicy oraz za to, aby każdy uczestnik wpisał się do książki pobytu.
 8. Strzelanie bez opłaconej rezerwacji jest zabronione. Osoba, która nie opłaciła rezerwacji, jest obowiązana niezwłocznie opuścić teren strzelnicy; zdarzenie jest zapisywane w Systemie i przekazywane obsłudze. Pozostanie na terenie strzelnicy bez strzelania (prace, obserwacja, inny cel) jest możliwe wyłącznie po wpisie do książki pobytu.
@@ -113,6 +111,15 @@ d) jeżeli nie da się ustalić, kto nie dokonał wpłaty, wszystkie osoby, któ
 3. W sprawach nieuregulowanych stosuje się Regulamin strzelnicy, Regulamin Stowarzyszenia oraz przepisy prawa powszechnie obowiązującego.
 
 =====
+ZMIANY WZGLĘDEM WERSJI OBOWIĄZUJĄCEJ (nie wklejać):
+- § 4 ust. 4: wpis rezerwującego przygotowany przez obsługę i podpisany zdalnie (odnośnik w Systemie).
+- § 5 ust. 3: dopłata według książki pobytu także do rezerwacji opłaconej; powiadomienie w trakcie rezerwacji i po jej zakończeniu.
+- § 5 ust. 3 i 4: kod wejścia — dopłata za osoby ponad liczbę objętą kodem (różnica do ceny całości; oś ryczałtowa bez dopłaty).
+- § 6 ust. 1 lit. a i § 7 ust. 3: Axepta BNP Paribas zamiast Tpay.
+- usunięte: § 6 ust. 7 (opłata za płatność online) i § 7 ust. 6 (brak zwrotu tej opłaty); dalsze ustępy przenumerowane
+  (§ 6 ust. 8–9 → 7–8, § 7 ust. 7 → 6) i poprawione odwołania (§ 6 ust. 1, § 6 ust. 6, § 11 ust. 5).
+- § 11 ust. 1: wpis w kiosku osobistym kodem QR albo kartą z kodem QR (osoby bez konta).
+
 NOTATKA DLA ZARZĄDU (nie wklejać):
 - § 6 ust. 2–5 i § 7 ust. 1: liczby to wartości domyślne Systemu — porównaj z Rezerwacje → Ustawienia rezerwacji i popraw, jeśli są inne:
   5 minut = „czas na wybór płatności”, 15 minut = „czas na płatność online”, 3 dni = „przelew tradycyjny: czas na zaksięgowanie”,

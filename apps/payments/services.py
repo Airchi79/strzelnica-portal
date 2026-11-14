@@ -745,10 +745,10 @@ def resolve_unknown_refund(refund, done, by):
     if refund.status != TpayRefund.Status.UNKNOWN:
         raise ValidationError("Ten zwrot nie czeka na sprawdzenie.")
     if not done:
-        return _refund_failed(refund.pk, "oznaczono w panelu: zwrotu nie ma w Tpay", by=by)
+        return _refund_failed(refund.pk, "oznaczono w panelu: zwrotu nie ma u operatora płatności", by=by)
     refund.status, refund.finished_at, refund.resolved_by = TpayRefund.Status.DONE, timezone.now(), by
     refund.save(update_fields=["status", "finished_at", "resolved_by"])
-    log_event("platnosc.zwrot_potwierdzony", refund.payment, f"{refund}: potwierdzony ręcznie (panel Tpay)", actor=by)
+    log_event("platnosc.zwrot_potwierdzony", refund.payment, f"{refund}: potwierdzony ręcznie (panel operatora płatności)", actor=by)
     return refund
 
 
@@ -763,7 +763,7 @@ def process_refund_queue(now=None):
     stuck = 0
     for refund in TpayRefund.objects.filter(status=TpayRefund.Status.SENDING, sent_at__lte=now - REFUND_STUCK_AFTER).select_related("payment__user"):
         if TpayRefund.objects.filter(pk=refund.pk, status=TpayRefund.Status.SENDING).update(
-                status=TpayRefund.Status.UNKNOWN, error="brak odpowiedzi Tpay (przerwane wysyłanie)"):
+                status=TpayRefund.Status.UNKNOWN, error="brak odpowiedzi operatora płatności (przerwane wysyłanie)"):
             _notify_refund_unknown(refund)
             stuck += 1
     return sent, stuck

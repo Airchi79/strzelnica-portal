@@ -90,7 +90,7 @@ class BoardCancelForm(forms.Form):
     reason = forms.CharField(label="Powód (strzelec zobaczy go w e-mailu)", max_length=255)
     keep_fee = forms.BooleanField(label="Zachowaj należność (późne odwołanie)", required=False)
     refund_to_payer = forms.BooleanField(
-        label="Zwróć wpłatę na rachunek / kartę strzelca (Tpay)", required=False, initial=True,
+        label="Zwróć wpłatę na rachunek / kartę strzelca (przez operatora płatności)", required=False, initial=True,
         help_text="Wpłaty online wrócą automatycznie. Bez zaznaczenia (albo przy wpłacie gotówką / przelewem) kwota zostaje nadpłatą strzelca.",
     )
 
@@ -206,7 +206,7 @@ class ChangeTermForm(forms.Form):
     start_hour = forms.TypedChoiceField(label="Od", choices=HOUR_START, coerce=int)
     end_hour = forms.TypedChoiceField(label="Do", choices=HOUR_END, coerce=int)
     refund_difference = forms.BooleanField(
-        label="Gdy nowa kwota jest niższa — zwróć różnicę na rachunek / kartę strzelca (Tpay)", required=False, initial=True,
+        label="Gdy nowa kwota jest niższa — zwróć różnicę na rachunek / kartę strzelca (przez operatora płatności)", required=False, initial=True,
         help_text="Bez zaznaczenia różnica zostaje nadpłatą strzelca. Wyższa kwota zawsze oznacza dopłatę do zapłaty.",
     )
 

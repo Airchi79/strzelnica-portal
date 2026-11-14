@@ -93,7 +93,7 @@ def to_pdf(payment, association):
     story = [top, Spacer(1, 10 * mm), Paragraph("Potwierdzenie wpłaty", head),
              Paragraph(f"Nr {number}", base), Spacer(1, 6 * mm), table, Spacer(1, 8 * mm)]
     if payment.is_test:
-        story.append(Paragraph("<b>PŁATNOŚĆ TESTOWA (sandbox Tpay) — bez prawdziwych pieniędzy, dokument nieważny.</b>", base))
+        story.append(Paragraph("<b>PŁATNOŚĆ TESTOWA (sandbox operatora płatności) — bez prawdziwych pieniędzy, dokument nieważny.</b>", base))
         story.append(Spacer(1, 4 * mm))
     story.append(Paragraph(
         "Dokument potwierdza przyjęcie wpłaty przez stowarzyszenie. Nie jest fakturą ani rachunkiem. "

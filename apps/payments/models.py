@@ -172,19 +172,19 @@ class BankImport(models.Model):
 
 
 class TpayRefund(models.Model):
-    """Zlecenie zwrotu przez Tpay (na kartę / rachunek płacącego).
+    """Zlecenie zwrotu przez operatora płatności online — Tpay albo Axepta (na kartę / rachunek płacącego).
 
     Zlecenie powstaje w transakcji operacji (anulowanie, odrzucenie, zwrot nadpłaty) razem z obciążeniem salda; wywołanie
-    API Tpay następuje dopiero po zatwierdzeniu transakcji — wycofanie operacji nie zostawi zwrotu bez śladu w systemie.
+    API operatora następuje dopiero po zatwierdzeniu transakcji — wycofanie operacji nie zostawi zwrotu bez śladu w systemie.
     Przed wywołaniem zlecenie dostaje status „wysyłane” (zapisany osobno): przerwanie w trakcie nie spowoduje
-    automatycznego ponowienia (ryzyko podwójnego zwrotu) — zarząd sprawdza w panelu Tpay i oznacza wynik."""
+    automatycznego ponowienia (ryzyko podwójnego zwrotu) — zarząd sprawdza w panelu operatora i oznacza wynik."""
 
     class Status(models.TextChoices):
         QUEUED = "zlecony", "Zlecony"
-        SENDING = "wysylany", "Wysyłany do Tpay"
-        DONE = "wykonany", "Przyjęty przez Tpay"
+        SENDING = "wysylany", "Wysyłany do operatora płatności"
+        DONE = "wykonany", "Przyjęty przez operatora płatności"
         FAILED = "nieudany", "Nieudany (kwota wróciła na saldo)"
-        UNKNOWN = "do_sprawdzenia", "Do sprawdzenia w panelu Tpay"
+        UNKNOWN = "do_sprawdzenia", "Do sprawdzenia w panelu operatora płatności"
 
     ACTIVE = (Status.QUEUED, Status.SENDING, Status.DONE, Status.UNKNOWN)
 
@@ -192,7 +192,7 @@ class TpayRefund(models.Model):
     amount = models.PositiveIntegerField("kwota [gr]")
     reason = models.CharField("powód", max_length=255)
     status = models.CharField("status", max_length=16, choices=Status.choices, default=Status.QUEUED, db_index=True)
-    response = models.JSONField("odpowiedź Tpay", default=dict, blank=True)
+    response = models.JSONField("odpowiedź operatora płatności", default=dict, blank=True)
     error = models.CharField("błąd", max_length=255, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField("zlecono", auto_now_add=True)
@@ -203,8 +203,8 @@ class TpayRefund(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
-        verbose_name = "zwrot Tpay"
-        verbose_name_plural = "zwroty Tpay"
+        verbose_name = "zwrot online"
+        verbose_name_plural = "zwroty online"
         constraints = [
             models.CheckConstraint(condition=models.Q(amount__gt=0), name="tpay_refund_positive"),
             # jeden aktywny (niezakończony porażką) zwrot na wpłatę — ochrona przed podwójnym zwrotem

@@ -78,6 +78,24 @@ Konta i hasła są takie jak na produkcji w chwili kopiowania (logowanie 2FA te�
 Konto panelu działa wyłącznie jako panel; do prób jako strzelec załóż w teście konto strzelca na inny adres —
 potwierdzenie przyjdzie na biuro@ z dopiskiem, do kogo było adresowane.
 
+## Płatności online w teście (Cloudflare Access)
+
+Strona testowa jest chroniona logowaniem Cloudflare Access (aplikacja „strzelnica-test”). Operator płatności nie
+przejdzie przez to logowanie, więc jego powiadomienia o płatnościach i zwrotach dostają przekierowanie do strony
+logowania i nie docierają do systemu (płatność zaksięguje się wtedy tylko po powrocie klienta z bramki).
+Dlatego w Zero Trust → Access controls → Applications jest osobna aplikacja „Axepta – powiadomienia (test)”:
+ścieżka `test.strzelnicasatok.pl/platnosci/axepta/powiadomienie/`, polityka **Bypass** dla adresów Axepty
+`141.95.10.64/28` i `51.83.82.16/28`. Reszta testu pozostaje chroniona; system i tak przyjmuje wyłącznie
+powiadomienia z poprawnym podpisem. Przy próbach z Tpay w teście potrzebny jest analogiczny wyjątek dla adresu
+powiadomień Tpay. Sprawdzenie, czy adres jest osiągalny (z serwera; `302` do `cloudflareaccess.com` = brak wyjątku):
+
+```
+curl -s -o /dev/null -w "%{http_code}\n" -X POST -d '{}' https://test.strzelnicasatok.pl/platnosci/axepta/powiadomienie/
+```
+
+Z serwera wynik zawsze będzie `302` (wyjątek obejmuje tylko adresy Axepty) — o działaniu świadczą w logach wpisy
+`POST /platnosci/axepta/powiadomienie/ ... 200`: `docker compose logs --since 1h app | grep axepta/powiadomienie`.
+
 ## Usunięcie kopii testowej
 
 ```

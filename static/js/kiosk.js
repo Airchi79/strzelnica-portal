@@ -284,6 +284,7 @@
     for (const hook of codeHooks) { if (hook(text)) return; }
     const res = /\/ksiazka\/wpis\/r\/([^/?#\s]+)/.exec(text);
     const person = /\/ksiazka\/osoba\/([^/?#\s]+)/.exec(text);
+    const card = /\/ksiazka\/karta\/([^/?#\s]+)/.exec(text);
     if (res) {
       const r = (state.reservations || []).find((x) => x.token === res[1]);
       const isOpen = r && openReservations().some((x) => x.id === r.id);
@@ -295,8 +296,14 @@
         if (status === 200) openForm({ prefill: data.prefill, person: person[1], info: "Dane z Twojego konta — sprawdź je i podpisz się." });
         else done("Nieznany kod", "Ten kod osobisty jest nieaktualny. Wygeneruj go ponownie w aplikacji (Mój kod QR).");
       } catch (e) { openForm({ info: "Brak połączenia — wpisz dane ręcznie." }); }
+    } else if (card) {
+      try {
+        const { status, data } = await api(`karta/${encodeURIComponent(card[1])}/`);
+        if (status === 200) openForm({ prefill: data.prefill, info: "Dane z karty — sprawdź je, wybierz rezerwację i podpisz się." });
+        else done("Nieaktualna karta", "Ta karta została unieważniona. Wpisz dane ręcznie albo poproś obsługę o nową kartę.");
+      } catch (e) { openForm({ info: "Brak połączenia — wpisz dane ręcznie." }); }
     } else {
-      done("Nieznany kod QR", "To nie jest kod rezerwacji ani osobisty kod strzelnicy.");
+      done("Nieznany kod QR", "To nie jest kod rezerwacji, osobisty kod ani karta strzelnicy.");
     }
   }
   let buffer = "", bufferTime = 0;

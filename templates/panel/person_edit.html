@@ -6,6 +6,10 @@
 <div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}
   <p class="small muted">Do wpisu w książce pobytu potrzebny jest numer pozwolenia z organem albo adres.</p>
   <div class="actions"><button class="btn" type="submit">Zapisz</button><a class="btn secondary" href="{% url 'panel:persons' %}">Anuluj</a></div></form>
+{% if person and not person.user %}<div class="card" style="margin:12px 0"><h2 class="step-title">Karta z kodem QR</h2>
+  <p class="small">{% if person.card_printed_at %}Karta wydrukowana {{ person.card_printed_at|date:"j.m.Y" }} (nr K-{{ person.pk|stringformat:"06d" }}).{% else %}Karta jeszcze nie była drukowana.{% endif %} Kod na karcie wypełnia formularz wpisu do książki pobytu w kiosku albo u prowadzącego strzelanie.</p>
+  <div class="actions"><a class="btn secondary small-btn" href="{% url 'panel:person_card' person.pk %}" target="_blank" rel="noopener">Karta (PDF)</a>
+    {% if person.card_printed_at %}<form method="post" action="{% url 'panel:person_card_reset' person.pk %}" data-confirm="Unieważnić kartę {{ person.full_name }}? Wydrukowana karta przestanie działać.">{% csrf_token %}<button class="btn secondary small-btn" type="submit">Unieważnij kartę (zgubiona) i wydaj nową</button></form>{% endif %}</div></div>{% endif %}
 {% if person %}<form method="post" data-confirm="Usunąć {{ person.full_name }} z kartoteki? Wpisy w książce pobytu zostają bez zmian.">{% csrf_token %}<input type="hidden" name="action" value="delete"><button class="btn danger small-btn" type="submit">Usuń z kartoteki</button></form>
 <p class="small muted">Pochodzenie: {{ person.get_source_display }}, dodano {{ person.created_at|date:"j.m.Y" }}.</p>{% endif %}</div>
 {% endblock %}

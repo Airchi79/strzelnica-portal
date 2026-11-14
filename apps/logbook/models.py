@@ -74,6 +74,7 @@ class Entry(models.Model):
         DEVICE = "urzadzenie", "Czytnik przy wejściu"
         STAFF = "obsluga", "Wpis przez obsługę (panel)"
         REMOTE = "podpis_zdalny", "Wpis obsługi podpisany zdalnie przez rezerwującego"
+        CARD_QR = "karta", "Dopisany przez prowadzącego (karta z kartoteki)"
 
     number = models.CharField("numer wpisu", max_length=24, unique=True)
     entered_at = models.DateTimeField("wejście", default=timezone.now, db_index=True)

@@ -98,6 +98,12 @@ class ClientPass(models.Model):
         return bool(self.paid_with)
 
 
+def _new_card_secret():
+    import secrets
+
+    return secrets.token_hex(16)
+
+
 class Person(models.Model):
     """Osoba z kartoteki bez konta w systemie (np. strzelcy przeniesieni z GunTrackera). Służy obsłudze do szybkiego
     uzupełnienia wpisu w książce pobytu; dane są widoczne tylko w panelu (z rejestrem wglądu)."""
@@ -117,6 +123,9 @@ class Person(models.Model):
                              related_name="kartoteka_persons")
     source = models.CharField("pochodzenie", max_length=12, choices=Source.choices, default=Source.PANEL)
     note = models.CharField("uwagi", max_length=255, blank=True)
+    # Sekret kodu QR karty (wpis do książki pobytu kartą) — nowy sekret unieważnia wydrukowane karty.
+    qr_secret = models.CharField(max_length=32, default=_new_card_secret, editable=False)
+    card_printed_at = models.DateTimeField("karta wydrukowana", null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
 

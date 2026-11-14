@@ -188,3 +188,60 @@ def persons_import(request):
         counts[status] = counts.get(status, 0) + 1
     return render(request, "panel/persons_import.html", {"report": report, "preview": preview, "counts": counts,
                                                          "overwrite": request.POST.get("nadpisz") == "1"})
+
+
+# --- karty osób z kartoteki (kod QR do wpisu w książce pobytu) --------------------------------------------------------
+
+
+MAX_CARDS = 200  # na jeden wydruk (20 arkuszy A4)
+
+
+def _cards_response(persons, by):
+    from django.http import HttpResponse
+    from django.utils import timezone
+
+    from apps.core.models import AssociationSettings
+
+    from .cards import render_cards
+
+    pdf = render_cards(persons, AssociationSettings.load().name)
+    Person.objects.filter(pk__in=[p.pk for p in persons]).update(card_printed_at=timezone.now())
+    log_event("klient.karty_wydruk", summary=f"Wydruk kart osób z kartoteki: {len(persons)}", actor=by)
+    response = HttpResponse(pdf, content_type="application/pdf")
+    name = f"karta-{persons[0].pk}.pdf" if len(persons) == 1 else f"karty-{len(persons)}.pdf"
+    response["Content-Disposition"] = f'inline; filename="{name}"'
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+@panel_required("clients.manage_clients")
+def person_card(request, pk):
+    """Karta jednej osoby (PDF) — tylko osoba bez konta (z kontem: „Mój kod QR” w aplikacji)."""
+    person = get_object_or_404(Person, pk=pk, user__isnull=True)
+    return _cards_response([person], request.user)
+
+
+@panel_required("clients.manage_clients")
+@require_POST
+def persons_cards(request):
+    ids = [int(i) for i in request.POST.getlist("ids") if i.isdigit()][:MAX_CARDS]
+    persons = list(Person.objects.filter(pk__in=ids, user__isnull=True).order_by("last_name", "first_name"))
+    if not persons:
+        messages.info(request, "Zaznacz osoby (bez konta), dla których chcesz wydrukować karty.")
+        return redirect("panel:persons")
+    return _cards_response(persons, request.user)
+
+
+@panel_required("clients.manage_clients")
+@require_POST
+def person_card_reset(request, pk):
+    """Nowy kod karty: poprzednio wydrukowana karta przestaje działać (zgubiona, skradziona)."""
+    from .models import _new_card_secret
+
+    person = get_object_or_404(Person, pk=pk)
+    person.qr_secret = _new_card_secret()
+    person.card_printed_at = None
+    person.save(update_fields=["qr_secret", "card_printed_at"])
+    log_event("klient.karta_uniewaznienie", person, person.full_name, actor=request.user)
+    messages.success(request, f"Unieważniono kartę {person.full_name}. Wydrukuj nową kartę.")
+    return redirect("panel:person_edit", pk=person.pk)

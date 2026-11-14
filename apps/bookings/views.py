@@ -501,6 +501,7 @@ def panel_detail(request, pk):
             "log_entries": list(r.log_entries.order_by("entered_at")) if request.user.has_perm("logbook.view_logbook") else None,
             "can_add_entry": staff_can_add_entry(r),
             "holder_entered": r.log_entries.filter(user=r.user).exists(),
+            "signature_requests": list(r.signature_requests.select_related("user")[:5]),
             "series": _series_info(r),
             "officers": list(range_officers().exclude(pk=r.user_id)) if r.with_officer else [],
         },

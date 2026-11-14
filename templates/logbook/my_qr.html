@@ -2,6 +2,9 @@
 {% block title %}Książka pobytu{% endblock %}
 {% block content %}
 <h1>Książka pobytu</h1>
+{% if to_sign %}<div class="card"><h2 class="step-title">Wpis do podpisania</h2>
+  {% for q in to_sign %}<div class="actions" style="margin:0 0 8px"><span>Rezerwacja {{ q.reservation.number }}: {{ q.reservation.lane }}, wejście {{ q.entered_at|date:"j.m H:i" }}</span>
+    <a class="btn" href="{% url 'logbook:sign_remote' q.pk %}">Sprawdź i podpisz</a></div>{% endfor %}</div>{% endif %}
 
 {% if open_stays %}<div class="card">
   <h2 class="step-title">Jesteś na strzelnicy</h2>

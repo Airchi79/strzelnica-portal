@@ -32,6 +32,8 @@
     </div>
   </div>
   <div class="actions"><button class="btn" type="submit">Zapisz wpis</button><button class="btn secondary" type="submit" name="kolejny" value="1">Zapisz i dodaj kolejną osobę</button></div>
+  {% if reservation_param %}<div class="actions"><button class="btn secondary" type="submit" name="do_podpisu" value="1">Rezerwującego nie ma na miejscu — wyślij mu link do podpisu</button></div>
+  <p class="small muted">Tylko dla rezerwującego tej rezerwacji: dostanie e-mail i powiadomienie z linkiem (ważnym 72 h), zaloguje się, sprawdzi dane, potwierdzi oświadczenie i podpisze. Wpis pojawi się w książce po podpisaniu — oświadczenia i podpisu nie wypełniasz.</p>{% endif %}
 </form>
 <script src="{% static 'js/signature.js' %}" defer></script>
 {% endblock %}

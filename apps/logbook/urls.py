@@ -14,5 +14,6 @@ urlpatterns = [
     path("moj-kod/", views.my_qr, name="my_qr"),
     path("moje-wyjscie/<int:pk>/", views.my_exit, name="my_exit"),
     path("dziennik/", views.my_diary, name="diary"),
+    path("podpis/<int:pk>/", views.sign_remote, name="sign_remote"),
     path("osoba/<str:token>/", views.personal_add, name="personal"),
 ]

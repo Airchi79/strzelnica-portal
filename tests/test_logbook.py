@@ -683,3 +683,61 @@ def test_panel_add_entry_prefilled_with_holder(owner_client, ps, running):
     assert f"?rezerwacja={running.pk}&amp;rezerwujacy=1" in days
     detail = owner_client.get(f"/panel/rezerwacje/{running.pk}/").content.decode()
     assert "+ Dodaj wpis rezerwującego" in detail
+
+
+# --- wpis obsługi podpisany zdalnie przez rezerwującego --------------------------------------
+
+
+def _send_for_signature(owner_client, running, **extra):
+    entered = max(running.starts_at, timezone.now() - timedelta(minutes=1))  # w czasie rezerwacji, nie w przyszłości
+    data = {"entered_at": timezone.localtime(entered).strftime("%Y-%m-%dT%H:%M"),
+            "purpose": "strzelanie", "reservation": running.pk, "first_name": "Piotr", "last_name": "Prowadzący",
+            "has_permit": "tak", "permit_number": "AB 777", "permit_issuer": "KWP Wrocław", "do_podpisu": "1", **extra}
+    return owner_client.post(f"/panel/ksiazka/nowy-wpis/?rezerwacja={running.pk}&rezerwujacy=1", data)
+
+
+def test_remote_signature_flow(owner_client, client, ps, running, sig):
+    from apps.core.models import OutgoingEmail
+    from apps.logbook.models import EntrySignatureRequest
+
+    r = _send_for_signature(owner_client, running)
+    assert r.status_code == 302 and r.url == f"/panel/rezerwacje/{running.pk}/"
+    req = EntrySignatureRequest.objects.get()
+    assert req.user == ps and req.status == "oczekuje" and not Entry.objects.exists()  # w książce dopiero po podpisie
+    mail = OutgoingEmail.objects.get(recipients=[ps.email])
+    assert f"/ksiazka/podpis/{req.pk}/" in mail.body
+    assert "czeka na podpis" in owner_client.get(f"/panel/rezerwacje/{running.pk}/").content.decode()
+    # inna osoba nie zobaczy wpisu; rezerwujący — tak (z listą na stronie książki)
+    other = make_user("obcy@example.com")
+    client.force_login(other)
+    assert client.get(f"/ksiazka/podpis/{req.pk}/").status_code == 404
+    client.force_login(ps)
+    assert "Sprawdź i podpisz" in client.get("/ksiazka/moj-kod/").content.decode()
+    page = client.get(f"/ksiazka/podpis/{req.pk}/").content.decode()
+    assert "AB 777" in page and "Podpisuję wpis" in page
+    assert client.post(f"/ksiazka/podpis/{req.pk}/", {"signature": sig}).status_code == 400  # bez oświadczenia
+    r = client.post(f"/ksiazka/podpis/{req.pk}/", {"signature": sig, "statement": "on"})
+    assert r.status_code == 302
+    e = Entry.objects.get()
+    assert (e.source, e.user, e.reservation, e.permit_number) == (Entry.Source.REMOTE, ps, running, "AB 777")
+    assert e.entered_at == req.entered_at and e.created_by is not None
+    req.refresh_from_db()
+    assert req.status == "podpisany" and req.entry == e
+    assert client.post(f"/ksiazka/podpis/{req.pk}/", {"signature": sig, "statement": "on"}).status_code == 400  # tylko raz
+    assert Entry.objects.count() == 1
+
+
+def test_remote_signature_only_for_holder_and_expires(owner_client, client, ps, running, sig):
+    from apps.logbook.models import EntrySignatureRequest
+
+    page = _send_for_signature(owner_client, running, first_name="Anna", last_name="Nowak").content.decode()
+    assert "tylko rezerwującemu" in page and not EntrySignatureRequest.objects.exists()
+    _send_for_signature(owner_client, running)
+    _send_for_signature(owner_client, running)  # ponowne wysłanie anuluje poprzedni link
+    assert list(EntrySignatureRequest.objects.order_by("created_at").values_list("status", flat=True)) == ["anulowany", "oczekuje"]
+    req = EntrySignatureRequest.objects.get(status="oczekuje")
+    EntrySignatureRequest.objects.filter(pk=req.pk).update(expires_at=timezone.now() - timedelta(minutes=1))
+    client.force_login(ps)
+    assert "nieaktualny" in client.get(f"/ksiazka/podpis/{req.pk}/").content.decode()
+    assert client.post(f"/ksiazka/podpis/{req.pk}/", {"signature": sig, "statement": "on"}).status_code == 400
+    assert not Entry.objects.exists()

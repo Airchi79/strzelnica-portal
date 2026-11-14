@@ -73,6 +73,7 @@ class Entry(models.Model):
         PERSONAL_QR = "qr_osobisty", "Dopisany przez prowadzącego (kod QR strzelca)"
         DEVICE = "urzadzenie", "Czytnik przy wejściu"
         STAFF = "obsluga", "Wpis przez obsługę (panel)"
+        REMOTE = "podpis_zdalny", "Wpis obsługi podpisany zdalnie przez rezerwującego"
 
     number = models.CharField("numer wpisu", max_length=24, unique=True)
     entered_at = models.DateTimeField("wejście", default=timezone.now, db_index=True)
@@ -181,6 +182,39 @@ class Entry(models.Model):
             hashlib.sha256(bytes(self.signature)).hexdigest() == self.signature_sha256
             and self.compute_content_hash() == self.content_sha256
         )
+
+
+class EntrySignatureRequest(models.Model):
+    """Wpis przygotowany przez obsługę dla rezerwującego, który nie podpisał się na miejscu: rezerwujący dostaje link,
+    loguje się i podpisuje — dopiero wtedy powstaje wpis w książce (z godziną wejścia podaną przez obsługę).
+    Wpisy w książce są niezmienne, dlatego niepodpisany wpis czeka tutaj, a nie w książce."""
+
+    class Status(models.TextChoices):
+        PENDING = "oczekuje", "Czeka na podpis"
+        SIGNED = "podpisany", "Podpisany"
+        CANCELLED = "anulowany", "Anulowany (wysłano nowy)"
+
+    reservation = models.ForeignKey(Reservation, verbose_name="rezerwacja", on_delete=models.CASCADE, related_name="signature_requests")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="rezerwujący", on_delete=models.CASCADE, related_name="+")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    data = models.JSONField("dane wpisu")
+    entered_at = models.DateTimeField("wejście")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField("link ważny do")
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING, db_index=True)
+    entry = models.OneToOneField(Entry, null=True, blank=True, on_delete=models.SET_NULL, related_name="signature_request")
+    signed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "wpis do podpisu"
+        verbose_name_plural = "wpisy do podpisu"
+
+    def __str__(self):
+        return f"{self.reservation.number}: {self.data.get('first_name', '')} {self.data.get('last_name', '')}"
+
+    def is_open(self, now=None):
+        return self.status == self.Status.PENDING and self.expires_at > (now or timezone.now())
 
 
 class EntryCorrection(models.Model):

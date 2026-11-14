@@ -570,3 +570,41 @@ def test_my_page_without_reservation_explains_qr(client, user):
     client.force_login(user)
     body = client.get("/ksiazka/moj-kod/").content.decode()
     assert "nie trwa żadna Twoja rezerwacja" in body
+
+
+# --- podpowiedź osi po imieniu i nazwisku rezerwującego ---------------------------------
+
+
+def test_suggest_reservation_exact_name_only(running, ps):
+    assert services.suggest_reservation("piotr", "  PROWADZĄCY ") == running  # wielkość liter i spacje bez znaczenia
+    assert services.suggest_reservation("Piotr", "Prowadząc") is None  # bez dopasowań częściowych
+    assert services.suggest_reservation("Piotr", "") is None
+    # dwie trwające rezerwacje tej samej osoby — bez podpowiedzi (nie wiadomo, którą wybrać)
+    other = Lane.objects.get(name="Oś 25 m nr 2")
+    Reservation.objects.create(number="SATOK-R-TEST-0002", lane=other, user=ps, starts_at=running.starts_at, ends_at=running.ends_at,
+                               persons=1, price_rule=running.price_rule, hourly_amount=100, amount=100)
+    assert services.suggest_reservation("Piotr", "Prowadzący") is None
+
+
+def test_suggest_ignores_reservations_not_open(running):
+    Reservation.objects.filter(pk=running.pk).update(status=Reservation.Status.CANCELLED)
+    assert services.suggest_reservation("Piotr", "Prowadzący") is None
+
+
+def test_gate_suggest_endpoint(client, running):
+    token = LogbookSettings.load().gate_token
+    page = client.get(f"/ksiazka/wpis/{token}/").content.decode()
+    assert f'data-suggest-url="/ksiazka/wpis/{token}/podpowiedz/"' in page and "logbook-suggest.js" in page
+    r = client.get(f"/ksiazka/wpis/{token}/podpowiedz/", {"imie": "Piotr", "nazwisko": "Prowadzący"})
+    assert r.status_code == 200 and r.json() == {"reservation": running.pk}  # sam identyfikator, bez danych osobowych
+    assert client.get(f"/ksiazka/wpis/{token}/podpowiedz/", {"imie": "Jan", "nazwisko": "Obcy"}).json() == {"reservation": None}
+    assert client.get("/ksiazka/wpis/zly-token/podpowiedz/", {"imie": "Piotr", "nazwisko": "Prowadzący"}).status_code == 404
+
+
+def test_gate_suggest_rate_limited(client, running, monkeypatch):
+    monkeypatch.setattr(services, "SUGGEST_PER_HOUR", 2)
+    token = LogbookSettings.load().gate_token
+    url = f"/ksiazka/wpis/{token}/podpowiedz/"
+    for _ in range(2):
+        assert client.get(url, {"imie": "Jan", "nazwisko": "Kowalski"}).status_code == 200
+    assert client.get(url, {"imie": "Piotr", "nazwisko": "Prowadzący"}).status_code == 429

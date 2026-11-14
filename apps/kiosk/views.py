@@ -184,6 +184,16 @@ def api_person(request, token):
 
 @require_GET
 @api
+def api_suggest(request):
+    """Podpowiedź osi przy wpisie w kiosku: rezerwacja rezerwującego o podanym imieniu i nazwisku (tylko identyfikator)."""
+    if not logbook.suggest_allowed(f"kiosk-{request.kiosk_device.pk}"):
+        return JsonResponse({"reservation": None}, status=429)
+    r = logbook.suggest_reservation(request.GET.get("imie", ""), request.GET.get("nazwisko", ""))
+    return JsonResponse({"reservation": r.pk if r else None})
+
+
+@require_GET
+@api
 def api_exit_search(request):
     q = request.GET.get("nazwisko", "").strip()
     if len(q) < 2:

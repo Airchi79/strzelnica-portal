@@ -8,11 +8,11 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from apps.audit.context import client_ip
 from apps.audit.services import log_event, log_sensitive_access
@@ -91,11 +91,23 @@ def entry_by_reservation(request, token):
     )
 
 
+@require_GET
+def gate_suggest(request, token):
+    """Podpowiedź osi w formularzu przy wejściu (kod QR bramki): {"reservation": id} albo null."""
+    if not services.gate_token_valid(token):
+        raise Http404
+    if not services.suggest_allowed(client_ip(request)):
+        return JsonResponse({"reservation": None}, status=429)
+    r = services.suggest_reservation(request.GET.get("imie", ""), request.GET.get("nazwisko", ""))
+    return JsonResponse({"reservation": r.pk if r else None})
+
+
 def entry_by_gate(request, token):
     if not services.gate_token_valid(token):
         return render(request, "logbook/closed.html", {"gate_invalid": True}, status=404)
     form = EntryForm(request.POST or None, initial=_initial(request), reservations=services.open_reservations())
-    return _handle_entry(request, form=form, source=Entry.Source.GATE_QR, template_ctx={"gate": True})
+    return _handle_entry(request, form=form, source=Entry.Source.GATE_QR,
+                         template_ctx={"gate": True, "suggest_url": reverse("logbook:gate_suggest", args=[token])})
 
 
 def done(request, pk):

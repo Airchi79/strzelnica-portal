@@ -7,6 +7,7 @@ app_name = "logbook"
 urlpatterns = [
     path("wpis/r/<str:token>/", views.entry_by_reservation, name="by_reservation"),
     path("wpis/<str:token>/", views.entry_by_gate, name="by_gate"),
+    path("wpis/<str:token>/podpowiedz/", views.gate_suggest, name="gate_suggest"),
     path("wpisano/<int:pk>/", views.done, name="done"),
     path("dolacz/<str:token>/", views.entry_by_companion, name="companion"),
     path("wyjscie/<str:token>/", views.exit_view, name="exit"),

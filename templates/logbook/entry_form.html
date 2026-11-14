@@ -1,13 +1,14 @@
 {% extends "base.html" %}{% load static %}
 {% block title %}Książka pobytu — wpis{% endblock %}
 {% block content %}
-<h1>{% if person %}Dopisz osobę do książki pobytu{% else %}Wpis do książki pobytu{% endif %}</h1>
+<h1>{% if person or card %}Dopisz osobę do książki pobytu{% else %}Wpis do książki pobytu{% endif %}</h1>
 {% if reservation %}<div class="card"><strong>{{ reservation.lane }}</strong> · {{ reservation.starts_at|date:"j.m.Y" }}, {{ reservation.starts_at|time:"H:i" }}–{{ reservation.ends_at|time:"H:i" }}
   <div class="small muted">Prowadzący strzelanie: {% if reservation.range_officer_user %}{{ reservation.range_officer_user.full_name }}{% else %}wyznaczy strzelnica{% endif %}</div></div>{% endif %}
 {% if companion_of %}<div class="card">Dopisujesz się jako <strong>osoba towarzysząca</strong>: {{ companion_of.full_name }} (wejście {{ companion_of.entered_at|time:"H:i" }}).
   <div class="small muted">Strzelać można tylko w ramach rezerwacji — wpisz się wtedy kodem rezerwacji od prowadzącego.</div></div>{% endif %}
 {% if person %}<div class="msg">Dane z konta: <strong>{{ person.full_name }}</strong>. Poproś tę osobę o sprawdzenie danych i podpis.</div>{% endif %}
-{% if user.is_authenticated and not person %}<p class="small muted">Dane uzupełniliśmy z Twojego konta — sprawdź je.</p>
+{% if card %}<div class="msg">Dane z karty: <strong>{{ card.full_name }}</strong>. Poproś tę osobę o sprawdzenie danych i podpis.</div>{% endif %}
+{% if user.is_authenticated and not person and not card %}<p class="small muted">Dane uzupełniliśmy z Twojego konta — sprawdź je.</p>
 {% elif not user.is_authenticated %}<p class="small muted">Masz konto? <a href="{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}">Zaloguj się</a>, a dane uzupełnią się same. Możesz też wpisać się bez konta.</p>{% endif %}
 <form method="post" novalidate data-entry-form class="card"{% if suggest_url %} data-suggest-url="{{ suggest_url }}"{% endif %}>{% csrf_token %}
   {% if form.non_field_errors %}<div class="msg error">{% for e in form.non_field_errors %}{{ e }}<br>{% endfor %}</div>{% endif %}

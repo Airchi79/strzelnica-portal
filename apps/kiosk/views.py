@@ -184,6 +184,16 @@ def api_person(request, token):
 
 @require_GET
 @api
+def api_card(request, token):
+    """Dane do formularza z karty osoby z kartoteki (osoba bez konta przykłada kartę do czytnika)."""
+    card = logbook.person_from_card_token(token)
+    if card is None:
+        return JsonResponse({"error": "Nieznana karta."}, status=404)
+    return JsonResponse({"prefill": logbook.prefill_for_person(card)})
+
+
+@require_GET
+@api
 def api_suggest(request):
     """Podpowiedź osi przy wpisie w kiosku: rezerwacja rezerwującego o podanym imieniu i nazwisku (tylko identyfikator)."""
     if not logbook.suggest_allowed(f"kiosk-{request.kiosk_device.pk}"):

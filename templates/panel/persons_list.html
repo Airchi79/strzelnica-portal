@@ -3,7 +3,7 @@
 {% block panel %}
 <h1>Strzelcy</h1>
 {% include "panel/_clients_tabs.html" %}
-<p class="muted">Osoby z kartoteki, które nie mają konta w systemie (m.in. przeniesione z GunTrackera). Obsługa wybiera je przy „Wpisie przez obsługę” w książce pobytu — dane uzupełniają się same. Na kiosku i w formularzach publicznych nie są dostępne.</p>
+<p class="muted">Osoby z kartoteki, które nie mają konta w systemie (m.in. przeniesione z GunTrackera). Obsługa wybiera je przy „Wpisie przez obsługę” w książce pobytu — dane uzupełniają się same. Osoba może też dostać wydrukowaną <strong>kartę z kodem QR</strong>: przykłada ją do czytnika w kiosku albo pokazuje prowadzącemu strzelanie, a formularz wpisu wypełnia się jej danymi (bez karty dane z kartoteki nie są dostępne w kiosku ani w formularzach publicznych).</p>
 <form method="get" class="card filters">
   <div><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ q }}" placeholder="nazwisko, imię, nr pozwolenia, e-mail"></div>
   <div class="checkbox"><label><input type="checkbox" name="niepelne" value="1"{% if niepelne %} checked{% endif %}> tylko z brakami</label></div>
@@ -16,14 +16,17 @@
     <input type="hidden" name="pokaz" value="1"><button class="btn secondary small-btn" type="submit">Pokaż dane na tej stronie</button></form>
   {% elif reveal %}<span class="badge warn">dane odkryte — dostęp zapisano w dzienniku</span>{% endif %}
 </div>
+{% if perms.clients.manage_clients %}<form method="post" action="{% url 'panel:persons_cards' %}" id="cards-form" target="_blank">{% csrf_token %}</form>
+<div class="actions" style="margin-top:0;margin-bottom:8px"><button class="btn secondary small-btn" type="submit" form="cards-form">Drukuj karty zaznaczonych (PDF, A4 po 10)</button></div>{% endif %}
 <section class="day"><div class="table-wrap"><table class="days">
-  <tr class="head"><th>Osoba</th><th>Pozwolenie / adres</th><th>Stan</th><th>Pochodzenie</th></tr>
+  <tr class="head">{% if perms.clients.manage_clients %}<th class="nowrap"><span class="sr-only">Karta</span></th>{% endif %}<th>Osoba</th><th>Pozwolenie / adres</th><th>Stan</th><th>Pochodzenie</th></tr>
   {% for p in people %}<tr>
-    <td>{% if perms.clients.manage_clients %}<a href="{% url 'panel:person_edit' p.pk %}">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}{% if p.user %} <span class="badge">konto</span>{% endif %}</td>
+    {% if perms.clients.manage_clients %}<td>{% if not p.user %}<input type="checkbox" name="ids" value="{{ p.pk }}" form="cards-form" aria-label="Karta: {{ p.full_name }}">{% endif %}</td>{% endif %}
+    <td>{% if perms.clients.manage_clients %}<a href="{% url 'panel:person_edit' p.pk %}">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}{% if p.user %} <span class="badge">konto</span>{% elif p.card_printed_at %} <span class="badge ok" title="wydrukowano {{ p.card_printed_at|date:'j.m.Y' }}">karta</span>{% endif %}</td>
     <td data-label="Pozwolenie / adres">{% if reveal %}{% if p.permit_number %}{{ p.permit_number }}<div class="small muted">{{ p.permit_issuer|default:"brak organu" }}</div>{% endif %}{% if p.address %}<div class="small">{{ p.address }}</div>{% endif %}{% if p.phone %}<div class="small">tel. {{ p.phone }}</div>{% endif %}{% if p.email %}<div class="small">{{ p.email }}</div>{% endif %}{% else %}<span class="muted">{{ p.masked }}{% if p.phone %} · tel. ukryty{% endif %}{% if p.email %} · e-mail ukryty{% endif %}</span>{% endif %}</td>
     <td data-label="Stan">{% if p.complete_for_logbook %}<span class="badge ok">kompletne</span>{% else %}<span class="badge warn">braki</span>{% endif %}</td>
     <td data-label="Pochodzenie" class="small">{{ p.get_source_display }}</td></tr>
-  {% empty %}<tr><td colspan="4" class="muted">Brak osób.{% if perms.clients.manage_clients %} <a href="{% url 'panel:persons_import' %}">Zaimportuj z GunTrackera</a>.{% endif %}</td></tr>{% endfor %}
+  {% empty %}<tr><td colspan="5" class="muted">Brak osób.{% if perms.clients.manage_clients %} <a href="{% url 'panel:persons_import' %}">Zaimportuj z GunTrackera</a>.{% endif %}</td></tr>{% endfor %}
 </table></div></section>
 {% include "partials/pagination.html" %}
 {% endblock %}

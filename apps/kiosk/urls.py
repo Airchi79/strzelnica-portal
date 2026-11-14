@@ -12,6 +12,7 @@ urlpatterns = [
     path("api/wpis/", views.api_entry, name="api_entry"),
     path("api/osoba/<str:token>/", views.api_person, name="api_person"),
     path("api/podpowiedz-osi/", views.api_suggest, name="api_suggest"),
+    path("api/karta/<str:token>/", views.api_card, name="api_card"),
     path("api/wyjscie/", views.api_exit_search, name="api_exit_search"),
     path("api/wyjscie/<int:pk>/", views.api_exit, name="api_exit"),
     path("api/odrzucony/", views.api_report_failed, name="api_failed"),

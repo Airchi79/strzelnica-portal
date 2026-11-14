@@ -48,6 +48,8 @@ def _handle_entry(request, *, form, source, reservation=None, person=None, templ
             signature = services.decode_signature(d.get("signature"))
             if source == Entry.Source.PERSONAL_QR:
                 account, author = person, request.user
+            elif source == Entry.Source.CARD_QR:  # osoba z kartoteki nie ma konta; wpis dodaje prowadzący
+                account, author = None, request.user
             else:
                 account, author = (request.user if request.user.is_authenticated else None), None
             entry = services.create_entry(
@@ -64,7 +66,7 @@ def _handle_entry(request, *, form, source, reservation=None, person=None, templ
             for m in e.messages:
                 form.add_error(None, m)
         else:
-            if source != Entry.Source.PERSONAL_QR:
+            if source not in (Entry.Source.PERSONAL_QR, Entry.Source.CARD_QR):
                 _remember(request, entry)
                 return redirect("logbook:done", pk=entry.pk)
             messages.success(request, f"Dopisano {entry.full_name} ({entry.number}).")
@@ -236,6 +238,26 @@ def personal_add(request, token):
     if request.method == "POST" and form.is_valid() and form.cleaned_data.get("reservation") is None:
         form.add_error("reservation", "Wybierz swoją rezerwację.")
     return _handle_entry(request, form=form, source=Entry.Source.PERSONAL_QR, person=person, template_ctx={"person": person})
+
+
+@login_required
+def card_add(request, token):
+    """Prowadzący strzelanie skanuje kartę osoby z kartoteki (bez konta) i dopisuje ją do swojej trwającej rezerwacji."""
+    card = services.person_from_card_token(token)
+    if card is None:
+        return render(request, "logbook/closed.html", {"card_invalid": True}, status=404)
+    own_open = services.open_reservations().filter(user=request.user)
+    if not own_open.exists():
+        return render(request, "logbook/closed.html", {"no_own_reservation": True, "card": card}, status=403)
+    form = EntryForm(
+        request.POST or None,
+        initial={"purpose": Entry.Purpose.SHOOTING, "reservation": own_open.first().pk, **services.prefill_for_person(card)},
+        reservations=own_open,
+        purposes=[Entry.Purpose.SHOOTING, Entry.Purpose.OBSERVER],
+    )
+    if request.method == "POST" and form.is_valid() and form.cleaned_data.get("reservation") is None:
+        form.add_error("reservation", "Wybierz swoją rezerwację.")
+    return _handle_entry(request, form=form, source=Entry.Source.CARD_QR, template_ctx={"card": card})
 
 
 def reservation_qr_context(request, reservation):

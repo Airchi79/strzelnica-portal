@@ -25,6 +25,7 @@ from .models import STATEMENT_TEXT, Entry, EntryCorrection, EntrySequence, Logbo
 
 RESERVATION_SALT = "satok.logbook.reservation-qr"
 PERSONAL_SALT = "satok.logbook.personal-qr"
+CARD_SALT = "satok.logbook.kartoteka-karta"
 EXIT_SALT = "satok.logbook.exit"
 COMPANION_SALT = "satok.logbook.companion"
 MAX_SIGNATURE_BYTES = 300 * 1024
@@ -58,6 +59,32 @@ def user_from_personal_token(token):
     except (signing.BadSignature, KeyError, TypeError, User.DoesNotExist):
         return None
     return user if user.qr_secret[:12] == data.get("s") else None
+
+
+def card_token(person):
+    """Kod QR karty osoby z kartoteki (bez konta). Nie zawiera danych osobowych; nowy sekret osoby unieważnia kartę."""
+    return signing.dumps({"p": person.pk, "s": person.qr_secret[:12]}, salt=CARD_SALT, compress=True)
+
+
+def person_from_card_token(token):
+    from apps.clients.models import Person
+
+    try:
+        data = signing.loads(token, salt=CARD_SALT)
+        person = Person.objects.get(pk=data["p"])
+    except (signing.BadSignature, KeyError, TypeError, Person.DoesNotExist):
+        return None
+    return person if person.qr_secret[:12] == data.get("s") else None
+
+
+def prefill_for_person(person):
+    """Dane do formularza wpisu z karty osoby z kartoteki (jak „Mój kod QR” z konta)."""
+    data = {"first_name": person.first_name, "last_name": person.last_name, "address": person.address}
+    if person.permit_number:
+        data.update(has_permit="tak", permit_number=person.permit_number, permit_issuer=person.permit_issuer)
+    else:
+        data["has_permit"] = "nie"
+    return data
 
 
 def exit_token(entry):

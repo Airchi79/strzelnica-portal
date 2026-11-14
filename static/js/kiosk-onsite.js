@@ -528,7 +528,7 @@
     title.textContent = "Zapłać za rezerwację";
     if (st.pay) {
       text.textContent = `${r.number}: ${r.label}.`;
-      $("[data-os-qr]").src = st.pay.qr;
+      $("[data-os-pay-qr]").src = st.pay.qr;
       $("[data-os-amount]").textContent = pln(st.pay.amount_due);
       $("[data-os-until]").textContent = st.pay.until ? `Termin jest trzymany do ${st.pay.until}. Po zapłacie ten ekran zmieni się sam.` : "Po zapłacie ten ekran zmieni się sam.";
       pay.hidden = false;

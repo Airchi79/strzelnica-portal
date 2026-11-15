@@ -241,7 +241,10 @@ def ksef_list(request):
     page = Paginator(qs, 50).get_page(request.GET.get("page"))
     counts = {s: KsefInvoice.objects.filter(status=s).count() for s in KsefInvoice.Status.values}
     sync = KsefSync.load()
+    from .forms import KsefBulkForm
+
     return render(request, "panel/accounting_ksef.html", {
+        "bulk_form": KsefBulkForm(), "hints": DESCRIPTION_HINTS[Record.Kind.COST] + DESCRIPTION_HINTS[Record.Kind.REVENUE],
         "page": page, "status": status, "statuses": KsefInvoice.Status.choices, "counts": counts, "sync": sync,
         "sync_form": KsefSyncForm(instance=sync), "ksef_enabled": dj_settings.KSEF_ENABLED, "ksef_env": dj_settings.KSEF_ENVIRONMENT,
         "nip": AssociationSettings.load().nip,
@@ -273,6 +276,28 @@ def ksef_sync_settings(request):
         (messages.success if result["ok"] else messages.error)(request, f"KSeF: {result['message']}")
     else:
         messages.success(request, "Zapisano ustawienia pobierania z KSeF.")
+    return redirect("panel:accounting_ksef")
+
+
+@panel_required(PERM)
+@require_POST
+def ksef_bulk(request):
+    from .forms import KsefBulkForm
+
+    form = KsefBulkForm(request.POST)
+    ids = [int(x) for x in request.POST.getlist("faktura") if x.isdigit()]
+    if not ids or not form.is_valid():
+        messages.error(request, "Zaznacz faktury do przyjęcia.")
+        return redirect("panel:accounting_ksef")
+    d = form.cleaned_data
+    invoices = KsefInvoice.objects.filter(pk__in=ids, status=KsefInvoice.Status.NEW).order_by("issue_date", "pk")
+    records, errors = ksef.accept_many(invoices, by=request.user, description=d["description"], cost_column=d["cost_column"],
+                                       activity=d["activity"], task=d["task"])
+    if records:
+        messages.success(request, f"Przyjęto do ewidencji faktur: {len(records)} (Lp. {records[0].lp}" +
+                         (f" – {records[-1].lp}" if len(records) > 1 else "") + ").")
+    for err in errors[:10]:
+        messages.error(request, err)
     return redirect("panel:accounting_ksef")
 
 
@@ -323,6 +348,7 @@ def ksef_detail(request, pk):
         view = None
     qr = ksef_view.qr_url(invoice, dj_settings.KSEF_ENVIRONMENT)
     return render(request, "panel/accounting_ksef_invoice.html", {
+        "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE if invoice.direction == KsefInvoice.Direction.SALE else Record.Kind.COST],
         "inv": invoice, "form": form, "reject_form": ReasonForm(), "gross": format_amount(invoice.gross),
         "v": view, "qr": qr, "qr_img": qr_svg_data_uri(qr, box_size=4) if qr else "",
         "parties": [("Sprzedawca", view["seller"]), ("Nabywca", view["buyer"])] + [("Podmiot trzeci", x) for x in view["third"]]

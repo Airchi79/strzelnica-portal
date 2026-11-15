@@ -274,3 +274,36 @@ def test_visualization_in_panel_and_pdf(owner_client, owner):
         f.write(b"<zepsuty")
     page = owner_client.get(f"/panel/ksiegowosc/ksef/{inv.pk}/").content.decode()
     assert "Nie udało się wyświetlić treści faktury" in page
+
+
+# --- przyjmowanie wielu faktur naraz -----------------------------------------------------
+
+
+def test_bulk_accept_common_or_own_description_and_currency(owner_client, owner):
+    a = ksef.import_files([upload("a.xml", invoice_xml(number="FV/A", gross="100.00"))], by=owner, own_nip=OWN_NIP)[0][0]
+    b = ksef.import_files([upload("b.xml", invoice_xml(number="FV/B", gross="50.00"))], by=owner, own_nip=OWN_NIP)[0][0]
+    s = ksef.import_files([upload("s.xml", invoice_xml(number="S/1", gross="30.00", seller_nip=OWN_NIP, buyer_nip="3333333333"))],
+                          by=owner, own_nip=OWN_NIP)[0][0]
+    eur = ksef.import_files([upload("e.xml", invoice_xml(number="E/1", currency="EUR"))], by=owner, own_nip=OWN_NIP)[0][0]
+    page = owner_client.get("/panel/ksiegowosc/ksef/").content.decode()
+    assert 'data-check-all="faktura"' in page and "Przyjmij zaznaczone" in page
+    assert '<option value="pozostala" selected>' in page  # domyślna forma działalności
+    r = owner_client.post("/panel/ksiegowosc/ksef/zbiorczo/", {"faktura": [a.pk, b.pk, s.pk, eur.pk], "description": "Prowizje GunTracker",
+                                                               "cost_column": "cost_other", "activity": "pozostala"}, follow=True)
+    content = r.content.decode()
+    assert "Przyjęto do ewidencji faktur: 3" in content and "E/1" in content and "walucie obcej" in content
+    recs = {rec.document: rec for rec in Record.objects.all()}
+    assert recs["FV/A"].cost_other == 10000 and recs["FV/B"].cost_other == 5000 and recs["S/1"].revenue == 3000
+    assert {r.description for r in recs.values()} == {"Prowizje GunTracker"} and {r.activity for r in recs.values()} == {"pozostala"}
+    assert recs["FV/A"].date == a.issue_date and recs["FV/A"].ksef_number == ""
+    assert KsefInvoice.objects.get(pk=eur.pk).status == KsefInvoice.Status.NEW
+    # bez opisu — opis z pozycji faktury
+    c = ksef.import_files([upload("c.xml", invoice_xml(number="FV/C", gross="20.00"))], by=owner, own_nip=OWN_NIP)[0][0]
+    records, errors = ksef.accept_many([c], by=owner, description="", cost_column="cost_deductible", activity="pozostala")
+    assert errors == [] and records[0].description == "Tarcze strzeleckie" and records[0].cost_deductible == 2000
+
+
+def test_accept_form_defaults_to_other_activity(owner_client, owner):
+    inv = ksef.import_files([upload(f"{KSEF_NO}.xml", invoice_xml())], by=owner, own_nip=OWN_NIP)[0][0]
+    page = owner_client.get(f"/panel/ksiegowosc/ksef/{inv.pk}/").content.decode()
+    assert '<option value="pozostala" selected>' in page and 'list="opisy"' in page and '<datalist id="opisy">' in page

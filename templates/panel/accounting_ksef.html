@@ -25,16 +25,26 @@
     <button class="btn" type="submit">Importuj</button></form>
 </div>
 <div class="tabs">{% for value, label in statuses %}<a href="?status={{ value }}" class="{% if status == value %}active{% endif %}">{{ label }} ({{ counts|get:value }})</a>{% endfor %}<a href="?status=wszystkie" class="{% if status == 'wszystkie' %}active{% endif %}">Wszystkie</a></div>
+<form method="post" action="{% url 'panel:accounting_ksef_bulk' %}" novalidate>{% csrf_token %}
 <section class="day"><div class="table-wrap"><table class="days">
-  <tr class="head"><th>Faktura</th><th>Data</th><th>Kontrahent</th><th>Kierunek</th><th>Kwota</th><th>Status</th></tr>
+  <tr class="head">{% if status == 'nowa' %}<th><input type="checkbox" aria-label="Zaznacz wszystkie" data-check-all="faktura"></th>{% endif %}<th>Faktura</th><th>Data</th><th>Kontrahent</th><th>Kierunek</th><th>Kwota</th><th>Status</th></tr>
   {% for inv in page %}<tr>
-    <td><a href="{% url 'panel:accounting_ksef_invoice' inv.pk %}"><strong>{{ inv.invoice_number }}</strong></a>{% if inv.ksef_number %}<div class="small muted code">{{ inv.ksef_number }}</div>{% endif %}</td>
+    {% if status == 'nowa' %}<td><input type="checkbox" name="faktura" value="{{ inv.pk }}" aria-label="Zaznacz fakturę {{ inv.invoice_number }}"></td>{% endif %}
+    <td><a href="{% url 'panel:accounting_ksef_invoice' inv.pk %}"><strong>{{ inv.invoice_number }}</strong></a>{% if inv.ksef_number %}<div class="small muted code">{{ inv.ksef_number }}</div>{% endif %}{% if inv.items_summary %}<div class="small muted">{{ inv.items_summary|truncatechars:80 }}</div>{% endif %}</td>
     <td data-label="Data">{{ inv.issue_date|date:"j.m.Y" }}</td>
     <td data-label="Kontrahent">{% if inv.direction == 'zakup' %}{{ inv.seller_name }}{% else %}{{ inv.buyer_name }}{% endif %}</td>
     <td data-label="Kierunek">{{ inv.get_direction_display }}</td>
     <td data-label="Kwota" style="text-align:right">{{ inv.gross|pln }}{% if inv.currency != 'PLN' %} {{ inv.currency }}{% endif %}</td>
     <td data-label="Status">{{ inv.get_status_display }}{% if inv.source == 'api' %} <span class="badge">z KSeF</span>{% endif %}{% if inv.record %} — <a href="{% url 'panel:accounting_record' inv.record.pk %}">Lp. {{ inv.record.lp }}</a>{% endif %}</td></tr>
-  {% empty %}<tr><td colspan="6" class="muted">Brak faktur.</td></tr>{% endfor %}
+  {% empty %}<tr><td colspan="7" class="muted">Brak faktur.</td></tr>{% endfor %}
 </table></div></section>
+{% if status == 'nowa' and page.object_list %}
+<div class="card"><h2 style="margin-top:0">Przyjmij zaznaczone do ewidencji</h2>
+  <p class="small muted">Każda zaznaczona faktura to osobny zapis: data zdarzenia = data wystawienia, nr dowodu = numer faktury, kwota = należność ogółem. Faktury zakupu trafiają do wybranej kolumny kosztów, faktury sprzedaży — do przychodów. Faktury w walucie obcej zostaną pominięte (wpis ręczny po przeliczeniu). Każdy zapis można później poprawić w karcie zapisu.</p>
+  {% with form=bulk_form %}{% include "partials/form.html" %}{% endwith %}
+  <datalist id="opisy">{% for h in hints %}<option value="{{ h }}">{% endfor %}</datalist>
+  <div class="actions"><button class="btn" type="submit">Przyjmij zaznaczone</button></div></div>
+{% endif %}
+</form>
 {% include "partials/pagination.html" %}
 {% endblock %}

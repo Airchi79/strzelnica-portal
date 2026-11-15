@@ -124,6 +124,7 @@ urlpatterns = [
     path("ksiegowosc/stripe/<int:year>-<int:month>.pdf", accounting_views.stripe_pdf, name="accounting_stripe_pdf"),
     path("ksiegowosc/ksef/", accounting_views.ksef_list, name="accounting_ksef"),
     path("ksiegowosc/ksef/import/", accounting_views.ksef_import, name="accounting_ksef_import"),
+    path("ksiegowosc/ksef/zbiorczo/", accounting_views.ksef_bulk, name="accounting_ksef_bulk"),
     path("ksiegowosc/ksef/pobieranie/", accounting_views.ksef_sync_settings, name="accounting_ksef_sync_settings"),
     path("ksiegowosc/ksef/<int:pk>/", accounting_views.ksef_detail, name="accounting_ksef_invoice"),
     path("ksiegowosc/ksef/<int:pk>/xml/", accounting_views.ksef_xml, name="accounting_ksef_xml"),

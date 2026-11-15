@@ -11,12 +11,11 @@
   <p class="small">Token KSeF: <span class="badge ok">ustawiony</span> · środowisko: <strong>{{ ksef_env }}</strong> · NIP kontekstu: {% if nip %}<strong>{{ nip }}</strong>{% else %}<span class="badge bad">uzupełnij NIP w „Dane stowarzyszenia”</span>{% endif %}</p>
   {% endif %}
   <p class="small muted">Faktury, w których stowarzyszenie jest nabywcą, pobierają się co godzinę (opcjonalnie także faktury sprzedaży) i trafiają poniżej „Do decyzji”. Pobieranie jest przyrostowe — po dacie trwałego zapisu w KSeF; limity KSeF pozwalają na ok. 40 faktur na przebieg, resztę dokończą kolejne przebiegi.</p>
-  {% if sync.last_run_at %}<p class="small">Ostatni przebieg: {{ sync.last_run_at|date:"j.m.Y H:i" }} — {{ sync.last_result }}{% if sync.last_error %} <span class="badge bad">{{ sync.last_error }}</span>{% endif %}{% if sync.pending %} · w kolejce: {{ sync.pending|length }}{% endif %}</p>{% endif %}
+  {% if sync.last_run_at %}<p class="small">Ostatni przebieg: {{ sync.last_run_at|date:"j.m.Y H:i" }} — {{ sync.last_result }}{% if sync.last_error %} <span class="badge {% if sync.last_result|slice:':10' == 'nie pobrano' %}warn{% else %}bad{% endif %}">{{ sync.last_error }}</span>{% endif %}{% if sync.pending %} · w kolejce: {{ sync.pending|length }}{% endif %}</p>{% endif %}
   <form method="post" action="{% url 'panel:accounting_ksef_sync_settings' %}" novalidate>{% csrf_token %}
     {% with form=sync_form %}{% include "partials/form.html" %}{% endwith %}
-    <div class="actions"><button class="btn secondary" type="submit">Zapisz ustawienia pobierania</button></div>
+    <div class="actions">{% if ksef_enabled %}<button class="btn" type="submit" name="pobierz" value="1">Zapisz i pobierz teraz</button>{% endif %}<button class="btn secondary" type="submit">Zapisz ustawienia</button></div>
   </form>
-  {% if ksef_enabled %}<form method="post" action="{% url 'panel:accounting_ksef_sync_now' %}" class="actions" style="margin:0">{% csrf_token %}<button class="btn" type="submit">Pobierz teraz</button></form>{% endif %}
 </div>
 <h2>Wgranie plików</h2>
 <div class="card">

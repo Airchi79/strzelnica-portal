@@ -90,6 +90,13 @@ def _collect(access, state, subject, now):
     return added
 
 
+def _stopped(state, now, message):
+    """Przebieg zatrzymany przed połączeniem z KSeF — przyczyna widoczna w panelu jako wynik ostatniego przebiegu."""
+    state.last_run_at, state.last_result, state.last_error = now, "nie pobrano — przebieg zatrzymany", message[:500]
+    state.save(update_fields=["last_run_at", "last_result", "last_error"])
+    return {"ok": False, "message": message}
+
+
 def run(*, by=None, now=None, force=False):
     """Jeden przebieg pobierania. Zwraca słownik z wynikiem (także gdy pobieranie jest wyłączone)."""
     from apps.core.models import AssociationSettings
@@ -97,16 +104,16 @@ def run(*, by=None, now=None, force=False):
     now = now or timezone.now()
     state = KsefSync.load()
     if not settings.KSEF_ENABLED:
-        return {"ok": False, "message": "Brak tokena KSeF (KSEF_TOKEN w pliku .env) — pobieranie wyłączone."}
+        return _stopped(state, now, "Brak tokena KSeF (KSEF_TOKEN w pliku .env) — pobieranie wyłączone.")
     if not (state.enabled or force):
-        return {"ok": False, "message": "Automatyczne pobieranie jest wyłączone w ustawieniach KSeF."}
+        return _stopped(state, now, "Automatyczne pobieranie jest wyłączone w ustawieniach KSeF.")
     if not state.sync_from:
-        return {"ok": False, "message": "Ustaw datę, od której pobierać faktury."}
+        return _stopped(state, now, "Ustaw datę, od której pobierać faktury.")
     nip = _digits(AssociationSettings.load().nip)
     if len(nip) != 10:
-        return {"ok": False, "message": "Uzupełnij NIP w „Dane stowarzyszenia” — KSeF wymaga kontekstu NIP."}
+        return _stopped(state, now, "Uzupełnij NIP w „Dane stowarzyszenia” — KSeF wymaga kontekstu NIP.")
     if not cache.add(LOCK_KEY, "1", LOCK_SECONDS):
-        return {"ok": False, "message": "Pobieranie już trwa — spróbuj za kilka minut."}
+        return {"ok": False, "message": "Pobieranie już trwa — spróbuj za kilka minut."}  # wynik zapisze trwający przebieg
     created, failed, queued = [], [], 0
     error = ""
     try:

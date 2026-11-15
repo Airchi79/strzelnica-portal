@@ -174,6 +174,14 @@ def test_sales_invoices_optional_and_direction(monkeypatch):
     assert KsefInvoice.objects.get().direction == KsefInvoice.Direction.SALE
 
 
+def test_stopped_run_is_visible_as_last_run(monkeypatch):
+    FakeKsef([]).install(monkeypatch)
+    _state(sync_from=None)
+    ksef_sync.run(force=True)
+    s = KsefSync.load()
+    assert s.last_run_at and s.last_result.startswith("nie pobrano") and "datę" in s.last_error
+
+
 def test_guards(monkeypatch, settings):
     fake = FakeKsef([]).install(monkeypatch)
     _state(enabled=False)
@@ -196,7 +204,7 @@ def test_guards(monkeypatch, settings):
 
 def test_panel_settings_and_sync_now(owner_client, monkeypatch):
     page = owner_client.get("/panel/ksiegowosc/ksef/").content.decode()
-    assert "Pobieranie z KSeF" in page and "Pobierz teraz" in page and "token-testowy" not in page
+    assert "Pobieranie z KSeF" in page and "Zapisz i pobierz teraz" in page and "token-testowy" not in page
     r = owner_client.post("/panel/ksiegowosc/ksef/pobieranie/", {"enabled": "on", "sync_from": "2026-02-01", "include_sales": ""})
     assert r.status_code == 302
     s = KsefSync.load()
@@ -208,6 +216,11 @@ def test_panel_settings_and_sync_now(owner_client, monkeypatch):
     r = owner_client.post("/panel/ksiegowosc/ksef/pobieranie/", {"enabled": "on", "sync_from": ""})
     assert KsefSync.load().sync_from == dt.date(2026, 1, 15)  # błąd walidacji — bez zmian
     FakeKsef([{"invoices": [_meta(ks(1), 1)], "hasMore": False, "isTruncated": False}]).install(monkeypatch)
-    r = owner_client.post("/panel/ksiegowosc/ksef/pobierz-teraz/", follow=True)
+    # „Zapisz i pobierz teraz” zapisuje zaznaczone ustawienia przed pobraniem (wcześniej osobny przycisk je pomijał)
+    KsefSync.objects.filter(pk=1).update(enabled=False, sync_from=None)
+    r = owner_client.post("/panel/ksiegowosc/ksef/pobieranie/", {"enabled": "on", "sync_from": "2026-02-01", "pobierz": "1"},
+                          follow=True)
     assert "nowe faktury: 1" in r.content.decode()
+    s = KsefSync.load()
+    assert s.enabled and s.sync_from == dt.date(2026, 2, 1) and s.last_error == ""
     assert "z KSeF" in owner_client.get("/panel/ksiegowosc/ksef/").content.decode()

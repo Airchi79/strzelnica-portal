@@ -251,30 +251,28 @@ def ksef_list(request):
 @panel_required(PERM)
 @require_POST
 def ksef_sync_settings(request):
+    """Zapis ustawień pobierania; przycisk „Zapisz i pobierz teraz” od razu uruchamia przebieg z zapisanymi ustawieniami."""
+    from . import ksef_sync
+
     sync = KsefSync.load()
     before = (sync.enabled, sync.sync_from, sync.include_sales)
     form = KsefSyncForm(request.POST, instance=sync)
-    if form.is_valid():
-        sync = form.save(commit=False)
-        if before[1] != sync.sync_from or before[2] != sync.include_sales:
-            sync.hwm, sync.pending = {}, []  # nowy zakres — pobieranie od początku (duplikaty są pomijane)
-        sync.save()
-        log_event("ksiegowosc.ksef_ustawienia", None, f"Pobieranie z KSeF: {'włączone' if sync.enabled else 'wyłączone'}, "
-                                                      f"od {sync.sync_from or '—'}", actor=request.user)
-        messages.success(request, "Zapisano ustawienia pobierania z KSeF.")
-    else:
+    if not form.is_valid():
         for errors in form.errors.values():
             messages.error(request, errors[0])
-    return redirect("panel:accounting_ksef")
-
-
-@panel_required(PERM)
-@require_POST
-def ksef_sync_now(request):
-    from . import ksef_sync
-
-    result = ksef_sync.run(by=request.user, force=True)
-    (messages.success if result["ok"] else messages.error)(request, f"KSeF: {result['message']}")
+        return redirect("panel:accounting_ksef")
+    sync = form.save(commit=False)
+    if before[1] != sync.sync_from or before[2] != sync.include_sales:
+        sync.hwm, sync.pending = {}, []  # nowy zakres — pobieranie od początku (duplikaty są pomijane)
+    sync.save()
+    if before != (sync.enabled, sync.sync_from, sync.include_sales):
+        log_event("ksiegowosc.ksef_ustawienia", None, f"Pobieranie z KSeF: {'włączone' if sync.enabled else 'wyłączone'}, "
+                                                      f"od {sync.sync_from or '—'}", actor=request.user)
+    if "pobierz" in request.POST:
+        result = ksef_sync.run(by=request.user, force=True)
+        (messages.success if result["ok"] else messages.error)(request, f"KSeF: {result['message']}")
+    else:
+        messages.success(request, "Zapisano ustawienia pobierania z KSeF.")
     return redirect("panel:accounting_ksef")
 
 

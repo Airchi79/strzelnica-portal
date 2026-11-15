@@ -120,6 +120,7 @@ urlpatterns = [
     path("ksiegowosc/ksef/pobieranie/", accounting_views.ksef_sync_settings, name="accounting_ksef_sync_settings"),
     path("ksiegowosc/ksef/<int:pk>/", accounting_views.ksef_detail, name="accounting_ksef_invoice"),
     path("ksiegowosc/ksef/<int:pk>/xml/", accounting_views.ksef_xml, name="accounting_ksef_xml"),
+    path("ksiegowosc/ksef/<int:pk>/pdf/", accounting_views.ksef_pdf, name="accounting_ksef_pdf"),
     path("ksiegowosc/ksef/<int:pk>/<str:action>/", accounting_views.ksef_decide, name="accounting_ksef_decide"),
     path("ksiegowosc/dokumenty/", accounting_views.docs_index, name="accounting_docs"),
     path("ksiegowosc/dokumenty/nowy/<str:key>/", accounting_views.doc_new, name="accounting_doc_new"),

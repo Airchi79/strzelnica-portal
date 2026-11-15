@@ -310,9 +310,41 @@ def ksef_detail(request, pk):
         else:
             messages.success(request, f"Faktura przyjęta do ewidencji pod Lp. {record.lp}.")
             return redirect("panel:accounting_ksef_invoice", pk=pk)
+    from django.conf import settings as dj_settings
+
+    from apps.core.qr import qr_svg_data_uri
+
+    from . import ksef_view
+
+    try:
+        with invoice.xml.open("rb") as f:
+            view = ksef_view.read(f.read())
+    except Exception:  # noqa: BLE001 — uszkodzony / nietypowy plik: zostaje podsumowanie z bazy
+        view = None
+    qr = ksef_view.qr_url(invoice, dj_settings.KSEF_ENVIRONMENT)
     return render(request, "panel/accounting_ksef_invoice.html", {
         "inv": invoice, "form": form, "reject_form": ReasonForm(), "gross": format_amount(invoice.gross),
+        "v": view, "qr": qr, "qr_img": qr_svg_data_uri(qr, box_size=4) if qr else "",
+        "parties": [("Sprzedawca", view["seller"]), ("Nabywca", view["buyer"])] + [("Podmiot trzeci", x) for x in view["third"]]
+        if view else [],
     })
+
+
+@panel_required(PERM)
+def ksef_pdf(request, pk):
+    from django.conf import settings as dj_settings
+
+    from . import ksef_view
+
+    invoice = get_object_or_404(KsefInvoice, pk=pk)
+    with invoice.xml.open("rb") as f:
+        data = ksef_view.read(f.read())
+    log_sensitive_access(None, f"ksef:{invoice.pk}:pdf", "wizualizacja faktury KSeF")
+    response = HttpResponse(ksef_view.to_pdf(invoice, data, ksef_view.qr_url(invoice, dj_settings.KSEF_ENVIRONMENT)),
+                            content_type="application/pdf")
+    name = "".join(ch if ch.isalnum() else "-" for ch in invoice.invoice_number)[:60] or str(invoice.pk)
+    response["Content-Disposition"] = f'inline; filename="faktura-{name}.pdf"'
+    return response
 
 
 @panel_required(PERM)

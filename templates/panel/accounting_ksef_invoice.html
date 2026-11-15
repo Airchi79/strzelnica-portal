@@ -3,17 +3,52 @@
 {% block panel %}
 <h1>Faktura {{ inv.invoice_number }}</h1>
 {% include "panel/_accounting_tabs.html" %}
-<div class="card"><table>
-  <tr><th>Status</th><td><strong>{{ inv.get_status_display }}</strong>{% if inv.record %} — <a href="{% url 'panel:accounting_record' inv.record.pk %}">zapis Lp. {{ inv.record.lp }}</a>{% endif %}{% if inv.status_note %}<div class="small muted">{{ inv.status_note }}</div>{% endif %}</td></tr>
-  <tr><th>Numer KSeF</th><td class="code">{{ inv.ksef_number|default:"— (brak w nazwie pliku)" }}</td></tr>
-  <tr><th>Rodzaj</th><td>{{ inv.kind|default:"—" }} · {{ inv.get_direction_display }}</td></tr>
-  <tr><th>Data wystawienia</th><td>{{ inv.issue_date|date:"j.m.Y" }}{% if inv.sale_date %} · dostawa / usługa: {{ inv.sale_date|date:"j.m.Y" }}{% endif %}</td></tr>
-  <tr><th>Sprzedawca</th><td>{{ inv.seller_name }}{% if inv.seller_nip %} · NIP {{ inv.seller_nip }}{% endif %}</td></tr>
-  <tr><th>Nabywca</th><td>{{ inv.buyer_name }}{% if inv.buyer_nip %} · NIP {{ inv.buyer_nip }}{% endif %}</td></tr>
-  <tr><th>Kwoty</th><td>netto {{ inv.net|pln }} · VAT {{ inv.vat|pln }} · <strong>należność ogółem {{ inv.gross|pln }}</strong>{% if inv.currency != 'PLN' %} ({{ inv.currency }}){% endif %}</td></tr>
-  {% if inv.items %}<tr><th>Pozycje</th><td class="small">{% for i in inv.items %}{{ forloop.counter }}. {{ i.name }}{% if i.qty %} — {{ i.qty }} {{ i.unit }}{% endif %}<br>{% endfor %}</td></tr>{% endif %}
-  <tr><th>Plik</th><td><a href="{% url 'panel:accounting_ksef_xml' inv.pk %}">Pobierz XML</a> · zaimportowano {{ inv.imported_at|date:"j.m.Y H:i" }}{% if inv.imported_by %} — {{ inv.imported_by.full_name }}{% endif %}</td></tr>
-</table></div>
+<div class="card">
+  <p><strong>{{ inv.get_status_display }}</strong>{% if inv.record %} — <a href="{% url 'panel:accounting_record' inv.record.pk %}">zapis Lp. {{ inv.record.lp }}</a>{% endif %} · {{ inv.get_direction_display }}{% if inv.source == 'api' %} · <span class="badge">z KSeF</span>{% endif %}{% if inv.status_note %}<span class="small muted"> · {{ inv.status_note }}</span>{% endif %}</p>
+  <div class="actions" style="margin:0"><a class="btn secondary" href="{% url 'panel:accounting_ksef_pdf' inv.pk %}" target="_blank" rel="noopener">Wizualizacja PDF</a><a class="btn secondary" href="{% url 'panel:accounting_ksef_xml' inv.pk %}">Pobierz XML</a></div>
+</div>
+{% if v %}
+<div class="card ksef-invoice">
+  <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <h2 style="margin:0">{{ v.kind_label }} nr {{ v.number }}</h2>
+      <div class="small">Data wystawienia: {{ v.issue_date|date:"j.m.Y" }}{% if v.place %}, {{ v.place }}{% endif %}{% if v.sale_date %} · data dostawy / usługi: {{ v.sale_date|date:"j.m.Y" }}{% endif %}{% if v.period %} · okres: {{ v.period.0 }} – {{ v.period.1 }}{% endif %}</div>
+      {% if inv.ksef_number %}<div class="small muted code">Numer KSeF: {{ inv.ksef_number }}</div>{% endif %}
+    </div>
+    {% if qr_img %}<div style="text-align:center"><a href="{{ qr }}" target="_blank" rel="noopener" title="Weryfikacja faktury w KSeF"><img src="{{ qr_img }}" alt="Kod QR weryfikacji w KSeF" width="110" height="110"></a><div class="small muted">weryfikacja w KSeF</div></div>{% endif %}
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:12px 0">
+    {% for title, p in parties %}{% if p %}<div style="border:1px solid var(--border);border-radius:8px;padding:10px">
+      <div class="small muted">{{ title }}</div><strong>{{ p.name }}</strong>
+      {% for line in p.address %}<div>{{ line }}</div>{% endfor %}
+      {% if p.nip %}<div>NIP: {{ p.nip }}</div>{% elif p.other_id %}<div>Identyfikator: {{ p.other_id }}</div>{% endif %}
+      {% if p.email or p.phone %}<div class="small">{{ p.email }}{% if p.email and p.phone %} · {% endif %}{{ p.phone }}</div>{% endif %}
+    </div>{% endif %}{% endfor %}
+  </div>
+  {% for k in v.corrected %}<p class="small"><strong>Korygowana faktura:</strong> {{ k.number }} z {{ k.date }}{% if k.ksef %} (KSeF {{ k.ksef }}){% endif %}</p>{% endfor %}
+  {% if v.correction_reason %}<p class="small">Przyczyna korekty: {{ v.correction_reason }}</p>{% endif %}
+  <div class="table-wrap"><table class="days">
+    <tr class="head"><th>Lp.</th><th>Nazwa</th><th>J.m.</th><th>Ilość</th><th>Cena netto</th><th>Wartość netto</th><th>Stawka</th><th>Wartość brutto</th></tr>
+    {% for l in v.lines %}<tr><td>{{ l.no }}</td><td data-label="Nazwa">{{ l.name }}</td><td data-label="J.m.">{{ l.unit }}</td><td data-label="Ilość">{{ l.qty }}</td>
+      <td data-label="Cena netto" style="text-align:right">{% if l.unit_net is not None %}{{ l.unit_net|pln }}{% elif l.unit_gross is not None %}{{ l.unit_gross|pln }} (brutto){% endif %}</td>
+      <td data-label="Wartość netto" style="text-align:right">{% if l.net is not None %}{{ l.net|pln }}{% endif %}</td><td data-label="Stawka">{{ l.rate }}</td>
+      <td data-label="Wartość brutto" style="text-align:right">{% if l.gross is not None %}{{ l.gross|pln }}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="8" class="muted">Faktura bez pozycji (np. zaliczkowa lub korekta danych).</td></tr>{% endfor %}
+  </table></div>
+  <div style="display:flex;justify-content:flex-end;margin-top:8px"><table style="width:auto">
+    {% for s in v.sums %}<tr><td class="small">{{ s.label }}</td><td style="text-align:right">netto {{ s.net|pln }}</td><td style="text-align:right">{% if s.vat is not None %}VAT {{ s.vat|pln }}{% endif %}</td></tr>{% endfor %}
+    <tr><th colspan="2" style="text-align:right">Należność ogółem{% if v.currency != 'PLN' %} ({{ v.currency }}){% endif %}</th><th style="text-align:right">{{ v.total|pln }}</th></tr>
+    {% if v.to_pay is not None and v.to_pay != v.total %}<tr><td colspan="2" style="text-align:right">Do zapłaty</td><td style="text-align:right">{{ v.to_pay|pln }}</td></tr>{% endif %}
+  </table></div>
+  {% if v.payment %}<p class="small"><strong>Płatność:</strong> {% if v.payment.paid %}zapłacono{% if v.payment.paid_on %} {{ v.payment.paid_on }}{% endif %} · {% endif %}{% if v.payment.form %}{{ v.payment.form }}{% endif %}{% if v.payment.terms %} · termin: {{ v.payment.terms|join:", " }}{% endif %}{% for a in v.payment.accounts %}<br>Rachunek: <span class="code">{{ a.number }}</span>{% if a.bank %} ({{ a.bank }}){% endif %}{% endfor %}</p>{% endif %}
+  {% if v.flags %}<p class="small"><strong>Adnotacje:</strong> {{ v.flags|join:"; " }}</p>{% endif %}
+  {% for k, val in v.extra %}<p class="small">{{ k }}: {{ val }}</p>{% endfor %}
+  {% for line in v.footer %}<p class="small muted">{{ line }}</p>{% endfor %}
+  {% if v.registers %}<p class="small muted">{% for k, val in v.registers %}{{ k }}: {{ val }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+</div>
+{% else %}
+<div class="card"><p class="muted">Nie udało się wyświetlić treści faktury — pobierz plik XML.</p><p>{{ inv.seller_name }} · {{ inv.issue_date|date:"j.m.Y" }} · należność ogółem {{ inv.gross|pln }}</p></div>
+{% endif %}
 {% if inv.status == 'nowa' %}
 <h2>Przyjęcie do ewidencji</h2>
 <form method="post" class="card" novalidate>{% csrf_token %}

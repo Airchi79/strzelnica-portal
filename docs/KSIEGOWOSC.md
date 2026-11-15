@@ -37,7 +37,19 @@ i rozporządzenie MFiG z 22.12.2025 (Dz. U. poz. 1880). Panel → Płatności �
   (z przyczyną), **usuń z ewidencji** (zapis usunięty, faktura wraca do decyzji).
 - Kierunek (zakup/sprzedaż) — po NIP stowarzyszenia z „Dane stowarzyszenia”.
 - Faktury w walucie obcej — wpis ręczny po przeliczeniu (§ 7 ust. 5).
-- Pobieranie bezpośrednio z API KSeF — kolejny etap (wymaga tokenu / certyfikatu KSeF).
+- **Automatyczne pobieranie z KSeF** (API KSeF 2.0) — co godzinę faktury zakupu (stowarzyszenie jako nabywca),
+  opcjonalnie sprzedaży; przyrostowo wg daty trwałego zapisu w KSeF; limity KSeF (20 zapytań / 64 pobrania na godzinę)
+  — jeden przebieg pobiera do 40 faktur, resztę kolejne. Przycisk „Pobierz teraz” w zakładce Faktury KSeF.
+
+### Uruchomienie pobierania z KSeF
+1. W Aplikacji Podatnika KSeF (ksef.podatki.gov.pl) zaloguj się w kontekście NIP stowarzyszenia (osoba uprawniona
+   do działania w imieniu stowarzyszenia) i wygeneruj **token** z uprawnieniem do **przeglądania faktur**
+   (wystarczy samo przeglądanie). Token pokazuje się tylko raz.
+2. Na serwerze (w folderze projektu): `sh deploy/ustaw-env.sh KSEF_TOKEN` → wklej token → `docker compose up -d`.
+   Token jest tylko w `.env` — nie trafia do bazy, panelu, logów ani repozytorium.
+3. Panel → Księgowość → Faktury KSeF → „Pobieranie z KSeF”: zaznacz „pobieranie włączone”, ustaw datę „od”
+   (np. 1.02.2026), zapisz, kliknij „Pobierz teraz”.
+4. NIP kontekstu pochodzi z „Dane stowarzyszenia”. Kopia testowa / próby: `KSEF_ENVIRONMENT=test` (api-test.ksef.mf.gov.pl).
 
 ## Generator dokumentów (PDF do podpisu, DOCX do edycji)
 - Uchwała organu zatwierdzającego o prowadzeniu UEPiK (art. 10a ust. 1).

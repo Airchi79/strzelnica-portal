@@ -74,6 +74,7 @@ services:
           python manage.py association_tasks;
           python manage.py sales_reports;
           python manage.py accounting_sync;
+          python manage.py ksef_sync;
           python manage.py check_backups;
         fi;
         n=$$((n + 1));

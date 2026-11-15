@@ -243,6 +243,14 @@ AXEPTA_ENABLED = bool(AXEPTA_MERCHANT_ID and AXEPTA_SERVICE_ID and AXEPTA_API_TO
 # Operator NOWYCH płatności online: „axepta” (domyślnie — decyzja właściciela, listopad 2026) albo „tpay”. Bez kompletu
 # danych operatora płatności online są wyłączone (System pokazuje przelew / gotówkę). Powiadomienia i zwroty dla
 # wcześniejszych płatności działają u operatora, przez którego przeszły (o ile jego dane zostają w .env).
+# KSeF — pobieranie faktur (docs/KSIEGOWOSC.md). Token z Aplikacji Podatnika KSeF z uprawnieniem do przeglądania faktur;
+# wpisuj poleceniem: sh deploy/ustaw-env.sh KSEF_TOKEN. Środowisko: „produkcja” albo „test” (api-test.ksef.mf.gov.pl).
+KSEF_TOKEN = env("KSEF_TOKEN", "")
+KSEF_ENVIRONMENT = env("KSEF_ENVIRONMENT", "produkcja").strip().lower()
+if KSEF_ENVIRONMENT not in {"produkcja", "test"}:
+    raise ImproperlyConfigured("KSEF_ENVIRONMENT: dozwolone wartości to „produkcja” albo „test”.")
+KSEF_ENABLED = bool(KSEF_TOKEN)
+
 ONLINE_PAYMENTS_PROVIDER = env("ONLINE_PAYMENTS_PROVIDER", "axepta").strip().lower()
 if ONLINE_PAYMENTS_PROVIDER not in {"tpay", "axepta"}:
     raise ImproperlyConfigured("ONLINE_PAYMENTS_PROVIDER: dozwolone wartości to „tpay” albo „axepta”.")

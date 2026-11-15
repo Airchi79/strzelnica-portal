@@ -16,9 +16,9 @@ from apps.core.permissions import panel_required
 from . import documents, exports, ksef, services
 from apps.audit.models import AuditLog
 
-from .forms import (DESCRIPTION_HINTS, AssetForm, ClassifyForm, DonationForm, TaskForm, DisposeForm, KsefAcceptForm, KsefImportForm, PostingForm, ReasonForm, RecordForm,
+from .forms import (DESCRIPTION_HINTS, AssetForm, ClassifyForm, DonationForm, KsefSyncForm, TaskForm, DisposeForm, KsefAcceptForm, KsefImportForm, PostingForm, ReasonForm, RecordForm,
                     SettingsForm, format_amount)
-from .models import (Activity, AccountingSettings, AccountingYear, DepreciationPosting, FixedAsset, GeneratedDocument, InKindDonation, KsefInvoice,
+from .models import (Activity, AccountingSettings, AccountingYear, DepreciationPosting, FixedAsset, GeneratedDocument, InKindDonation, KsefInvoice, KsefSync,
                      PublicTask, Record)
 
 PERM = "accounting.manage_accounting"
@@ -232,14 +232,50 @@ def panel_years(request):
 
 @panel_required(PERM)
 def ksef_list(request):
+    from django.conf import settings as dj_settings
+
     status = request.GET.get("status", KsefInvoice.Status.NEW)
     qs = KsefInvoice.objects.select_related("record")
     if status in KsefInvoice.Status.values:
         qs = qs.filter(status=status)
     page = Paginator(qs, 50).get_page(request.GET.get("page"))
     counts = {s: KsefInvoice.objects.filter(status=s).count() for s in KsefInvoice.Status.values}
-    return render(request, "panel/accounting_ksef.html", {"page": page, "status": status, "statuses": KsefInvoice.Status.choices,
-                                                          "counts": counts})
+    sync = KsefSync.load()
+    return render(request, "panel/accounting_ksef.html", {
+        "page": page, "status": status, "statuses": KsefInvoice.Status.choices, "counts": counts, "sync": sync,
+        "sync_form": KsefSyncForm(instance=sync), "ksef_enabled": dj_settings.KSEF_ENABLED, "ksef_env": dj_settings.KSEF_ENVIRONMENT,
+        "nip": AssociationSettings.load().nip,
+    })
+
+
+@panel_required(PERM)
+@require_POST
+def ksef_sync_settings(request):
+    sync = KsefSync.load()
+    before = (sync.enabled, sync.sync_from, sync.include_sales)
+    form = KsefSyncForm(request.POST, instance=sync)
+    if form.is_valid():
+        sync = form.save(commit=False)
+        if before[1] != sync.sync_from or before[2] != sync.include_sales:
+            sync.hwm, sync.pending = {}, []  # nowy zakres — pobieranie od początku (duplikaty są pomijane)
+        sync.save()
+        log_event("ksiegowosc.ksef_ustawienia", None, f"Pobieranie z KSeF: {'włączone' if sync.enabled else 'wyłączone'}, "
+                                                      f"od {sync.sync_from or '—'}", actor=request.user)
+        messages.success(request, "Zapisano ustawienia pobierania z KSeF.")
+    else:
+        for errors in form.errors.values():
+            messages.error(request, errors[0])
+    return redirect("panel:accounting_ksef")
+
+
+@panel_required(PERM)
+@require_POST
+def ksef_sync_now(request):
+    from . import ksef_sync
+
+    result = ksef_sync.run(by=request.user, force=True)
+    (messages.success if result["ok"] else messages.error)(request, f"KSeF: {result['message']}")
+    return redirect("panel:accounting_ksef")
 
 
 @panel_required(PERM)

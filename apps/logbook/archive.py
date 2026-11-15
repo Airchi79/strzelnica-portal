@@ -62,12 +62,13 @@ def parse(uploaded):
 
 
 def run(uploaded, *, by=None, preview=False, add_persons=True):
-    from apps.clients.importer import find_existing, merge
+    from apps.clients.importer import PersonIndex, find_existing, merge
     from apps.clients.models import Person
 
     items = parse(uploaded)
     stats = {"dodane": 0, "pominiete": 0, "osoby": 0, "osoby_uzupelnione": 0}
     with transaction.atomic():
+        index = PersonIndex() if add_persons else None
         existing = set(ArchivedEntry.objects.filter(row_hash__in=[i["row_hash"] for _, i in items]).values_list("row_hash", flat=True))
         for _, item in items:
             if item["row_hash"] in existing:
@@ -78,9 +79,9 @@ def run(uploaded, *, by=None, preview=False, add_persons=True):
             stats["dodane"] += 1
             if add_persons:
                 person = {k: item[k] for k in ("first_name", "last_name", "permit_number", "permit_issuer", "address")}
-                known = find_existing(person)
+                known = find_existing(person, index)
                 if known is None:
-                    Person.objects.create(**person, source=Person.Source.GUNTRACKER, created_by=by)
+                    index.add(Person.objects.create(**person, source=Person.Source.GUNTRACKER, created_by=by))
                     stats["osoby"] += 1
                 elif merge(known, person)[0]:  # tylko uzupełnienie pustych pól — bez nadpisywania
                     stats["osoby_uzupelnione"] += 1

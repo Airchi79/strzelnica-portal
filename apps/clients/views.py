@@ -245,3 +245,57 @@ def person_card_reset(request, pk):
     log_event("klient.karta_uniewaznienie", person, person.full_name, actor=request.user)
     messages.success(request, f"Unieważniono kartę {person.full_name}. Wydrukuj nową kartę.")
     return redirect("panel:person_edit", pk=person.pk)
+
+
+# --- porządkowanie kartoteki: eksport i duplikaty ------------------------------------------------------------------------
+
+
+@panel_required("clients.manage_clients")
+def persons_export(request):
+    from django.http import HttpResponse
+    from django.utils import timezone
+
+    from .duplicates import export_xlsx
+
+    persons = Person.objects.all()
+    log_sensitive_access(None, "kartoteka:eksport", f"eksport kartoteki osób bez konta do XLSX ({persons.count()} osób)")
+    log_event("klient.eksport_kartoteki", summary=f"Eksport kartoteki: {persons.count()} osób", actor=request.user)
+    response = HttpResponse(export_xlsx(persons), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="kartoteka-osoby-bez-konta-{timezone.localdate():%Y-%m-%d}.xlsx"'
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+@panel_required("clients.manage_clients")
+def persons_duplicates(request):
+    from .duplicates import groups, merge, suggested_primary
+
+    if request.method == "POST":
+        ids = [int(x) for x in request.POST.getlist("scal") if x.isdigit()]
+        primary_id = request.POST.get("glowna", "")
+        try:
+            if not primary_id.isdigit():
+                raise ValidationError("Wybierz osobę główną.")
+            primary = Person.objects.get(pk=int(primary_id))
+            filled, differences, cards = merge(primary, list(Person.objects.filter(pk__in=ids)), by=request.user)
+        except Person.DoesNotExist:
+            messages.error(request, "Tej osoby już nie ma w kartotece (odśwież stronę).")
+        except ValidationError as e:
+            messages.error(request, " ".join(e.messages))
+        else:
+            parts = [f"Scalono — zostaje {primary.full_name}."]
+            if filled:
+                parts.append("Uzupełniono: " + ", ".join(filled) + ".")
+            if differences:
+                parts.append("Inne dane zapisano w uwagach osoby — sprawdź je.")
+            if cards:
+                parts.append(f"Wydrukowane karty usuniętych kopii ({cards}) przestały działać — w razie potrzeby wydrukuj kartę ponownie.")
+            messages.success(request, " ".join(parts))
+        return redirect("panel:persons_duplicates")
+    found = groups()
+    for g in found:
+        primary = suggested_primary(g)
+        for p in g:
+            p.is_primary = p.pk == primary.pk
+    log_sensitive_access(None, "kartoteka:duplikaty", f"przegląd możliwych duplikatów ({sum(len(g) for g in found)} osób)")
+    return render(request, "panel/persons_duplicates.html", {"groups": found, "total": Person.objects.count()})

@@ -1,0 +1,30 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Możliwe duplikaty{% endblock %}
+{% block panel %}
+<h1>Strzelcy</h1>
+{% include "panel/_clients_tabs.html" %}
+<p class="small"><a href="{% url 'panel:persons' %}">← Osoby bez konta</a> · <a href="{% url 'panel:persons_export' %}">Pobierz całą kartotekę (XLSX)</a></p>
+<div class="card">
+  <p><strong>Możliwe duplikaty: {{ groups|length }} grup</strong> (w kartotece {{ total }} osób). Grupa to osoby o tym samym imieniu i nazwisku (bez znaczenia wielkość liter, polskie znaki i kolejność) albo z tym samym numerem pozwolenia.</p>
+  <p class="small muted">Wybierz osobę główną (zaproponowana: z kontem albo z najpełniejszymi danymi) i zaznacz kopie do scalenia. Puste pola osoby głównej zostaną uzupełnione, różniące się dane trafią do jej uwag, a kopie zostaną usunięte. Wydrukowana karta QR usuniętej kopii przestanie działać. Jeśli to <strong>różne osoby</strong> o tym samym nazwisku — odznacz je i nic nie rób. Dane są widoczne, bo bez nich nie da się porównać — dostęp jest zapisany w dzienniku.</p>
+</div>
+{% for g in groups %}
+<form method="post" class="card" novalidate>{% csrf_token %}
+  <div class="table-wrap"><table class="days">
+    <tr class="head"><th>Główna</th><th>Scal</th><th>Osoba</th><th>Pozwolenie</th><th>Adres</th><th>Kontakt</th><th>Pochodzenie</th></tr>
+    {% for p in g %}<tr>
+      <td><input type="radio" name="glowna" value="{{ p.pk }}"{% if p.is_primary %} checked{% endif %} aria-label="Osoba główna: {{ p.full_name }} #{{ p.pk }}"></td>
+      <td><input type="checkbox" name="scal" value="{{ p.pk }}"{% if not p.is_primary %} checked{% endif %} aria-label="Scal: {{ p.full_name }} #{{ p.pk }}"></td>
+      <td><a href="{% url 'panel:person_edit' p.pk %}">{{ p.full_name }}</a> <span class="small muted">#{{ p.pk }}</span>{% if p.user %} <span class="badge">konto</span>{% endif %}{% if p.card_printed_at %} <span class="badge warn" title="wydrukowano {{ p.card_printed_at|date:'j.m.Y' }}">karta</span>{% endif %}{% if p.note %}<div class="small muted">{{ p.note }}</div>{% endif %}</td>
+      <td data-label="Pozwolenie" class="small">{{ p.permit_number|default:"—" }}{% if p.permit_issuer %}<div class="muted">{{ p.permit_issuer }}</div>{% endif %}</td>
+      <td data-label="Adres" class="small">{{ p.address|default:"—" }}</td>
+      <td data-label="Kontakt" class="small">{{ p.email }}{% if p.email and p.phone %}<br>{% endif %}{{ p.phone }}</td>
+      <td data-label="Pochodzenie" class="small">{{ p.get_source_display }}<div class="muted">{{ p.created_at|date:"j.m.Y" }}</div></td>
+    </tr>{% endfor %}
+  </table></div>
+  <div class="actions"><button class="btn secondary" type="submit" data-confirm-click="Scalić zaznaczone osoby z osobą główną? Kopie zostaną usunięte.">Scal zaznaczone z główną</button></div>
+</form>
+{% empty %}
+<div class="card"><p class="muted">Brak możliwych duplikatów ✓</p></div>
+{% endfor %}
+{% endblock %}

@@ -85,14 +85,43 @@ def read_rows(uploaded):
     return out
 
 
-def find_existing(item):
-    if item.get("permit_number"):
-        hit = Person.objects.filter(permit_number=item["permit_number"]).first()
+class PersonIndex:
+    """Osoby z kartoteki wg klucza imienia i nazwiska — budowany raz na import (bez zapytania na każdy wiersz)."""
+
+    def __init__(self):
+        from .duplicates import person_key
+
+        self._key = person_key
+        self.by_name = {}
+        for p in Person.objects.all():
+            self.add(p)
+
+    def add(self, person):
+        self.by_name.setdefault(self._key(person), []).append(person)
+
+    def same_name(self, item):
+        from .duplicates import name_key
+
+        return self.by_name.get(name_key(item.get("first_name"), item.get("last_name")), [])
+
+
+def find_existing(item, index=None):
+    """Ta sama osoba w kartotece: ten sam numer pozwolenia; albo to samo imię i nazwisko (bez wielkości liter, polskich
+    znaków i kolejności), gdy wiersz nie ma pozwolenia, osoba w kartotece go nie ma albo zgadza się adres.
+    Dwie osoby o tym samym imieniu i nazwisku z RÓŻNYMI pozwoleniami to dwie osoby (ekran „Możliwe duplikaty”)."""
+    permit = item.get("permit_number")
+    if permit:
+        hit = Person.objects.filter(permit_number=permit).first()
         if hit:
             return hit
-    return Person.objects.filter(first_name__iexact=item["first_name"], last_name__iexact=item["last_name"]).filter(
-        Q(permit_number="") | Q(permit_number=item.get("permit_number", "")) | Q(address__iexact=item.get("address", ""))
-    ).first()
+    same = (index or PersonIndex()).same_name(item)
+    if not same:
+        return None
+    address = " ".join((item.get("address") or "").split()).lower()
+    by_address = [p for p in same if address and " ".join(p.address.split()).lower() == address]
+    if permit:
+        return next((p for p in same if not p.permit_number), None) or (by_address[0] if by_address else None)
+    return by_address[0] if by_address else same[0]
 
 
 def _same(field, a, b):
@@ -133,6 +162,7 @@ def run(uploaded, *, by=None, preview=False, overwrite=False, source=Person.Sour
     rows = read_rows(uploaded)
     report, stats = [], {"dodane": 0, "uzupelnione": 0, "nadpisane": 0}
     with transaction.atomic():
+        index = PersonIndex()
         for row_no, item in rows:
             label = f"Wiersz {row_no}: {item['first_name']} {item['last_name']}"
             if not item["first_name"] or not item["last_name"]:
@@ -144,7 +174,7 @@ def run(uploaded, *, by=None, preview=False, overwrite=False, source=Person.Sour
                 except ValidationError:
                     report.append(("blad", f"{label} — niepoprawny e-mail „{item['email']}” pominięto"))
                     item["email"] = ""
-            existing = find_existing(item)
+            existing = find_existing(item, index)
             if existing:
                 filled, different, replaced = merge(existing, item, overwrite=overwrite)
                 if filled:
@@ -158,7 +188,7 @@ def run(uploaded, *, by=None, preview=False, overwrite=False, source=Person.Sour
                 if not (filled or replaced or different):
                     report.append(("bez_zmian", f"{label} — już w kartotece, bez zmian"))
                 continue
-            Person.objects.create(**item, source=source, created_by=by)
+            index.add(Person.objects.create(**item, source=source, created_by=by))
             stats["dodane"] += 1
             if item["permit_number"] and not item["permit_issuer"]:
                 report.append(("blad", f"{label} — dodano, ale brak organu wydającego pozwolenie (uzupełnij przed wpisem)"))

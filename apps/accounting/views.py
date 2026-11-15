@@ -347,7 +347,10 @@ def ksef_detail(request, pk):
     except Exception:  # noqa: BLE001 — uszkodzony / nietypowy plik: zostaje podsumowanie z bazy
         view = None
     qr = ksef_view.qr_url(invoice, dj_settings.KSEF_ENVIRONMENT)
+    from .bank import booked_payment_for
+
     return render(request, "panel/accounting_ksef_invoice.html", {
+        "duplicate": booked_payment_for(invoice) if invoice.status == KsefInvoice.Status.NEW else None,
         "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE if invoice.direction == KsefInvoice.Direction.SALE else Record.Kind.COST],
         "inv": invoice, "form": form, "reject_form": ReasonForm(), "gross": format_amount(invoice.gross),
         "v": view, "qr": qr, "qr_img": qr_svg_data_uri(qr, box_size=4) if qr else "",
@@ -730,6 +733,10 @@ def bank_list(request):
         qs = qs.filter(status=status)
     page = Paginator(qs, 100).get_page(request.GET.get("page"))
     counts = {s: BankOperation.objects.filter(status=s).count() for s in BankOperation.Status.values}
+    from . import bank
+
+    for op in page:  # wydatki „Do decyzji” pasujące do faktury KSeF — do połączenia, nie do księgowania
+        op.matching_invoices = bank.candidate_invoices(op) if op.status == BankOperation.Status.NEW and op.amount < 0 else []
     return render(request, "panel/accounting_bank.html", {
         "page": page, "status": status, "statuses": BankOperation.Status.choices, "counts": counts, "bulk_form": BankBulkForm(),
         "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE] + DESCRIPTION_HINTS[Record.Kind.COST] + ["Opłaty i prowizje bankowe"],
@@ -776,6 +783,11 @@ def bank_bulk(request):
     d = form.cleaned_data
     done, errors = 0, []
     for op in BankOperation.objects.filter(pk__in=ids, status=BankOperation.Status.NEW).order_by("booked_on", "pk"):
+        matching = [] if op.is_inflow else bank.candidate_invoices(op)
+        if matching:
+            errors.append(f"{op.booked_on:%d.%m.%Y} {format_amount(op.amount)} zł: pasuje do faktury KSeF {matching[0].invoice_number} — "
+                          "otwórz operację i połącz ją z fakturą zamiast księgować drugi raz")
+            continue
         try:
             bank.book(op, by=request.user, description=d["description"], column="revenue" if op.is_inflow else d["cost_column"],
                       activity=d["activity"], task=d["task"])
@@ -809,6 +821,7 @@ def bank_detail(request, pk):
             nxt = BankOperation.objects.filter(status=BankOperation.Status.NEW).order_by("booked_on", "pk").first()
             return redirect("panel:accounting_bank_op", pk=nxt.pk) if nxt else redirect("panel:accounting_bank")
     return render(request, "panel/accounting_bank_op.html", {
+        "candidates": bank.candidate_invoices(op) if op.status == BankOperation.Status.NEW and not op.is_inflow else [],
         "op": op, "form": form, "invoice_form": BankInvoiceForm(op=op), "reason_form": ReasonForm(),
         "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE if op.is_inflow else Record.Kind.COST] + ["Opłaty i prowizje bankowe"],
     })

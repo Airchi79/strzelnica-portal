@@ -49,6 +49,9 @@
 {% else %}
 <div class="card"><p class="muted">Nie udało się wyświetlić treści faktury — pobierz plik XML.</p><p>{{ inv.seller_name }} · {{ inv.issue_date|date:"j.m.Y" }} · należność ogółem {{ inv.gross|pln }}</p></div>
 {% endif %}
+{% if duplicate %}
+<div class="card"><p><span class="badge bad">możliwy podwójny koszt</span> Wydatek {{ duplicate.amount|pln }} z {{ duplicate.booked_on|date:"j.m.Y" }} jest już zaksięgowany z wyciągu bankowego jako <a href="{% url 'panel:accounting_record' duplicate.record.pk %}">Lp. {{ duplicate.record.lp }}</a>. Usuń tamten zapis (operacja wróci do decyzji) i połącz ją z tą fakturą w <a href="{% url 'panel:accounting_bank_op' duplicate.pk %}">operacji z wyciągu</a> — wtedy koszt ujmie faktura.</p></div>
+{% endif %}
 {% if inv.status == 'nowa' %}
 <h2>Przyjęcie do ewidencji</h2>
 <form method="post" class="card" novalidate>{% csrf_token %}

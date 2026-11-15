@@ -155,6 +155,10 @@ def run(*, by=None, now=None, force=False):
     if not error:
         state.last_success_at = now
     state.save()
+    if created:
+        from .bank import match_pending_invoices
+
+        match_pending_invoices()
     if created or failed or error:
         log_event("ksiegowosc.ksef_pobieranie", None, f"KSeF: {state.last_result}" + (f"; błąd: {error}" if error else ""), actor=by)
     return {"ok": not error, "message": state.last_result + (f" — {error}" if error else ""), "created": created}

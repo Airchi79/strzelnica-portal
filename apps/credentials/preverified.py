@@ -235,36 +235,59 @@ def run(uploaded, *, by, preview=False, approve_client=True, fill_emails=True):
     return report
 
 
-def _fill_person_emails(Person, entries):
-    """Kartoteka: osoba bez e-maila i bez konta, jednoznacznie dopasowana po imieniu i nazwisku → e-mail z listy."""
-    report = []
-    by_key = {}
+def kartoteka_status(entries):
+    """{e-mail z listy: (stan, opis)} — jak osoba z listy ma się do kartoteki osób bez konta (bez zmian w danych)."""
+    from apps.clients.models import Person
+
+    persons = {}
+    for p in Person.objects.all():
+        persons.setdefault(name_key(p.first_name, p.last_name), []).append(p)
+    by_email = {}
+    for p in Person.objects.exclude(email=""):
+        by_email.setdefault(p.email.lower(), []).append(p)
+    names = {}
     for e in entries:
-        by_key.setdefault(name_key(e.name), []).append(e)
+        names.setdefault(name_key(e.name), []).append(e)
+    out = {}
+    for e in entries:
+        same_email = by_email.get(e.email, [])
+        matches = persons.get(name_key(e.name), [])
+        if same_email:
+            linked = [p for p in same_email if p.user_id]
+            out[e.email] = ("ok", "połączona z kontem" if linked else "e-mail w kartotece")
+        elif not matches:
+            out[e.email] = ("brak", "brak w kartotece")
+        elif len(matches) > 1 or len(names[name_key(e.name)]) > 1:
+            out[e.email] = ("uwaga", f"{len(matches)} osoby o tym imieniu i nazwisku — uzupełnij ręcznie")
+        elif matches[0].email:
+            out[e.email] = ("uwaga", "w kartotece inny e-mail")
+        elif matches[0].user_id:
+            out[e.email] = ("ok", "połączona z kontem")
+        else:
+            out[e.email] = ("do_uzupelnienia", "bez e-maila — uzupełni import")
+    return out
+
+
+def _fill_person_emails(Person, entries):
+    """Kartoteka: osoba bez e-maila i bez konta, jednoznacznie dopasowana po imieniu i nazwisku → e-mail z listy.
+    Raport obejmuje każdą osobę z listy (także brak w kartotece i e-mail już wpisany)."""
+    report = []
+    status = kartoteka_status(entries)
     persons = {}
     for p in Person.objects.all():
         persons.setdefault(name_key(p.first_name, p.last_name), []).append(p)
     used = {e.lower() for e in Person.objects.exclude(email="").values_list("email", flat=True)}
-    for key, items in by_key.items():
-        matches = persons.get(key, [])
-        if not matches:
+    for e in entries:
+        state, text = status[e.email]
+        if state != "do_uzupelnienia":
+            report.append(("email_ok" if state == "ok" else "pominieto", f"Kartoteka: {e.name} — {text}"))
             continue
-        name = items[0].name
-        if len(items) > 1 or len(matches) > 1:
-            report.append(("pominieto", f"Kartoteka: {name} — kilka osób o tym imieniu i nazwisku, e-mail uzupełnij ręcznie"))
-            continue
-        person, entry = matches[0], items[0]
-        if person.email:
-            if person.email.lower() != entry.email:
-                report.append(("pominieto", f"Kartoteka: {person.full_name} — ma już inny e-mail, bez zmian"))
-            continue
-        if person.user_id:
-            continue
-        if entry.email in used:
+        person = persons[name_key(e.name)][0]
+        if e.email in used:
             report.append(("pominieto", f"Kartoteka: {person.full_name} — ten e-mail ma już inna osoba w kartotece, bez zmian"))
             continue
-        person.email = entry.email
+        person.email = e.email
         person.save(update_fields=["email"])
-        used.add(entry.email)
+        used.add(e.email)
         report.append(("email", f"Kartoteka: {person.full_name} — uzupełniono e-mail"))
     return report

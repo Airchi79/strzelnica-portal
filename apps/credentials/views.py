@@ -257,11 +257,17 @@ def panel_preverified(request):
             else:
                 if not preview:
                     messages.success(request, "Lista zapisana.")
-    entries = PreverifiedOfficer.objects.select_related("applied_user")
+    entries = list(PreverifiedOfficer.objects.select_related("applied_user"))
+    status = preverified.kartoteka_status(entries)
+    for e in entries:
+        e.kartoteka_state, e.kartoteka_text = status[e.email]
+    summary = {}
+    for state, _ in status.values():
+        summary[state] = summary.get(state, 0) + 1
     log_sensitive_access(None, "ps-zweryfikowani-wczesniej", "lista PS zweryfikowanych wcześniej")
     counts = {}
     for status, _ in report or []:
         counts[status] = counts.get(status, 0) + 1
     return render(request, "panel/credentials_preverified.html", {
-        "entries": entries, "report": report, "preview": preview, "counts": counts,
-        "applied": entries.filter(applied_user__isnull=False).count()})
+        "entries": entries, "report": report, "preview": preview, "counts": counts, "summary": summary,
+        "applied": sum(1 for e in entries if e.applied_user_id)})

@@ -68,6 +68,8 @@ def test_import_preview_then_save_fills_kartoteka_and_approves_waiting_account(o
     Credential.objects.create(user=mismatch, kind="ps", number="PS-8", issuer="PZSS", issued_on=date(2020, 1, 1))
     mail.outbox.clear()
 
+    before = owner_client.get("/panel/weryfikacja/ps-zweryfikowani/").content.decode()
+    assert "Lista jest pusta" in before
     r = owner_client.post("/panel/weryfikacja/ps-zweryfikowani/", {"plik": gt_list(ROWS), "tryb": "podglad",
                                                                     "zatwierdz_klienta": "1", "uzupelnij_emaile": "1"})
     page = r.content.decode()
@@ -81,7 +83,11 @@ def test_import_preview_then_save_fills_kartoteka_and_approves_waiting_account(o
     assert PreverifiedOfficer.objects.count() == 3 and "brak lub błędny adres e-mail" in page
     assert PreverifiedOfficer.objects.get(email="anna@example.com").verified_on == date(2026, 6, 3)
     assert Person.objects.get(last_name="Testowy").email == "pawel@example.com"
-    assert not Person.objects.filter(last_name="Dwojga").exclude(email="").exists() and "kilka osób" in page
+    assert not Person.objects.filter(last_name="Dwojga").exclude(email="").exists() and "2 osoby o tym imieniu i nazwisku" in page
+    assert "Anna Próbna — brak w kartotece" in page  # raport pokazuje też osoby spoza kartoteki
+    listing = owner_client.get("/panel/weryfikacja/ps-zweryfikowani/").content.decode()
+    assert "e-mail już jest — <strong>1</strong>" in listing and "brak w kartotece — <strong>1</strong>" in listing
+    assert "do sprawdzenia ręcznie — <strong>1</strong>" in listing
     c = Credential.objects.get(user=waiting)
     assert c.status == Credential.Status.VERIFIED and c.reviewed_by is None and "GunTracker (03.06.2026)" in c.review_note
     assert profile_for(waiting).approved_at is not None  # klient zatwierdzony

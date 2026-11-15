@@ -13,6 +13,7 @@ Zasady (bez podwójnego ujęcia):
 
 import hashlib
 import io
+import itertools
 import re
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -23,7 +24,8 @@ from django.utils import timezone
 
 from apps.audit.services import log_event
 
-from .models import BankOperation, KsefInvoice, Record
+from .models import (PAYMENT_BANK, PAYMENT_METHODS, PAYMENT_PRIVATE, REIMBURSE_PENDING, REIMBURSE_TRANSFER, REIMBURSEMENTS,
+                     BankOperation, KsefInvoice, Record)
 
 MAX_BYTES = 10 * 1024 * 1024
 MAX_ROWS = 20000
@@ -31,6 +33,7 @@ REQUIRED = ["Data zaksięgowania", "Kwota", "Opis", "Typ transakcji", "Nadawca",
 DONE_STATUSES = {"zrealizowana", "zaksięgowana", "wykonana", ""}
 INVOICE_WINDOW_DAYS = 180
 PREPAYMENT_DAYS = 30
+MAX_REIMBURSE_CANDIDATES = 15
 
 
 def _grosze(value):
@@ -133,7 +136,8 @@ def candidate_invoices(op, *, include_linked=False):
     """Faktury KSeF (zakup) z należnością równą wydatkowi, z okna dat; najpierw te z numerem faktury w tytule przelewu."""
     start, end = _invoice_window(op.booked_on)
     qs = KsefInvoice.objects.filter(direction=KsefInvoice.Direction.PURCHASE, gross=-op.amount, currency="PLN",
-                                    issue_date__gte=start, issue_date__lte=end).exclude(status=KsefInvoice.Status.REJECTED)
+                                    issue_date__gte=start, issue_date__lte=end, payment_method=PAYMENT_BANK
+                                    ).exclude(status=KsefInvoice.Status.REJECTED)
     if not include_linked:
         qs = qs.exclude(bank_operations__isnull=False)
     title = _norm(op.title)
@@ -271,8 +275,12 @@ def reopen(op, *, by):
         raise ValidationError("Tej operacji nie można przywrócić do decyzji.")
     if op.status == BankOperation.Status.BOOKED and op.record_id and not op.record.is_removed:
         raise ValidationError("Operacja jest zaksięgowana — usuń zapis w ewidencji (karta zapisu), operacja wróci do decyzji.")
-    op.status, op.status_note, op.invoice, op.record, op.stripe_payout = BankOperation.Status.NEW, "", None, None, None
-    op.save(update_fields=["status", "status_note", "invoice", "record", "stripe_payout"])
+    with transaction.atomic():
+        if op.status == BankOperation.Status.REIMBURSEMENT:
+            KsefInvoice.objects.filter(reimbursement_op=op).update(reimbursement=REIMBURSE_PENDING, reimbursement_op=None,
+                                                                    reimbursed_on=None)
+        op.status, op.status_note, op.invoice, op.record, op.stripe_payout = BankOperation.Status.NEW, "", None, None, None
+        op.save(update_fields=["status", "status_note", "invoice", "record", "stripe_payout"])
     log_event("ksiegowosc.wyciag_przywrocenie", None, f"Operacja {op.amount / 100:.2f} zł z {op.booked_on} wraca do decyzji", actor=by)
 
 
@@ -293,3 +301,102 @@ def suggestion(op):
     if "prowizj" in title or "opłat" in title or "oplat" in title or op.kind.lower().startswith(("opłata", "prowizja")):
         return "Opłaty i prowizje bankowe"
     return op.title or op.counterparty
+
+
+# --- faktury zapłacone prywatnie i ich zwrot z rachunku ------------------------------------------
+
+
+def set_payment(invoice, *, by, method, paid_by="", paid_on=None, reimbursement="", reimbursed_on=None, note="",
+                same_seller=False):
+    """Sposób zapłaty faktury zakupu, gdy nie przelewem z rachunku: prywatnie (z rozliczeniem zwrotu), potrącenie przez
+    operatora płatności (Stripe), gotówka. Zwraca liczbę faktur tego sprzedawcy, którym ustawiono ten sam sposób."""
+    methods = {m for m, _ in PAYMENT_METHODS}
+    if method not in methods:
+        raise ValidationError("Wybierz sposób zapłaty.")
+    if invoice.direction != KsefInvoice.Direction.PURCHASE:
+        raise ValidationError("Sposób zapłaty dotyczy faktur zakupu.")
+    paid_by = " ".join((paid_by or "").split())[:120]
+    note = " ".join((note or "").split())[:255]
+    with transaction.atomic():
+        invoice = KsefInvoice.objects.select_for_update().get(pk=invoice.pk)
+        if method != PAYMENT_BANK and invoice.bank_operations.exists():
+            raise ValidationError("Faktura jest połączona z zapłatą z wyciągu bankowego — najpierw przywróć tamtą operację do decyzji.")
+        if invoice.reimbursement_op_id and (method != PAYMENT_PRIVATE or reimbursement != REIMBURSE_TRANSFER):
+            raise ValidationError("Zwrot jest połączony z przelewem z wyciągu — najpierw przywróć tamtą operację do decyzji.")
+        if method == PAYMENT_PRIVATE:
+            if not paid_by:
+                raise ValidationError("Podaj, kto zapłacił fakturę prywatnie.")
+            reimbursement = reimbursement or REIMBURSE_PENDING
+            if reimbursement not in {r for r, _ in REIMBURSEMENTS}:
+                raise ValidationError("Wybierz stan zwrotu.")
+            if reimbursement == REIMBURSE_TRANSFER and not invoice.reimbursement_op_id:
+                raise ValidationError("Zwrot przelewem łączy się z operacją na karcie przelewu w wyciągu bankowym.")
+            if reimbursement == REIMBURSE_PENDING:
+                reimbursed_on = None
+        else:
+            paid_by, reimbursement, reimbursed_on = "", "", None
+        invoice.payment_method, invoice.paid_by, invoice.paid_on = method, paid_by, paid_on
+        invoice.reimbursement, invoice.reimbursed_on, invoice.payment_note = reimbursement, reimbursed_on, note
+        invoice.save(update_fields=["payment_method", "paid_by", "paid_on", "reimbursement", "reimbursed_on", "payment_note"])
+        others = 0
+        if same_seller and method not in (PAYMENT_BANK, PAYMENT_PRIVATE) and invoice.seller_nip:
+            others = (KsefInvoice.objects.filter(direction=KsefInvoice.Direction.PURCHASE, seller_nip=invoice.seller_nip,
+                                                 payment_method=PAYMENT_BANK, bank_operations__isnull=True)
+                      .exclude(pk=invoice.pk).update(payment_method=method))
+    log_event("ksiegowosc.ksef_zaplata", None, f"Faktura {invoice.invoice_number}: sposób zapłaty — "
+                                               f"{invoice.get_payment_method_display()}"
+                                               + (f" ({invoice.get_reimbursement_display().lower()})" if reimbursement else "")
+                                               + (f"; to samo dla innych faktur sprzedawcy: {others}" if others else ""), actor=by)
+    return others
+
+
+def reimbursement_candidates(op):
+    """Faktury zapłacone prywatnie, czekające na zwrot, wystawione najpóźniej 30 dni po przelewie."""
+    if op.is_inflow or op.currency != "PLN":
+        return []
+    return list(KsefInvoice.objects.filter(direction=KsefInvoice.Direction.PURCHASE, payment_method=PAYMENT_PRIVATE,
+                                           reimbursement=REIMBURSE_PENDING, currency="PLN",
+                                           issue_date__lte=op.booked_on + timedelta(days=PREPAYMENT_DAYS))
+                .exclude(status=KsefInvoice.Status.REJECTED).order_by("issue_date", "pk"))
+
+
+def reimbursement_match(op, candidates=None):
+    """Zestaw faktur do zwrotu, których suma równa się kwocie przelewu (najmniej faktur; przy remisie — najstarsze)."""
+    candidates = reimbursement_candidates(op) if candidates is None else candidates
+    target = -op.amount
+    pool = candidates[:MAX_REIMBURSE_CANDIDATES]
+    for size in range(1, len(pool) + 1):
+        for combo in itertools.combinations(pool, size):
+            if sum(i.gross for i in combo) == target:
+                return list(combo)
+    return []
+
+
+def link_reimbursement(op, invoices, *, by):
+    """Przelew z rachunku = zwrot osobie, która zapłaciła faktury prywatnie. Koszt ujmują faktury — przelew nie jest
+    drugim kosztem."""
+    if op.is_inflow or op.status != BankOperation.Status.NEW:
+        raise ValidationError("Jako zwrot łączy się wydatek czekający na decyzję.")
+    if not invoices:
+        raise ValidationError("Zaznacz faktury, za które jest ten zwrot.")
+    with transaction.atomic():
+        op = BankOperation.objects.select_for_update().get(pk=op.pk)
+        if op.status != BankOperation.Status.NEW:
+            raise ValidationError("Ta operacja nie czeka na decyzję.")
+        locked = list(KsefInvoice.objects.select_for_update().filter(pk__in=[i.pk for i in invoices]))
+        if any(not i.awaiting_reimbursement for i in locked) or len(locked) != len(invoices):
+            raise ValidationError("Zaznaczone faktury muszą być zapłacone prywatnie i czekać na zwrot.")
+        total = sum(i.gross for i in locked)
+        if total != -op.amount:
+            from apps.facilities.models import format_pln
+
+            raise ValidationError(f"Suma zaznaczonych faktur ({format_pln(total)}) różni się od kwoty przelewu ({format_pln(-op.amount)}).")
+        for i in locked:
+            i.reimbursement, i.reimbursement_op, i.reimbursed_on = REIMBURSE_TRANSFER, op, op.booked_on
+            i.save(update_fields=["reimbursement", "reimbursement_op", "reimbursed_on"])
+        names = ", ".join(sorted({i.invoice_number for i in locked}))
+        op.status, op.status_note = BankOperation.Status.REIMBURSEMENT, f"zwrot za faktury: {names}"[:255]
+        op.save(update_fields=["status", "status_note"])
+    log_event("ksiegowosc.wyciag_zwrot", None, f"Wydatek {-op.amount / 100:.2f} zł z {op.booked_on} — zwrot za faktury "
+                                               f"zapłacone prywatnie: {names}", actor=by)
+    return op

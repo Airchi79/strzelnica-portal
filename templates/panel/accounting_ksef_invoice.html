@@ -52,6 +52,18 @@
 {% if duplicate %}
 <div class="card"><p><span class="badge bad">możliwy podwójny koszt</span> Wydatek {{ duplicate.amount|pln }} z {{ duplicate.booked_on|date:"j.m.Y" }} jest już zaksięgowany z wyciągu bankowego jako <a href="{% url 'panel:accounting_record' duplicate.record.pk %}">Lp. {{ duplicate.record.lp }}</a>. Usuń tamten zapis (operacja wróci do decyzji) i połącz ją z tą fakturą w <a href="{% url 'panel:accounting_bank_op' duplicate.pk %}">operacji z wyciągu</a> — wtedy koszt ujmie faktura.</p></div>
 {% endif %}
+{% if payment_form and inv.status != 'odrzucona' %}
+<details class="card"{% if inv.payment_method %} open{% endif %}><summary>Zapłata: {% if paid_from_bank %}przelewem z rachunku {{ paid_from_bank.booked_on|date:"j.m.Y" }}{% else %}{{ inv.get_payment_method_display|lower }}{% if inv.payment_method == 'prywatnie' %} — {{ inv.paid_by }}, {{ inv.get_reimbursement_display|lower }}{% if inv.reimbursed_on %} {{ inv.reimbursed_on|date:"j.m.Y" }}{% endif %}{% elif not inv.payment_method %} (brak w wyciągu){% endif %}{% endif %}</summary>
+{% if paid_from_bank %}<p class="small">Zapłata z wyciągu: <a href="{% url 'panel:accounting_bank_op' paid_from_bank.pk %}">{{ paid_from_bank.booked_on|date:"j.m.Y" }} · {{ paid_from_bank.amount|pln }}</a>.</p>
+{% else %}
+{% if inv.reimbursement_op %}<p class="small">Zwrot przelewem: <a href="{% url 'panel:accounting_bank_op' inv.reimbursement_op.pk %}">{{ inv.reimbursement_op.booked_on|date:"j.m.Y" }} · {{ inv.reimbursement_op.amount|pln }}</a>.</p>{% endif %}
+<form method="post" action="{% url 'panel:accounting_ksef_payment' inv.pk %}" novalidate>{% csrf_token %}
+  <p class="small muted">Wskaż sposób zapłaty, gdy faktura nie była płacona przelewem z rachunku stowarzyszenia. Koszt w ewidencji się nie zmienia — informacja służy do uzgodnienia salda i rozliczenia zwrotów.</p>
+  {% with form=payment_form %}{% include "partials/form.html" %}{% endwith %}
+  <div class="actions"><button class="btn secondary" type="submit">Zapisz sposób zapłaty</button></div></form>
+{% endif %}
+</details>
+{% endif %}
 {% if inv.status == 'nowa' %}
 <h2>Przyjęcie do ewidencji</h2>
 <form method="post" class="card" novalidate>{% csrf_token %}

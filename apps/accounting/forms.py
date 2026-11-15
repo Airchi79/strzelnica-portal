@@ -403,3 +403,42 @@ class KsefBulkForm(forms.Form):
     activity = forms.ChoiceField(label="Forma działalności", required=False, choices=[("", "— nieprzypisane —")] + Activity.choices,
                                  initial=DEFAULT_ACTIVITY)
     task = forms.ModelChoiceField(label="Umowa (dotacja)", required=False, queryset=PublicTask.objects.all(), empty_label="— nie dotyczy —")
+
+
+class KsefPaymentForm(forms.Form):
+    """Sposób zapłaty faktury zakupu (uzgodnienie salda: koszt bez wydatku z rachunku stowarzyszenia)."""
+
+    method = forms.ChoiceField(label="Sposób zapłaty", required=False, widget=forms.RadioSelect)
+    paid_by = forms.CharField(label="Kto zapłacił prywatnie", max_length=120, required=False,
+                              help_text="Imię i nazwisko — do rozliczenia zwrotu.")
+    paid_on = forms.DateField(label="Data zapłaty", required=False, widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+    reimbursement = forms.ChoiceField(label="Zwrot wydatku", required=False, help_text=(
+        "Zwrot przelewem łączy się na karcie przelewu w wyciągu bankowym („Zwrot za faktury zapłacone prywatnie”). Zrzeczenie się "
+        "zwrotu jest zwykle nieodpłatnym świadczeniem (darowizną) na rzecz stowarzyszenia — rozważ ujęcie go jako przychodu "
+        "wpisem ręcznym; w razie wątpliwości skonsultuj z księgowym."))
+    reimbursed_on = forms.DateField(label="Data zwrotu gotówką", required=False,
+                                    widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+    note = forms.CharField(label="Uwagi", max_length=255, required=False)
+    same_seller = forms.BooleanField(label="Ustaw ten sam sposób dla pozostałych faktur tego sprzedawcy bez zapłaty z wyciągu",
+                                     required=False, help_text="Np. wszystkie faktury prowizyjne platformy — potrącane z wypłat Stripe.")
+
+    def __init__(self, *args, invoice, **kwargs):
+        from .models import PAYMENT_METHODS, REIMBURSE_TRANSFER, REIMBURSEMENTS
+
+        initial = {"method": invoice.payment_method, "paid_by": invoice.paid_by, "paid_on": invoice.paid_on,
+                   "reimbursement": invoice.reimbursement, "reimbursed_on": invoice.reimbursed_on, "note": invoice.payment_note}
+        super().__init__(*args, initial=initial, **kwargs)
+        self.fields["method"].choices = PAYMENT_METHODS
+        allowed = [(v, label) for v, label in REIMBURSEMENTS if v != REIMBURSE_TRANSFER or invoice.reimbursement_op_id]
+        self.fields["reimbursement"].choices = allowed
+
+
+class BankReimbursementForm(forms.Form):
+    invoices = forms.ModelMultipleChoiceField(label="Faktury zapłacone prywatnie, za które jest ten zwrot", queryset=KsefInvoice.objects.none(),
+                                              widget=forms.CheckboxSelectMultiple)
+
+    def __init__(self, *args, candidates=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["invoices"].queryset = KsefInvoice.objects.filter(pk__in=[i.pk for i in candidates]).order_by("issue_date", "pk")
+        self.fields["invoices"].label_from_instance = (
+            lambda i: f"{i.invoice_number} · {i.seller_name} · {i.issue_date:%d.%m.%Y} · {format_amount(i.gross)} zł — zapłacił(a) {i.paid_by}")

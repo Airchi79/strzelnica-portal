@@ -1,0 +1,25 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Dokumenty{% endblock %}
+{% block panel %}
+<h1>Generator dokumentów</h1>
+{% include "panel/_accounting_tabs.html" %}
+<p class="muted">Gotowe dokumenty z danymi stowarzyszenia i kwotami z ewidencji: PDF do podpisu albo DOCX do dalszej edycji. Treść przed użyciem sprawdź — za dokument odpowiada zarząd. Dane stowarzyszenia (nazwa, adres, NIP, REGON) pochodzą z „Dane stowarzyszenia”, a urząd skarbowy, organ zatwierdzający i podpisujący — z ustawień księgowości.</p>
+{% for group, docs in groups.items %}
+<h2>{{ group }}</h2>
+<div class="card">{% for d in docs %}
+  <div style="margin-bottom:10px"><a href="{% url 'panel:accounting_doc_new' d.key %}"><strong>{{ d.title }}</strong></a>
+    <div class="small muted">{{ d.legal }}{% if d.hint %} — {{ d.hint }}{% endif %}</div></div>
+{% endfor %}</div>
+{% endfor %}
+<h2>Wygenerowane dokumenty</h2>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Dokument</th><th>Rodzaj</th><th>Utworzono</th><th>Pobierz</th></tr>
+  {% for obj in page %}<tr>
+    <td><a href="{% url 'panel:accounting_doc' obj.pk %}">{{ obj.title }}</a></td>
+    <td data-label="Rodzaj" class="small">{% for k, v in names.items %}{% if k == obj.kind %}{{ v }}{% endif %}{% endfor %}</td>
+    <td data-label="Utworzono">{{ obj.created_at|date:"j.m.Y H:i" }}{% if obj.created_by %} — {{ obj.created_by.full_name }}{% endif %}</td>
+    <td data-label="Pobierz"><a href="{% url 'panel:accounting_doc_download' obj.pk 'pdf' %}">PDF</a> · <a href="{% url 'panel:accounting_doc_download' obj.pk 'docx' %}">DOCX</a></td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Brak dokumentów.</td></tr>{% endfor %}
+</table></div></section>
+{% include "partials/pagination.html" %}
+{% endblock %}

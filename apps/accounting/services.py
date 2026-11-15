@@ -180,6 +180,8 @@ def remove_record(record, *, by, reason):
         record.version += 1
         record.save()
         _version(record, RecordVersion.Action.REMOVE, by, reason)
+        # operacja z wyciągu wraca do decyzji (powiązanie zostaje — przywrócenie zapisu przywróci też „zaksięgowana”)
+        record.bank_operations.update(status="nowa", status_note=f"zapis usunięty z ewidencji: {reason}"[:255])
         for invoice in record.ksef_invoices.all():  # faktura wraca do decyzji
             invoice.status, invoice.record, invoice.status_note = invoice.Status.NEW, None, f"usunięta z ewidencji: {reason}"[:255]
             invoice.save(update_fields=["status", "record", "status_note"])
@@ -203,6 +205,7 @@ def restore_record(record, *, by, reason=""):
         record.version += 1
         record.save()
         _version(record, RecordVersion.Action.RESTORE, by, reason or "przywrócenie zapisu")
+        record.bank_operations.filter(status="nowa").update(status="zaksiegowana", status_note="")
         if record.ksef_number:
             from .models import KsefInvoice
 

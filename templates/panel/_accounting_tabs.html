@@ -5,6 +5,7 @@
   <a href="{% url 'panel:accounting_add' 'koszt' %}" class="{% if u == 'accounting_add' and kind == 'koszt' %}active{% endif %}">Dodaj koszt</a>
   <a href="{% url 'panel:accounting_supplementary' %}" class="{% if u == 'accounting_supplementary' or 'accounting_task' in u or 'accounting_donation' in u %}active{% endif %}">Uzupełniające</a>
   <a href="{% url 'panel:accounting_assets' %}" class="{% if 'accounting_asset' in u %}active{% endif %}">Środki trwałe</a>
+  <a href="{% url 'panel:accounting_bank' %}" class="{% if 'accounting_bank' in u %}active{% endif %}">Wyciąg bankowy</a>
   <a href="{% url 'panel:accounting_ksef' %}" class="{% if 'accounting_ksef' in u %}active{% endif %}">Faktury KSeF</a>
   <a href="{% url 'panel:accounting_docs' %}" class="{% if 'accounting_doc' in u %}active{% endif %}">Dokumenty</a>
   <a href="{% url 'panel:accounting_years' %}" class="{% if u == 'accounting_years' %}active{% endif %}">Lata i zamknięcia</a>

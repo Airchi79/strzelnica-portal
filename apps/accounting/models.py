@@ -414,3 +414,48 @@ class KsefSync(models.Model):
     def load(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class BankOperation(models.Model):
+    """Operacja z wyciągu bankowego (import XLSX z bankowości) czekająca na decyzję w księgowości. Wyciąg bankowy jest
+    dowodem księgowym (§ 7 ust. 3 pkt 1 rozporządzenia). Wpłaty strzelców rozliczone w systemie i zapłaty faktur KSeF
+    nie tworzą drugiego zapisu — przychód ujmuje raport wpływów, koszt — faktura."""
+
+    class Status(models.TextChoices):
+        NEW = "nowa", "Do decyzji"
+        BOOKED = "zaksiegowana", "Zaksięgowana"
+        SYSTEM = "system", "Wpłata strzelca rozliczona w systemie"
+        INVOICE = "faktura", "Zapłata faktury KSeF"
+        SKIPPED = "pominieta", "Pominięta (nie dotyczy ewidencji)"
+
+    key = models.CharField("identyfikator operacji", max_length=64, unique=True)
+    account = models.CharField("rachunek stowarzyszenia", max_length=34, blank=True)
+    transaction_at = models.DateTimeField("data transakcji", null=True, blank=True)
+    booked_on = models.DateField("data zaksięgowania")
+    amount = models.BigIntegerField("kwota [gr] (wpływ +, wydatek −)")
+    currency = models.CharField("waluta", max_length=3, default="PLN")
+    counterparty_account = models.CharField("rachunek kontrahenta", max_length=34, blank=True)
+    counterparty = models.CharField("kontrahent", max_length=160, blank=True)
+    title = models.CharField("tytuł / opis", max_length=255, blank=True)
+    kind = models.CharField("typ transakcji", max_length=60, blank=True)
+    balance_after = models.BigIntegerField("saldo po operacji [gr]", null=True, blank=True)
+    status = models.CharField("status", max_length=12, choices=Status.choices, default=Status.NEW)
+    status_note = models.CharField("uwagi do decyzji", max_length=255, blank=True)
+    record = models.ForeignKey(Record, null=True, blank=True, on_delete=models.SET_NULL, related_name="bank_operations")
+    invoice = models.ForeignKey(KsefInvoice, null=True, blank=True, on_delete=models.SET_NULL, related_name="bank_operations")
+    payment = models.ForeignKey("payments.Payment", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    source_file = models.CharField("plik", max_length=160, blank=True)
+    imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-booked_on", "-transaction_at", "-pk"]
+        verbose_name = "operacja z wyciągu"
+        verbose_name_plural = "operacje z wyciągu"
+
+    def __str__(self):
+        return f"{self.booked_on} {self.amount / 100:.2f} {self.counterparty}"
+
+    @property
+    def is_inflow(self):
+        return self.amount > 0

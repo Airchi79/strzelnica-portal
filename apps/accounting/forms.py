@@ -342,3 +342,49 @@ class KsefSyncForm(forms.ModelForm):
         if data.get("sync_from") and data["sync_from"] > timezone.localdate():
             self.add_error("sync_from", "Data nie może być z przyszłości.")
         return data
+
+
+class BankBookForm(forms.Form):
+    date = forms.DateField(label="Data zdarzenia (kol. 2)", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+    document = forms.CharField(label="Nr dowodu księgowego (kol. 3)", max_length=64)
+    description = forms.CharField(label="Opis zdarzenia (kol. 4)", max_length=255, widget=forms.TextInput(attrs={"list": "opisy"}))
+    column = forms.ChoiceField(label="Kolumna zestawienia", choices=COST_COLUMNS, widget=forms.RadioSelect)
+    activity = forms.ChoiceField(label="Forma działalności", required=False, choices=[("", "— nieprzypisane —")] + Activity.choices)
+    task = forms.ModelChoiceField(label="Umowa o realizację zadania publicznego (dotacja)", required=False,
+                                  queryset=PublicTask.objects.all(), empty_label="— nie dotyczy —")
+    notes = forms.CharField(label="Uwagi (kol. 8)", max_length=255, required=False)
+
+    def __init__(self, *args, op, suggestion="", **kwargs):
+        super().__init__(*args, **kwargs)
+        if op.is_inflow:
+            self.fields["column"].choices = [("revenue", "Kol. 5 — przychód")]
+        if not self.is_bound:
+            self.initial.update({"date": op.booked_on, "document": f"Wyciąg bankowy {op.booked_on:%d.%m.%Y}",
+                                 "description": suggestion, "notes": op.title[:255],
+                                 "column": "revenue" if op.is_inflow else "cost_deductible"})
+
+    def clean_date(self):
+        value = self.cleaned_data["date"]
+        if value > timezone.localdate():
+            raise forms.ValidationError("Data zdarzenia nie może być z przyszłości.")
+        return value
+
+
+class BankBulkForm(forms.Form):
+    description = forms.CharField(label="Opis zdarzenia (kol. 4) dla zaznaczonych", max_length=255,
+                                  widget=forms.TextInput(attrs={"list": "opisy"}))
+    cost_column = forms.ChoiceField(label="Kolumna dla wydatków", choices=COST_COLUMNS, initial="cost_deductible")
+    activity = forms.ChoiceField(label="Forma działalności", required=False, choices=[("", "— nieprzypisane —")] + Activity.choices)
+    task = forms.ModelChoiceField(label="Umowa (dotacja)", required=False, queryset=PublicTask.objects.all(), empty_label="— nie dotyczy —")
+
+
+class BankInvoiceForm(forms.Form):
+    invoice = forms.ModelChoiceField(label="Faktura KSeF opłacona tym przelewem", queryset=KsefInvoice.objects.none())
+
+    def __init__(self, *args, op, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["invoice"].queryset = (KsefInvoice.objects.filter(direction=KsefInvoice.Direction.PURCHASE)
+                                           .exclude(status=KsefInvoice.Status.REJECTED).exclude(bank_operations__isnull=False)
+                                           .order_by("-issue_date"))
+        self.fields["invoice"].label_from_instance = (
+            lambda i: f"{i.invoice_number} · {i.seller_name} · {i.issue_date:%d.%m.%Y} · {format_amount(i.gross)} zł")

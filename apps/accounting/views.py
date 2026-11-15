@@ -688,3 +688,129 @@ def donation_delete(request, pk):
         messages.success(request, "Usunięto darowiznę z zestawienia" + (" — zapis przychodu usuń osobno w zestawieniu przychodów i kosztów."
                                                                          if donation.record_id else "."))
     return redirect(reverse("panel:accounting_supplementary") + f"?rok={year}")
+
+
+# --- wyciąg bankowy -----------------------------------------------------------------------
+
+
+@panel_required(PERM)
+def bank_list(request):
+    from .forms import BankBulkForm
+    from .models import BankOperation
+
+    status = request.GET.get("status", BankOperation.Status.NEW)
+    qs = BankOperation.objects.select_related("record", "invoice", "payment")
+    if status in BankOperation.Status.values:
+        qs = qs.filter(status=status)
+    page = Paginator(qs, 100).get_page(request.GET.get("page"))
+    counts = {s: BankOperation.objects.filter(status=s).count() for s in BankOperation.Status.values}
+    return render(request, "panel/accounting_bank.html", {
+        "page": page, "status": status, "statuses": BankOperation.Status.choices, "counts": counts, "bulk_form": BankBulkForm(),
+        "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE] + DESCRIPTION_HINTS[Record.Kind.COST] + ["Opłaty i prowizje bankowe"],
+    })
+
+
+@panel_required(PERM)
+@require_POST
+def bank_import(request):
+    from . import bank
+
+    uploaded = request.FILES.get("plik")
+    if not uploaded:
+        messages.error(request, "Wybierz plik XLSX z bankowości.")
+        return redirect("panel:accounting_bank")
+    try:
+        created, duplicates, system, invoices = bank.import_xlsx(uploaded, by=request.user)
+    except ValidationError as e:
+        _error(request, e)
+        return redirect("panel:accounting_bank")
+    parts = [f"nowe operacje: {len(created)}"]
+    if system:
+        parts.append(f"wpłaty strzelców rozliczone w systemie: {system}")
+    if invoices:
+        parts.append(f"zapłaty faktur KSeF: {invoices}")
+    if duplicates:
+        parts.append(f"pominięte (już wgrane): {duplicates}")
+    messages.success(request, "Wyciąg: " + ", ".join(parts) + ".")
+    return redirect("panel:accounting_bank")
+
+
+@panel_required(PERM)
+@require_POST
+def bank_bulk(request):
+    from . import bank
+    from .forms import BankBulkForm
+    from .models import BankOperation
+
+    form = BankBulkForm(request.POST)
+    ids = [int(x) for x in request.POST.getlist("operacja") if x.isdigit()]
+    if not ids or not form.is_valid():
+        messages.error(request, "Zaznacz operacje i podaj opis zdarzenia.")
+        return redirect("panel:accounting_bank")
+    d = form.cleaned_data
+    done, errors = 0, []
+    for op in BankOperation.objects.filter(pk__in=ids, status=BankOperation.Status.NEW).order_by("booked_on", "pk"):
+        try:
+            bank.book(op, by=request.user, description=d["description"], column="revenue" if op.is_inflow else d["cost_column"],
+                      activity=d["activity"], task=d["task"])
+            done += 1
+        except ValidationError as e:
+            errors.append(f"{op.booked_on:%d.%m.%Y} {format_amount(op.amount)} zł: {e.messages[0]}")
+    if done:
+        messages.success(request, f"Zaksięgowano operacji: {done}.")
+    for err in errors[:10]:
+        messages.error(request, err)
+    return redirect("panel:accounting_bank")
+
+
+@panel_required(PERM)
+def bank_detail(request, pk):
+    from . import bank
+    from .forms import BankBookForm, BankInvoiceForm
+    from .models import BankOperation
+
+    op = get_object_or_404(BankOperation.objects.select_related("record", "invoice", "payment"), pk=pk)
+    form = BankBookForm(request.POST or None, op=op, suggestion=bank.suggestion(op))
+    if request.method == "POST" and form.is_valid():
+        d = form.cleaned_data
+        try:
+            record = bank.book(op, by=request.user, description=d["description"], column=d["column"], activity=d["activity"],
+                               task=d["task"], day=d["date"], document=d["document"], notes=d["notes"])
+        except ValidationError as e:
+            form.add_error(None, e.messages[0])
+        else:
+            messages.success(request, f"Zaksięgowano pod Lp. {record.lp}.")
+            nxt = BankOperation.objects.filter(status=BankOperation.Status.NEW).order_by("booked_on", "pk").first()
+            return redirect("panel:accounting_bank_op", pk=nxt.pk) if nxt else redirect("panel:accounting_bank")
+    return render(request, "panel/accounting_bank_op.html", {
+        "op": op, "form": form, "invoice_form": BankInvoiceForm(op=op), "reason_form": ReasonForm(),
+        "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE if op.is_inflow else Record.Kind.COST] + ["Opłaty i prowizje bankowe"],
+    })
+
+
+@panel_required(PERM)
+@require_POST
+def bank_action(request, pk, action):
+    from . import bank
+    from .forms import BankInvoiceForm
+    from .models import BankOperation
+
+    op = get_object_or_404(BankOperation, pk=pk)
+    try:
+        if action == "pomin":
+            bank.skip(op, by=request.user, reason=request.POST.get("reason", ""))
+            messages.success(request, "Operację pominięto.")
+        elif action == "faktura":
+            form = BankInvoiceForm(request.POST, op=op)
+            if not form.is_valid():
+                raise ValidationError("Wybierz fakturę.")
+            bank.link_invoice(op, form.cleaned_data["invoice"], by=request.user)
+            messages.success(request, "Połączono z fakturą — koszt ujmuje faktura.")
+        elif action == "przywroc":
+            bank.reopen(op, by=request.user)
+            messages.success(request, "Operacja wraca do decyzji.")
+        else:
+            raise Http404
+    except ValidationError as e:
+        _error(request, e)
+    return redirect("panel:accounting_bank_op", pk=pk)

@@ -118,8 +118,10 @@ class PriceRule(models.Model):
 
 
 def format_pln(grosze: int) -> str:
-    zl, gr = divmod(int(grosze), 100)
-    return f"{zl:,}".replace(",", " ") + (f",{gr:02d}" if gr else "") + " zł"
+    # znak osobno: divmod liczby ujemnej zaokrągla w dół (−1250 gr dawało „−13,50 zł” zamiast „−12,50 zł”)
+    sign = "-" if int(grosze) < 0 else ""
+    zl, gr = divmod(abs(int(grosze)), 100)
+    return sign + f"{zl:,}".replace(",", " ") + (f",{gr:02d}" if gr else "") + " zł"
 
 
 from apps.credentials.models import get_private_storage  # noqa: E402 — zdjęcia usterek poza publicznym dostępem

@@ -208,6 +208,11 @@ def test_booked_bank_cost_blocks_double_invoice_cost(owner, owner_client):
     assert records == [] and "podwoiłoby koszt" in errors[0]
     # poprawka: usunięcie zapisu z wyciągu → operacja do decyzji → podpowiedź faktury → połączenie
     services.remove_record(rec, by=owner, reason="koszt z faktury")
+    listing = owner_client.get("/panel/ksiegowosc/wyciag/").content.decode()
+    assert "pasuje do faktury 129/09/2026" in listing
+    r = owner_client.post("/panel/ksiegowosc/wyciag/zbiorczo/", {"operacja": [op.pk], "description": "Druk", "cost_column": "cost_deductible",
+                                                                 "activity": "pozostala"}, follow=True)
+    assert "połącz ją z fakturą" in r.content.decode() and BankOperation.objects.get(pk=op.pk).status == BankOperation.Status.NEW
     page = owner_client.get(f"/panel/ksiegowosc/wyciag/{op.pk}/").content.decode()
     assert "pasująca faktura KSeF" in page and "129/09/2026" in page
     owner_client.post(f"/panel/ksiegowosc/wyciag/{op.pk}/faktura/", {"invoice": inv.pk})

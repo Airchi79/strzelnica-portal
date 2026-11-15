@@ -733,6 +733,10 @@ def bank_list(request):
         qs = qs.filter(status=status)
     page = Paginator(qs, 100).get_page(request.GET.get("page"))
     counts = {s: BankOperation.objects.filter(status=s).count() for s in BankOperation.Status.values}
+    from . import bank
+
+    for op in page:  # wydatki „Do decyzji” pasujące do faktury KSeF — do połączenia, nie do księgowania
+        op.matching_invoices = bank.candidate_invoices(op) if op.status == BankOperation.Status.NEW and op.amount < 0 else []
     return render(request, "panel/accounting_bank.html", {
         "page": page, "status": status, "statuses": BankOperation.Status.choices, "counts": counts, "bulk_form": BankBulkForm(),
         "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE] + DESCRIPTION_HINTS[Record.Kind.COST] + ["Opłaty i prowizje bankowe"],
@@ -779,6 +783,11 @@ def bank_bulk(request):
     d = form.cleaned_data
     done, errors = 0, []
     for op in BankOperation.objects.filter(pk__in=ids, status=BankOperation.Status.NEW).order_by("booked_on", "pk"):
+        matching = [] if op.is_inflow else bank.candidate_invoices(op)
+        if matching:
+            errors.append(f"{op.booked_on:%d.%m.%Y} {format_amount(op.amount)} zł: pasuje do faktury KSeF {matching[0].invoice_number} — "
+                          "otwórz operację i połącz ją z fakturą zamiast księgować drugi raz")
+            continue
         try:
             bank.book(op, by=request.user, description=d["description"], column="revenue" if op.is_inflow else d["cost_column"],
                       activity=d["activity"], task=d["task"])

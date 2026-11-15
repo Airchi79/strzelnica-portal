@@ -660,8 +660,9 @@ def test_gate_suggest_rate_limited(client, running, monkeypatch):
 def test_dashboard_quick_logbook_actions(client, ps, running, sig):
     client.force_login(ps)
     page = client.get("/pulpit/").content.decode()
-    token = services.reservation_token(running)
-    assert "Zarezerwuj oś" in page and f'href="/ksiazka/wpis/r/{token}/"' in page  # jedna trwająca rezerwacja → od razu wpis
+    # token zawiera znacznik czasu podpisu (sekundy) — porównujemy rezerwację, na którą wskazuje, a nie sam tekst tokenu
+    links = re.findall(r'href="/ksiazka/wpis/r/([^"/]+)/"', page)
+    assert "Zarezerwuj oś" in page and [services.reservation_from_token(t) for t in links] == [running]  # od razu wpis
     assert 'href="/ksiazka/moj-kod/">Zakończ pobyt' in page  # bez otwartego pobytu → strona książki z informacją
     assert "Nie masz teraz otwartego pobytu" in client.get("/ksiazka/moj-kod/").content.decode()
     entry = services.create_entry(data={**permit_data(), "purpose": "strzelanie", "has_permit": True},

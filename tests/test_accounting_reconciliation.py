@@ -176,3 +176,56 @@ def test_new_commission_invoice_inherits_stripe_offset(owner):
     bank.import_xlsx(xlsx([op_row(date(2026, 9, 2), -9.99, title="GT/003")]), by=owner)
     assert BankOperation.objects.get().invoice == third
     assert _commission(owner, "GT/004", "3.33", date(2026, 10, 1)).payment_method == ""
+
+
+# --- lista kontrolna miesiąca ---------------------------------------------------------------
+
+
+def _states(year, month, today=date(2026, 11, 15)):
+    from apps.accounting import checklist
+
+    return {s.title: s for s in checklist.month_steps(year, month, today)}
+
+
+def test_month_checklist_walks_through_routine(owner, owner_client):
+    s = _states(2026, 7)
+    assert s["Płatności online (Stripe) wgrane i ujęte"].state == "warn"  # brak eksportu
+    assert s["Wyciąg bankowy za cały miesiąc"].state == "warn"
+    # Stripe za lipiec: płatność z prowizją 4 zł, wypłata 96 zł
+    stripe_import.import_files([bal([
+        ("txn_1", "payment", "100.00", "4.00", "96.00", "2026-07-02 10:00", ""),
+        ("txn_x", "payment", "10.00", "0.40", "9.60", "2026-11-10 10:00", ""),  # późniejszy eksport — obejmuje lipiec
+        ("txn_p", "payout", "-96.00", "0.00", "-96.00", "2026-07-03 20:00", "STRIPE PAYOUT")]),
+        payouts([("po_0001", "96.00", "2026-07-03 20:00", "2026-07-04 00:00", "paid")])], by=owner)
+    s = _states(2026, 7)
+    assert s["Płatności online (Stripe) wgrane i ujęte"].state == "todo" and "nieujęte" in s["Płatności online (Stripe) wgrane i ujęte"].detail
+    assert s["Wyciąg bankowy za cały miesiąc"].state == "warn"
+    stripe_import.post(by=owner)
+    bank.import_xlsx(xlsx([op_row(date(2026, 7, 4), 96.0, who="11110000000000000000000000\nSTRIPE", title="STRIPE", balance=96),
+                           op_row(date(2026, 7, 20), -5.0, title="opłata", balance=91),
+                           op_row(date(2026, 8, 2), -1.0, title="opłata", balance=90)]), by=owner)
+    s = _states(2026, 7)
+    assert s["Płatności online (Stripe) wgrane i ujęte"].state == "ok"
+    assert s["Wyciąg bankowy za cały miesiąc"].state == "ok"
+    assert s["Operacje z wyciągu rozstrzygnięte"].state == "todo"
+    assert s["Faktura prowizyjna za płatności online"].state == "warn"  # 15.11 — faktury za lipiec już dawno powinny być
+    bank.skip(BankOperation.objects.get(amount=-500), by=owner, reason="test")
+    # faktura prowizyjna (sierpniowa data) z inną kwotą → sprawdź; po przyjęciu właściwej → gotowe
+    wrong = _commission(owner, "GT/002", "3.50", date(2026, 8, 1))
+    bank.set_payment(wrong, by=owner, method=PAYMENT_OFFSET)
+    assert _states(2026, 7)["Faktura prowizyjna za płatności online"].state == "todo"  # czeka na przyjęcie
+    _accept(owner, wrong)
+    step = _states(2026, 7)["Faktura prowizyjna za płatności online"]
+    assert step.state == "warn" and "3,50" in step.detail and "4\xa0zł" in step.detail
+    ksef.reject(_commission(owner, "GT/003", "9.99", date(2026, 8, 5)), by=owner, note="test")  # odrzucona — nie liczy się
+    s = _states(2026, 7)
+    assert s["Operacje z wyciągu rozstrzygnięte"].state == "ok"
+    # zwrot do oddania — przypomnienie
+    _accept(owner, _private(owner, _invoice(owner, "P/1", "12.00", date(2026, 7, 8))))
+    step = _states(2026, 7)["Zwroty za faktury zapłacone prywatnie"]
+    assert step.state == "warn" and "12\xa0zł" in step.detail
+    # bieżący miesiąc: wyciąg i Stripe „jeszcze nie teraz”, a nie błąd
+    assert _states(2026, 11)["Wyciąg bankowy za cały miesiąc"].state in ("later", "todo")
+    page = owner_client.get("/panel/ksiegowosc/miesiac/?rok=2026&miesiac=7").content.decode()
+    assert "Lista kontrolna — lipiec 2026" in page and "Faktura prowizyjna za płatności online" in page and "następny miesiąc" in page
+    assert owner_client.get("/panel/ksiegowosc/miesiac/?rok=abc").status_code == 200

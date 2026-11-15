@@ -980,3 +980,32 @@ def reconciliation(request):
     data = rec.reconcile(year, until)
     years = sorted(set(Record.objects.values_list("year", flat=True)) | {today.year}, reverse=True)
     return render(request, "panel/accounting_reconciliation.html", {"r": data, "years": years, "until": until})
+
+
+# --- lista kontrolna miesiąca ------------------------------------------------------------
+
+
+@panel_required(PERM)
+def month_checklist(request):
+    from datetime import date, timedelta
+
+    from . import checklist
+
+    today = timezone.localdate()
+    previous = today.replace(day=1) - timedelta(days=1)
+    try:
+        year = int(request.GET.get("rok", previous.year))
+        month = int(request.GET.get("miesiac", previous.month))
+        start = date(year, month, 1)
+    except ValueError:
+        start = previous.replace(day=1)
+    if start > today or start.year < 2000:
+        start = previous.replace(day=1)
+    prev = (start - timedelta(days=1)).replace(day=1)
+    nxt = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
+    steps = checklist.month_steps(start.year, start.month, today)
+    return render(request, "panel/accounting_month.html", {
+        "steps": steps, "start": start, "label": f"{exports.MONTHS[start.month]} {start.year}",
+        "prev": prev, "next": nxt if nxt <= today else None, "done": sum(s.state == "ok" for s in steps),
+        "open": sum(s.state in ("todo", "warn") for s in steps),
+    })

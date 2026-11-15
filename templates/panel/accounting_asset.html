@@ -1,0 +1,44 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Wykaz poz. {{ a.number }}{% endblock %}
+{% block panel %}
+<h1>{{ a.number }}. {{ a.name }}{% if a.disposed_on %} <span class="badge">{{ a.get_disposal_display|lower }}</span>{% endif %}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<div class="card"><table>
+  <tr><th>Rodzaj</th><td>{{ a.get_kind_display }} · {{ a.get_acquisition_display|lower }}</td></tr>
+  <tr><th>Symbol KŚT</th><td>{{ a.kst|default:"—" }}</td></tr>
+  <tr><th>Data nabycia / wytworzenia</th><td>{{ a.acquired_on|date:"j.m.Y" }}</td></tr>
+  <tr><th>Przyjęcie do używania</th><td>{{ a.in_use_on|date:"j.m.Y" }}{% if a.in_use_doc %} — dowód {{ a.in_use_doc }}{% endif %}</td></tr>
+  <tr><th>Wprowadzono do wykazu</th><td>{{ a.entered_on|date:"j.m.Y" }}{% if late %} <span class="badge warn">ujawnienie (§ 3 ust. 3)</span>{% endif %}</td></tr>
+  {% if a.acquisition_doc %}<tr><th>Dowód nabycia / wytworzenia</th><td>{{ a.acquisition_doc }}</td></tr>{% endif %}
+  <tr><th>Wartość początkowa</th><td>{{ a.initial_value|pln }}{% if a.updated_value is not None %} · zaktualizowana: <strong>{{ a.updated_value|pln }}</strong>{% endif %}</td></tr>
+  <tr><th>Amortyzacja</th><td>{{ a.get_method_display }}{% if a.method == 'liniowa' %} — {{ a.rate }}% rocznie{% endif %}</td></tr>
+  {% if prior %}<tr><th>Odpisy sprzed systemu</th><td>{{ prior|pln }} (do końca {{ a.prior_until_year }} r.)</td></tr>{% endif %}
+  {% if a.disposed_on %}<tr><th>Wykreślenie</th><td>{{ a.get_disposal_display }} {{ a.disposed_on|date:"j.m.Y" }}{% if a.disposal_reason %}: {{ a.disposal_reason }}{% endif %}{% if a.disposal_doc %} · dowód {{ a.disposal_doc }}{% endif %}{% if a.disposal_ksef %} · KSeF {{ a.disposal_ksef }}{% endif %}</td></tr>{% endif %}
+  {% if a.notes %}<tr><th>Uwagi</th><td>{{ a.notes }}</td></tr>{% endif %}
+</table>
+<div class="actions"><a class="btn secondary" href="{% url 'panel:accounting_assets' %}">Wróć do wykazu</a>{% if not closed %}<a class="btn" href="{% url 'panel:accounting_asset_edit' a.pk %}">Zmień dane</a>{% else %}<span class="badge warn">rok {{ a.entered_on.year }} zamknięty</span>{% endif %}</div></div>
+<h2>Plan odpisów</h2>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Rok</th><th>Odpis w roku</th><th>Odpisy narastająco</th></tr>
+  {% for r in schedule %}<tr><td>{{ r.year }}</td><td data-label="Odpis" style="text-align:right">{{ r.amount|pln }}</td><td data-label="Narastająco" style="text-align:right">{{ r.accumulated|pln }}</td></tr>
+  {% empty %}<tr><td colspan="3" class="muted">Bez odpisów amortyzacyjnych.</td></tr>{% endfor %}
+</table></div></section>
+{% if a.disposed_on %}
+<details class="card"><summary>Cofnij wykreślenie (pomyłka)</summary>
+<form method="post" action="{% url 'panel:accounting_asset_action' a.pk 'cofnij-wykreslenie' %}" novalidate>{% csrf_token %}
+  {% with form=reason_form %}{% include "partials/form.html" %}{% endwith %}<div class="actions"><button class="btn secondary" type="submit">Cofnij wykreślenie</button></div></form></details>
+{% else %}
+<details class="card"><summary>Likwidacja, zbycie albo niedobór</summary>
+<form method="post" action="{% url 'panel:accounting_asset_action' a.pk 'wykresl' %}" novalidate>{% csrf_token %}
+  <p class="small muted">Odpisy kończą się w miesiącu likwidacji / zbycia / stwierdzenia niedoboru (art. 16h ust. 1 pkt 1). Pozycja zostaje w wykazie z datą i przyczyną (§ 3 ust. 1 pkt 11).</p>
+  {% with form=dispose_form %}{% include "partials/form.html" %}{% endwith %}<div class="actions"><button class="btn" type="submit">Wykreśl</button></div></form></details>
+{% endif %}
+{% if not closed %}
+<details class="card"><summary class="danger-summary">Usuń pozycję wprowadzoną omyłkowo</summary>
+<form method="post" action="{% url 'panel:accounting_asset_action' a.pk 'usun' %}" novalidate>{% csrf_token %}
+  <p class="small muted">Tylko dla pomyłek — zbycie i likwidację rejestruje się jako wykreślenie. Dane pozycji zostają w dzienniku zdarzeń.</p>
+  {% with form=reason_form %}{% include "partials/form.html" %}{% endwith %}<div class="actions"><button class="btn danger" type="submit">Usuń z wykazu</button></div></form></details>
+{% endif %}
+<h2>Historia</h2>
+<div class="card small">{% for e in history %}<div>{{ e.at|date:"j.m.Y H:i" }} — {% if e.actor %}{{ e.actor.full_name }}{% endif %}: {{ e.summary }}{% if e.changes and e.action == 'ksiegowosc.srodek_trwaly_zmiana' %}<br>{% for f, v in e.changes.items %}<span class="muted">{{ f }}: <s>{{ v.0 }}</s> → {{ v.1 }}</span>{% if not forloop.last %}; {% endif %}{% endfor %}{% endif %}</div>{% empty %}<span class="muted">Brak.</span>{% endfor %}</div>
+{% endblock %}

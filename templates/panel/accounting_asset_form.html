@@ -1,0 +1,11 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{% if asset %}Zmiana pozycji {{ asset.number }}{% else %}Wprowadzenie do wykazu{% endif %}{% endblock %}
+{% block panel %}
+<h1>{% if asset %}Zmiana pozycji wykazu nr {{ asset.number }}{% else %}Wprowadzenie do wykazu środków trwałych{% endif %}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<p class="muted">Dane wymagane w § 3 ust. 1 rozporządzenia. Stawkę amortyzacyjną bierze się z Wykazu rocznych stawek amortyzacyjnych (załącznik nr 1 do ustawy o CIT) według symbolu KŚT; obniżenie stawki jest możliwe (art. 16i ust. 5), ale nie w działalności zwolnionej z podatku (art. 16i ust. 8). Wybraną metodę stosuje się do pełnego zamortyzowania (art. 16h ust. 2).{% if asset %} Zmiana zapisze się w dzienniku z powodem i poprzednimi wartościami.{% endif %}</p>
+<form method="post" class="card" novalidate>{% csrf_token %}
+  {% include "partials/form.html" %}
+  <div class="actions"><button class="btn" type="submit">Zapisz</button><a class="btn secondary" href="{% if asset %}{% url 'panel:accounting_asset' asset.pk %}{% else %}{% url 'panel:accounting_assets' %}{% endif %}">Anuluj</a></div>
+</form>
+{% endblock %}

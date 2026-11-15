@@ -430,7 +430,7 @@ class KsefPaymentForm(forms.Form):
         super().__init__(*args, initial=initial, **kwargs)
         self.fields["method"].choices = PAYMENT_METHODS
         allowed = [(v, label) for v, label in REIMBURSEMENTS if v != REIMBURSE_TRANSFER or invoice.reimbursement_op_id]
-        self.fields["reimbursement"].choices = allowed
+        self.fields["reimbursement"].choices = [("", "— nie dotyczy (tylko przy zapłacie prywatnej) —")] + allowed
 
 
 class BankReimbursementForm(forms.Form):

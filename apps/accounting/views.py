@@ -349,8 +349,12 @@ def ksef_detail(request, pk):
     qr = ksef_view.qr_url(invoice, dj_settings.KSEF_ENVIRONMENT)
     from .bank import booked_payment_for
 
+    from .forms import KsefPaymentForm
+
     return render(request, "panel/accounting_ksef_invoice.html", {
         "duplicate": booked_payment_for(invoice) if invoice.status == KsefInvoice.Status.NEW else None,
+        "payment_form": KsefPaymentForm(invoice=invoice) if invoice.direction == KsefInvoice.Direction.PURCHASE else None,
+        "paid_from_bank": invoice.bank_operations.order_by("booked_on").first(),
         "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE if invoice.direction == KsefInvoice.Direction.SALE else Record.Kind.COST],
         "inv": invoice, "form": form, "reject_form": ReasonForm(), "gross": format_amount(invoice.gross),
         "v": view, "qr": qr, "qr_img": qr_svg_data_uri(qr, box_size=4) if qr else "",
@@ -396,6 +400,29 @@ def ksef_decide(request, pk, action):
             raise Http404
     except ValidationError as e:
         _error(request, e)
+    return redirect("panel:accounting_ksef_invoice", pk=pk)
+
+
+@panel_required(PERM)
+@require_POST
+def ksef_payment(request, pk):
+    from . import bank
+    from .forms import KsefPaymentForm
+
+    invoice = get_object_or_404(KsefInvoice, pk=pk)
+    form = KsefPaymentForm(request.POST, invoice=invoice)
+    if not form.is_valid():
+        messages.error(request, "Sprawdź sposób zapłaty: " + "; ".join(e for errs in form.errors.values() for e in errs))
+        return redirect("panel:accounting_ksef_invoice", pk=pk)
+    d = form.cleaned_data
+    try:
+        others = bank.set_payment(invoice, by=request.user, method=d["method"], paid_by=d["paid_by"], paid_on=d["paid_on"],
+                                  reimbursement=d["reimbursement"], reimbursed_on=d["reimbursed_on"], note=d["note"],
+                                  same_seller=d["same_seller"])
+    except ValidationError as e:
+        _error(request, e)
+    else:
+        messages.success(request, "Zapisano sposób zapłaty." + (f" Ten sam sposób ustawiono dla innych faktur sprzedawcy: {others}." if others else ""))
     return redirect("panel:accounting_ksef_invoice", pk=pk)
 
 
@@ -735,8 +762,10 @@ def bank_list(request):
     counts = {s: BankOperation.objects.filter(status=s).count() for s in BankOperation.Status.values}
     from . import bank
 
-    for op in page:  # wydatki „Do decyzji” pasujące do faktury KSeF — do połączenia, nie do księgowania
-        op.matching_invoices = bank.candidate_invoices(op) if op.status == BankOperation.Status.NEW and op.amount < 0 else []
+    for op in page:  # wydatki „Do decyzji” pasujące do faktury KSeF albo zwrotu — do połączenia, nie do księgowania
+        pending_outflow = op.status == BankOperation.Status.NEW and op.amount < 0
+        op.matching_invoices = bank.candidate_invoices(op) if pending_outflow else []
+        op.reimbursement = bank.reimbursement_match(op) if pending_outflow and not op.matching_invoices else []
     return render(request, "panel/accounting_bank.html", {
         "page": page, "status": status, "statuses": BankOperation.Status.choices, "counts": counts, "bulk_form": BankBulkForm(),
         "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE] + DESCRIPTION_HINTS[Record.Kind.COST] + ["Opłaty i prowizje bankowe"],
@@ -788,6 +817,10 @@ def bank_bulk(request):
             errors.append(f"{op.booked_on:%d.%m.%Y} {format_amount(op.amount)} zł: pasuje do faktury KSeF {matching[0].invoice_number} — "
                           "otwórz operację i połącz ją z fakturą zamiast księgować drugi raz")
             continue
+        if not op.is_inflow and bank.reimbursement_match(op):
+            errors.append(f"{op.booked_on:%d.%m.%Y} {format_amount(op.amount)} zł: kwota równa fakturom zapłaconym prywatnie — "
+                          "jeśli to zwrot, otwórz operację i połącz ją ze zwrotem zamiast księgować drugi koszt")
+            continue
         try:
             bank.book(op, by=request.user, description=d["description"], column="revenue" if op.is_inflow else d["cost_column"],
                       activity=d["activity"], task=d["task"])
@@ -820,8 +853,16 @@ def bank_detail(request, pk):
             messages.success(request, f"Zaksięgowano pod Lp. {record.lp}.")
             nxt = BankOperation.objects.filter(status=BankOperation.Status.NEW).order_by("booked_on", "pk").first()
             return redirect("panel:accounting_bank_op", pk=nxt.pk) if nxt else redirect("panel:accounting_bank")
+    from .forms import BankReimbursementForm
+
+    pending_outflow = op.status == BankOperation.Status.NEW and not op.is_inflow
+    to_reimburse = bank.reimbursement_candidates(op) if pending_outflow else []
+    suggested = bank.reimbursement_match(op, to_reimburse) if to_reimburse else []
     return render(request, "panel/accounting_bank_op.html", {
-        "candidates": bank.candidate_invoices(op) if op.status == BankOperation.Status.NEW and not op.is_inflow else [],
+        "candidates": bank.candidate_invoices(op) if pending_outflow else [],
+        "reimburse_form": BankReimbursementForm(candidates=to_reimburse, initial={"invoices": [i.pk for i in suggested]})
+        if to_reimburse else None, "reimburse_suggested": suggested,
+        "reimbursed": op.reimbursed_invoices.order_by("issue_date") if op.status == BankOperation.Status.REIMBURSEMENT else [],
         "op": op, "form": form, "invoice_form": BankInvoiceForm(op=op), "reason_form": ReasonForm(),
         "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE if op.is_inflow else Record.Kind.COST] + ["Opłaty i prowizje bankowe"],
     })
@@ -845,6 +886,14 @@ def bank_action(request, pk, action):
                 raise ValidationError("Wybierz fakturę.")
             bank.link_invoice(op, form.cleaned_data["invoice"], by=request.user)
             messages.success(request, "Połączono z fakturą — koszt ujmuje faktura.")
+        elif action == "zwrot":
+            from .forms import BankReimbursementForm
+
+            form = BankReimbursementForm(request.POST, candidates=bank.reimbursement_candidates(op))
+            if not form.is_valid():
+                raise ValidationError("Zaznacz faktury, za które jest ten zwrot.")
+            bank.link_reimbursement(op, list(form.cleaned_data["invoices"]), by=request.user)
+            messages.success(request, "Połączono jako zwrot za faktury zapłacone prywatnie — koszt ujmują faktury.")
         elif action == "przywroc":
             bank.reopen(op, by=request.user)
             messages.success(request, "Operacja wraca do decyzji.")
@@ -907,3 +956,27 @@ def stripe_pdf(request, year, month):
     response = HttpResponse(stripe_import.statement_pdf(start, AssociationSettings.load()), content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="zestawienie-wplat-online-{year}-{month:02d}.pdf"'
     return response
+
+
+# --- uzgodnienie salda --------------------------------------------------------------------
+
+
+@panel_required(PERM)
+def reconciliation(request):
+    from datetime import date
+
+    from . import reconciliation as rec
+
+    today = timezone.localdate()
+    year, _ = _period(request)
+    until = None
+    if request.GET.get("do"):
+        try:
+            until = date.fromisoformat(request.GET["do"])
+        except ValueError:
+            until = None
+    if until is None or until.year != year:
+        until = min(today, date(year, 12, 31))
+    data = rec.reconcile(year, until)
+    years = sorted(set(Record.objects.values_list("year", flat=True)) | {today.year}, reverse=True)
+    return render(request, "panel/accounting_reconciliation.html", {"r": data, "years": years, "until": until})

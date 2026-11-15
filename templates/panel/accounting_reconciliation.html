@@ -1,0 +1,41 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Uzgodnienie salda{% endblock %}
+{% block panel %}
+<h1>Uzgodnienie salda rachunku z ewidencją</h1>
+{% include "panel/_accounting_tabs.html" %}
+<form method="get" class="card actions" style="align-items:flex-end">
+  <label>Rok<br><select name="rok">{% for y in years %}<option value="{{ y }}"{% if y == r.year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select></label>
+  <label>Do dnia<br><input type="date" name="do" value="{{ until|date:'Y-m-d' }}"></label>
+  <button class="btn secondary" type="submit">Pokaż</button>
+</form>
+<p class="small muted">Ewidencja ujmuje przychody i koszty według dowodów (faktura, dzienne zestawienie), a rachunek bankowy — tylko pieniądze, które na niego wpłynęły lub z niego wyszły. Poniżej każda różnica jest rozpisana na przyczyny: <strong>+</strong> oznacza, że na koncie jest więcej niż wynikałoby z ewidencji, <strong>−</strong> — mniej.</p>
+{% for w in r.warnings %}<div class="msg error">{{ w }}</div>{% endfor %}
+{% if not r.ops_count %}<div class="msg">Brak operacji z wyciągu w okresie 1.01–{{ r.end|date:"j.m.Y" }}. Wgraj wyciąg w zakładce <a href="{% url 'panel:accounting_bank' %}">Wyciąg bankowy</a>.</div>{% endif %}
+<div class="card"><div class="table-wrap"><table>
+  <tr><th>Saldo rachunku na początek okresu</th><td style="text-align:right;white-space:nowrap">{{ r.opening|pln }}</td></tr>
+  {% if not r.opening_known %}<tr><td colspan="2" class="small muted">W wyciągu brak salda po transakcji — przyjęto 0 zł dla części rachunków.</td></tr>{% endif %}
+  <tr><th>Wynik z ewidencji: przychody − koszty (kol. 5 − kol. 6 − kol. 7)
+    <div class="small muted" style="font-weight:normal">przychody {{ r.revenue|pln }} · koszty kol. 6 {{ r.cost_deductible|pln }} · kol. 7 {{ r.cost_other|pln }} · dochód (kol. 5 − kol. 6) {{ r.income|pln }}</div></th>
+    <td style="text-align:right;white-space:nowrap">{% if r.result > 0 %}+{% endif %}{{ r.result|pln }}</td></tr>
+  {% for g in r.groups %}<tr><td><a href="#g-{{ g.key }}">{{ g.label }}</a></td>
+    <td style="text-align:right;white-space:nowrap">{% if g.total > 0 %}+{% endif %}{{ g.total|pln }}</td></tr>{% endfor %}
+  {% if r.unexplained %}<tr><td class="danger">Różnica niewyjaśniona</td><td style="text-align:right">{{ r.unexplained|pln }}</td></tr>{% endif %}
+  <tr><th>= Saldo rachunku na {{ r.end|date:"j.m.Y" }} (z operacji w wyciągu)</th><th style="text-align:right;white-space:nowrap">{{ r.closing|pln }}</th></tr>
+  {% if r.closing_statement != r.closing and r.opening_known %}<tr><td colspan="2" class="small muted">Saldo po ostatniej operacji w wyciągu: {{ r.closing_statement|pln }}.</td></tr>{% endif %}
+</table></div></div>
+
+{% for g in r.groups %}
+<details class="card" id="g-{{ g.key }}"{% if g.lines %} open{% endif %}><summary><strong>{{ g.label }}</strong>: {% if g.total > 0 %}+{% endif %}{{ g.total|pln }} <span class="small muted">({{ g.count }} poz.)</span></summary>
+  <p class="small muted">{{ g.help }}</p>
+  {% if g.lines %}<table style="width:auto">{% for label, value in g.lines %}<tr><td>{{ label }}</td><td style="text-align:right;white-space:nowrap">{% if value > 0 %}+{% endif %}{{ value|pln }}</td></tr>{% endfor %}</table>{% endif %}
+  <div class="table-wrap"><table class="days">
+    <tr class="head"><th>Data</th><th>Pozycja</th><th>Wpływ na różnicę</th></tr>
+    {% for i in g.items %}<tr><td>{{ i.day|date:"j.m.Y" }}</td>
+      <td data-label="Pozycja">{% if i.invoice %}<a href="{% url 'panel:accounting_ksef_invoice' i.invoice.pk %}">{{ i.text }}</a>{% elif i.op %}<a href="{% url 'panel:accounting_bank_op' i.op.pk %}">{{ i.text }}</a>{% elif i.record %}<a href="{% url 'panel:accounting_record' i.record.pk %}">{{ i.text }}</a>{% else %}{{ i.text }}{% endif %}</td>
+      <td data-label="Kwota" style="text-align:right;white-space:nowrap">{% if i.value > 0 %}+{% endif %}{{ i.value|pln }}</td></tr>{% endfor %}
+    {% if g.more %}<tr><td colspan="3" class="muted">… i jeszcze {{ g.more }} pozycji.</td></tr>{% endif %}
+  </table></div>
+</details>
+{% endfor %}
+{% if r.zero_groups %}<p class="small muted">Bez różnicy: {% for g in r.zero_groups %}{{ g.label|lower }} ({{ g.count }} poz.){% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+{% endblock %}

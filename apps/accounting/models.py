@@ -204,6 +204,22 @@ def ksef_upload_to(instance, filename):
     return f"ksef/{uuid.uuid4().hex}.xml"
 
 
+PAYMENT_BANK, PAYMENT_PRIVATE, PAYMENT_OFFSET, PAYMENT_CASH = "", "prywatnie", "potracenie", "gotowka"
+PAYMENT_METHODS = [
+    (PAYMENT_BANK, "Przelewem z rachunku stowarzyszenia"),
+    (PAYMENT_PRIVATE, "Prywatnie przez członka / osobę z zarządu"),
+    (PAYMENT_OFFSET, "Potrącona z wypłat operatora płatności (Stripe)"),
+    (PAYMENT_CASH, "Gotówką z kasy stowarzyszenia"),
+]
+REIMBURSE_PENDING, REIMBURSE_TRANSFER, REIMBURSE_CASH, REIMBURSE_WAIVED = "do_zwrotu", "przelew", "gotowka", "bez_zwrotu"
+REIMBURSEMENTS = [
+    (REIMBURSE_PENDING, "Do zwrotu"),
+    (REIMBURSE_TRANSFER, "Zwrócono przelewem z rachunku"),
+    (REIMBURSE_CASH, "Zwrócono gotówką"),
+    (REIMBURSE_WAIVED, "Bez zwrotu — osoba zrzekła się zwrotu"),
+]
+
+
 class KsefInvoice(models.Model):
     """Faktura ustrukturyzowana z Krajowego Systemu e-Faktur (plik XML pobrany z KSeF), czekająca na decyzję:
     przyjęcie do ewidencji (zapis kosztu albo przychodu) lub odrzucenie (nie dotyczy ewidencji)."""
@@ -235,6 +251,15 @@ class KsefInvoice(models.Model):
     status = models.CharField("status", max_length=10, choices=Status.choices, default=Status.NEW)
     status_note = models.CharField("uwagi do decyzji", max_length=255, blank=True)
     record = models.ForeignKey(Record, null=True, blank=True, on_delete=models.SET_NULL, related_name="ksef_invoices")
+    # sposób zapłaty — gdy nie przelewem z rachunku stowarzyszenia (uzgodnienie salda bankowego z ewidencją)
+    payment_method = models.CharField("sposób zapłaty", max_length=12, choices=PAYMENT_METHODS, blank=True, default="")
+    paid_by = models.CharField("zapłacił(a) prywatnie", max_length=120, blank=True)
+    paid_on = models.DateField("data zapłaty", null=True, blank=True)
+    reimbursement = models.CharField("zwrot wydatku", max_length=12, choices=REIMBURSEMENTS, blank=True, default="")
+    reimbursed_on = models.DateField("data zwrotu", null=True, blank=True)
+    reimbursement_op = models.ForeignKey("BankOperation", verbose_name="przelew zwrotu (wyciąg)", null=True, blank=True,
+                                         on_delete=models.SET_NULL, related_name="reimbursed_invoices")
+    payment_note = models.CharField("uwagi do zapłaty", max_length=255, blank=True)
     xml = models.FileField("plik XML", upload_to=ksef_upload_to, storage=get_private_storage)
     sha256 = models.CharField(max_length=64, unique=True)
     source = models.CharField("źródło", max_length=8, choices=[("plik", "Plik wgrany w panelu"), ("api", "Pobrana z KSeF")],
@@ -257,6 +282,14 @@ class KsefInvoice(models.Model):
     def items_summary(self):
         names = [i.get("name", "") for i in self.items if i.get("name")]
         return "; ".join(names)[:255]
+
+    @property
+    def paid_outside_bank(self):
+        return self.payment_method != PAYMENT_BANK
+
+    @property
+    def awaiting_reimbursement(self):
+        return self.payment_method == PAYMENT_PRIVATE and self.reimbursement == REIMBURSE_PENDING
 
 
 class GeneratedDocument(models.Model):
@@ -428,6 +461,7 @@ class BankOperation(models.Model):
         INVOICE = "faktura", "Zapłata faktury KSeF"
         STRIPE = "stripe", "Wypłata ze Stripe (przychód ujęty z zestawienia Stripe)"
         SKIPPED = "pominieta", "Pominięta (nie dotyczy ewidencji)"
+        REIMBURSEMENT = "zwrot", "Zwrot za faktury zapłacone prywatnie"
 
     key = models.CharField("identyfikator operacji", max_length=64, unique=True)
     account = models.CharField("rachunek stowarzyszenia", max_length=34, blank=True)

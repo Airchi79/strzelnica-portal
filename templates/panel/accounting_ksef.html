@@ -3,8 +3,24 @@
 {% block panel %}
 <h1>Faktury KSeF</h1>
 {% include "panel/_accounting_tabs.html" %}
+<h2>Pobieranie z KSeF</h2>
 <div class="card">
-  <p class="small muted">Wgraj faktury pobrane z Krajowego Systemu e-Faktur (pliki XML albo archiwum ZIP — np. z Aplikacji Podatnika KSeF). Każdą fakturę przyjmij do ewidencji (koszt albo przychód, kwota należności ogółem) albo oznacz jako niedotyczącą ewidencji. Przyjętą fakturę można później usunąć z ewidencji — wróci do decyzji. Numer KSeF jest odczytywany z nazwy pliku. Pobieranie faktur bezpośrednio z KSeF (token) — w kolejnym etapie.</p>
+  {% if not ksef_enabled %}
+  <p><span class="badge warn">brak tokena KSeF</span> Automatyczne pobieranie wymaga tokena KSeF stowarzyszenia z uprawnieniem do przeglądania faktur. Wygeneruj go w Aplikacji Podatnika KSeF (ksef.podatki.gov.pl) i wpisz na serwerze poleceniem <code>sh deploy/ustaw-env.sh KSEF_TOKEN</code>, potem <code>docker compose up -d</code>. Token nie trafia do bazy ani do panelu.</p>
+  {% else %}
+  <p class="small">Token KSeF: <span class="badge ok">ustawiony</span> · środowisko: <strong>{{ ksef_env }}</strong> · NIP kontekstu: {% if nip %}<strong>{{ nip }}</strong>{% else %}<span class="badge bad">uzupełnij NIP w „Dane stowarzyszenia”</span>{% endif %}</p>
+  {% endif %}
+  <p class="small muted">Faktury, w których stowarzyszenie jest nabywcą, pobierają się co godzinę (opcjonalnie także faktury sprzedaży) i trafiają poniżej „Do decyzji”. Pobieranie jest przyrostowe — po dacie trwałego zapisu w KSeF; limity KSeF pozwalają na ok. 40 faktur na przebieg, resztę dokończą kolejne przebiegi.</p>
+  {% if sync.last_run_at %}<p class="small">Ostatni przebieg: {{ sync.last_run_at|date:"j.m.Y H:i" }} — {{ sync.last_result }}{% if sync.last_error %} <span class="badge bad">{{ sync.last_error }}</span>{% endif %}{% if sync.pending %} · w kolejce: {{ sync.pending|length }}{% endif %}</p>{% endif %}
+  <form method="post" action="{% url 'panel:accounting_ksef_sync_settings' %}" novalidate>{% csrf_token %}
+    {% with form=sync_form %}{% include "partials/form.html" %}{% endwith %}
+    <div class="actions"><button class="btn secondary" type="submit">Zapisz ustawienia pobierania</button></div>
+  </form>
+  {% if ksef_enabled %}<form method="post" action="{% url 'panel:accounting_ksef_sync_now' %}" class="actions" style="margin:0">{% csrf_token %}<button class="btn" type="submit">Pobierz teraz</button></form>{% endif %}
+</div>
+<h2>Wgranie plików</h2>
+<div class="card">
+  <p class="small muted">Faktury można też wgrać ręcznie (pliki XML albo archiwum ZIP — np. z Aplikacji Podatnika KSeF). Każdą fakturę przyjmij do ewidencji (koszt albo przychód, kwota należności ogółem) albo oznacz jako niedotyczącą ewidencji. Przyjętą fakturę można później usunąć z ewidencji — wróci do decyzji.</p>
   <form method="post" action="{% url 'panel:accounting_ksef_import' %}" enctype="multipart/form-data" class="actions" style="margin:0">{% csrf_token %}
     <input type="file" name="pliki" accept=".xml,.zip" multiple required aria-label="Pliki faktur">
     <button class="btn" type="submit">Importuj</button></form>
@@ -18,7 +34,7 @@
     <td data-label="Kontrahent">{% if inv.direction == 'zakup' %}{{ inv.seller_name }}{% else %}{{ inv.buyer_name }}{% endif %}</td>
     <td data-label="Kierunek">{{ inv.get_direction_display }}</td>
     <td data-label="Kwota" style="text-align:right">{{ inv.gross|pln }}{% if inv.currency != 'PLN' %} {{ inv.currency }}{% endif %}</td>
-    <td data-label="Status">{{ inv.get_status_display }}{% if inv.record %} — <a href="{% url 'panel:accounting_record' inv.record.pk %}">Lp. {{ inv.record.lp }}</a>{% endif %}</td></tr>
+    <td data-label="Status">{{ inv.get_status_display }}{% if inv.source == 'api' %} <span class="badge">z KSeF</span>{% endif %}{% if inv.record %} — <a href="{% url 'panel:accounting_record' inv.record.pk %}">Lp. {{ inv.record.lp }}</a>{% endif %}</td></tr>
   {% empty %}<tr><td colspan="6" class="muted">Brak faktur.</td></tr>{% endfor %}
 </table></div></section>
 {% include "partials/pagination.html" %}

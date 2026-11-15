@@ -138,9 +138,26 @@ def _digits(nip):
     return re.sub(r"\D", "", nip or "")
 
 
+def import_content(name, content, *, by, own_nip="", source="plik"):
+    """Jedna faktura XML → KsefInvoice. Zwraca fakturę albo None, gdy już jest w systemie (duplikat).
+    Błędny plik → ValidationError."""
+    data = parse(content, name)
+    digest = hashlib.sha256(content).hexdigest()
+    if KsefInvoice.objects.filter(sha256=digest).exists() or (
+            data["ksef_number"] and KsefInvoice.objects.filter(ksef_number=data["ksef_number"]).exists()):
+        return None
+    own = _digits(own_nip)
+    data["direction"] = (KsefInvoice.Direction.SALE if own and _digits(data["seller_nip"]) == own
+                         else KsefInvoice.Direction.PURCHASE)
+    with transaction.atomic():
+        invoice = KsefInvoice(sha256=digest, imported_by=by, source=source, **data)
+        invoice.xml.save("faktura.xml", ContentFile(content), save=False)
+        invoice.save()
+    return invoice
+
+
 def import_files(uploads, *, by, own_nip=""):
     """Importuje faktury; zwraca (nowe, pominięte_duplikaty, błędy[str])."""
-    own = _digits(own_nip)
     created, duplicates, errors = [], 0, []
     for uploaded in uploads:
         try:
@@ -150,22 +167,14 @@ def import_files(uploads, *, by, own_nip=""):
             continue
         for name, content in files:
             try:
-                data = parse(content, name)
+                invoice = import_content(name, content, by=by, own_nip=own_nip)
             except ValidationError as e:
                 errors.append(e.messages[0])
                 continue
-            digest = hashlib.sha256(content).hexdigest()
-            if KsefInvoice.objects.filter(sha256=digest).exists() or (
-                    data["ksef_number"] and KsefInvoice.objects.filter(ksef_number=data["ksef_number"]).exists()):
+            if invoice is None:
                 duplicates += 1
-                continue
-            data["direction"] = (KsefInvoice.Direction.SALE if own and _digits(data["seller_nip"]) == own
-                                 else KsefInvoice.Direction.PURCHASE)
-            with transaction.atomic():
-                invoice = KsefInvoice(sha256=digest, imported_by=by, **data)
-                invoice.xml.save("faktura.xml", ContentFile(content), save=False)
-                invoice.save()
-            created.append(invoice)
+            else:
+                created.append(invoice)
     if created:
         log_event("ksiegowosc.ksef_import", None, f"Zaimportowano faktur KSeF: {len(created)}", actor=by)
     return created, duplicates, errors

@@ -6,7 +6,8 @@ from django.utils import timezone
 
 from apps.credentials.forms import ALLOWED_SIGNATURES
 
-from .models import CATEGORY_ORDER, DEFAULT_LABELS, AccountingSettings, Activity, FixedAsset, KsefInvoice, PublicTask, Record
+from .models import (CATEGORY_ORDER, DEFAULT_LABELS, AccountingSettings, Activity, FixedAsset, KsefInvoice, KsefSync, PublicTask,
+                     Record)
 
 COST_COLUMNS = [
     ("cost_deductible", "Kol. 6 — koszt uzyskania przychodów (art. 15 ustawy o CIT)"),
@@ -326,3 +327,18 @@ class ClassifyForm(forms.Form):
     task = forms.ModelChoiceField(label="Umowa (dotacja)", required=False, queryset=PublicTask.objects.all(),
                                   empty_label="— bez zmiany —")
     clear_task = forms.BooleanField(label="Odłącz od umowy", required=False)
+
+
+class KsefSyncForm(forms.ModelForm):
+    class Meta:
+        model = KsefSync
+        fields = ["enabled", "sync_from", "include_sales"]
+        widgets = {"sync_from": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}
+
+    def clean(self):
+        data = super().clean()
+        if data.get("enabled") and not data.get("sync_from"):
+            self.add_error("sync_from", "Podaj datę, od której pobierać faktury.")
+        if data.get("sync_from") and data["sync_from"] > timezone.localdate():
+            self.add_error("sync_from", "Data nie może być z przyszłości.")
+        return data

@@ -237,6 +237,8 @@ class KsefInvoice(models.Model):
     record = models.ForeignKey(Record, null=True, blank=True, on_delete=models.SET_NULL, related_name="ksef_invoices")
     xml = models.FileField("plik XML", upload_to=ksef_upload_to, storage=get_private_storage)
     sha256 = models.CharField(max_length=64, unique=True)
+    source = models.CharField("źródło", max_length=8, choices=[("plik", "Plik wgrany w panelu"), ("api", "Pobrana z KSeF")],
+                              default="plik")
     imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     imported_at = models.DateTimeField(auto_now_add=True)
 
@@ -392,3 +394,23 @@ class InKindDonation(models.Model):
         ordering = ["-date", "-pk"]
         verbose_name = "darowizna rzeczowa"
         verbose_name_plural = "darowizny rzeczowe"
+
+
+class KsefSync(models.Model):
+    """Stan automatycznego pobierania faktur z KSeF (jeden rekord): od kiedy, dokąd doszło pobieranie (data trwałego
+    zapisu w KSeF — pobieranie przyrostowe), kolejka faktur do pobrania i wynik ostatniego przebiegu."""
+
+    enabled = models.BooleanField("pobieranie włączone", default=False)
+    sync_from = models.DateField("pobieraj faktury zapisane w KSeF od dnia", null=True, blank=True)
+    include_sales = models.BooleanField("pobieraj też faktury sprzedaży (stowarzyszenie jako sprzedawca)", default=False)
+    hwm = models.JSONField("dokąd pobrano (data trwałego zapisu)", default=dict, blank=True)
+    pending = models.JSONField("kolejka do pobrania", default=list, blank=True)
+    last_run_at = models.DateTimeField("ostatni przebieg", null=True, blank=True)
+    last_success_at = models.DateTimeField("ostatni udany przebieg", null=True, blank=True)
+    last_result = models.CharField("wynik ostatniego przebiegu", max_length=500, blank=True)
+    last_error = models.CharField("ostatni błąd", max_length=500, blank=True)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

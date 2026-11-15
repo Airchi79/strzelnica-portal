@@ -19,7 +19,7 @@ from django.db import transaction
 
 from apps.audit.services import log_event
 
-from .models import KsefInvoice
+from .models import PAYMENT_OFFSET, KsefInvoice
 
 MAX_XML_BYTES = 5 * 1024 * 1024
 MAX_ZIP_BYTES = 20 * 1024 * 1024
@@ -138,6 +138,16 @@ def _digits(nip):
     return re.sub(r"\D", "", nip or "")
 
 
+def _offset_seller(seller_nip):
+    """Czy ostatnia faktura zakupu od tego sprzedawcy z określonym sposobem zapłaty była potrącona przez Stripe."""
+    if not _digits(seller_nip):
+        return False
+    last = (KsefInvoice.objects.filter(direction=KsefInvoice.Direction.PURCHASE, seller_nip=seller_nip)
+            .exclude(status=KsefInvoice.Status.REJECTED).exclude(payment_method="", bank_operations__isnull=True)
+            .order_by("-issue_date", "-pk").first())
+    return last is not None and last.payment_method == PAYMENT_OFFSET
+
+
 def import_content(name, content, *, by, own_nip="", source="plik"):
     """Jedna faktura XML → KsefInvoice. Zwraca fakturę albo None, gdy już jest w systemie (duplikat).
     Błędny plik → ValidationError."""
@@ -149,6 +159,10 @@ def import_content(name, content, *, by, own_nip="", source="plik"):
     own = _digits(own_nip)
     data["direction"] = (KsefInvoice.Direction.SALE if own and _digits(data["seller_nip"]) == own
                          else KsefInvoice.Direction.PURCHASE)
+    if data["direction"] == KsefInvoice.Direction.PURCHASE and _offset_seller(data["seller_nip"]):
+        # kolejna faktura prowizyjna platformy — jak poprzednie: potrącona z wypłat Stripe, bez przelewu z rachunku
+        data["payment_method"] = PAYMENT_OFFSET
+        data["payment_note"] = "Ustawiono automatycznie — poprzednie faktury tego sprzedawcy są potrącane przez Stripe"
     with transaction.atomic():
         invoice = KsefInvoice(sha256=digest, imported_by=by, source=source, **data)
         invoice.xml.save("faktura.xml", ContentFile(content), save=False)

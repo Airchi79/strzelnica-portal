@@ -11,11 +11,12 @@
   {% if op.balance_after is not None %}<tr><th>Saldo po operacji</th><td>{{ op.balance_after|pln }}</td></tr>{% endif %}
   {% if op.record %}<tr><th>Zapis w ewidencji</th><td><a href="{% url 'panel:accounting_record' op.record.pk %}">Lp. {{ op.record.lp }}</a> — {{ op.record.description }}</td></tr>{% endif %}
   {% if op.invoice %}<tr><th>Faktura KSeF</th><td><a href="{% url 'panel:accounting_ksef_invoice' op.invoice.pk %}">{{ op.invoice.invoice_number }}</a> — {{ op.invoice.seller_name }} ({{ op.invoice.get_status_display|lower }})</td></tr>{% endif %}
+  {% if op.stripe_payout %}<tr><th>Wypłata ze Stripe</th><td class="code">{{ op.stripe_payout.stripe_id }}{% if op.stripe_payout.arrival_date %} · wg Stripe wpływ {{ op.stripe_payout.arrival_date|date:"j.m.Y" }}{% endif %} — <a href="{% url 'panel:accounting_stripe' %}">przychód w zestawieniu Stripe</a></td></tr>{% endif %}
   {% if op.payment %}<tr><th>Wpłata w systemie</th><td><a href="{% url 'panel:payment' op.payment.pk %}">{{ op.payment }}</a></td></tr>{% endif %}
   <tr><th>Plik</th><td class="small">{{ op.source_file }} · {{ op.imported_at|date:"j.m.Y H:i" }}</td></tr>
 </table>
 <div class="actions"><a class="btn secondary" href="{% url 'panel:accounting_bank' %}">Wróć do wyciągu</a>
-{% if op.status == 'pominieta' or op.status == 'faktura' %}<form method="post" action="{% url 'panel:accounting_bank_action' op.pk 'przywroc' %}" style="margin:0">{% csrf_token %}<button class="btn secondary" type="submit">Przywróć do decyzji</button></form>{% endif %}
+{% if op.status == 'pominieta' or op.status == 'faktura' or op.status == 'stripe' %}<form method="post" action="{% url 'panel:accounting_bank_action' op.pk 'przywroc' %}" style="margin:0">{% csrf_token %}<button class="btn secondary" type="submit">Przywróć do decyzji</button></form>{% endif %}
 </div></div>
 {% if op.status == 'nowa' %}
 <h2>Zaksięguj jako {% if op.is_inflow %}przychód{% else %}koszt{% endif %}</h2>

@@ -426,6 +426,7 @@ class BankOperation(models.Model):
         BOOKED = "zaksiegowana", "Zaksięgowana"
         SYSTEM = "system", "Wpłata strzelca rozliczona w systemie"
         INVOICE = "faktura", "Zapłata faktury KSeF"
+        STRIPE = "stripe", "Wypłata ze Stripe (przychód ujęty z zestawienia Stripe)"
         SKIPPED = "pominieta", "Pominięta (nie dotyczy ewidencji)"
 
     key = models.CharField("identyfikator operacji", max_length=64, unique=True)
@@ -444,6 +445,7 @@ class BankOperation(models.Model):
     record = models.ForeignKey(Record, null=True, blank=True, on_delete=models.SET_NULL, related_name="bank_operations")
     invoice = models.ForeignKey(KsefInvoice, null=True, blank=True, on_delete=models.SET_NULL, related_name="bank_operations")
     payment = models.ForeignKey("payments.Payment", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    stripe_payout = models.ForeignKey("StripePayout", null=True, blank=True, on_delete=models.SET_NULL, related_name="bank_operations")
     source_file = models.CharField("plik", max_length=160, blank=True)
     imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     imported_at = models.DateTimeField(auto_now_add=True)
@@ -459,3 +461,55 @@ class BankOperation(models.Model):
     @property
     def is_inflow(self):
         return self.amount > 0
+
+
+class StripePayout(models.Model):
+    """Wypłata z salda Stripe na rachunek bankowy (eksport „Wypłaty”) — przeniesienie środków, nie przychód."""
+
+    stripe_id = models.CharField("identyfikator Stripe", max_length=64, unique=True)
+    amount = models.BigIntegerField("kwota [gr]")
+    currency = models.CharField("waluta", max_length=3, default="PLN")
+    created_at = models.DateTimeField("utworzono")
+    arrival_date = models.DateField("data wpływu (wg Stripe)", null=True, blank=True)
+    status = models.CharField("status", max_length=20, blank=True)
+    descriptor = models.CharField("opis na wyciągu", max_length=60, blank=True)
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class StripeTransaction(models.Model):
+    """Operacja salda Stripe (eksport „Historia salda”): płatność klienta, zwrot, korekta opłaty. Bez danych klientów."""
+
+    stripe_id = models.CharField("identyfikator Stripe", max_length=64, unique=True)
+    type = models.CharField("typ", max_length=40)
+    source = models.CharField("źródło", max_length=64, blank=True)
+    amount = models.BigIntegerField("kwota [gr]")
+    fee = models.BigIntegerField("opłata [gr]", default=0)
+    net = models.BigIntegerField("netto [gr]")
+    currency = models.CharField("waluta", max_length=3, default="PLN")
+    created_at = models.DateTimeField("utworzono")
+    day = models.DateField("dzień (czas polski)", db_index=True)
+    description = models.CharField("opis", max_length=255, blank=True)
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class StripePosting(models.Model):
+    """Ujęcie w ewidencji: przychód dnia (wpłaty − zwroty) albo prowizje miesiąca (opłaty − zwroty opłat)."""
+
+    class Kind(models.TextChoices):
+        REVENUE = "przychod", "Przychód dnia"
+        FEES = "prowizje", "Prowizje Stripe za miesiąc"
+
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    period_start = models.DateField("okres od")
+    amount = models.BigIntegerField("kwota [gr]")
+    record = models.ForeignKey(Record, on_delete=models.PROTECT, related_name="stripe_postings")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["period_start", "kind"]

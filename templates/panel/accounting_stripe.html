@@ -1,0 +1,38 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Płatności online — Stripe{% endblock %}
+{% block panel %}
+<h1>Płatności online — Stripe</h1>
+{% include "panel/_accounting_tabs.html" %}
+<div class="card">
+  <p class="small muted">Wgraj dwa eksporty z panelu Stripe (Saldo → „Eksportuj”, zakres „Wszystko”, kolumny „Wszystko”): <strong>historię salda</strong> (zakładka „Wszystko”) i <strong>wypłaty</strong> (zakładka „Wypłaty”). Ponowne wgranie nie tworzy duplikatów. Przychód ujmuje się dziennie: pełne kwoty zapłacone przez klientów pomniejszone o zwroty (dowód: zestawienie wpłat online, § 13 rozporządzenia). Prowizje potrącane przez Stripe księguje się z faktur prowizyjnych platformy (zakładka Faktury KSeF) — kolumna „Prowizje” poniżej służy do porównania z fakturami. Wypłaty ze Stripe w wyciągu bankowym łączą się same i nie są drugi raz przychodem.</p>
+  <form method="post" enctype="multipart/form-data" class="actions" style="margin:0">{% csrf_token %}<input type="hidden" name="akcja" value="import">
+    <input type="file" name="pliki" accept=".csv" multiple required aria-label="Pliki CSV ze Stripe"><button class="btn" type="submit">Importuj</button></form>
+  {% if tx_count %}<p class="small">Operacji: {{ tx_count }} · wypłat: {{ payout_count }}{% if unmatched_payouts %} (bez dopasowania w wyciągu: {{ unmatched_payouts }} — wgraj wyciąg z banku za ten okres){% endif %} · saldo wg eksportu: <strong>{{ balance|pln }}</strong> — porównaj z „Całkowite saldo” w panelu Stripe.</p>{% endif %}
+</div>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Miesiąc</th><th>Płatności</th><th>Wpłaty brutto</th><th>Zwroty</th><th>Przychód</th><th>Prowizje (do porównania z fakturami)</th><th>Wypłaty na rachunek</th><th>W ewidencji</th></tr>
+  {% for m in months %}<tr>
+    <td><a href="{% url 'panel:accounting_stripe_pdf' m.month.year m.month.month %}" target="_blank" rel="noopener">{{ m.month|date:"F Y" }}</a></td>
+    <td data-label="Płatności">{{ m.count }}</td>
+    <td data-label="Brutto" style="text-align:right">{{ m.gross|pln }}</td>
+    <td data-label="Zwroty" style="text-align:right">{{ m.refunds|pln }}</td>
+    <td data-label="Przychód" style="text-align:right"><strong>{{ m.revenue|pln }}</strong></td>
+    <td data-label="Prowizje" style="text-align:right">{{ m.fee_cost|pln }}</td>
+    <td data-label="Wypłaty" style="text-align:right">{{ m.payouts|pln }}</td>
+    <td data-label="W ewidencji" class="small">dni {{ m.posted_days }}/{{ m.days }} · prowizje {% if m.fees_posted %}<span class="badge ok">tak</span>{% else %}—{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="8" class="muted">Brak danych — wgraj eksporty ze Stripe.</td></tr>{% endfor %}
+</table></div></section>
+{% if months %}
+<form method="post" class="card" novalidate>{% csrf_token %}<input type="hidden" name="akcja" value="ujmij">
+  <h2 style="margin-top:0">Ujmij w ewidencji</h2>
+  <p class="small muted">Dopisze przychód każdego zakończonego dnia z płatnościami (dni już ujęte są pomijane). Nazwa miesiąca w tabeli otwiera zestawienie wpłat (PDF) — dowód do zapisów.</p>
+  <div class="field"><label for="forma">Forma działalności przychodu</label><select id="forma" name="forma">{% for v, l in activities %}<option value="{{ v }}"{% if v == default_activity %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <details><summary class="small">Prowizje bez faktur (wyjątkowo)</summary>
+    <p class="small muted">Zaznacz tylko wtedy, gdy za dany miesiąc nie ma faktury prowizyjnej w KSeF — inaczej koszt zostanie policzony dwa razy.</p>
+    <label class="small"><input type="checkbox" name="prowizje" value="1"> Ujmij też prowizje z eksportu Stripe jako koszt miesięczny</label>
+    <div class="field"><label for="kolumna">Prowizje w kolumnie</label><select id="kolumna" name="kolumna"><option value="cost_deductible">kol. 6 — koszt uzyskania przychodów</option><option value="cost_other">kol. 7 — koszt niestanowiący KUP</option></select></div>
+  </details>
+  <div class="actions"><button class="btn" type="submit">Ujmij w ewidencji</button></div>
+</form>
+{% endif %}
+{% endblock %}

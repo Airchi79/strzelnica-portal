@@ -160,3 +160,19 @@ def test_reconciliation_page_without_statement(owner_client):
     page = owner_client.get("/panel/ksiegowosc/uzgodnienie/").content.decode()
     assert "Brak operacji z wyciągu" in page
     assert KsefInvoice.objects.count() == 0
+
+
+def test_new_commission_invoice_inherits_stripe_offset(owner):
+    first = _commission(owner, "GT/001", "2.40", date(2026, 7, 20))
+    assert first.payment_method == ""  # pierwsza faktura sprzedawcy — bez zgadywania
+    bank.set_payment(first, by=owner, method=PAYMENT_OFFSET)
+    nxt = _commission(owner, "GT/002", "1.17", date(2026, 8, 1))
+    assert nxt.payment_method == PAYMENT_OFFSET and "automatycznie" in nxt.payment_note
+    other = _invoice(owner, "FV/9", "45.00", date(2026, 8, 2))  # inny sprzedawca — bez zmian
+    assert other.payment_method == ""
+    # gdy ostatnią fakturę sprzedawcy opłacono przelewem z rachunku — kolejna nie jest oznaczana
+    third = _commission(owner, "GT/003", "9.99", date(2026, 9, 1))
+    bank.set_payment(third, by=owner, method="")
+    bank.import_xlsx(xlsx([op_row(date(2026, 9, 2), -9.99, title="GT/003")]), by=owner)
+    assert BankOperation.objects.get().invoice == third
+    assert _commission(owner, "GT/004", "3.33", date(2026, 10, 1)).payment_method == ""

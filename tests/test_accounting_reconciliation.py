@@ -93,7 +93,13 @@ def test_payment_method_rules_and_same_seller(owner, owner_client):
     r = owner_client.post(f"/panel/ksiegowosc/ksef/{c1.pk}/zaplata/", {"method": PAYMENT_OFFSET, "same_seller": "on"}, follow=True)
     assert "innych faktur sprzedawcy: 1" in r.content.decode()
     c2.refresh_from_db()
-    assert c2.payment_method == PAYMENT_OFFSET
+    assert c2.payment_method == PAYMENT_OFFSET and c2.reimbursement == ""
+    page = owner_client.get(f"/panel/ksiegowosc/ksef/{c2.pk}/").content.decode()
+    assert '<option value="" selected>— nie dotyczy' in page  # przy potrąceniu Stripe pole zwrotu nie podpowiada „Do zwrotu”
+    # „Do zwrotu” przesłane razem z potrąceniem jest ignorowane
+    bank.set_payment(c2, by=owner, method=PAYMENT_OFFSET, reimbursement=REIMBURSE_PENDING)
+    c2.refresh_from_db()
+    assert c2.reimbursement == ""
     # faktura potrącana przez Stripe nie jest dopasowywana do wydatku z rachunku o tej samej kwocie
     bank.import_xlsx(xlsx([op_row(date(2026, 8, 3), -1.17, title="opłata", balance=1)]), by=owner)
     assert BankOperation.objects.get(amount=-117).status == BankOperation.Status.NEW

@@ -122,6 +122,7 @@ urlpatterns = [
     path("ksiegowosc/wyciag/<int:pk>/<str:action>/", accounting_views.bank_action, name="accounting_bank_action"),
     path("ksiegowosc/stripe/", accounting_views.stripe_page, name="accounting_stripe"),
     path("ksiegowosc/uzgodnienie/", accounting_views.reconciliation, name="accounting_reconciliation"),
+    path("ksiegowosc/miesiac/", accounting_views.month_checklist, name="accounting_month"),
     path("ksiegowosc/stripe/<int:year>-<int:month>.pdf", accounting_views.stripe_pdf, name="accounting_stripe_pdf"),
     path("ksiegowosc/ksef/", accounting_views.ksef_list, name="accounting_ksef"),
     path("ksiegowosc/ksef/import/", accounting_views.ksef_import, name="accounting_ksef_import"),

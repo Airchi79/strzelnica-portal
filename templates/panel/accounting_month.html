@@ -1,0 +1,21 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Lista miesiąca{% endblock %}
+{% block panel %}
+<h1>Lista kontrolna — {{ label }}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<div class="card actions" style="justify-content:space-between;align-items:center">
+  <a class="btn secondary" href="?rok={{ prev.year }}&amp;miesiac={{ prev.month }}">← poprzedni miesiąc</a>
+  <span>{% if open %}<span class="badge warn">do zrobienia / sprawdzenia: {{ open }}</span>{% else %}<span class="badge ok">miesiąc rozliczony</span>{% endif %} <span class="small muted">gotowe {{ done }} z {{ steps|length }}</span></span>
+  {% if next %}<a class="btn secondary" href="?rok={{ next.year }}&amp;miesiac={{ next.month }}">następny miesiąc →</a>{% else %}<span></span>{% endif %}
+</div>
+<p class="small muted">Rutyna na początek miesiąca: przyjmij faktury KSeF (w tym fakturę prowizyjną), wgraj eksport ze Stripe i ujmij dni, wgraj wyciąg z BNP Paribas i rozstrzygnij operacje, na koniec sprawdź uzgodnienie salda.</p>
+<div class="table-wrap card"><table class="days">
+  <tr class="head"><th>Krok</th><th>Stan</th><th>Szczegóły</th><th></th></tr>
+  {% for s in steps %}<tr>
+    <td><strong>{{ forloop.counter }}. {{ s.title }}</strong></td>
+    <td data-label="Stan"><span class="badge {{ s.badge }}">{{ s.label }}</span></td>
+    <td data-label="Szczegóły" class="small">{{ s.detail }}</td>
+    <td>{% if s.url and s.action %}<a class="btn{% if s.state != 'todo' %} secondary{% endif %}" href="{{ s.url }}">{{ s.action }}</a>{% endif %}</td>
+  </tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -225,3 +225,103 @@ def occupancy(first, nxt):
         "days": days, "lanes": lanes_out, "busiest_day": busiest_day,
         "top": [{"day": WEEKDAYS_FULL[w], "hour": h, "booked": b, "pct": p} for b, p, w, h in top],
     }
+
+
+# --- rezerwacje i osie: przychód osi, rezerwacje bez wpisu w książce pobytu ----------------------------------------------
+
+REPORT_PERIODS = {"7": ("ostatnie 7 dni", 7), "30": ("ostatnie 30 dni", 30), "90": ("ostatnie 90 dni", 90), "365": ("ostatni rok", 365)}
+ENTRY_WINDOW = timedelta(hours=1)  # wpis bez powiązania z rezerwacją, ale tej osoby, od godziny przed rozpoczęciem
+
+
+def _lane_revenue(r):
+    """Przychód osi z rezerwacji (bez dopłaty za prowadzącego od strzelnicy); zwolniona z opłaty — 0."""
+    if r.payment_status == "zwolniona":
+        return 0
+    return max(0, r.amount - r.officer_amount)
+
+
+def _period_core(first, nxt, now):
+    from apps.bookings.models import Reservation
+    from apps.logbook.models import Entry
+
+    tz = timezone.get_current_timezone()
+    start = timezone.make_aware(datetime.combine(first, datetime.min.time()), tz)
+    end = timezone.make_aware(datetime.combine(nxt, datetime.min.time()), tz)
+    occ = occupancy(first, nxt)
+    reservations = list(Reservation.objects.filter(starts_at__gte=start, starts_at__lt=end)
+                        .exclude(ACTIVE_EXCLUDE).exclude(status__in=["oczekuje", "do_zatwierdzenia"])
+                        .select_related("lane", "user", "officer"))
+    lanes = {x["lane"].pk: {**x, "revenue": 0, "officer_fees": 0, "count": 0, "hours": 0} for x in occ["lanes"]}
+    for r in reservations:
+        row = lanes.get(r.lane_id)
+        if row is None:
+            continue
+        row["revenue"] += _lane_revenue(r)
+        row["officer_fees"] += r.officer_amount if r.payment_status != "zwolniona" else 0
+        row["count"] += 1
+        row["hours"] += r.hours
+    for row in lanes.values():
+        row["per_open_hour"] = round(row["revenue"] / row["capacity"]) if row["capacity"] else None
+        row["per_booked_hour"] = round(row["revenue"] / row["hours"]) if row["hours"] else None
+        row["avg_hours"] = round(row["hours"] / row["count"], 1) if row["count"] else None
+
+    # rezerwacje zakończone, odbyte (potwierdzone) — czy jest wpis w książce pobytu
+    done = [r for r in reservations if r.status == "potwierdzona" and r.ends_at <= now]
+    with_link = set(Entry.objects.filter(reservation__in=done).values_list("reservation_id", flat=True))
+    by_user = {}
+    for e in Entry.objects.filter(entered_at__gte=start - ENTRY_WINDOW, entered_at__lt=end, user__isnull=False).only("user_id", "entered_at"):
+        by_user.setdefault(e.user_id, []).append(e.entered_at)
+    missing = []
+    for r in done:
+        if r.pk in with_link:
+            continue
+        people = {r.user_id, r.officer_id} - {None}
+        if any(r.starts_at - ENTRY_WINDOW <= t < r.ends_at for uid in people for t in by_user.get(uid, [])):
+            continue
+        missing.append(r)
+    return {"occ": occ, "reservations": reservations, "lanes": list(lanes.values()), "done": done, "missing": missing}
+
+
+def reservations_report(days, today=None, now=None):
+    """Raport jak w GunTrackerze: przychód osi (na godzinę otwarcia i na zarezerwowaną godzinę), rezerwacje bez wpisu
+    w książce pobytu z listą osób, porównanie z poprzednim okresem tej samej długości."""
+    today = today or timezone.localdate()
+    now = now or timezone.now()
+    nxt = today + timedelta(days=1)
+    first = nxt - timedelta(days=days)
+    cur = _period_core(first, nxt, now)
+    prev = _period_core(first - timedelta(days=days), first, now)
+
+    def kpi(core):
+        rs = core["reservations"]
+        revenue = sum(row["revenue"] for row in core["lanes"])
+        hours = sum(r.hours for r in rs)
+        return {"revenue": revenue, "reservations": len(rs), "occupancy": core["occ"]["pct"],
+                "avg_value": round(revenue / len(rs)) if rs else None, "avg_hours": round(hours / len(rs), 1) if rs else None,
+                "missing_pct": round(100 * len(core["missing"]) / len(core["done"])) if core["done"] else None}
+
+    k, p = kpi(cur), kpi(prev)
+    deltas = {}
+    for key, v in k.items():
+        old = p.get(key)
+        deltas[key] = None if v is None or old is None else (
+            {"abs": v - old, "pct": None} if key in ("occupancy", "missing_pct") else
+            {"abs": round(v - old, 1) if isinstance(v, float) or isinstance(old, float) else v - old,
+             "pct": round(100 * (v - old) / old) if old else None})
+    people = {}
+    for r in cur["done"]:
+        row = people.setdefault(r.user_id, {"user": r.user, "visits": 0, "missing": 0, "last_missing": None})
+        row["visits"] += 1
+    for r in cur["missing"]:
+        row = people[r.user_id]
+        row["missing"] += 1
+        row["last_missing"] = max(filter(None, [row["last_missing"], timezone.localtime(r.starts_at).date()]))
+    ranking = sorted((x for x in people.values() if x["missing"]), key=lambda x: (-x["missing"], -x["visits"], x["user"].last_name))
+    lanes = sorted(cur["lanes"], key=lambda x: -(x["per_open_hour"] or 0))
+    best = next((x for x in lanes if x["revenue"]), None)
+    return {
+        "first": first, "last": today, "kpi": k, "deltas": deltas, "lanes": lanes, "best_lane": best,
+        "officer_fees": sum(x["officer_fees"] for x in cur["lanes"]),
+        "done_count": len(cur["done"]), "missing": sorted(cur["missing"], key=lambda r: r.starts_at, reverse=True),
+        "ranking": ranking[:15],
+    }

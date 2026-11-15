@@ -566,6 +566,20 @@ def panel_occupancy(request):
 
 
 @panel_required(PERM_REP)
+def panel_reservations_report(request):
+    """Rezerwacje i osie: przychód osi na godzinę otwarcia, rezerwacje bez wpisu w książce pobytu."""
+    from . import stats
+
+    key = request.GET.get("okres", "30")
+    if key not in stats.REPORT_PERIODS:
+        key = "30"
+    label, days = stats.REPORT_PERIODS[key]
+    data = stats.reservations_report(days)
+    data.update({"period": key, "period_label": label, "periods": [(k, v[0]) for k, v in stats.REPORT_PERIODS.items()]})
+    return render(request, "panel/reservations_report.html", data)
+
+
+@panel_required(PERM_REP)
 def panel_month_stats(request):
     """Statystyki miesiąca z porównaniem do poprzedniego."""
     from . import stats

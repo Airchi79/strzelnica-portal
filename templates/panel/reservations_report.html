@@ -1,0 +1,60 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Rezerwacje i osie{% endblock %}
+{% block panel %}
+<div class="today-head">
+  <div><h1 style="margin-bottom:2px">Rezerwacje i osie</h1>
+    <p class="daylabel week-label" style="margin:0">{{ period_label|capfirst }}: {{ first|date:"j.m.Y" }} – {{ last|date:"j.m.Y" }} · zmiany wobec poprzedniego okresu tej samej długości</p></div>
+  <div class="actions no-print" style="margin:0"><button type="button" class="btn small-btn" data-print>Drukuj</button></div>
+</div>
+<div class="no-print">{% include "panel/_assoc_tabs.html" %}</div>
+<nav class="tabs no-print" aria-label="Okres">{% for k, l in periods %}<a href="?okres={{ k }}" class="{% if k == period %}active{% endif %}"{% if k == period %} aria-current="page"{% endif %}>{{ l|capfirst }}</a>{% endfor %}</nav>
+
+{% with d=deltas %}
+<div class="today-tiles kpi-tiles">
+  {% include "panel/_kpi.html" with label="przychód osi (bez dopłat za PS)" value=kpi.revenue money=True delta=d.revenue %}
+  {% include "panel/_kpi.html" with label="rezerwacji" value=kpi.reservations delta=d.reservations %}
+  {% include "panel/_kpi.html" with label="obłożenie osi" value=kpi.occupancy suffix="%" delta=d.occupancy unit="p.p." %}
+  {% include "panel/_kpi.html" with label="średnia wartość rezerwacji" value=kpi.avg_value money=True delta=d.avg_value %}
+  {% include "panel/_kpi.html" with label="średnia długość [h]" value=kpi.avg_hours delta=d.avg_hours %}
+  {% include "panel/_kpi.html" with label="rezerwacji bez wpisu w książce" value=kpi.missing_pct suffix="%" delta=d.missing_pct unit="p.p." inverse=True %}
+</div>
+{% endwith %}
+
+<div class="card table-wrap">
+  <h2 class="step-title">Osie — przychód na godzinę otwarcia</h2>
+  <p class="small muted" style="margin-top:0">Przychód osi (opłaty za oś, bez dopłat za prowadzącego od strzelnicy{% if officer_fees %} — te wyniosły {{ officer_fees|pln }}{% endif %}) podzielony przez godziny, w których oś była otwarta (bez blokad), oraz przez godziny faktycznie zarezerwowane. Pokazuje, która oś zarabia, a która stoi.{% if best_lane %} Najlepsza: <strong>{{ best_lane.lane }}</strong> — {{ best_lane.per_open_hour|pln }} na godzinę otwarcia.{% endif %}</p>
+  <table class="days">
+    <tr class="head"><th>Oś</th><th>Na godzinę otwarcia</th><th>Na zarezerwowaną godzinę</th><th>Obłożenie</th><th>Przychód</th><th>Rezerwacje</th><th>Średnia długość</th></tr>
+    {% for x in lanes %}<tr><td><strong>{{ x.lane }}</strong></td>
+      <td data-label="Na godzinę otwarcia" style="text-align:right">{% if x.per_open_hour is None %}—{% else %}{{ x.per_open_hour|pln }}{% endif %}</td>
+      <td data-label="Na zarezerwowaną godzinę" style="text-align:right">{% if x.per_booked_hour is None %}—{% else %}{{ x.per_booked_hour|pln }}{% endif %}</td>
+      <td data-label="Obłożenie" style="text-align:right">{% if x.pct is None %}zamknięta{% else %}{{ x.pct }}%{% endif %} <span class="small muted">{{ x.booked }}/{{ x.capacity }} h</span></td>
+      <td data-label="Przychód" style="text-align:right">{{ x.revenue|pln }}</td>
+      <td data-label="Rezerwacje" style="text-align:right">{{ x.count }}</td>
+      <td data-label="Średnia długość" style="text-align:right">{% if x.avg_hours is None %}—{% else %}{{ x.avg_hours }} h{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="7" class="muted">Brak aktywnych osi.</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="today-tiles two-col">
+  <div class="card table-wrap">
+    <h2 class="step-title">Rezerwacje bez wpisu w książce pobytu</h2>
+    <p class="small muted" style="margin-top:0">Odbyte (zakończone, potwierdzone) rezerwacje, do których nie ma wpisu w książce pobytu — ani powiązanego z rezerwacją, ani wpisu rezerwującego / przydzielonego prowadzącego od godziny przed rozpoczęciem do końca. Odwołane i nieodbyte się nie liczą. {% if done_count %}<strong>{{ missing|length }} z {{ done_count }}</strong> odbytych.{% endif %}</p>
+    <table class="days">
+      <tr class="head"><th>Termin</th><th>Oś</th><th>Rezerwujący</th></tr>
+      {% for r in missing|slice:":50" %}<tr><td><a href="{% url 'panel:reservation' r.pk %}">{{ r.starts_at|date:"j.m.Y H:i" }}</a></td><td data-label="Oś">{{ r.lane }}</td><td data-label="Rezerwujący">{{ r.user.full_name }}</td></tr>
+      {% empty %}<tr><td colspan="3" class="muted">{% if done_count %}Każda odbyta rezerwacja ma wpis ✓{% else %}Brak odbytych rezerwacji w okresie.{% endif %}</td></tr>{% endfor %}
+      {% if missing|length > 50 %}<tr><td colspan="3" class="muted">… i jeszcze {{ missing|length|add:"-50" }}.</td></tr>{% endif %}
+    </table>
+  </div>
+  <div class="card table-wrap">
+    <h2 class="step-title">Najczęściej bez wpisu</h2>
+    <p class="small muted" style="margin-top:0">Rezerwujący, których rezerwacje najczęściej nie mają wpisu — warto przypomnieć o obowiązku wpisu do książki pobytu.</p>
+    <table class="days">
+      <tr class="head"><th>Osoba</th><th>Bez wpisu</th><th>Ostatnio</th></tr>
+      {% for x in ranking %}<tr><td><a href="{% url 'panel:user' x.user.pk %}">{{ x.user.full_name }}</a></td><td data-label="Bez wpisu">{{ x.missing }} z {{ x.visits }}</td><td data-label="Ostatnio">{{ x.last_missing|date:"j.m.Y" }}</td></tr>
+      {% empty %}<tr><td colspan="3" class="muted">Brak.</td></tr>{% endfor %}
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -81,6 +81,9 @@ def verify_email(request, uidb64, token):
         user.save(update_fields=["email_verified_at"])
         log_event("konto.potwierdzenie_email", user, actor=user)
         send_welcome_email(user)  # tylko przy pierwszym potwierdzeniu — ponowne kliknięcie linku nie wysyła drugi raz
+        from apps.credentials import preverified
+
+        preverified.on_email_verified(user)  # kartoteka (ten sam e-mail) i PS zweryfikowani wcześniej
     messages.success(request, "Adres e-mail potwierdzony. Możesz się zalogować.")
     return redirect("accounts:login")
 

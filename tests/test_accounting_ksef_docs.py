@@ -307,3 +307,16 @@ def test_accept_form_defaults_to_other_activity(owner_client, owner):
     inv = ksef.import_files([upload(f"{KSEF_NO}.xml", invoice_xml())], by=owner, own_nip=OWN_NIP)[0][0]
     page = owner_client.get(f"/panel/ksiegowosc/ksef/{inv.pk}/").content.decode()
     assert '<option value="pozostala" selected>' in page and 'list="opisy"' in page and '<datalist id="opisy">' in page
+
+
+def test_flows_form_suggests_col6_from_column7_costs(owner_client, owner):
+    from django.utils import timezone
+
+    year = timezone.localdate().year - (1 if timezone.localdate().month <= 3 else 0)
+    day = date(year, 1, 10)
+    services.add_record(kind=Record.Kind.REVENUE, day=day, document="WB", description="x", amount=500000, column="revenue", by=owner)
+    services.add_record(kind=Record.Kind.COST, day=day, document="FV1", description="y", amount=100000, column="cost_deductible", by=owner)
+    services.add_record(kind=Record.Kind.COST, day=day, document="FV2", description="z", amount=123456, column="cost_other", by=owner)
+    page = owner_client.get("/panel/ksiegowosc/dokumenty/nowy/przeplywy/").content.decode()
+    assert 'value="4000,00"' in page  # kol. 4 = dochód 5 000 − 1 000
+    assert 'value="1234,56"' in page  # kol. 6 = koszty z kol. 7

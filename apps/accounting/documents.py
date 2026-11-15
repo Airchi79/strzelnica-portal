@@ -367,7 +367,9 @@ class Flows(Doc):
     title = "Zestawienie przepływów finansowych (załącznik nr 2)"
     group = "Zestawienia roczne"
     legal = "§ 2 pkt 2 rozporządzenia, wzór z załącznika nr 2"
-    hint = "Kol. 1–3 wylicza system z ewidencji. Kol. 4–6 uzupełnia zarząd; kol. 5 domyślnie przenosi kol. 7 z roku poprzedniego."
+    hint = "Kol. 1–3 wylicza system z ewidencji. Kol. 4–6 uzupełnia zarząd — podpowiedzi: kol. 4 = dochód (kol. 3), kol. 6 = suma " \
+           "kosztów z kol. 7 ewidencji (wydatki pokryte z dochodu wolnego); kol. 5 domyślnie przenosi kol. 7 z roku poprzedniego. " \
+           "Zestawienie sporządza się po zakończeniu roku."
     landscape = True
 
     def fields(self, ctx):
@@ -381,8 +383,10 @@ class Flows(Doc):
     def initial(self, ctx):
         year = timezone.localdate().year - (1 if timezone.localdate().month <= 3 else 0)
         f = flows_data(year)
+        # podpowiedzi: kol. 4 = dochód (kol. 3), kol. 6 = koszty z kol. 7 ewidencji (wydatki pokryte z dochodu wolnego
+        # od podatku — objaśnienie 7 do załącznika nr 1); zapisane wcześniej wartości mają pierwszeństwo
         return {"rok": year, "kol4": f["col4"] if f["col4"] is not None else (f["col3"] if f["col3"] > 0 else 0),
-                "kol5": AccountingYear.get(year).free_prior, "kol6": f["col6"]}
+                "kol5": AccountingYear.get(year).free_prior, "kol6": f["col6"] if f["col6"] is not None else f["cost_other"]}
 
     def doc_title(self, d):
         return f"Zestawienie przepływów finansowych za {d['rok']} r."

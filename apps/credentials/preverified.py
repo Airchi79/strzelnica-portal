@@ -12,7 +12,6 @@ tylko jednoznaczne), a konto z potwierdzonym e-mailem łączy się z osobą z ka
 
 import io
 import re
-import unicodedata
 from datetime import date, datetime
 
 from django.core.exceptions import ValidationError
@@ -21,6 +20,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.audit.services import log_event
+from apps.clients.duplicates import name_key as _clients_name_key
 
 from .models import Credential, PreverifiedOfficer
 
@@ -38,12 +38,7 @@ class _Rollback(Exception):
     pass
 
 
-def name_key(*parts):
-    """Klucz porównania imienia i nazwiska: bez wielkości liter, polskich znaków, kolejności i nadmiarowych spacji."""
-    text = " ".join(str(p or "") for p in parts).replace("ł", "l").replace("Ł", "L")
-    text = unicodedata.normalize("NFKD", text)
-    text = "".join(ch for ch in text if not unicodedata.combining(ch)).casefold()
-    return tuple(sorted(re.findall(r"[a-z]+", text)))
+name_key = _clients_name_key  # jeden klucz porównania imienia i nazwiska w całym systemie
 
 
 def _date(value):

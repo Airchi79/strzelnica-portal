@@ -8,7 +8,9 @@
   <div><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ q }}" placeholder="nazwisko, imię, nr pozwolenia, e-mail"></div>
   <div class="checkbox"><label><input type="checkbox" name="niepelne" value="1"{% if niepelne %} checked{% endif %}> tylko z brakami</label></div>
   <div class="actions"><button class="btn" type="submit">Pokaż</button>
-    {% if perms.clients.manage_clients %}<a class="btn secondary" href="{% url 'panel:person_new' %}">+ Dodaj osobę</a>{% endif %}</div>
+    {% if perms.clients.manage_clients %}<a class="btn secondary" href="{% url 'panel:person_new' %}">+ Dodaj osobę</a>
+    <a class="btn secondary" href="{% url 'panel:persons_export' %}">Pobierz kartotekę (XLSX)</a>
+    <a class="btn secondary" href="{% url 'panel:persons_duplicates' %}">Możliwe duplikaty</a>{% endif %}</div>
 </form>
 <div class="actions" style="margin-top:0;margin-bottom:12px;align-items:center">
   <span class="muted small">{{ page.paginator.count }} z {{ total }} osób{% if not reveal %} · numery pozwoleń i adresy ukryte{% endif %}</span>
@@ -17,9 +19,9 @@
   {% elif reveal %}<span class="badge warn">dane odkryte — dostęp zapisano w dzienniku</span>{% endif %}
 </div>
 {% if perms.clients.manage_clients %}<form method="post" action="{% url 'panel:persons_cards' %}" id="cards-form" target="_blank">{% csrf_token %}</form>
-<div class="actions" style="margin-top:0;margin-bottom:8px"><button class="btn secondary small-btn" type="submit" form="cards-form">Drukuj karty zaznaczonych (PDF, A4 po 10)</button></div>{% endif %}
+<div class="actions" style="margin-top:0;margin-bottom:8px;align-items:center"><button class="btn secondary small-btn" type="submit" form="cards-form">Drukuj karty zaznaczonych (PDF, A4 po 10)</button><span class="small muted">pole w nagłówku zaznacza wszystkie osoby na tej stronie ({{ people|length }}); osoby z kontem nie dostają karty</span></div>{% endif %}
 <section class="day"><div class="table-wrap"><table class="days">
-  <tr class="head">{% if perms.clients.manage_clients %}<th class="nowrap"><span class="sr-only">Karta</span></th>{% endif %}<th>Osoba</th><th>Pozwolenie / adres</th><th>Stan</th><th>Pochodzenie</th></tr>
+  <tr class="head">{% if perms.clients.manage_clients %}<th class="nowrap"><input type="checkbox" data-check-all="ids" aria-label="Zaznacz wszystkie na tej stronie"></th>{% endif %}<th>Osoba</th><th>Pozwolenie / adres</th><th>Stan</th><th>Pochodzenie</th></tr>
   {% for p in people %}<tr>
     {% if perms.clients.manage_clients %}<td>{% if not p.user %}<input type="checkbox" name="ids" value="{{ p.pk }}" form="cards-form" aria-label="Karta: {{ p.full_name }}">{% endif %}</td>{% endif %}
     <td>{% if perms.clients.manage_clients %}<a href="{% url 'panel:person_edit' p.pk %}">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}{% if p.user %} <span class="badge">konto</span>{% elif p.card_printed_at %} <span class="badge ok" title="wydrukowano {{ p.card_printed_at|date:'j.m.Y' }}">karta</span>{% endif %}</td>

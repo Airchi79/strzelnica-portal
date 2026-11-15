@@ -30,6 +30,7 @@ MAX_ROWS = 20000
 REQUIRED = ["Data zaksięgowania", "Kwota", "Opis", "Typ transakcji", "Nadawca", "Odbiorca"]
 DONE_STATUSES = {"zrealizowana", "zaksięgowana", "wykonana", ""}
 INVOICE_WINDOW_DAYS = 180
+PREPAYMENT_DAYS = 30
 
 
 def _grosze(value):
@@ -123,17 +124,57 @@ def _norm(text):
     return re.sub(r"[^0-9A-Z]", "", (text or "").upper())
 
 
+def _invoice_window(booked_on):
+    """Faktura wystawiona do 180 dni przed zapłatą albo do 30 dni po niej (przedpłata przy zamówieniu)."""
+    return booked_on - timedelta(days=INVOICE_WINDOW_DAYS), booked_on + timedelta(days=PREPAYMENT_DAYS)
+
+
+def candidate_invoices(op, *, include_linked=False):
+    """Faktury KSeF (zakup) z należnością równą wydatkowi, z okna dat; najpierw te z numerem faktury w tytule przelewu."""
+    start, end = _invoice_window(op.booked_on)
+    qs = KsefInvoice.objects.filter(direction=KsefInvoice.Direction.PURCHASE, gross=-op.amount, currency="PLN",
+                                    issue_date__gte=start, issue_date__lte=end).exclude(status=KsefInvoice.Status.REJECTED)
+    if not include_linked:
+        qs = qs.exclude(bank_operations__isnull=False)
+    title = _norm(op.title)
+    found = list(qs.order_by("issue_date", "pk"))
+    return sorted(found, key=lambda i: (not (_norm(i.invoice_number) and _norm(i.invoice_number) in title),
+                                        abs((i.issue_date - op.booked_on).days)))
+
+
 def match_invoice(op):
-    """Faktura KSeF (zakup) z należnością równą wydatkowi, jeszcze nie połączona z zapłatą; najpierw po numerze w tytule."""
-    candidates = list(KsefInvoice.objects.filter(
-        direction=KsefInvoice.Direction.PURCHASE, gross=-op.amount, currency="PLN",
-        issue_date__lte=op.booked_on, issue_date__gte=op.booked_on - timedelta(days=INVOICE_WINDOW_DAYS),
-    ).exclude(status=KsefInvoice.Status.REJECTED).exclude(bank_operations__isnull=False))
+    """Jednoznaczna faktura do zapłaty: po numerze w tytule albo jedyna o tej kwocie w oknie dat."""
+    candidates = candidate_invoices(op)
     title = _norm(op.title)
     by_number = [i for i in candidates if _norm(i.invoice_number) and _norm(i.invoice_number) in title]
     if len(by_number) == 1:
         return by_number[0]
     return candidates[0] if len(candidates) == 1 else None
+
+
+def match_pending_invoices():
+    """Wydatki „Do decyzji” ↔ faktury KSeF — także po imporcie faktur, które przyszły później niż wyciąg."""
+    matched = 0
+    for op in BankOperation.objects.filter(status=BankOperation.Status.NEW, amount__lt=0, currency="PLN").order_by("booked_on", "pk"):
+        invoice = match_invoice(op)
+        if invoice:
+            op.invoice, op.status, op.status_note = invoice, BankOperation.Status.INVOICE, ""
+            op.save(update_fields=["invoice", "status", "status_note"])
+            matched += 1
+    return matched
+
+
+def booked_payment_for(invoice):
+    """Wydatek z wyciągu już zaksięgowany jako koszt (bez połączenia z fakturą), pasujący kwotą i datą do faktury —
+    przyjęcie faktury podwoiłoby koszt."""
+    if invoice.direction != KsefInvoice.Direction.PURCHASE:
+        return None
+    for op in (BankOperation.objects.filter(status=BankOperation.Status.BOOKED, amount=-invoice.gross, invoice__isnull=True,
+                                            record__removed_at__isnull=True).select_related("record")):
+        start, end = _invoice_window(op.booked_on)
+        if start <= invoice.issue_date <= end:
+            return op
+    return None
 
 
 def import_xlsx(uploaded, *, by):

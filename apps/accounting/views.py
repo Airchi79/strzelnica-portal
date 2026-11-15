@@ -347,7 +347,10 @@ def ksef_detail(request, pk):
     except Exception:  # noqa: BLE001 — uszkodzony / nietypowy plik: zostaje podsumowanie z bazy
         view = None
     qr = ksef_view.qr_url(invoice, dj_settings.KSEF_ENVIRONMENT)
+    from .bank import booked_payment_for
+
     return render(request, "panel/accounting_ksef_invoice.html", {
+        "duplicate": booked_payment_for(invoice) if invoice.status == KsefInvoice.Status.NEW else None,
         "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE if invoice.direction == KsefInvoice.Direction.SALE else Record.Kind.COST],
         "inv": invoice, "form": form, "reject_form": ReasonForm(), "gross": format_amount(invoice.gross),
         "v": view, "qr": qr, "qr_img": qr_svg_data_uri(qr, box_size=4) if qr else "",
@@ -809,6 +812,7 @@ def bank_detail(request, pk):
             nxt = BankOperation.objects.filter(status=BankOperation.Status.NEW).order_by("booked_on", "pk").first()
             return redirect("panel:accounting_bank_op", pk=nxt.pk) if nxt else redirect("panel:accounting_bank")
     return render(request, "panel/accounting_bank_op.html", {
+        "candidates": bank.candidate_invoices(op) if op.status == BankOperation.Status.NEW and not op.is_inflow else [],
         "op": op, "form": form, "invoice_form": BankInvoiceForm(op=op), "reason_form": ReasonForm(),
         "hints": DESCRIPTION_HINTS[Record.Kind.REVENUE if op.is_inflow else Record.Kind.COST] + ["Opłaty i prowizje bankowe"],
     })

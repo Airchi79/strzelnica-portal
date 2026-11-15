@@ -176,6 +176,9 @@ def import_files(uploads, *, by, own_nip=""):
             else:
                 created.append(invoice)
     if created:
+        from .bank import match_pending_invoices
+
+        match_pending_invoices()
         log_event("ksiegowosc.ksef_import", None, f"Zaimportowano faktur KSeF: {len(created)}", actor=by)
     return created, duplicates, errors
 
@@ -187,6 +190,12 @@ def accept(invoice, *, by, day, column, description, document=None, notes="", ac
 
     if invoice.status == KsefInvoice.Status.ACCEPTED and invoice.record_id:
         raise ValidationError("Faktura jest już w ewidencji.")
+    from .bank import booked_payment_for
+
+    duplicate = booked_payment_for(invoice)
+    if duplicate:
+        raise ValidationError(f"Ten wydatek jest już zaksięgowany z wyciągu bankowego (Lp. {duplicate.record.lp}) — przyjęcie faktury "
+                              "podwoiłoby koszt. Usuń tamten zapis i połącz operację z wyciągu z tą fakturą.")
     if invoice.currency != "PLN":
         raise ValidationError("Faktura w walucie obcej — przelicz kwotę na złote i wprowadź zapis ręcznie (§ 7 ust. 5).")
     expected = ("revenue",) if invoice.direction == KsefInvoice.Direction.SALE else ("cost_deductible", "cost_other")

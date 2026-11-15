@@ -161,3 +161,55 @@ def test_negative_amounts_format_correctly():
 
     assert pln(-1250) == "-12,50\xa0zł" and pln(-50) == "-0,50\xa0zł" and pln(-100000) == "-1\xa0000\xa0zł"
     assert pln(1250) == "12,50\xa0zł" and pln(0) == "0\xa0zł"
+
+
+# --- łączenie wydatków z fakturami KSeF: przedpłaty, faktury późniejsze niż wyciąg, podwójny koszt ---------------
+
+
+def _invoice(owner, number, gross, issue):
+    xml = invoice_xml(number=number, gross=gross).replace(b"<P_1>2026-02-10</P_1>", f"<P_1>{issue.isoformat()}</P_1>".encode())
+    return ksef.import_files([SimpleUploadedFile(f"{number.replace('/', '_')}.xml", xml)], by=owner, own_nip="1111111111")[0][0]
+
+
+def test_prepayment_before_invoice_date_is_matched(owner):
+    inv = _invoice(owner, "129/09/2026", "99.96", date(2026, 9, 16))
+    bank.import_xlsx(xlsx([op_row(date(2026, 9, 12), -99.96, who="47000000000000000000000002\nDRUKARNIA TESTOWA",
+                                  title="Zamówienie nr 303817")]), by=owner)
+    op = BankOperation.objects.get()
+    assert op.status == BankOperation.Status.INVOICE and op.invoice == inv  # zapłata 4 dni przed wystawieniem faktury
+    # przedpłata dawniej niż 30 dni przed fakturą — bez dopasowania
+    _invoice(owner, "FV/9", "12.34", date(2026, 9, 30))
+    bank.import_xlsx(xlsx([op_row(date(2026, 8, 1), -12.34, balance=500)]), by=owner)
+    assert BankOperation.objects.get(amount=-1234).status == BankOperation.Status.NEW
+
+
+def test_invoice_arriving_after_statement_links_pending_payment(owner):
+    bank.import_xlsx(xlsx([op_row(date(2026, 10, 7), -3300.0, who="42000000000000000000000003\nSTUDIO TESTOWE", title="FV 3/10/2026")]), by=owner)
+    op = BankOperation.objects.get()
+    assert op.status == BankOperation.Status.NEW
+    inv = _invoice(owner, "3/10/2026", "3300.00", date(2026, 10, 7))  # faktura przyszła później
+    op.refresh_from_db()
+    assert op.status == BankOperation.Status.INVOICE and op.invoice == inv
+
+
+def test_booked_bank_cost_blocks_double_invoice_cost(owner, owner_client):
+    bank.import_xlsx(xlsx([op_row(date(2026, 9, 12), -99.96, title="Zamówienie")]), by=owner)
+    op = BankOperation.objects.get()
+    page = owner_client.get(f"/panel/ksiegowosc/wyciag/{op.pk}/").content.decode()
+    assert "pasująca faktura KSeF" not in page
+    rec = bank.book(op, by=owner, description="Druk", column="cost_deductible")
+    inv = _invoice(owner, "129/09/2026", "99.96", date(2026, 9, 16))
+    assert BankOperation.objects.get(pk=op.pk).status == BankOperation.Status.BOOKED  # zaksięgowanej nie zmienia
+    page = owner_client.get(f"/panel/ksiegowosc/ksef/{inv.pk}/").content.decode()
+    assert "możliwy podwójny koszt" in page and f"Lp. {rec.lp}" in page
+    with pytest.raises(ValidationError, match="podwoiłoby koszt"):
+        ksef.accept(inv, by=owner, day=inv.issue_date, column="cost_deductible", description="Druk")
+    records, errors = ksef.accept_many([inv], by=owner, description="Druk")
+    assert records == [] and "podwoiłoby koszt" in errors[0]
+    # poprawka: usunięcie zapisu z wyciągu → operacja do decyzji → podpowiedź faktury → połączenie
+    services.remove_record(rec, by=owner, reason="koszt z faktury")
+    page = owner_client.get(f"/panel/ksiegowosc/wyciag/{op.pk}/").content.decode()
+    assert "pasująca faktura KSeF" in page and "129/09/2026" in page
+    owner_client.post(f"/panel/ksiegowosc/wyciag/{op.pk}/faktura/", {"invoice": inv.pk})
+    assert BankOperation.objects.get(pk=op.pk).invoice == inv
+    ksef.accept(inv, by=owner, day=inv.issue_date, column="cost_deductible", description="Druk")  # teraz bez podwójnego kosztu

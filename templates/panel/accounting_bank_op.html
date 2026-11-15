@@ -18,6 +18,13 @@
 <div class="actions"><a class="btn secondary" href="{% url 'panel:accounting_bank' %}">Wróć do wyciągu</a>
 {% if op.status == 'pominieta' or op.status == 'faktura' or op.status == 'stripe' %}<form method="post" action="{% url 'panel:accounting_bank_action' op.pk 'przywroc' %}" style="margin:0">{% csrf_token %}<button class="btn secondary" type="submit">Przywróć do decyzji</button></form>{% endif %}
 </div></div>
+{% if candidates %}
+<div class="card"><p><span class="badge warn">pasująca faktura KSeF</span> Kwota tego wydatku odpowiada fakturze — to najpewniej jej zapłata. Połącz zamiast księgować drugi raz:</p>
+{% for inv in candidates %}<form method="post" action="{% url 'panel:accounting_bank_action' op.pk 'faktura' %}" class="actions" style="margin:4px 0">{% csrf_token %}<input type="hidden" name="invoice" value="{{ inv.pk }}">
+  <span><a href="{% url 'panel:accounting_ksef_invoice' inv.pk %}">{{ inv.invoice_number }}</a> · {{ inv.seller_name }} · {{ inv.issue_date|date:"j.m.Y" }} · {{ inv.get_status_display|lower }}</span>
+  <button class="btn" type="submit">Połącz z tą fakturą</button></form>{% endfor %}
+</div>
+{% endif %}
 {% if op.status == 'nowa' %}
 <h2>Zaksięguj jako {% if op.is_inflow %}przychód{% else %}koszt{% endif %}</h2>
 <form method="post" class="card" novalidate>{% csrf_token %}

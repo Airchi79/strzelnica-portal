@@ -208,3 +208,69 @@ def test_internal_proof_numbering_and_prefill_link(owner_client):
     assert "Wpisz koszt do ewidencji" in page and "amount=25%2C00" in page and "document=DW%2F1%2F2026" in page
     form = owner_client.get("/panel/ksiegowosc/dodaj/koszt/?document=DW%2F1%2F2026&amount=25%2C00&description=Ta%C5%9Bma").content.decode()
     assert 'value="DW/1/2026"' in form and 'value="25,00"' in form
+
+
+# --- wizualizacja faktury ----------------------------------------------------------------
+
+
+RICH_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<Faktura xmlns="http://crd.gov.pl/wzor/2025/06/25/13775/">
+  <Naglowek><KodFormularza kodSystemowy="FA (3)" wersjaSchemy="1-0E">FA</KodFormularza><WariantFormularza>3</WariantFormularza></Naglowek>
+  <Podmiot1><DaneIdentyfikacyjne><NIP>2222222222</NIP><Nazwa>Hurtownia Testowa sp. z o.o.</Nazwa></DaneIdentyfikacyjne>
+    <Adres><KodKraju>PL</KodKraju><AdresL1>ul. Testowa 1</AdresL1><AdresL2>00-001 Testowo</AdresL2></Adres></Podmiot1>
+  <Podmiot2><DaneIdentyfikacyjne><NIP>1111111111</NIP><Nazwa>Stowarzyszenie Testowe</Nazwa></DaneIdentyfikacyjne></Podmiot2>
+  <Fa><KodWaluty>PLN</KodWaluty><P_1>2026-02-10</P_1><P_1M>Testowo</P_1M><P_2>FV/9/2026</P_2><P_6>2026-02-09</P_6>
+    <P_13_1>100.00</P_13_1><P_14_1>23.00</P_14_1><P_13_7>50.00</P_13_7><P_15>173.00</P_15>
+    <Adnotacje><P_16>2</P_16><P_17>2</P_17><P_18>2</P_18><P_18A>1</P_18A><Zwolnienie><P_19N>1</P_19N></Zwolnienie></Adnotacje>
+    <RodzajFaktury>VAT</RodzajFaktury>
+    <FaWiersz><NrWierszaFa>1</NrWierszaFa><P_7>Tarcze &lt;papierowe&gt;</P_7><P_8A>szt.</P_8A><P_8B>100</P_8B><P_9A>1.00</P_9A><P_11>100.00</P_11><P_12>23</P_12></FaWiersz>
+    <FaWiersz><NrWierszaFa>2</NrWierszaFa><P_7>Szkolenie</P_7><P_8A>usł.</P_8A><P_8B>1</P_8B><P_9A>50.00</P_9A><P_11>50.00</P_11><P_12>zw</P_12></FaWiersz>
+    <Platnosc><TerminPlatnosci><Termin>2026-02-24</Termin></TerminPlatnosci><FormaPlatnosci>6</FormaPlatnosci>
+      <RachunekBankowy><NrRB>11222233334444555566667777</NrRB><NazwaBanku>Bank Testowy</NazwaBanku></RachunekBankowy></Platnosc>
+  </Fa>
+  <Stopka><Informacje><StopkaFaktury>Dziękujemy za zakupy</StopkaFaktury></Informacje><Rejestry><REGON>123456789</REGON></Rejestry></Stopka>
+</Faktura>""".encode()
+
+
+def test_visualization_read_full_invoice():
+    from apps.accounting import ksef_view
+
+    v = ksef_view.read(RICH_XML)
+    assert v["number"] == "FV/9/2026" and v["kind_label"] == "Faktura podstawowa" and v["place"] == "Testowo"
+    assert v["seller"]["address"] == ["ul. Testowa 1", "00-001 Testowo"] and v["buyer"]["nip"] == "1111111111"
+    assert [(line["name"], line["qty"], line["unit_net"], line["net"], line["rate"]) for line in v["lines"]] == [
+        ("Tarcze <papierowe>", "100", 100, 10000, "23"), ("Szkolenie", "1", 5000, 5000, "zw")]
+    assert v["sums"] == [{"label": "stawka podstawowa", "net": 10000, "vat": 2300}, {"label": "zwolnione z podatku", "net": 5000, "vat": None}]
+    assert v["total"] == 17300 and v["flags"] == ["mechanizm podzielonej płatności"]
+    assert v["payment"]["form"] == "przelew" and v["payment"]["terms"] == ["2026-02-24"]
+    assert v["payment"]["accounts"][0]["number"] == "11222233334444555566667777"
+    assert v["footer"] == ["Dziękujemy za zakupy"] and v["registers"] == [("REGON", "123456789")]
+
+
+def test_visualization_qr_link_format(owner):
+    import base64
+    import hashlib
+
+    from apps.accounting import ksef_view
+
+    inv = ksef.import_files([upload(f"{KSEF_NO}.xml", RICH_XML)], by=owner, own_nip=OWN_NIP)[0][0]
+    digest = base64.urlsafe_b64encode(hashlib.sha256(RICH_XML).digest()).decode().rstrip("=")
+    assert ksef_view.qr_url(inv) == f"https://qr.ksef.mf.gov.pl/invoice/2222222222/10-02-2026/{digest}"
+    assert ksef_view.qr_url(inv, "test").startswith("https://qr-test.ksef.mf.gov.pl/invoice/")
+    inv.ksef_number = ""
+    assert ksef_view.qr_url(inv) == ""  # bez numeru KSeF — bez kodu (plik spoza KSeF)
+
+
+def test_visualization_in_panel_and_pdf(owner_client, owner):
+    inv = ksef.import_files([upload(f"{KSEF_NO}.xml", RICH_XML)], by=owner, own_nip=OWN_NIP)[0][0]
+    page = owner_client.get(f"/panel/ksiegowosc/ksef/{inv.pk}/").content.decode()
+    assert "Faktura podstawowa nr FV/9/2026" in page and "ul. Testowa 1" in page and "Tarcze &lt;papierowe&gt;" in page
+    assert "11222233334444555566667777" in page and "mechanizm podzielonej płatności" in page
+    assert "data:image/svg+xml;base64," in page and "qr.ksef.mf.gov.pl/invoice/2222222222/10-02-2026/" in page
+    pdf = owner_client.get(f"/panel/ksiegowosc/ksef/{inv.pk}/pdf/")
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF") and "faktura-FV-9-2026.pdf" in pdf["Content-Disposition"]
+    # uszkodzony plik w magazynie — strona działa (podsumowanie z bazy)
+    with inv.xml.open("wb") as f:
+        f.write(b"<zepsuty")
+    page = owner_client.get(f"/panel/ksiegowosc/ksef/{inv.pk}/").content.decode()
+    assert "Nie udało się wyświetlić treści faktury" in page

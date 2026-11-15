@@ -54,6 +54,7 @@
 <form method="post" class="card" novalidate>{% csrf_token %}
   <p class="small muted">Do ewidencji trafia kwota należności ogółem ({{ gross }} zł) — stowarzyszenie bez działalności gospodarczej nie odlicza VAT. Sprawdź datę zdarzenia i opis.</p>
   {% include "partials/form.html" %}
+  <datalist id="opisy">{% for h in hints %}<option value="{{ h }}">{% endfor %}</datalist>
   <div class="actions"><button class="btn" type="submit">Przyjmij do ewidencji</button></div>
 </form>
 <details class="card"><summary class="danger-summary">Nie dotyczy ewidencji</summary>

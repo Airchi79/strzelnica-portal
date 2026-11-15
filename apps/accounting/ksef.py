@@ -220,3 +220,26 @@ def reopen(invoice, *, by):
     invoice.status, invoice.status_note = KsefInvoice.Status.NEW, ""
     invoice.save(update_fields=["status", "status_note"])
     log_event("ksiegowosc.ksef_przywrocenie", None, f"Faktura {invoice.invoice_number} wraca do decyzji", actor=by)
+
+
+def default_description(invoice):
+    return (invoice.items_summary or invoice.seller_name or invoice.invoice_number)[:255]
+
+
+def accept_many(invoices, *, by, description="", cost_column="cost_deductible", activity="", task=None):
+    """Przyjęcie wielu faktur naraz: data zdarzenia = data wystawienia, nr dowodu = numer faktury, wspólny opis
+    (albo opis z pozycji każdej faktury). Zwraca (przyjęte zapisy, błędy[str])."""
+    from django.utils import timezone
+
+    records, errors = [], []
+    for invoice in invoices:
+        column = "revenue" if invoice.direction == KsefInvoice.Direction.SALE else cost_column
+        try:
+            if invoice.issue_date > timezone.localdate():
+                raise ValidationError("data wystawienia jest z przyszłości")
+            records.append(accept(invoice, by=by, day=invoice.issue_date, column=column,
+                                  description=(description or default_description(invoice))[:255], document=invoice.invoice_number[:64],
+                                  notes=f"KSeF {invoice.ksef_number}"[:255] if invoice.ksef_number else "", activity=activity, task=task))
+        except ValidationError as e:
+            errors.append(f"{invoice.invoice_number}: {e.messages[0]}")
+    return records, errors

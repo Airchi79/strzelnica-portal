@@ -22,6 +22,8 @@ DESCRIPTION_HINTS = {
                        "Podatek od nieruchomości", "Naprawy i konserwacja", "Hosting i domena", "Opłaty administracyjne i pocztowe"],
 }
 MAX_AMOUNT = Decimal(100_000_000)
+# Forma działalności proponowana przy przyjmowaniu faktur i operacji z wyciągu (zdecydowana większość zapisów).
+DEFAULT_ACTIVITY = Activity.OTHER
 
 
 def parse_amount(value, *, allow_zero=False, allow_negative=False):
@@ -161,11 +163,11 @@ class KsefAcceptForm(forms.Form):
     date = forms.DateField(label="Data zdarzenia (kol. 2)", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
                            help_text="Data poniesienia wydatku albo uzyskania przychodu — domyślnie data wystawienia faktury.")
     document = forms.CharField(label="Nr dowodu księgowego (kol. 3)", max_length=64)
-    description = forms.CharField(label="Opis zdarzenia (kol. 4)", max_length=255)
+    description = forms.CharField(label="Opis zdarzenia (kol. 4)", max_length=255, widget=forms.TextInput(attrs={"list": "opisy"}))
     column = forms.ChoiceField(label="Kolumna zestawienia", choices=COST_COLUMNS, widget=forms.RadioSelect)
     notes = forms.CharField(label="Uwagi (kol. 8)", max_length=255, required=False)
     activity = forms.ChoiceField(label="Forma działalności (zestawienie uzupełniające)", required=False,
-                                 choices=[("", "— nieprzypisane —")] + Activity.choices)
+                                 choices=[("", "— nieprzypisane —")] + Activity.choices, initial=DEFAULT_ACTIVITY)
     task = forms.ModelChoiceField(label="Umowa o realizację zadania publicznego (dotacja)", required=False,
                                   queryset=PublicTask.objects.all(), empty_label="— nie dotyczy —")
 
@@ -179,6 +181,7 @@ class KsefAcceptForm(forms.Form):
                 "description": (invoice.items_summary or invoice.seller_name)[:255], "notes": f"KSeF {invoice.ksef_number}"[:255]
                 if invoice.ksef_number else "",
                 "column": "revenue" if invoice.direction == KsefInvoice.Direction.SALE else "cost_deductible",
+                "activity": DEFAULT_ACTIVITY,
             })
 
     def clean_date(self):
@@ -349,7 +352,8 @@ class BankBookForm(forms.Form):
     document = forms.CharField(label="Nr dowodu księgowego (kol. 3)", max_length=64)
     description = forms.CharField(label="Opis zdarzenia (kol. 4)", max_length=255, widget=forms.TextInput(attrs={"list": "opisy"}))
     column = forms.ChoiceField(label="Kolumna zestawienia", choices=COST_COLUMNS, widget=forms.RadioSelect)
-    activity = forms.ChoiceField(label="Forma działalności", required=False, choices=[("", "— nieprzypisane —")] + Activity.choices)
+    activity = forms.ChoiceField(label="Forma działalności", required=False, choices=[("", "— nieprzypisane —")] + Activity.choices,
+                                 initial=DEFAULT_ACTIVITY)
     task = forms.ModelChoiceField(label="Umowa o realizację zadania publicznego (dotacja)", required=False,
                                   queryset=PublicTask.objects.all(), empty_label="— nie dotyczy —")
     notes = forms.CharField(label="Uwagi (kol. 8)", max_length=255, required=False)
@@ -361,7 +365,7 @@ class BankBookForm(forms.Form):
         if not self.is_bound:
             self.initial.update({"date": op.booked_on, "document": f"Wyciąg bankowy {op.booked_on:%d.%m.%Y}",
                                  "description": suggestion, "notes": op.title[:255],
-                                 "column": "revenue" if op.is_inflow else "cost_deductible"})
+                                 "column": "revenue" if op.is_inflow else "cost_deductible", "activity": DEFAULT_ACTIVITY})
 
     def clean_date(self):
         value = self.cleaned_data["date"]
@@ -374,7 +378,8 @@ class BankBulkForm(forms.Form):
     description = forms.CharField(label="Opis zdarzenia (kol. 4) dla zaznaczonych", max_length=255,
                                   widget=forms.TextInput(attrs={"list": "opisy"}))
     cost_column = forms.ChoiceField(label="Kolumna dla wydatków", choices=COST_COLUMNS, initial="cost_deductible")
-    activity = forms.ChoiceField(label="Forma działalności", required=False, choices=[("", "— nieprzypisane —")] + Activity.choices)
+    activity = forms.ChoiceField(label="Forma działalności", required=False, choices=[("", "— nieprzypisane —")] + Activity.choices,
+                                 initial=DEFAULT_ACTIVITY)
     task = forms.ModelChoiceField(label="Umowa (dotacja)", required=False, queryset=PublicTask.objects.all(), empty_label="— nie dotyczy —")
 
 
@@ -388,3 +393,13 @@ class BankInvoiceForm(forms.Form):
                                            .order_by("-issue_date"))
         self.fields["invoice"].label_from_instance = (
             lambda i: f"{i.invoice_number} · {i.seller_name} · {i.issue_date:%d.%m.%Y} · {format_amount(i.gross)} zł")
+
+
+class KsefBulkForm(forms.Form):
+    description = forms.CharField(
+        label="Opis zdarzenia (kol. 4) dla zaznaczonych", max_length=255, required=False, widget=forms.TextInput(attrs={"list": "opisy"}),
+        help_text="Puste — każda faktura dostanie własny opis (pozycje z faktury albo nazwa sprzedawcy).")
+    cost_column = forms.ChoiceField(label="Kolumna dla faktur zakupu", choices=COST_COLUMNS, initial="cost_deductible")
+    activity = forms.ChoiceField(label="Forma działalności", required=False, choices=[("", "— nieprzypisane —")] + Activity.choices,
+                                 initial=DEFAULT_ACTIVITY)
+    task = forms.ModelChoiceField(label="Umowa (dotacja)", required=False, queryset=PublicTask.objects.all(), empty_label="— nie dotyczy —")

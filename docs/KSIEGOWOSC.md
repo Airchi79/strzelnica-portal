@@ -60,6 +60,14 @@ i rozporządzenie MFiG z 22.12.2025 (Dz. U. poz. 1880). Panel → Płatności �
 - Pozostałe: „Zaksięguj” (przychód kol. 5 / koszt kol. 6–7, forma działalności, umowa), także zbiorczo dla zaznaczonych;
   „Nie dotyczy ewidencji” z przyczyną. Usunięcie zapisu w ewidencji przywraca operację do decyzji.
 
+## Płatności online — Stripe
+- Import eksportów z panelu Stripe (konto Express stowarzyszenia): „Historia salda” i „Wypłaty” (Saldo → Eksportuj,
+  zakres „Wszystko”, kolumny „Wszystko”, CSV). Bez danych klientów; ponowne wgranie bez duplikatów.
+- Przychód dzienny = kwoty zapłacone przez klientów − zwroty (czas polski), zapis z dowodem „Stripe DD.MM.RRRR”;
+  zestawienie wpłat online za miesiąc (PDF) z listą identyfikatorów transakcji Stripe = dowód.
+- Prowizje dokumentują faktury platformy w KSeF — z eksportu Stripe są tylko do porównania (opcjonalnie koszt, gdy brak faktury).
+- Wypłaty Stripe na BNP łączą się z wyciągiem (kwota, data ±4 dni; bank księguje zwykle dzień przed „Arrival Date”).
+
 ## Generator dokumentów (PDF do podpisu, DOCX do edycji)
 - Uchwała organu zatwierdzającego o prowadzeniu UEPiK (art. 10a ust. 1).
 - Zawiadomienie US o wyborze UEPiK (art. 10a ust. 3 — do końca 3. miesiąca roku podatkowego).

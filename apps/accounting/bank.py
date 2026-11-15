@@ -41,6 +41,13 @@ def _grosze(value):
     return int((Decimal(text) * 100).quantize(Decimal(1)))
 
 
+def _aware(value):
+    """Daty z banku są w czasie polskim, bez strefy — zapisujemy je ze strefą (Europe/Warsaw)."""
+    if value is None or timezone.is_aware(value):
+        return value
+    return timezone.make_aware(value)
+
+
 def _when(value):
     if isinstance(value, datetime):
         return value
@@ -98,7 +105,7 @@ def parse_xlsx(uploaded):
         product = [line.strip() for line in str(row.get("Produkt") or "").splitlines() if line.strip()]
         own = product[-1].replace(" ", "") if product and re.fullmatch(r"\d{10,32}", product[-1].replace(" ", "")) else ""
         out.append({
-            "account": own[:34], "transaction_at": _when(row.get("Data transakcji")), "booked_on": booked.date(), "amount": amount,
+            "account": own[:34], "transaction_at": _aware(_when(row.get("Data transakcji"))), "booked_on": booked.date(), "amount": amount,
             "currency": str(row.get("Waluta") or "PLN")[:3], "counterparty_account": account, "counterparty": name,
             "title": " ".join(str(row.get("Opis") or "").split())[:255], "kind": str(row.get("Typ transakcji") or "")[:60],
             "balance_after": _grosze(row.get("Saldo po transakcji")),
@@ -161,9 +168,12 @@ def import_xlsx(uploaded, *, by):
                     op.save(update_fields=["invoice", "status"])
                     invoices += 1
             created.append(op)
+    from .stripe_import import match_bank_operations
+
+    stripe = match_bank_operations()  # wypłaty ze Stripe — przychód ujmuje zestawienie Stripe
     if created:
         log_event("ksiegowosc.wyciag_import", None, f"Wyciąg {uploaded.name}: nowych operacji {len(created)}, wpłat strzelców {system}, "
-                                                    f"zapłat faktur {invoices}", actor=by)
+                                                    f"zapłat faktur {invoices}, wypłat Stripe {stripe}", actor=by)
     return created, duplicates, system, invoices
 
 
@@ -220,8 +230,8 @@ def reopen(op, *, by):
         raise ValidationError("Tej operacji nie można przywrócić do decyzji.")
     if op.status == BankOperation.Status.BOOKED and op.record_id and not op.record.is_removed:
         raise ValidationError("Operacja jest zaksięgowana — usuń zapis w ewidencji (karta zapisu), operacja wróci do decyzji.")
-    op.status, op.status_note, op.invoice, op.record = BankOperation.Status.NEW, "", None, None
-    op.save(update_fields=["status", "status_note", "invoice", "record"])
+    op.status, op.status_note, op.invoice, op.record, op.stripe_payout = BankOperation.Status.NEW, "", None, None, None
+    op.save(update_fields=["status", "status_note", "invoice", "record", "stripe_payout"])
     log_event("ksiegowosc.wyciag_przywrocenie", None, f"Operacja {op.amount / 100:.2f} zł z {op.booked_on} wraca do decyzji", actor=by)
 
 

@@ -814,3 +814,57 @@ def bank_action(request, pk, action):
     except ValidationError as e:
         _error(request, e)
     return redirect("panel:accounting_bank_op", pk=pk)
+
+
+# --- Stripe -------------------------------------------------------------------------------
+
+
+@panel_required(PERM)
+def stripe_page(request):
+    from . import stripe_import
+    from .models import StripePayout, StripeTransaction
+
+    from django.db.models import Sum
+
+    if request.method == "POST":
+        action = request.POST.get("akcja")
+        try:
+            if action == "import":
+                files = request.FILES.getlist("pliki")
+                if not files:
+                    raise ValidationError("Wybierz pliki CSV ze Stripe.")
+                r = stripe_import.import_files(files, by=request.user)
+                messages.success(request, f"Stripe: nowe operacje {r['transactions']}, wypłaty {r['payouts']}, "
+                                          f"połączone z wyciągiem bankowym {r['matched']}" + (f", pominięte (już wgrane) {r['duplicates']}" if r["duplicates"] else "") + ".")
+            elif action == "ujmij":
+                days, months_done = stripe_import.post(by=request.user, column=request.POST.get("kolumna", "cost_deductible"),
+                                                       activity=request.POST.get("forma", ""), include_fees="prowizje" in request.POST)
+                messages.success(request, f"Ujęto w ewidencji: przychody dni {days}, prowizje miesięcy {months_done}.")
+            else:
+                raise Http404
+        except ValidationError as e:
+            _error(request, e)
+        return redirect("panel:accounting_stripe")
+    balance = (StripeTransaction.objects.aggregate(s=Sum("net"))["s"] or 0) - (StripePayout.objects.aggregate(s=Sum("amount"))["s"] or 0)
+    return render(request, "panel/accounting_stripe.html", {
+        "months": stripe_import.months(), "balance": balance, "tx_count": StripeTransaction.objects.count(),
+        "payout_count": StripePayout.objects.count(), "activities": Activity.choices,
+        "unmatched_payouts": StripePayout.objects.filter(bank_operations__isnull=True).count(),
+        "default_activity": AccountingSettings.load().auto_activity,
+    })
+
+
+@panel_required(PERM)
+def stripe_pdf(request, year, month):
+    from datetime import date
+
+    from . import stripe_import
+
+    try:
+        start = date(year, month, 1)
+    except ValueError as e:
+        raise Http404 from e
+    log_sensitive_access(None, f"ksiegowosc:stripe:{year}-{month:02d}", "zestawienie wpłat online")
+    response = HttpResponse(stripe_import.statement_pdf(start, AssociationSettings.load()), content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="zestawienie-wplat-online-{year}-{month:02d}.pdf"'
+    return response

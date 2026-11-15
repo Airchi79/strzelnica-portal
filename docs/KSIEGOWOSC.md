@@ -51,6 +51,15 @@ i rozporządzenie MFiG z 22.12.2025 (Dz. U. poz. 1880). Panel → Płatności �
    (np. 1.02.2026) i kliknij „Zapisz i pobierz teraz”.
 4. NIP kontekstu pochodzi z „Dane stowarzyszenia”. Kopia testowa / próby: `KSEF_ENVIRONMENT=test` (api-test.ksef.mf.gov.pl).
 
+## Wyciąg bankowy
+- Import „Zestawienia operacji” z bankowości BNP Paribas (eksport XLSX) — wpływy i wydatki do skrzynki „Do decyzji”;
+  ponowne wgranie nie tworzy duplikatów; operacje odrzucone są pomijane; z kontrahenta zapisywany jest tylko rachunek i nazwa.
+- Wpłaty strzelców rozpoznane po tytule (rezerwacja, doładowanie) rozlicza moduł Płatności — przychód ujmuje raport
+  wpływów (bez podwójnego zapisu). Nierozpoznane wpływy nie trafiają do „nieprzypisanych” w Płatnościach.
+- Wydatek równy fakturze KSeF (najpierw po numerze faktury w tytule) — „Zapłata faktury KSeF”, koszt ujmuje faktura.
+- Pozostałe: „Zaksięguj” (przychód kol. 5 / koszt kol. 6–7, forma działalności, umowa), także zbiorczo dla zaznaczonych;
+  „Nie dotyczy ewidencji” z przyczyną. Usunięcie zapisu w ewidencji przywraca operację do decyzji.
+
 ## Generator dokumentów (PDF do podpisu, DOCX do edycji)
 - Uchwała organu zatwierdzającego o prowadzeniu UEPiK (art. 10a ust. 1).
 - Zawiadomienie US o wyborze UEPiK (art. 10a ust. 3 — do końca 3. miesiąca roku podatkowego).

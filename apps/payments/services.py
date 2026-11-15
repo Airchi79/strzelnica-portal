@@ -567,35 +567,48 @@ def parse_bank_csv(raw: bytes):
     return out
 
 
+def bank_external_ids(rows):
+    """Identyfikatory przelewów z wyciągu (identyczne wiersze w jednym pliku to osobne wpłaty) — wspólne dla importu
+    w Płatnościach i w Księgowości, żeby ten sam przelew nie został zarejestrowany dwa razy."""
+    seen, out = {}, []
+    for row in rows:
+        base = f"{row['booked_on']}|{row['amount']}|{row['title']}|{row['payer_name']}"
+        seen[base] = seen.get(base, 0) + 1
+        out.append("bank:" + hashlib.sha256(f"{base}|{seen[base]}".encode()).hexdigest())
+    return out
+
+
+def register_bank_transfer(row, external_id, by, *, raw=None, unmatched=True):
+    """Przelew przychodzący z wyciągu → wpłata. Rozpoznany tytuł (rezerwacja, doładowanie) — księgowanie na saldo
+    strzelca; nierozpoznany — „nieprzypisana” (albo pominięty, gdy unmatched=False). Zwraca (wpłata|None, nowa)."""
+    existing = Payment.objects.filter(external_id=external_id).first()
+    if existing:
+        return existing, False
+    user, reservation = match_title(row["title"])
+    if not user and not unmatched:
+        return None, False
+    payment = Payment.objects.create(
+        amount=row["amount"], method=Payment.Method.TRANSFER,
+        status=Payment.Status.PENDING if user else Payment.Status.UNMATCHED,
+        title=row["title"], payer_name=row["payer_name"], booked_on=row["booked_on"], external_id=external_id,
+        user=user, reservation=reservation, raw=raw or {}, created_by=by,
+    )
+    if user:
+        payment = complete_payment(payment, by=by)
+    return payment, True
+
+
 @transaction.atomic
 def import_bank_csv(raw: bytes, filename: str, by):
     rows = parse_bank_csv(raw)
     batch = BankImport.objects.create(filename=filename[:255], sha256=hashlib.sha256(raw).hexdigest(), rows_total=len(rows), created_by=by)
-    seen = {}
     new = matched = 0
-    for row in rows:
-        base = f"{row['booked_on']}|{row['amount']}|{row['title']}|{row['payer_name']}"
-        seen[base] = seen.get(base, 0) + 1  # identyczne wiersze w jednym pliku to osobne wpłaty
-        external_id = "bank:" + hashlib.sha256(f"{base}|{seen[base]}".encode()).hexdigest()
-        if Payment.objects.filter(external_id=external_id).exists():
+    for row, external_id in zip(rows, bank_external_ids(rows)):
+        payment, created = register_bank_transfer(row, external_id, by, raw={"plik": filename[:120], "import": batch.pk})
+        if not created:
             continue
-        user, reservation = match_title(row["title"])
-        payment = Payment.objects.create(
-            amount=row["amount"],
-            method=Payment.Method.TRANSFER,
-            status=Payment.Status.PENDING if user else Payment.Status.UNMATCHED,
-            title=row["title"],
-            payer_name=row["payer_name"],
-            booked_on=row["booked_on"],
-            external_id=external_id,
-            user=user,
-            reservation=reservation,
-            raw={"plik": filename[:120], "import": batch.pk},
-            created_by=by,
-        )
         new += 1
-        if user:
-            complete_payment(payment, by=by)
+        if payment.status == Payment.Status.COMPLETED:
             matched += 1
     batch.rows_new, batch.rows_matched = new, matched
     batch.save(update_fields=["rows_new", "rows_matched"])

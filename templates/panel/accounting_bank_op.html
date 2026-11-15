@@ -1,0 +1,40 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Operacja z wyciągu{% endblock %}
+{% block panel %}
+<h1>{% if op.is_inflow %}Wpływ{% else %}Wydatek{% endif %} {{ op.amount|pln }} — {{ op.booked_on|date:"j.m.Y" }}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<div class="card"><table>
+  <tr><th>Status</th><td><strong>{{ op.get_status_display }}</strong>{% if op.status_note %} — {{ op.status_note }}{% endif %}</td></tr>
+  <tr><th>Kontrahent</th><td>{{ op.counterparty|default:"—" }}{% if op.counterparty_account %}<div class="small muted code">{{ op.counterparty_account }}</div>{% endif %}</td></tr>
+  <tr><th>Tytuł</th><td>{{ op.title|default:"—" }}</td></tr>
+  <tr><th>Typ</th><td>{{ op.kind }}{% if op.transaction_at %} · transakcja {{ op.transaction_at|date:"j.m.Y H:i" }}{% endif %}</td></tr>
+  {% if op.balance_after is not None %}<tr><th>Saldo po operacji</th><td>{{ op.balance_after|pln }}</td></tr>{% endif %}
+  {% if op.record %}<tr><th>Zapis w ewidencji</th><td><a href="{% url 'panel:accounting_record' op.record.pk %}">Lp. {{ op.record.lp }}</a> — {{ op.record.description }}</td></tr>{% endif %}
+  {% if op.invoice %}<tr><th>Faktura KSeF</th><td><a href="{% url 'panel:accounting_ksef_invoice' op.invoice.pk %}">{{ op.invoice.invoice_number }}</a> — {{ op.invoice.seller_name }} ({{ op.invoice.get_status_display|lower }})</td></tr>{% endif %}
+  {% if op.payment %}<tr><th>Wpłata w systemie</th><td><a href="{% url 'panel:payment' op.payment.pk %}">{{ op.payment }}</a></td></tr>{% endif %}
+  <tr><th>Plik</th><td class="small">{{ op.source_file }} · {{ op.imported_at|date:"j.m.Y H:i" }}</td></tr>
+</table>
+<div class="actions"><a class="btn secondary" href="{% url 'panel:accounting_bank' %}">Wróć do wyciągu</a>
+{% if op.status == 'pominieta' or op.status == 'faktura' %}<form method="post" action="{% url 'panel:accounting_bank_action' op.pk 'przywroc' %}" style="margin:0">{% csrf_token %}<button class="btn secondary" type="submit">Przywróć do decyzji</button></form>{% endif %}
+</div></div>
+{% if op.status == 'nowa' %}
+<h2>Zaksięguj jako {% if op.is_inflow %}przychód{% else %}koszt{% endif %}</h2>
+<form method="post" class="card" novalidate>{% csrf_token %}
+  <p class="small muted">Dowodem jest wyciąg bankowy (§ 7 ust. 3 pkt 1 rozporządzenia).{% if not op.is_inflow %} Jeśli to zapłata faktury z KSeF — połącz z fakturą poniżej zamiast księgować drugi raz.{% endif %}</p>
+  {% include "partials/form.html" %}
+  <datalist id="opisy">{% for h in hints %}<option value="{{ h }}">{% endfor %}</datalist>
+  <div class="actions"><button class="btn" type="submit">Zaksięguj i przejdź do następnej</button></div>
+</form>
+{% if not op.is_inflow %}
+<details class="card"><summary>To zapłata faktury z KSeF</summary>
+<form method="post" action="{% url 'panel:accounting_bank_action' op.pk 'faktura' %}" novalidate>{% csrf_token %}
+  {% with form=invoice_form %}{% include "partials/form.html" %}{% endwith %}
+  <div class="actions"><button class="btn secondary" type="submit">Połącz z fakturą</button></div></form></details>
+{% endif %}
+<details class="card"><summary class="danger-summary">Nie dotyczy ewidencji</summary>
+<form method="post" action="{% url 'panel:accounting_bank_action' op.pk 'pomin' %}" novalidate>{% csrf_token %}
+  <p class="small muted">Np. przelew między własnymi rachunkami, zwrot pomyłkowej wpłaty, wpłata już ujęta inaczej.</p>
+  {% with form=reason_form %}{% include "partials/form.html" %}{% endwith %}
+  <div class="actions"><button class="btn danger" type="submit">Pomiń</button></div></form></details>
+{% endif %}
+{% endblock %}

@@ -112,3 +112,28 @@ def valid_credentials(user, kind):
 
 def is_range_officer(user):
     return bool(user and user.is_authenticated) and valid_credentials(user, Credential.Kind.RANGE_OFFICER).exists()
+
+
+class PreverifiedOfficer(models.Model):
+    """Prowadzący strzelanie, którego legitymację zweryfikowano wcześniej poza systemem (lista z GunTrackera). Gdy ta osoba
+    założy konto z tym adresem e-mail (potwierdzonym), a imię i nazwisko się zgadzają, jej uprawnienia PS są zatwierdzane
+    bez ponownej weryfikacji przez obsługę. Lista nie zawiera numerów legitymacji ani skanów."""
+
+    name = models.CharField("imię i nazwisko", max_length=200)
+    email = models.EmailField("e-mail", unique=True)
+    verified_on = models.DateField("zweryfikowano (poza systemem)", null=True, blank=True)
+    source = models.CharField("źródło", max_length=40, default="GunTracker")
+    approve_client = models.BooleanField("zatwierdzić też jako klienta (rezerwacje bez akceptacji obsługi)", default=True)
+    imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    imported_at = models.DateTimeField("wgrano", auto_now_add=True)
+    applied_user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="konto", null=True, blank=True,
+                                     on_delete=models.SET_NULL, related_name="+")
+    applied_at = models.DateTimeField("zatwierdzono w systemie", null=True, blank=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "PS zweryfikowany wcześniej"
+        verbose_name_plural = "PS zweryfikowani wcześniej"
+
+    def __str__(self):
+        return self.name

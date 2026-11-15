@@ -35,6 +35,13 @@ def submit(credential, changed_fields=None, notify=True):
         str(credential),
         changes={"pola": sorted(changed_fields or [])},
     )
+    if (credential.status == Credential.Status.PENDING and notify and credential.kind == Credential.Kind.RANGE_OFFICER):
+        from . import preverified
+
+        # PS zweryfikowany wcześniej (lista z GunTrackera) — zatwierdzenie bez kolejki do obsługi
+        if preverified.apply(credential.user):
+            credential.refresh_from_db()
+            return
     if credential.status == Credential.Status.PENDING and notify:  # kiosk: osobne, pilne powiadomienie
         notify_board(
             "Nowy dokument do weryfikacji",

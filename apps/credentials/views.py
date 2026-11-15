@@ -50,8 +50,12 @@ def my_edit(request, pk=None):
             old = Credential.objects.get(pk=pk)
             if old.scan:
                 old.scan.delete(save=False)
-        services.submit(form.save(commit=False), form.changed_data)
-        messages.success(request, "Zapisano. Dokument czeka na weryfikację przez zarząd.")
+        saved = form.save(commit=False)
+        services.submit(saved, form.changed_data)
+        if saved.status == Credential.Status.VERIFIED:
+            messages.success(request, "Zapisano. Twoje uprawnienia zostały zweryfikowane wcześniej — możesz od razu rezerwować.")
+        else:
+            messages.success(request, "Zapisano. Dokument czeka na weryfikację przez zarząd.")
         return redirect("credentials:my_list")
     return render(
         request, "credentials/my_edit.html", {"form": form, "credential": credential, "kind_hints": form.hints_json(), "max_upload": settings.MAX_UPLOAD_BYTES}
@@ -118,7 +122,8 @@ def panel_list(request):
     expiring = qs.filter(status=Credential.Status.VERIFIED, valid_until__gte=today, valid_until__lte=today + timedelta(days=30))
     from apps.kiosk.onsite import AUTO_NOTE
 
-    auto = qs.filter(status=Credential.Status.VERIFIED, reviewed_by__isnull=True, review_note=AUTO_NOTE)
+    auto = qs.filter(status=Credential.Status.VERIFIED, reviewed_by__isnull=True).filter(
+        Q(review_note=AUTO_NOTE) | Q(review_note__contains="lista PS zweryfikowanych"))
     if status == AUTO:
         qs = auto.order_by("-reviewed_at")
     elif status == EXPIRING:
@@ -224,3 +229,39 @@ def panel_scan(request, pk):
     response["Content-Disposition"] = response["Content-Disposition"].replace("attachment", "inline")
     response["Cache-Control"] = "no-store"
     return response
+
+
+@panel_required("credentials.review_credential")
+def panel_preverified(request):
+    """Lista PS zweryfikowanych wcześniej (GunTracker): import z podglądem, stan wykorzystania."""
+    from apps.audit.services import log_sensitive_access
+    from django.core.exceptions import ValidationError
+
+    from . import preverified
+    from .models import PreverifiedOfficer
+
+    report = None
+    preview = True
+    if request.method == "POST":
+        uploaded = request.FILES.get("plik")
+        preview = request.POST.get("tryb") != "importuj"
+        if not uploaded:
+            messages.error(request, "Wybierz plik XLSX.")
+        else:
+            try:
+                report = preverified.run(uploaded, by=request.user, preview=preview,
+                                         approve_client=request.POST.get("zatwierdz_klienta") == "1",
+                                         fill_emails=request.POST.get("uzupelnij_emaile") == "1")
+            except ValidationError as e:
+                messages.error(request, " ".join(e.messages))
+            else:
+                if not preview:
+                    messages.success(request, "Lista zapisana.")
+    entries = PreverifiedOfficer.objects.select_related("applied_user")
+    log_sensitive_access(None, "ps-zweryfikowani-wczesniej", "lista PS zweryfikowanych wcześniej")
+    counts = {}
+    for status, _ in report or []:
+        counts[status] = counts.get(status, 0) + 1
+    return render(request, "panel/credentials_preverified.html", {
+        "entries": entries, "report": report, "preview": preview, "counts": counts,
+        "applied": entries.filter(applied_user__isnull=False).count()})

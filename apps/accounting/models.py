@@ -5,7 +5,10 @@ i o wolontariacie.
 Zestawienie przychodów i kosztów (załącznik nr 1): każdy zapis ma kolejny numer w roku (Lp.), datę, numer dowodu, opis
 zdarzenia i kwotę w jednej z kolumn: przychody (kol. 5), koszty uzyskania przychodów (kol. 6), koszty niestanowiące
 kosztów uzyskania przychodów (kol. 7). Zapisy są trwałe (§ 7 ust. 1) — baza nie pozwala ich zmienić ani usunąć; błędy
-poprawia się nowym zapisem korygującym (§ 7 ust. 2 pkt 2). Każdy zapis ma autora i czas (§ 6 ust. 3 pkt 3)."""
+poprawia się, wpisując nową treść zapisu (§ 7 ust. 2 pkt 1 — ewidencja w postaci elektronicznej). Każda zmiana
+i usunięcie zapisu zostaje w niezmiennej historii wersji: kto, kiedy, jaka treść i z jakiego powodu (§ 6 ust. 3 pkt 3).
+Usunięty zapis zachowuje swój numer (Lp.) i jest widoczny na wydruku jako usunięty — bez kwot w sumach.
+Po zamknięciu roku zapisów z tego roku nie można zmieniać."""
 
 import uuid
 from pathlib import Path
@@ -35,6 +38,13 @@ class AccountingSettings(models.Model):
                   "zbiorcze). Ustaw na dzień uruchomienia systemu dla strzelców — wcześniejsze przychody (GunTracker, "
                   "wyciągi bankowe) wpisuje się ręcznie. Puste = zasilanie wyłączone.")
     labels = models.JSONField("opisy przychodów z systemu", default=dict, blank=True)
+    tax_office = models.TextField("urząd skarbowy (nazwa i adres)", blank=True,
+                                  help_text="Naczelnik urzędu skarbowego właściwego w sprawach podatku dochodowego — do zawiadomień.")
+    approving_body = models.CharField("organ zatwierdzający", max_length=120, blank=True, default="Zebranie Członków",
+                                      help_text="Organ, który wg regulaminu stowarzyszenia zatwierdza sprawozdania i decyduje o "
+                                                "uproszczonej ewidencji (art. 10a ust. 1 ustawy o działalności pożytku publicznego).")
+    signatories = models.TextField("osoby podpisujące", blank=True,
+                                   help_text="Każda osoba w osobnym wierszu, np. „Jan Kowalski — przedstawiciel”.")
 
     class Meta:
         verbose_name = "ustawienia księgowości"
@@ -46,6 +56,28 @@ class AccountingSettings(models.Model):
 
     def label(self, category):
         return (self.labels or {}).get(category) or DEFAULT_LABELS.get(category, category)
+
+
+class AccountingYear(models.Model):
+    """Rok podatkowy: zamknięcie (blokada zmian) i dane do zestawienia przepływów finansowych (załącznik nr 2)."""
+
+    year = models.PositiveIntegerField("rok", unique=True)
+    closed_at = models.DateTimeField("zamknięto", null=True, blank=True)
+    closed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    free_income = models.BigIntegerField("kol. 4 — dochód wolny w roku przeznaczony na cele z art. 17 ust. 1 [gr]", null=True, blank=True)
+    free_prior = models.BigIntegerField("kol. 5 — dochód wolny z lat ubiegłych [gr]", null=True, blank=True)
+    free_spent = models.BigIntegerField("kol. 6 — wydatki na cele z art. 17 ust. 1 pokryte z dochodu wolnego [gr]", null=True, blank=True)
+
+    class Meta:
+        ordering = ["-year"]
+
+    @classmethod
+    def get(cls, year):
+        return cls.objects.get_or_create(year=year)[0]
+
+    @classmethod
+    def is_closed(cls, year):
+        return cls.objects.filter(year=year, closed_at__isnull=False).exists()
 
 
 class RecordSequence(models.Model):
@@ -66,6 +98,7 @@ class Record(models.Model):
         REVENUE = "przychod", "Przychód (wpis ręczny)"
         COST = "koszt", "Koszt"
         CORRECTION = "korekta", "Zapis korygujący"
+        KSEF = "ksef", "Faktura z KSeF"
 
     year = models.PositiveIntegerField("rok", db_index=True)
     number = models.PositiveIntegerField("Lp.")
@@ -87,6 +120,13 @@ class Record(models.Model):
     attachment_sha256 = models.CharField(max_length=64, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField("zapisano", auto_now_add=True)
+    ksef_number = models.CharField("numer KSeF", max_length=40, blank=True)
+    version = models.PositiveIntegerField("wersja", default=1)
+    updated_at = models.DateTimeField("ostatnia zmiana", null=True, blank=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    removed_at = models.DateTimeField("usunięto", null=True, blank=True)
+    removed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    removed_reason = models.CharField("przyczyna usunięcia", max_length=255, blank=True)
 
     class Meta:
         ordering = ["year", "number"]
@@ -108,3 +148,112 @@ class Record(models.Model):
     @property
     def lp(self):
         return f"{self.number}/{self.year}"
+
+    @property
+    def is_removed(self):
+        return self.removed_at is not None
+
+    # pola treści zapisu — zapisywane w historii wersji
+    CONTENT_FIELDS = ("date", "document", "description", "counterparty", "revenue", "cost_deductible", "cost_other", "notes",
+                      "ksef_number", "attachment_sha256")
+
+    def snapshot(self):
+        return {f: (getattr(self, f).isoformat() if f == "date" else getattr(self, f)) for f in self.CONTENT_FIELDS}
+
+
+class RecordVersion(models.Model):
+    """Niezmienna historia zapisu (trigger w bazie): każda wersja treści, usunięcie i przywrócenie."""
+
+    class Action(models.TextChoices):
+        CREATE = "utworzenie", "Utworzenie"
+        UPDATE = "zmiana", "Zmiana treści"
+        REMOVE = "usuniecie", "Usunięcie z ewidencji"
+        RESTORE = "przywrocenie", "Przywrócenie"
+
+    record = models.ForeignKey(Record, on_delete=models.PROTECT, related_name="versions")
+    version = models.PositiveIntegerField()
+    action = models.CharField(max_length=16, choices=Action.choices)
+    data = models.JSONField()
+    reason = models.CharField("powód", max_length=255, blank=True)
+    by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["record", "pk"]
+
+
+def ksef_upload_to(instance, filename):
+    return f"ksef/{uuid.uuid4().hex}.xml"
+
+
+class KsefInvoice(models.Model):
+    """Faktura ustrukturyzowana z Krajowego Systemu e-Faktur (plik XML pobrany z KSeF), czekająca na decyzję:
+    przyjęcie do ewidencji (zapis kosztu albo przychodu) lub odrzucenie (nie dotyczy ewidencji)."""
+
+    class Status(models.TextChoices):
+        NEW = "nowa", "Do decyzji"
+        ACCEPTED = "przyjeta", "Przyjęta do ewidencji"
+        REJECTED = "odrzucona", "Odrzucona (poza ewidencją)"
+
+    class Direction(models.TextChoices):
+        PURCHASE = "zakup", "Zakup (koszt)"
+        SALE = "sprzedaz", "Sprzedaż (przychód)"
+
+    ksef_number = models.CharField("numer KSeF", max_length=40, blank=True)
+    invoice_number = models.CharField("numer faktury", max_length=256)
+    kind = models.CharField("rodzaj faktury", max_length=16, blank=True)
+    issue_date = models.DateField("data wystawienia")
+    sale_date = models.DateField("data dostawy / wykonania usługi", null=True, blank=True)
+    seller_nip = models.CharField("NIP sprzedawcy", max_length=16, blank=True)
+    seller_name = models.CharField("sprzedawca", max_length=255, blank=True)
+    buyer_nip = models.CharField("NIP nabywcy", max_length=16, blank=True)
+    buyer_name = models.CharField("nabywca", max_length=255, blank=True)
+    currency = models.CharField("waluta", max_length=3, default="PLN")
+    net = models.BigIntegerField("netto [gr]", default=0)
+    vat = models.BigIntegerField("VAT [gr]", default=0)
+    gross = models.BigIntegerField("należność ogółem [gr]", default=0)
+    items = models.JSONField("pozycje", default=list, blank=True)
+    direction = models.CharField("kierunek", max_length=8, choices=Direction.choices)
+    status = models.CharField("status", max_length=10, choices=Status.choices, default=Status.NEW)
+    status_note = models.CharField("uwagi do decyzji", max_length=255, blank=True)
+    record = models.ForeignKey(Record, null=True, blank=True, on_delete=models.SET_NULL, related_name="ksef_invoices")
+    xml = models.FileField("plik XML", upload_to=ksef_upload_to, storage=get_private_storage)
+    sha256 = models.CharField(max_length=64, unique=True)
+    imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-issue_date", "-pk"]
+        verbose_name = "faktura KSeF"
+        verbose_name_plural = "faktury KSeF"
+        constraints = [
+            models.UniqueConstraint(fields=["ksef_number"], condition=~models.Q(ksef_number=""), name="ksef_invoice_number_unique"),
+        ]
+
+    def __str__(self):
+        return f"{self.invoice_number} ({self.seller_name})"
+
+    @property
+    def items_summary(self):
+        names = [i.get("name", "") for i in self.items if i.get("name")]
+        return "; ".join(names)[:255]
+
+
+class GeneratedDocument(models.Model):
+    """Dokument z generatora (zawiadomienie, uchwała, zestawienie, dowód wewnętrzny…) — dane zapamiętane, żeby można
+    było pobrać ten sam dokument ponownie (PDF albo DOCX do edycji)."""
+
+    kind = models.CharField("rodzaj", max_length=32)
+    year = models.PositiveIntegerField("rok")
+    number = models.PositiveIntegerField("numer w roku i rodzaju")
+    title = models.CharField("tytuł", max_length=255)
+    data = models.JSONField("dane")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        constraints = [models.UniqueConstraint(fields=["kind", "year", "number"], name="generated_document_number_unique")]
+
+    def __str__(self):
+        return self.title

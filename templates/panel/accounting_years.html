@@ -1,0 +1,22 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Lata podatkowe{% endblock %}
+{% block panel %}
+<h1>Lata podatkowe</h1>
+{% include "panel/_accounting_tabs.html" %}
+<p class="muted">Zamknięcie roku blokuje zmiany zapisów z tego roku — zamknij rok po złożeniu zeznania CIT-8 i wydruku ewidencji (wydruk za rok podatkowy najpóźniej w ciągu 90 dni od jego zakończenia, § 6 ust. 4). Dane do zestawienia przepływów finansowych (kol. 4–6) uzupełnia się w <a href="{% url 'panel:accounting_doc_new' 'przeplywy' %}">generatorze dokumentów</a>.</p>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Rok</th><th>Przychody</th><th>Koszty uzyskania</th><th>Dochód</th><th>Koszty nie-KUP</th><th>Niewydatkowany dochód wolny (kol. 7)</th><th>Status</th></tr>
+  {% for row in rows %}<tr>
+    <td><a href="{% url 'panel:accounting' %}?rok={{ row.year }}&miesiac=0"><strong>{{ row.year }}</strong></a></td>
+    <td data-label="Przychody" style="text-align:right">{{ row.flows.col1|pln }}</td>
+    <td data-label="Koszty uzyskania" style="text-align:right">{{ row.flows.col2|pln }}</td>
+    <td data-label="Dochód" style="text-align:right">{{ row.flows.col3|pln }}</td>
+    <td data-label="Koszty nie-KUP" style="text-align:right">{{ row.flows.cost_other|pln }}</td>
+    <td data-label="Kol. 7" style="text-align:right">{% if row.flows.col7 is not None %}{{ row.flows.col7|pln }}{% else %}—{% endif %}</td>
+    <td data-label="Status">{% if row.closed %}<span class="badge ok">zamknięty {{ row.closed|date:"j.m.Y" }}</span>
+      <form method="post" class="actions" style="margin:4px 0 0">{% csrf_token %}<input type="hidden" name="rok" value="{{ row.year }}"><input type="hidden" name="akcja" value="otworz"><input name="powod" placeholder="powód otwarcia" required aria-label="Powód otwarcia"><button class="btn secondary" type="submit">Otwórz</button></form>
+      {% elif row.can_close %}<form method="post" style="margin:0">{% csrf_token %}<input type="hidden" name="rok" value="{{ row.year }}"><input type="hidden" name="akcja" value="zamknij"><button class="btn secondary" type="submit">Zamknij rok</button></form>
+      {% else %}<span class="badge">bieżący</span>{% endif %}</td></tr>
+  {% endfor %}
+</table></div></section>
+{% endblock %}

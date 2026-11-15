@@ -1,0 +1,40 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Faktura {{ inv.invoice_number }}{% endblock %}
+{% block panel %}
+<h1>Faktura {{ inv.invoice_number }}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<div class="card"><table>
+  <tr><th>Status</th><td><strong>{{ inv.get_status_display }}</strong>{% if inv.record %} — <a href="{% url 'panel:accounting_record' inv.record.pk %}">zapis Lp. {{ inv.record.lp }}</a>{% endif %}{% if inv.status_note %}<div class="small muted">{{ inv.status_note }}</div>{% endif %}</td></tr>
+  <tr><th>Numer KSeF</th><td class="code">{{ inv.ksef_number|default:"— (brak w nazwie pliku)" }}</td></tr>
+  <tr><th>Rodzaj</th><td>{{ inv.kind|default:"—" }} · {{ inv.get_direction_display }}</td></tr>
+  <tr><th>Data wystawienia</th><td>{{ inv.issue_date|date:"j.m.Y" }}{% if inv.sale_date %} · dostawa / usługa: {{ inv.sale_date|date:"j.m.Y" }}{% endif %}</td></tr>
+  <tr><th>Sprzedawca</th><td>{{ inv.seller_name }}{% if inv.seller_nip %} · NIP {{ inv.seller_nip }}{% endif %}</td></tr>
+  <tr><th>Nabywca</th><td>{{ inv.buyer_name }}{% if inv.buyer_nip %} · NIP {{ inv.buyer_nip }}{% endif %}</td></tr>
+  <tr><th>Kwoty</th><td>netto {{ inv.net|pln }} · VAT {{ inv.vat|pln }} · <strong>należność ogółem {{ inv.gross|pln }}</strong>{% if inv.currency != 'PLN' %} ({{ inv.currency }}){% endif %}</td></tr>
+  {% if inv.items %}<tr><th>Pozycje</th><td class="small">{% for i in inv.items %}{{ forloop.counter }}. {{ i.name }}{% if i.qty %} — {{ i.qty }} {{ i.unit }}{% endif %}<br>{% endfor %}</td></tr>{% endif %}
+  <tr><th>Plik</th><td><a href="{% url 'panel:accounting_ksef_xml' inv.pk %}">Pobierz XML</a> · zaimportowano {{ inv.imported_at|date:"j.m.Y H:i" }}{% if inv.imported_by %} — {{ inv.imported_by.full_name }}{% endif %}</td></tr>
+</table></div>
+{% if inv.status == 'nowa' %}
+<h2>Przyjęcie do ewidencji</h2>
+<form method="post" class="card" novalidate>{% csrf_token %}
+  <p class="small muted">Do ewidencji trafia kwota należności ogółem ({{ gross }} zł) — stowarzyszenie bez działalności gospodarczej nie odlicza VAT. Sprawdź datę zdarzenia i opis.</p>
+  {% include "partials/form.html" %}
+  <div class="actions"><button class="btn" type="submit">Przyjmij do ewidencji</button></div>
+</form>
+<details class="card"><summary class="danger-summary">Nie dotyczy ewidencji</summary>
+<form method="post" action="{% url 'panel:accounting_ksef_decide' inv.pk 'odrzuc' %}" novalidate>{% csrf_token %}
+  {% with form=reject_form %}{% include "partials/form.html" %}{% endwith %}
+  <div class="actions"><button class="btn danger" type="submit">Oznacz jako poza ewidencją</button></div>
+</form></details>
+{% elif inv.status == 'przyjeta' %}
+<details class="card"><summary class="danger-summary">Usuń z ewidencji</summary>
+<form method="post" action="{% url 'panel:accounting_ksef_decide' inv.pk 'usun-z-ewidencji' %}" novalidate>{% csrf_token %}
+  <p class="small muted">Zapis Lp. {{ inv.record.lp }} zostanie usunięty z ewidencji (numer i historia zostają), a faktura wróci do decyzji.</p>
+  {% with form=reject_form %}{% include "partials/form.html" %}{% endwith %}
+  <div class="actions"><button class="btn danger" type="submit">Usuń z ewidencji</button></div>
+</form></details>
+{% else %}
+<form method="post" action="{% url 'panel:accounting_ksef_decide' inv.pk 'przywroc' %}" class="card">{% csrf_token %}
+  <div class="actions"><button class="btn secondary" type="submit">Przywróć do decyzji</button></div></form>
+{% endif %}
+{% endblock %}

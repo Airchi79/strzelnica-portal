@@ -1,0 +1,15 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{{ obj.title }}{% endblock %}
+{% block panel %}
+<h1>{{ obj.title }}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<div class="card">
+  <p class="muted">{{ doc.title }} · utworzono {{ obj.created_at|date:"j.m.Y H:i" }}{% if obj.created_by %} — {{ obj.created_by.full_name }}{% endif %}. Podstawa: {{ doc.legal }}.</p>
+  <div class="actions">
+    <a class="btn" href="{% url 'panel:accounting_doc_download' obj.pk 'pdf' %}">Pobierz PDF</a>
+    <a class="btn secondary" href="{% url 'panel:accounting_doc_download' obj.pk 'docx' %}">Pobierz DOCX (do edycji)</a>
+    {% if add_url %}<a class="btn secondary" href="{{ add_url }}">Wpisz koszt do ewidencji</a>{% endif %}
+    <a class="btn secondary" href="{% url 'panel:accounting_doc_new' obj.kind %}">Nowy dokument tego rodzaju</a>
+  </div>
+</div>
+{% endblock %}

@@ -74,7 +74,8 @@ def world(owner):
 
     AccountingSettings.objects.update_or_create(pk=1, defaults={"auto_from": timezone.localdate() - timedelta(days=30)})
     auto = accounting.sync_from_sales_reports()[0]
-    accounting.correct(auto, reason="próba korekty", by=owner)
+    accounting.update_record(auto, by=owner, reason="próba zmiany", day=auto.date, document=auto.document,
+                             description="Zmieniony opis", amount=auto.revenue, column="revenue")
     accounting.add_record(kind="koszt", day=timezone.localdate(), document="FV 1", description="Energia", amount=1000,
                           column="cost_deductible", by=owner)
     # pozostałe moduły

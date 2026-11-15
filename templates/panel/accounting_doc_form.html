@@ -1,0 +1,11 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{{ doc.title }}{% endblock %}
+{% block panel %}
+<h1>{{ doc.title }}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<p class="muted">Podstawa: {{ doc.legal }}.{% if doc.hint %} {{ doc.hint }}{% endif %}</p>
+<form method="post" class="card" novalidate>{% csrf_token %}
+  {% include "partials/form.html" %}
+  <div class="actions"><button class="btn" type="submit">Utwórz dokument</button><a class="btn secondary" href="{% url 'panel:accounting_docs' %}">Anuluj</a></div>
+</form>
+{% endblock %}

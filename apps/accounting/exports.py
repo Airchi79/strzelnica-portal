@@ -34,17 +34,22 @@ def _pln(grosze):
 
 
 def _notes(r):
+    if r.is_removed:
+        return f"ZAPIS USUNIĘTY {r.removed_at:%d.%m.%Y}: {r.removed_reason}"
     parts = [r.notes] if r.notes else []
     if r.counterparty:
         parts.append(r.counterparty)
-    for fix in r.corrections.all():
-        parts.append(f"skorygowany zapisem Lp. {fix.lp}")
+    if r.ksef_number and r.ksef_number not in (r.notes or ""):
+        parts.append(f"KSeF {r.ksef_number}")
     return "; ".join(parts)
 
 
 def _rows(st):
-    return [[r.lp, r.date.strftime("%d.%m.%Y"), r.document, r.description, r.revenue, r.cost_deductible, r.cost_other, _notes(r)]
-            for r in st["records"]]
+    rows = []
+    for r in st["records"]:
+        amounts = [0, 0, 0] if r.is_removed else [r.revenue, r.cost_deductible, r.cost_other]
+        rows.append([r.lp, r.date.strftime("%d.%m.%Y"), r.document, r.description, *amounts, _notes(r)])
+    return rows
 
 
 def to_pdf(st, association):

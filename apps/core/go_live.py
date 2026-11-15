@@ -32,7 +32,7 @@ GUARDED = [
     ("audit_sensitiveaccesslog", "sensitiveaccesslog_append_only"),
     ("payments_ledgerentry", "ledgerentry_append_only"),
     ("reports_salesreport", "sales_report_guard"),
-    ("accounting_record", "accounting_record_guard"),
+    ("accounting_recordversion", "accounting_recordversion_guard"),
 ]
 
 
@@ -75,6 +75,8 @@ def plan(keep_user):
         ("Kopie wysłanych e-maili", _m("core.OutgoingEmail").objects.all()),
         ("Zgłoszenia usterek", _m("facilities.Issue").objects.all()),
         # Ewidencja księgowa: tylko zapisy przychodów z testowych raportów wpływów (i ich korekty) — zapisy ręczne zarządu zostają.
+        ("Księgowość: historia zapisów z raportów wpływów", _m("accounting.RecordVersion").objects.filter(
+            Q(record__sales_report__isnull=False) | Q(record__corrects__sales_report__isnull=False))),
         ("Księgowość: korekty zapisów z raportów wpływów", _m("accounting.Record").objects.filter(corrects__sales_report__isnull=False)),
         ("Księgowość: przychody z raportów wpływów", _m("accounting.Record").objects.filter(sales_report__isnull=False)),
         ("Raporty wpływów", _m("reports.SalesReport").objects.all()),

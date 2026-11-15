@@ -12,6 +12,16 @@ i rozporządzenie MFiG z 22.12.2025 (Dz. U. poz. 1880). Panel → Płatności �
 - **Zamknięcie roku** (zakładka „Lata i zamknięcia”): blokuje zmiany po złożeniu CIT-8; otwarcie wymaga powodu.
 - Przychody z systemu: dzienne raporty wpływów → jeden zapis na kategorię dnia (od dnia ustawionego w ustawieniach).
 
+## Wykaz środków trwałych i WNiP (§ 3)
+- Kolumny wg § 3 ust. 1 pkt 1–11; wydruk PDF/XLSX za rok.
+- Metody: liniowa (stawka z Wykazu stawek amortyzacyjnych — zał. nr 1 do ustawy o CIT), bez odpisów do 10 000 zł
+  (art. 16d ust. 1), bez amortyzacji (art. 16c, np. grunt).
+- Odpisy od miesiąca po wprowadzeniu do wykazu, do zrównania z wartością albo miesiąca likwidacji/zbycia (art. 16h ust. 1 pkt 1).
+- Wprowadzenie po miesiącu przyjęcia do używania oznaczane jako ujawnienie (§ 3 ust. 3).
+- Składniki sprzed systemu: dotychczasowe odpisy + rok, do którego ich dokonano.
+- Likwidacja / zbycie / niedobór = wykreślenie z datą, przyczyną i dowodem (KSeF faktury zbycia).
+- „Ujmij odpisy w zestawieniu” — jeden zapis kosztu (kol. 6 albo 7) za miesiąc lub cały rok.
+
 ## Faktury KSeF
 - Import plików XML (FA(2), FA(3)) lub ZIP pobranych z KSeF; numer KSeF odczytywany z nazwy pliku.
 - Faktura: **przyjmij do ewidencji** (koszt kol. 6/7 albo przychód, kwota należności ogółem), **nie dotyczy ewidencji**
@@ -33,5 +43,5 @@ Dane do dokumentów: „Dane stowarzyszenia” (nazwa, adres, NIP, REGON) oraz K
 organ zatwierdzający, osoby podpisujące). Każdy wygenerowany dokument jest zapamiętany i można go pobrać ponownie.
 
 ## Do zrobienia (kolejne etapy)
-- Wykaz środków trwałych i WNiP (§ 3), zestawienie uzupełniające (§ 4).
+- Zestawienie uzupełniające (§ 4).
 - Pobieranie faktur z API KSeF.

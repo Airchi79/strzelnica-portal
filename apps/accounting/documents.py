@@ -332,6 +332,8 @@ class Principles(Doc):
                       "automatyczne ujmowanie przychodów z dziennych zestawień wpływów (raz na godzinę oraz na żądanie);",
                       "import faktur z Krajowego Systemu e-Faktur (pliki XML), przyjmowanie do ewidencji i odrzucanie;",
                       "przechowywanie skanów dowodów księgowych z sumą kontrolną SHA-256;",
+                      "wykaz środków trwałych oraz wartości niematerialnych i prawnych z planem odpisów amortyzacyjnych (metoda "
+                      "liniowa, art. 16h i 16i ustawy o CIT) i ujęciem odpisów w zestawieniu przychodów i kosztów;",
                       "wydruk zestawienia za miesiąc i rok w porządku chronologicznym zapisów (PDF, XLSX) — § 6 ust. 3 pkt 1;",
                       "zestawienie przepływów finansowych, arkusz danych do zeznania CIT-8, generator zawiadomień, uchwał i dowodów wewnętrznych;",
                       "zamknięcie roku podatkowego."]),

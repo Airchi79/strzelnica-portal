@@ -1,0 +1,45 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Wykaz środków trwałych {{ reg.year }}{% endblock %}
+{% block panel %}
+<h1>Wykaz środków trwałych i WNiP — {{ reg.year }}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<div class="card">
+  <form method="get" class="actions" style="margin:0">
+    <select name="rok" aria-label="Rok">{% for y in years %}<option value="{{ y }}"{% if y == reg.year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select>
+    <button class="btn secondary" type="submit">Pokaż</button>
+    <a class="btn" href="{% url 'panel:accounting_asset_new' %}">Wprowadź do wykazu</a>
+    <a class="btn secondary" href="{% url 'panel:accounting_assets_export' 'pdf' %}?rok={{ reg.year }}">Wydruk PDF</a>
+    <a class="btn secondary" href="{% url 'panel:accounting_assets_export' 'xlsx' %}?rok={{ reg.year }}">Arkusz XLSX</a>
+  </form>
+  <p class="small muted">Wykaz wg § 3 rozporządzenia (Dz. U. 2025 poz. 1880). Środki trwałe i WNiP to składniki z art. 16a–16m ustawy o CIT — o przewidywanym okresie używania dłuższym niż rok. Wprowadza się je najpóźniej w miesiącu przyjęcia do używania. Odpisy liniowe liczą się od miesiąca następującego po wprowadzeniu do wykazu, do zrównania z wartością początkową albo do miesiąca likwidacji / zbycia (art. 16h ust. 1 pkt 1). Składniki do 10 000 zł można nie amortyzować — wydatek trafia wtedy do kosztów w miesiącu oddania do używania (art. 16d ust. 1).</p>
+</div>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Lp.</th><th>Określenie</th><th>KŚT</th><th>Przyjęcie do używania</th><th>Wartość początkowa</th><th>Stawka</th><th>Odpis {{ reg.year }}</th><th>Narastająco</th><th>Pozostało</th></tr>
+  {% for r in reg.rows %}<tr{% if r.asset.disposed_on %} class="muted"{% endif %}>
+    <td><a href="{% url 'panel:accounting_asset' r.asset.pk %}"><strong>{{ r.asset.number }}</strong></a></td>
+    <td data-label="Określenie">{{ r.asset.name }}{% if r.asset.kind == 'wnip' %} <span class="badge">WNiP</span>{% endif %}{% if r.asset.disposed_on %} <span class="badge">{{ r.asset.get_disposal_display|lower }} {{ r.asset.disposed_on|date:"j.m.Y" }}</span>{% endif %}{% if r.late %} <span class="badge warn" title="wprowadzony po miesiącu przyjęcia do używania">ujawnienie</span>{% endif %}</td>
+    <td data-label="KŚT">{{ r.asset.kst }}</td>
+    <td data-label="Przyjęcie">{{ r.asset.in_use_on|date:"j.m.Y" }}</td>
+    <td data-label="Wartość" style="text-align:right">{{ r.asset.base|pln }}</td>
+    <td data-label="Stawka">{% if r.asset.method == 'liniowa' %}{{ r.asset.rate }}%{% else %}{{ r.asset.get_method_display|truncatechars:24 }}{% endif %}</td>
+    <td data-label="Odpis" style="text-align:right">{{ r.year|pln }}</td>
+    <td data-label="Narastająco" style="text-align:right">{{ r.accumulated|pln }}</td>
+    <td data-label="Pozostało" style="text-align:right">{{ r.remaining|pln }}</td></tr>
+  {% empty %}<tr><td colspan="9" class="muted">Brak pozycji w wykazie w tym roku.</td></tr>{% endfor %}
+  <tr><th colspan="4">Razem</th><th style="text-align:right">{{ reg.totals.initial|pln }}</th><th></th><th style="text-align:right">{{ reg.totals.year|pln }}</th><th style="text-align:right">{{ reg.totals.accumulated|pln }}</th><th></th></tr>
+</table></div></section>
+<h2>Odpisy w zestawieniu przychodów i kosztów</h2>
+<div class="card">
+  <p class="small muted">Odpisy amortyzacyjne ujmuje się w zestawieniu jednym zapisem za miesiąc albo za cały rok (po jego zakończeniu). Kol. 6 — gdy odpisy są kosztem uzyskania przychodów; kol. 7 — gdy nie są (np. od składników sfinansowanych z dochodu wolnego od podatku lub dotacji, których wydatek ujęto już w kosztach). Kwalifikację ustala zarząd.</p>
+  {% if postings %}<p class="small">Ujęte: {% for p in postings %}{% if p.month %}{{ p.month }}/{{ p.year }}{% else %}cały rok {{ p.year }}{% endif %} — <a href="{% url 'panel:accounting_record' p.record.pk %}">Lp. {{ p.record.lp }}</a> ({{ p.amount|pln }}){% if not forloop.last %}; {% endif %}{% endfor %}</p>{% endif %}
+  <form method="post" action="{% url 'panel:accounting_assets_post' %}" class="actions" style="margin:0">{% csrf_token %}
+    <input type="hidden" name="year" value="{{ reg.year }}">
+    <select name="month" aria-label="Okres">
+      {% if can_post_year and not postings %}<option value="0">cały rok {{ reg.year }} ({{ reg.totals.year|pln }})</option>{% endif %}
+      {% if not year_posted %}{% for m, name, amount in months %}{% if m not in posted_months and amount %}<option value="{{ m }}">{{ name }} ({{ amount|pln }})</option>{% endif %}{% endfor %}{% endif %}
+    </select>
+    <select name="column" aria-label="Kolumna"><option value="cost_deductible">kol. 6 — koszt uzyskania przychodów</option><option value="cost_other">kol. 7 — koszt niestanowiący KUP</option></select>
+    <button class="btn secondary" type="submit">Ujmij odpisy w zestawieniu</button>
+  </form>
+</div>
+{% endblock %}

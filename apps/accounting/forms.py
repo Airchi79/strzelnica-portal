@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.credentials.forms import ALLOWED_SIGNATURES
 
-from .models import CATEGORY_ORDER, DEFAULT_LABELS, AccountingSettings, KsefInvoice, Record
+from .models import CATEGORY_ORDER, DEFAULT_LABELS, AccountingSettings, FixedAsset, KsefInvoice, Record
 
 COST_COLUMNS = [
     ("cost_deductible", "Kol. 6 — koszt uzyskania przychodów (art. 15 ustawy o CIT)"),
@@ -49,6 +49,7 @@ class AmountField(forms.CharField):
 
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("max_length", 18)
+        kwargs.setdefault("required", False)
         kwargs.setdefault("widget", forms.TextInput(attrs={"inputmode": "decimal"}))
         super().__init__(*args, **kwargs)
 
@@ -199,3 +200,75 @@ class SettingsForm(forms.ModelForm):
         if commit:
             obj.save()
         return obj
+
+
+def _date(label, required=True, help_text=""):
+    return forms.DateField(label=label, required=required, help_text=help_text,
+                           widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+
+
+class AssetForm(forms.Form):
+    kind = forms.ChoiceField(label="Rodzaj", choices=FixedAsset.Kind.choices)
+    name = forms.CharField(label="Określenie środka trwałego / WNiP (§ 3 ust. 1 pkt 5)", max_length=255)
+    kst = forms.CharField(label="Symbol KŚT (pkt 6)", max_length=20, required=False,
+                          help_text="Klasyfikacja Środków Trwałych — przy WNiP zostaw puste.")
+    acquisition = forms.ChoiceField(label="Sposób pozyskania", choices=FixedAsset.Acquisition.choices)
+    acquired_on = _date("Data nabycia / wytworzenia (pkt 2)")
+    in_use_on = _date("Data przyjęcia do używania (pkt 3)")
+    entered_on = _date("Data wprowadzenia do wykazu",
+                       help_text="Najpóźniej w miesiącu przyjęcia do używania — później oznacza ujawnienie (§ 3 ust. 3).")
+    acquisition_doc = forms.CharField(label="Rodzaj i numer dowodu nabycia / wytworzenia (pkt 4 lit. c)", max_length=160, required=False,
+                                      help_text="Np. „faktura FV 12/2026 (KSeF …)”, „umowa darowizny z 3.02.2026”.")
+    in_use_doc = forms.CharField(label="Numer dowodu przyjęcia do używania (pkt 4 lit. b)", max_length=64, required=False,
+                                 help_text="Np. „OT 1/2026”.")
+    initial_value = AmountField(label="Wartość początkowa [zł] (pkt 7)", required=True)
+    updated_value = AmountField(label="Zaktualizowana wartość początkowa [zł] (pkt 10) — np. po ulepszeniu")
+    method = forms.ChoiceField(label="Metoda", choices=FixedAsset.Method.choices, widget=forms.RadioSelect)
+    rate = forms.DecimalField(label="Roczna stawka amortyzacyjna [%] (pkt 8)", max_digits=5, decimal_places=2, min_value=0,
+                              max_value=100, required=False,
+                              help_text="Z Wykazu rocznych stawek amortyzacyjnych (załącznik nr 1 do ustawy o CIT).")
+    prior_depreciation = AmountField(label="Odpisy dokonane przed prowadzeniem wykazu w systemie [zł]",
+                                     help_text="Tylko dla składników wprowadzonych do wykazu wcześniej (np. przed 2026 r.).")
+    prior_until_year = forms.IntegerField(label="…dokonane do końca roku", min_value=1990, max_value=2100, required=False)
+    notes = forms.CharField(label="Uwagi", max_length=255, required=False)
+    reason = forms.CharField(label="Powód zmiany", max_length=255, required=False)
+
+    def __init__(self, *args, editing=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if editing:
+            self.fields["reason"].required = True
+        else:
+            del self.fields["reason"]
+        if not self.is_bound and not self.initial.get("method"):
+            self.initial["method"] = "liniowa"
+
+    def clean_initial_value(self):
+        value = self.cleaned_data["initial_value"]
+        if not value:
+            raise forms.ValidationError("Wartość początkowa musi być większa od zera.")
+        return value
+
+    def clean(self):
+        data = super().clean()
+        data["rate"] = data.get("rate") or Decimal(0)
+        return data
+
+    @staticmethod
+    def initial_for(asset):
+        return {f: getattr(asset, f) for f in ("kind", "name", "kst", "acquisition", "acquired_on", "in_use_on", "entered_on",
+                                               "acquisition_doc", "in_use_doc", "initial_value", "updated_value", "method", "rate",
+                                               "prior_depreciation", "prior_until_year", "notes")}
+
+
+class DisposeForm(forms.Form):
+    kind = forms.ChoiceField(label="Rodzaj", choices=FixedAsset.Disposal.choices)
+    day = _date("Data likwidacji / zbycia / stwierdzenia niedoboru")
+    reason = forms.CharField(label="Przyczyna likwidacji", max_length=255, required=False)
+    doc = forms.CharField(label="Numer dowodu wykreślenia (np. protokół likwidacji LT 1/2026)", max_length=64, required=False)
+    ksef_number = forms.CharField(label="Numer KSeF faktury zbycia (jeśli wystawiona w KSeF)", max_length=40, required=False)
+
+
+class PostingForm(forms.Form):
+    year = forms.IntegerField(min_value=2000, max_value=2100)
+    month = forms.IntegerField(min_value=0, max_value=12)
+    column = forms.ChoiceField(choices=[("cost_deductible", "kol. 6"), ("cost_other", "kol. 7")])

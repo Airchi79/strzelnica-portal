@@ -14,8 +14,11 @@ from apps.core.models import AssociationSettings
 from apps.core.permissions import panel_required
 
 from . import documents, exports, ksef, services
-from .forms import DESCRIPTION_HINTS, KsefAcceptForm, KsefImportForm, ReasonForm, RecordForm, SettingsForm, format_amount
-from .models import AccountingSettings, AccountingYear, GeneratedDocument, KsefInvoice, Record
+from apps.audit.models import AuditLog
+
+from .forms import (DESCRIPTION_HINTS, AssetForm, DisposeForm, KsefAcceptForm, KsefImportForm, PostingForm, ReasonForm, RecordForm,
+                    SettingsForm, format_amount)
+from .models import AccountingSettings, AccountingYear, DepreciationPosting, FixedAsset, GeneratedDocument, KsefInvoice, Record
 
 PERM = "accounting.manage_accounting"
 
@@ -360,4 +363,138 @@ def doc_download(request, pk, fmt):
     else:
         raise Http404
     response["Content-Disposition"] = f'attachment; filename="{documents.filename(obj, fmt)}"'
+    return response
+
+
+# --- wykaz środków trwałych -------------------------------------------------------------
+
+
+@panel_required(PERM)
+def assets_list(request):
+    from . import assets
+
+    year, _ = _period(request)
+    reg = assets.register(year)
+    for r in reg["rows"]:
+        r["late"] = assets.late_entry(r["asset"])
+    postings = DepreciationPosting.objects.filter(year=year, record__removed_at__isnull=True).select_related("record")
+    today = timezone.localdate()
+    months = [(m, exports.MONTHS[m], assets.month_total(year, m)) for m in range(1, 13)
+              if (year, m) < (today.year, today.month)]
+    return render(request, "panel/accounting_assets.html", {
+        "reg": reg, "years": services.years(), "postings": postings, "months": months,
+        "posted_months": {p.month for p in postings}, "year_posted": any(p.month is None for p in postings),
+        "can_post_year": year < today.year,
+    })
+
+
+@panel_required(PERM)
+def asset_form(request, pk=None):
+    from . import assets
+
+    asset = get_object_or_404(FixedAsset, pk=pk) if pk else None
+    initial = AssetForm.initial_for(asset) if asset else {"entered_on": timezone.localdate(), "in_use_on": timezone.localdate(),
+                                                           "acquired_on": timezone.localdate()}
+    form = AssetForm(request.POST or None, initial=initial, editing=bool(asset))
+    if request.method == "POST" and form.is_valid():
+        d = dict(form.cleaned_data)
+        reason = d.pop("reason", "")
+        try:
+            if asset:
+                posted = assets.posted_months(asset)
+                assets.update(asset, d, by=request.user, reason=reason)
+                if posted:
+                    messages.warning(request, "Odpisy od tej pozycji są już ujęte w zestawieniu przychodów i kosztów — "
+                                              "jeśli zmiana wpływa na ich wysokość, popraw te zapisy.")
+                messages.success(request, f"Zmieniono pozycję wykazu nr {asset.number}.")
+            else:
+                asset = assets.create(d, by=request.user)
+                messages.success(request, f"Wprowadzono do wykazu pod nr {asset.number}.")
+                if assets.late_entry(asset):
+                    messages.warning(request, "Wprowadzenie po miesiącu przyjęcia do używania — to ujawnienie środka trwałego "
+                                              "(§ 3 ust. 3 rozporządzenia); odpisy liczą się od miesiąca po wprowadzeniu.")
+        except ValidationError as e:
+            form.add_error(None, e.messages[0])
+        else:
+            return redirect("panel:accounting_asset", pk=asset.pk)
+    return render(request, "panel/accounting_asset_form.html", {"form": form, "asset": asset})
+
+
+@panel_required(PERM)
+def asset_detail(request, pk):
+    from . import assets
+
+    asset = get_object_or_404(FixedAsset.objects.select_related("created_by"), pk=pk)
+    rows, prior = assets.schedule(asset)
+    history = AuditLog.objects.filter(object_type="accounting.fixedasset", object_id=str(asset.pk)).select_related("actor")
+    return render(request, "panel/accounting_asset.html", {
+        "a": asset, "schedule": rows, "prior": prior, "late": assets.late_entry(asset), "history": history,
+        "dispose_form": DisposeForm(initial={"day": timezone.localdate()}), "reason_form": ReasonForm(),
+        "closed": AccountingYear.is_closed(asset.entered_on.year),
+    })
+
+
+@panel_required(PERM)
+@require_POST
+def asset_action(request, pk, action):
+    from . import assets
+
+    asset = get_object_or_404(FixedAsset, pk=pk)
+    try:
+        if action == "wykresl":
+            form = DisposeForm(request.POST)
+            if not form.is_valid():
+                raise ValidationError("Uzupełnij rodzaj i datę wykreślenia.")
+            d = form.cleaned_data
+            assets.dispose(asset, by=request.user, day=d["day"], kind=d["kind"], reason=d["reason"], doc=d["doc"], ksef_number=d["ksef_number"])
+            messages.success(request, "Pozycja wykreślona z wykazu.")
+        elif action == "cofnij-wykreslenie":
+            assets.cancel_disposal(asset, by=request.user, reason=request.POST.get("reason", ""))
+            messages.success(request, "Cofnięto wykreślenie.")
+        elif action == "usun":
+            assets.delete(asset, by=request.user, reason=request.POST.get("reason", ""))
+            messages.success(request, "Pozycję usunięto z wykazu.")
+            return redirect("panel:accounting_assets")
+        else:
+            raise Http404
+    except ValidationError as e:
+        _error(request, e)
+    return redirect("panel:accounting_asset", pk=pk)
+
+
+@panel_required(PERM)
+@require_POST
+def assets_post(request):
+    from . import assets
+
+    form = PostingForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Niepoprawny okres.")
+        return redirect("panel:accounting_assets")
+    d = form.cleaned_data
+    try:
+        record = assets.post_depreciation(d["year"], d["month"] or None, by=request.user, column=d["column"])
+    except ValidationError as e:
+        _error(request, e)
+    else:
+        messages.success(request, f"Odpisy ujęte w zestawieniu pod Lp. {record.lp}.")
+    return redirect(reverse("panel:accounting_assets") + f"?rok={d['year']}")
+
+
+@panel_required(PERM)
+def assets_export(request, fmt):
+    from . import assets
+
+    year, _ = _period(request)
+    reg = assets.register(year)
+    association = AssociationSettings.load()
+    log_sensitive_access(None, f"ksiegowosc:wykaz-st:{year}:{fmt}", "wydruk wykazu środków trwałych")
+    if fmt == "pdf":
+        response = HttpResponse(assets.to_pdf(reg, association), content_type="application/pdf")
+    elif fmt == "xlsx":
+        response = HttpResponse(assets.to_xlsx(reg, association),
+                                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    else:
+        raise Http404
+    response["Content-Disposition"] = f'attachment; filename="wykaz-srodkow-trwalych-{year}.{fmt}"'
     return response

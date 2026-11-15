@@ -257,3 +257,77 @@ class GeneratedDocument(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class FixedAsset(models.Model):
+    """Pozycja wykazu środków trwałych oraz wartości niematerialnych i prawnych (§ 3 rozporządzenia, Dz. U. 2025
+    poz. 1880; art. 16a–16m ustawy o CIT). Odpisy liniowe liczone są od miesiąca następującego po miesiącu
+    wprowadzenia do wykazu do zrównania z wartością początkową albo do miesiąca likwidacji / zbycia (art. 16h ust. 1 pkt 1)."""
+
+    class Kind(models.TextChoices):
+        FIXED = "st", "Środek trwały"
+        INTANGIBLE = "wnip", "Wartość niematerialna i prawna"
+
+    class Method(models.TextChoices):
+        LINEAR = "liniowa", "Liniowa — stawka z Wykazu stawek amortyzacyjnych (art. 16i)"
+        ONE_OFF = "jednorazowo", "Bez odpisów — wydatek w kosztach w miesiącu oddania do używania (art. 16d ust. 1, do 10 000 zł)"
+        NONE = "brak", "Nie podlega amortyzacji (art. 16c, np. grunt)"
+
+    class Acquisition(models.TextChoices):
+        PURCHASE = "nabycie", "Nabycie"
+        PRODUCTION = "wytworzenie", "Wytworzenie we własnym zakresie"
+
+    class Disposal(models.TextChoices):
+        LIQUIDATION = "likwidacja", "Likwidacja"
+        SALE = "zbycie", "Zbycie"
+        SHORTAGE = "niedobor", "Niedobór"
+
+    number = models.PositiveIntegerField("Lp.", unique=True)
+    kind = models.CharField("rodzaj", max_length=4, choices=Kind.choices, default=Kind.FIXED)
+    name = models.CharField("określenie (§ 3 ust. 1 pkt 5)", max_length=255)
+    kst = models.CharField("symbol KŚT (pkt 6)", max_length=20, blank=True)
+    acquisition = models.CharField("sposób", max_length=12, choices=Acquisition.choices, default=Acquisition.PURCHASE)
+    acquired_on = models.DateField("data nabycia / wytworzenia (pkt 2)")
+    in_use_on = models.DateField("data przyjęcia do używania (pkt 3)")
+    entered_on = models.DateField("data wprowadzenia do wykazu")
+    acquisition_doc = models.CharField("rodzaj i numer dowodu nabycia / wytworzenia (pkt 4 lit. c)", max_length=160, blank=True)
+    in_use_doc = models.CharField("numer dowodu przyjęcia do używania (pkt 4 lit. b)", max_length=64, blank=True)
+    initial_value = models.BigIntegerField("wartość początkowa [gr] (pkt 7)")
+    updated_value = models.BigIntegerField("zaktualizowana wartość początkowa [gr] (pkt 10)", null=True, blank=True)
+    method = models.CharField("metoda", max_length=12, choices=Method.choices, default=Method.LINEAR)
+    rate = models.DecimalField("roczna stawka amortyzacyjna [%] (pkt 8)", max_digits=5, decimal_places=2, default=0)
+    prior_depreciation = models.BigIntegerField("odpisy dokonane przed rokiem prowadzenia wykazu w systemie [gr]", null=True, blank=True)
+    prior_until_year = models.PositiveIntegerField("odpisy dokonane do końca roku", null=True, blank=True)
+    disposed_on = models.DateField("data likwidacji / zbycia (pkt 11)", null=True, blank=True)
+    disposal = models.CharField("rodzaj wykreślenia", max_length=12, choices=Disposal.choices, blank=True)
+    disposal_reason = models.CharField("przyczyna likwidacji", max_length=255, blank=True)
+    disposal_doc = models.CharField("numer dowodu wykreślenia (pkt 4 lit. b)", max_length=64, blank=True)
+    disposal_ksef = models.CharField("numer KSeF faktury zbycia (pkt 4 lit. a)", max_length=40, blank=True)
+    notes = models.CharField("uwagi", max_length=255, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["number"]
+        verbose_name = "środek trwały / WNiP"
+        verbose_name_plural = "wykaz środków trwałych i WNiP"
+
+    def __str__(self):
+        return f"{self.number}. {self.name}"
+
+    @property
+    def base(self):
+        return self.updated_value if self.updated_value is not None else self.initial_value
+
+
+class DepreciationPosting(models.Model):
+    """Ujęcie odpisów amortyzacyjnych z wykazu w zestawieniu przychodów i kosztów (za miesiąc albo cały rok)."""
+
+    year = models.PositiveIntegerField("rok")
+    month = models.PositiveSmallIntegerField("miesiąc (puste — cały rok)", null=True, blank=True)
+    amount = models.BigIntegerField("kwota [gr]")
+    record = models.ForeignKey(Record, on_delete=models.PROTECT, related_name="depreciation_postings")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["year", "month"]

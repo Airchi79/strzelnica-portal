@@ -177,7 +177,7 @@ def test_panel_add_edit_remove_with_attachment(client, owner):
         "attachment": SimpleUploadedFile("wirus.pdf", b"MZ\x90\x00 nie pdf")})
     assert bad.status_code == 200 and "Dozwolone są tylko pliki" in bad.content.decode()
     edit_page = client.get(f"/panel/ksiegowosc/zapis/{rec.pk}/zmien/").content.decode()
-    assert 'value="1234,56"' in edit_page
+    assert 'value="1234,56"' in edit_page and 'list="opisy"' in edit_page and "<script>" not in edit_page
     r = client.post(f"/panel/ksiegowosc/zapis/{rec.pk}/zmien/", {
         "date": day.isoformat(), "document": "FV 7/11/2026", "description": "Tarcze papierowe", "counterparty": "Hurtownia",
         "amount": "1234,56", "column": "cost_deductible", "notes": "", "reason": "zła kolumna"})
@@ -212,7 +212,7 @@ def test_settings_and_sync_button(owner_client):
     r = owner_client.post("/panel/ksiegowosc/uzupelnij/")
     assert r.url == "/panel/ksiegowosc/ustawienia/"
     r = owner_client.post("/panel/ksiegowosc/ustawienia/", {"auto_from": "2026-01-01", "label_skladka": "  Składki   członkowskie ",
-                                                            "approving_body": "Zebranie Członków", "tax_office": "US Oleśnica",
+                                                            "approving_body": "Zebranie Członków", "tax_office": "US Oleśnica", "auto_activity": "pozostala",
                                                             "signatories": "Jan Testowy — przedstawiciel"})
     assert r.status_code == 302
     s = AccountingSettings.load()

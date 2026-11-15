@@ -33,3 +33,8 @@ document.querySelectorAll("[data-countdown-to]").forEach((el) => {
   };
   tick();
 });
+
+// Pole „zaznacz wszystkie”: <input type="checkbox" data-check-all="nazwa"> przełącza pola o name="nazwa".
+document.querySelectorAll("[data-check-all]").forEach((box) => box.addEventListener("change", () => {
+  document.querySelectorAll(`input[type=checkbox][name="${box.dataset.checkAll}"]`).forEach((c) => { c.checked = box.checked; });
+}));

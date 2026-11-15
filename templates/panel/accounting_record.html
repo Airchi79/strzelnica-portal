@@ -13,6 +13,7 @@
   {% if r.cost_deductible %}<tr><th>Koszty uzyskania przychodów (kol. 6)</th><td>{{ r.cost_deductible|pln }}</td></tr>{% endif %}
   {% if r.cost_other %}<tr><th>Koszty niestanowiące KUP (kol. 7)</th><td>{{ r.cost_other|pln }}</td></tr>{% endif %}
   {% if r.notes %}<tr><th>Uwagi (kol. 8)</th><td>{{ r.notes }}</td></tr>{% endif %}
+  <tr><th>Forma działalności</th><td>{{ r.get_activity_display|default:"— nieprzypisana —" }}{% if r.task %} · umowa: {{ r.task }}{% endif %}</td></tr>
   {% if r.ksef_number %}<tr><th>Numer KSeF</th><td class="code">{{ r.ksef_number }}</td></tr>{% endif %}
   {% for inv in invoices %}<tr><th>Faktura KSeF</th><td><a href="{% url 'panel:accounting_ksef_invoice' inv.pk %}">{{ inv.invoice_number }} — {{ inv.seller_name }}</a></td></tr>{% endfor %}
   {% if r.corrects %}<tr><th>Koryguje zapis</th><td><a href="{% url 'panel:accounting_record' r.corrects.pk %}">Lp. {{ r.corrects.lp }}</a></td></tr>{% endif %}

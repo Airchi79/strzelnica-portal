@@ -15,5 +15,4 @@
   <datalist id="opisy">{% for h in hints %}<option value="{{ h }}">{% endfor %}</datalist>
   <div class="actions"><button class="btn" type="submit">Zapisz</button>{% if not record %}<button class="btn secondary" type="submit" name="jeszcze" value="1">Zapisz i dodaj następny</button>{% endif %}<a class="btn secondary" href="{% if record %}{% url 'panel:accounting_record' record.pk %}{% else %}{% url 'panel:accounting' %}{% endif %}">Anuluj</a></div>
 </form>
-<script>document.querySelector('[name=description]').setAttribute('list', 'opisy');</script>
 {% endblock %}

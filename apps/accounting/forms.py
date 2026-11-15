@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.credentials.forms import ALLOWED_SIGNATURES
 
-from .models import CATEGORY_ORDER, DEFAULT_LABELS, AccountingSettings, FixedAsset, KsefInvoice, Record
+from .models import CATEGORY_ORDER, DEFAULT_LABELS, AccountingSettings, Activity, FixedAsset, KsefInvoice, PublicTask, Record
 
 COST_COLUMNS = [
     ("cost_deductible", "Kol. 6 — koszt uzyskania przychodów (art. 15 ustawy o CIT)"),
@@ -81,12 +81,17 @@ class RecordForm(forms.Form):
     date = forms.DateField(label="Data zdarzenia (kol. 2)", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
     document = forms.CharField(label="Nr dowodu księgowego (kol. 3)", max_length=64,
                                help_text="Np. numer faktury, rachunku, wyciągu bankowego albo dowodu wewnętrznego.")
-    description = forms.CharField(label="Opis zdarzenia (kol. 4)", max_length=255)
+    description = forms.CharField(label="Opis zdarzenia (kol. 4)", max_length=255,
+                                  widget=forms.TextInput(attrs={"list": "opisy"}))  # podpowiedzi z <datalist id="opisy">
     counterparty = forms.CharField(label="Kontrahent / wystawca dowodu", max_length=160, required=False)
     amount = forms.CharField(label="Kwota [zł]", max_length=18, widget=forms.TextInput(attrs={"inputmode": "decimal"}))
     column = forms.ChoiceField(label="Kolumna zestawienia", choices=COST_COLUMNS, widget=forms.RadioSelect, required=False)
     notes = forms.CharField(label="Uwagi (kol. 8)", max_length=255, required=False)
     ksef_number = forms.CharField(label="Numer KSeF faktury (jeśli jest)", max_length=40, required=False)
+    activity = forms.ChoiceField(label="Forma działalności (zestawienie uzupełniające)", required=False,
+                                 choices=[("", "— nieprzypisane —")] + Activity.choices)
+    task = forms.ModelChoiceField(label="Umowa o realizację zadania publicznego (dotacja)", required=False,
+                                  queryset=PublicTask.objects.all(), empty_label="— nie dotyczy —")
     attachment = forms.FileField(label="Skan dowodu (PDF, JPG, PNG — do 5 MB)", required=False)
     reason = forms.CharField(label="Powód zmiany", max_length=255, required=False,
                              help_text="Zapisuje się w historii zapisu razem z poprzednią treścią.")
@@ -132,7 +137,8 @@ class RecordForm(forms.Form):
 
         return {"date": record.date, "document": record.document, "description": record.description,
                 "counterparty": record.counterparty, "amount": format_amount(record_amount(record)),
-                "column": record_column(record), "notes": record.notes, "ksef_number": record.ksef_number}
+                "column": record_column(record), "notes": record.notes, "ksef_number": record.ksef_number,
+                "activity": record.activity, "task": record.task_id}
 
 
 class ReasonForm(forms.Form):
@@ -157,6 +163,10 @@ class KsefAcceptForm(forms.Form):
     description = forms.CharField(label="Opis zdarzenia (kol. 4)", max_length=255)
     column = forms.ChoiceField(label="Kolumna zestawienia", choices=COST_COLUMNS, widget=forms.RadioSelect)
     notes = forms.CharField(label="Uwagi (kol. 8)", max_length=255, required=False)
+    activity = forms.ChoiceField(label="Forma działalności (zestawienie uzupełniające)", required=False,
+                                 choices=[("", "— nieprzypisane —")] + Activity.choices)
+    task = forms.ModelChoiceField(label="Umowa o realizację zadania publicznego (dotacja)", required=False,
+                                  queryset=PublicTask.objects.all(), empty_label="— nie dotyczy —")
 
     def __init__(self, *args, invoice, **kwargs):
         super().__init__(*args, **kwargs)
@@ -180,7 +190,7 @@ class KsefAcceptForm(forms.Form):
 class SettingsForm(forms.ModelForm):
     class Meta:
         model = AccountingSettings
-        fields = ["auto_from", "approving_body", "tax_office", "signatories"]
+        fields = ["auto_from", "auto_activity", "approving_body", "tax_office", "signatories"]
         widgets = {"auto_from": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
                    "tax_office": forms.Textarea(attrs={"rows": 3}), "signatories": forms.Textarea(attrs={"rows": 3})}
 
@@ -272,3 +282,47 @@ class PostingForm(forms.Form):
     year = forms.IntegerField(min_value=2000, max_value=2100)
     month = forms.IntegerField(min_value=0, max_value=12)
     column = forms.ChoiceField(choices=[("cost_deductible", "kol. 6"), ("cost_other", "kol. 7")])
+
+
+class TaskForm(forms.Form):
+    name = forms.CharField(label="Nazwa zadania publicznego", max_length=255)
+    agreement = forms.CharField(label="Numer umowy", max_length=80, required=False)
+    grantor = forms.CharField(label="Zleceniodawca (organ, jednostka)", max_length=160)
+    signed_on = _date("Data zawarcia umowy")
+    starts_on = _date("Realizacja od")
+    ends_on = _date("Realizacja do")
+    grant = AmountField(label="Kwota dotacji [zł]", required=True)
+    notes = forms.CharField(label="Uwagi", max_length=255, required=False)
+
+    def clean_grant(self):
+        value = self.cleaned_data["grant"]
+        if not value:
+            raise forms.ValidationError("Kwota dotacji musi być większa od zera.")
+        return value
+
+
+class DonationForm(forms.Form):
+    date = _date("Data otrzymania")
+    description = forms.CharField(label="Przedmiot darowizny", max_length=255,
+                                  help_text="Bez danych osobowych darczyńcy (§ 4 ust. 2 rozporządzenia).")
+    value = AmountField(label="Wartość [zł]", required=True, help_text="Wartość rynkowa z dnia otrzymania.")
+    document = forms.CharField(label="Dowód (np. umowa darowizny nr …, protokół przyjęcia)", max_length=120, required=False)
+    statutory = forms.BooleanField(label="Przeznaczona na działalność statutową (nie wlicza się do limitu przychodów)", required=False,
+                                   initial=True)
+    add_revenue = forms.BooleanField(label="Dodaj też zapis przychodu (kol. 5) w zestawieniu przychodów i kosztów", required=False,
+                                     initial=True)
+    activity = forms.ChoiceField(label="Forma działalności zapisu przychodu", required=False,
+                                 choices=[("", "— nieprzypisane —")] + Activity.choices, initial=Activity.UNPAID)
+
+    def clean_value(self):
+        value = self.cleaned_data["value"]
+        if not value:
+            raise forms.ValidationError("Wartość musi być większa od zera.")
+        return value
+
+
+class ClassifyForm(forms.Form):
+    activity = forms.ChoiceField(label="Forma działalności", required=False, choices=[("", "— bez zmiany —")] + Activity.choices)
+    task = forms.ModelChoiceField(label="Umowa (dotacja)", required=False, queryset=PublicTask.objects.all(),
+                                  empty_label="— bez zmiany —")
+    clear_task = forms.BooleanField(label="Odłącz od umowy", required=False)

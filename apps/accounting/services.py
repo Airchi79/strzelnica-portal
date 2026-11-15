@@ -79,7 +79,7 @@ def _amounts(kind, amount, column):
 
 
 def add_record(*, kind, day, document, description, amount, column, by, counterparty="", notes="", attachment=None,
-               ksef_number=""):
+               ksef_number="", activity="", task=None):
     """Zapis ręczny: przychód (kol. 5) albo koszt (kol. 6 — koszt uzyskania przychodów, kol. 7 — pozostałe koszty).
     `amount` w groszach; dodatni (ujemny tylko dla faktury korygującej z KSeF)."""
     if kind not in (Record.Kind.REVENUE, Record.Kind.COST, Record.Kind.KSEF):
@@ -90,7 +90,7 @@ def add_record(*, kind, day, document, description, amount, column, by, counterp
     _check_date(day)
     record = _create(day=day, by=by, kind=kind, document=document.strip(), description=description.strip(),
                      counterparty=counterparty.strip(), notes=notes.strip(), attachment=attachment or "",
-                     ksef_number=ksef_number.strip(), **amounts)
+                     ksef_number=ksef_number.strip(), activity=_activity(activity), task=task, **amounts)
     log_event("ksiegowosc.zapis", record, f"Lp. {record.lp}: {record.get_kind_display().lower()} {amount / 100:.2f} zł — "
                                           f"{record.description}", actor=by)
     return record
@@ -107,8 +107,19 @@ def record_amount(record):
     return getattr(record, record_column(record))
 
 
+KEEP = object()
+
+
+def _activity(value):
+    from .models import Activity
+
+    if value and value not in Activity.values:
+        raise ValidationError("Nieznana forma działalności.")
+    return value or ""
+
+
 def update_record(record, *, by, reason, day, document, description, amount, column, counterparty="", notes="",
-                  ksef_number="", attachment=None):
+                  ksef_number="", attachment=None, activity=KEEP, task=KEEP):
     """Wpisanie nowej treści zapisu (§ 7 ust. 2 pkt 1). Poprzednia treść zostaje w historii wersji; numer (Lp.) bez zmian."""
     reason = " ".join((reason or "").split())
     if not reason:
@@ -131,6 +142,10 @@ def update_record(record, *, by, reason, day, document, description, amount, col
         before = record.snapshot()
         record.date, record.document, record.description = day, document.strip(), description.strip()
         record.counterparty, record.notes, record.ksef_number = counterparty.strip(), notes.strip(), ksef_number.strip()
+        if activity is not KEEP:
+            record.activity = _activity(activity)
+        if task is not KEEP:
+            record.task = task
         for c, v in amounts.items():
             setattr(record, c, v)
         if attachment:
@@ -267,7 +282,7 @@ def sync_from_sales_reports(now=None):
                         day=report.period_start, by=None, kind=Record.Kind.REVENUE_AUTO, document=report.number,
                         description=settings.label(category)[:255], counterparty="Wpłaty strzelców — wykaz w raporcie",
                         notes=f"Dowód zbiorczy — liczba operacji: {counts.get(category, 0)}", category=category,
-                        sales_report=report, revenue=amount)
+                        sales_report=report, revenue=amount, activity=settings.auto_activity)
             except IntegrityError:  # równoległe uzupełnianie
                 continue
             created.append(record)
@@ -328,3 +343,19 @@ def years():
     found = set(Record.objects.values_list("year", flat=True).distinct())
     found.add(timezone.localdate().year)
     return sorted(found, reverse=True)
+
+
+def classify(records, *, by, activity=KEEP, task=KEEP):
+    """Przypisanie formy działalności / umowy wielu zapisom naraz (nowa wersja każdego zapisu z powodem)."""
+    changed = 0
+    for record in records:
+        if record.is_removed or AccountingYear.is_closed(record.year):
+            continue
+        if (activity is KEEP or record.activity == activity) and (task is KEEP or record.task_id == (task.pk if task else None)):
+            continue
+        update_record(record, by=by, reason="przypisanie do zestawienia uzupełniającego", day=record.date, document=record.document,
+                      description=record.description, amount=record_amount(record), column=record_column(record),
+                      counterparty=record.counterparty, notes=record.notes, ksef_number=record.ksef_number,
+                      activity=activity, task=task)
+        changed += 1
+    return changed

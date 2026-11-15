@@ -1,0 +1,61 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Zestawienie uzupełniające {{ st.year }}{% endblock %}
+{% block panel %}
+<h1>Zestawienie uzupełniające — {{ st.year }}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<div class="card">
+  <form method="get" class="actions" style="margin:0">
+    <select name="rok" aria-label="Rok">{% for y in years %}<option value="{{ y }}"{% if y == st.year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select>
+    <button class="btn secondary" type="submit">Pokaż</button>
+    <a class="btn" href="{% url 'panel:accounting_supplementary_export' 'pdf' %}?rok={{ st.year }}">Wydruk PDF</a>
+    <a class="btn secondary" href="{% url 'panel:accounting_supplementary_export' 'xlsx' %}?rok={{ st.year }}">Arkusz XLSX</a>
+  </form>
+  <p class="small muted">Zestawienie wg § 4 rozporządzenia (Dz. U. 2025 poz. 1880): wyodrębnienie przychodów, kosztów i wyniku form działalności (art. 10 ust. 1 ustawy o działalności pożytku publicznego), środków z umów o realizację zadania publicznego (art. 16 ust. 5) oraz łączna wartość darowizn rzeczowych do limitu przychodów (art. 10a ust. 1 pkt 5). Bez danych osobowych.</p>
+</div>
+<h2>1. Formy działalności</h2>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Forma działalności</th><th>Przychody</th><th>Koszty uzyskania przychodów</th><th>Pozostałe koszty</th><th>Wynik</th></tr>
+  {% for a in st.activities %}<tr><td>{{ a.label }}</td><td data-label="Przychody" style="text-align:right">{{ a.revenue|pln }}</td><td data-label="KUP" style="text-align:right">{{ a.cost_deductible|pln }}</td><td data-label="Pozostałe" style="text-align:right">{{ a.cost_other|pln }}</td><td data-label="Wynik" style="text-align:right">{{ a.result|pln }}</td></tr>{% endfor %}
+  {% if st.unassigned_count %}<tr><td><span class="badge warn">nieprzypisane ({{ st.unassigned_count }})</span></td><td style="text-align:right">{{ st.unassigned.revenue|pln }}</td><td style="text-align:right">{{ st.unassigned.cost_deductible|pln }}</td><td style="text-align:right">{{ st.unassigned.cost_other|pln }}</td><td style="text-align:right">{{ st.unassigned.result|pln }}</td></tr>{% endif %}
+  <tr><th>Razem</th><th style="text-align:right">{{ st.total.revenue|pln }}</th><th style="text-align:right">{{ st.total.cost_deductible|pln }}</th><th style="text-align:right">{{ st.total.cost_other|pln }}</th><th style="text-align:right">{{ st.total.result|pln }}</th></tr>
+</table></div></section>
+<h2>2. Umowy o realizację zadania publicznego (dotacje)</h2>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Zadanie / umowa</th><th>Dotacja</th><th>Przychody w roku</th><th>Koszty w roku</th><th>Koszty od początku</th><th>Pozostało</th></tr>
+  {% for x in st.tasks %}<tr><td><a href="{% url 'panel:accounting_task' x.task.pk %}">{{ x.task.name }}</a><div class="small muted">{{ x.task.grantor }}{% if x.task.agreement %} · umowa {{ x.task.agreement }}{% endif %} · {{ x.task.starts_on|date:"j.m.Y" }}–{{ x.task.ends_on|date:"j.m.Y" }}</div></td>
+    <td data-label="Dotacja" style="text-align:right">{{ x.task.grant|pln }}</td><td data-label="Przychody" style="text-align:right">{{ x.year.revenue|pln }}</td><td data-label="Koszty w roku" style="text-align:right">{{ x.year.costs|pln }}</td><td data-label="Od początku" style="text-align:right">{{ x.all.costs|pln }}</td><td data-label="Pozostało" style="text-align:right">{{ x.left|pln }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Brak umów w tym roku.</td></tr>{% endfor %}
+</table></div></section>
+<div class="actions"><a class="btn secondary" href="{% url 'panel:accounting_task_new' %}">Dodaj umowę</a></div>
+<h2>3. Darowizny rzeczowe i limit przychodów</h2>
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th>Data</th><th>Przedmiot</th><th>Dowód</th><th>Na działalność statutową</th><th>Wartość</th><th></th></tr>
+  {% for d in st.donations %}<tr><td>{{ d.date|date:"j.m.Y" }}</td><td data-label="Przedmiot">{{ d.description }}{% if d.record %} · <a href="{% url 'panel:accounting_record' d.record.pk %}">Lp. {{ d.record.lp }}</a>{% endif %}</td><td data-label="Dowód">{{ d.document }}</td><td data-label="Statutowa">{{ d.statutory|yesno:"tak,nie" }}</td><td data-label="Wartość" style="text-align:right">{{ d.value|pln }}</td>
+    <td><details><summary class="small">usuń</summary><form method="post" action="{% url 'panel:accounting_donation_delete' d.pk %}" class="actions" style="margin:0">{% csrf_token %}<input name="reason" placeholder="przyczyna" required aria-label="Przyczyna"><button class="btn danger" type="submit">Usuń</button></form></details></td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Brak darowizn rzeczowych w tym roku.</td></tr>{% endfor %}
+  <tr><th colspan="4">Razem darowizny rzeczowe</th><th style="text-align:right">{{ st.donations_total|pln }}</th><th></th></tr>
+</table></div></section>
+<div class="actions"><a class="btn secondary" href="{% url 'panel:accounting_donation_new' %}">Dodaj darowiznę rzeczową</a></div>
+<div class="card"><table>
+  <tr><td>Przychody roku (kol. 5)</td><td style="text-align:right">{{ st.total.revenue|pln }}</td></tr>
+  <tr><td>minus darowizny rzeczowe na działalność statutową</td><td style="text-align:right">{{ st.donations_statutory|pln }}</td></tr>
+  <tr><th>Przychody do limitu (art. 10a ust. 1 pkt 5)</th><th style="text-align:right">{{ st.limit_base|pln }}</th></tr>
+  <tr><td>Limit</td><td style="text-align:right">{{ st.limit|pln }} {% if st.limit_ok %}<span class="badge ok">spełniony</span>{% else %}<span class="badge bad">przekroczony</span>{% endif %}</td></tr>
+</table>{% if not st.limit_ok %}<p class="small">Po przekroczeniu limitu w roku poprzedzającym uproszczonej ewidencji nie można prowadzić — zawiadom urząd skarbowy (generator dokumentów: zawiadomienie o niespełnianiu warunków).</p>{% endif %}</div>
+<h2>Przypisanie zapisów</h2>
+<div class="tabs"><a href="?rok={{ st.year }}&pokaz=nieprzypisane" class="{% if show == 'nieprzypisane' %}active{% endif %}">Nieprzypisane ({{ st.unassigned_count }})</a><a href="?rok={{ st.year }}&pokaz=wszystkie" class="{% if show == 'wszystkie' %}active{% endif %}">Wszystkie</a></div>
+<form method="post" novalidate>{% csrf_token %}<input type="hidden" name="pokaz" value="{{ show }}">
+<section class="day"><div class="table-wrap"><table class="days">
+  <tr class="head"><th><input type="checkbox" aria-label="Zaznacz wszystkie" data-check-all="zapis"></th><th>Lp.</th><th>Data</th><th>Opis</th><th>Kwota</th><th>Forma / umowa</th></tr>
+  {% for r in page %}<tr><td><input type="checkbox" name="zapis" value="{{ r.pk }}" aria-label="Zaznacz {{ r.lp }}"></td>
+    <td><a href="{% url 'panel:accounting_record' r.pk %}">{{ r.lp }}</a></td><td data-label="Data">{{ r.date|date:"j.m.Y" }}</td><td data-label="Opis">{{ r.description }}</td>
+    <td data-label="Kwota" style="text-align:right">{% if r.revenue %}+{{ r.revenue|pln }}{% elif r.cost_deductible %}−{{ r.cost_deductible|pln }}{% else %}−{{ r.cost_other|pln }}{% endif %}</td>
+    <td data-label="Forma" class="small">{{ activities|get:r.activity|default:"—" }}{% if r.task %}<br>{{ r.task.name }}{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Brak zapisów.</td></tr>{% endfor %}
+</table></div></section>
+{% include "partials/pagination.html" %}
+<div class="card">{% with form=classify_form %}{% include "partials/form.html" %}{% endwith %}
+  <p class="small muted">Każde przypisanie zapisuje się w historii zapisu (nowa wersja z powodem „przypisanie do zestawienia uzupełniającego”).</p>
+  <div class="actions"><button class="btn" type="submit">Przypisz zaznaczone</button></div></div>
+</form>
+{% endblock %}

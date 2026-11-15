@@ -31,6 +31,16 @@ DEFAULT_LABELS = {
 CATEGORY_ORDER = ["rezerwacja", "kod_wejscia", "wydarzenie", "skladka", "inne", "zwrot"]
 
 
+class Activity(models.TextChoices):
+    """Formy działalności do rachunkowego wyodrębnienia (art. 10 ust. 1 ustawy o działalności pożytku publicznego) —
+    zestawienie uzupełniające (§ 4 ust. 1 pkt 1 rozporządzenia)."""
+
+    UNPAID = "nieodplatna", "Nieodpłatna działalność pożytku publicznego"
+    PAID = "odplatna", "Odpłatna działalność pożytku publicznego"
+    OTHER = "pozostala", "Pozostałe przychody i koszty (np. dochody z majątku, odsetki)"
+    COMMON = "wspolne", "Koszty wspólne / administracyjne"
+
+
 class AccountingSettings(models.Model):
     auto_from = models.DateField(
         "przychody z systemu od dnia", null=True, blank=True,
@@ -45,6 +55,11 @@ class AccountingSettings(models.Model):
                                                 "uproszczonej ewidencji (art. 10a ust. 1 ustawy o działalności pożytku publicznego).")
     signatories = models.TextField("osoby podpisujące", blank=True,
                                    help_text="Każda osoba w osobnym wierszu, np. „Jan Kowalski — przedstawiciel”.")
+    auto_activity = models.CharField(
+        "forma działalności dla przychodów z systemu", max_length=12, choices=Activity.choices, default=Activity.OTHER,
+        help_text="Do zestawienia uzupełniającego (art. 10 ust. 1 ustawy o działalności pożytku publicznego). Opłaty za "
+                  "udostępnianie strzelnicy jako dochody z majątku — „pozostałe”. Stowarzyszenie zwykłe nie może prowadzić "
+                  "odpłatnej działalności pożytku publicznego (art. 42 ust. 1 pkt 4 Prawa o stowarzyszeniach).")
 
     class Meta:
         verbose_name = "ustawienia księgowości"
@@ -121,6 +136,9 @@ class Record(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField("zapisano", auto_now_add=True)
     ksef_number = models.CharField("numer KSeF", max_length=40, blank=True)
+    activity = models.CharField("forma działalności", max_length=12, choices=Activity.choices, blank=True)
+    task = models.ForeignKey("PublicTask", verbose_name="umowa o realizację zadania publicznego", null=True, blank=True,
+                             on_delete=models.PROTECT, related_name="records")
     version = models.PositiveIntegerField("wersja", default=1)
     updated_at = models.DateTimeField("ostatnia zmiana", null=True, blank=True)
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
@@ -155,7 +173,7 @@ class Record(models.Model):
 
     # pola treści zapisu — zapisywane w historii wersji
     CONTENT_FIELDS = ("date", "document", "description", "counterparty", "revenue", "cost_deductible", "cost_other", "notes",
-                      "ksef_number", "attachment_sha256")
+                      "ksef_number", "attachment_sha256", "activity", "task_id")
 
     def snapshot(self):
         return {f: (getattr(self, f).isoformat() if f == "date" else getattr(self, f)) for f in self.CONTENT_FIELDS}
@@ -331,3 +349,46 @@ class DepreciationPosting(models.Model):
 
     class Meta:
         ordering = ["year", "month"]
+
+
+class PublicTask(models.Model):
+    """Umowa o wsparcie lub powierzenie realizacji zadania publicznego (art. 16 ustawy o działalności pożytku publicznego) —
+    środki z umowy wyodrębnia się w ewidencji (art. 16 ust. 5)."""
+
+    name = models.CharField("nazwa zadania", max_length=255)
+    agreement = models.CharField("numer umowy", max_length=80, blank=True)
+    grantor = models.CharField("zleceniodawca (organ / jednostka)", max_length=160)
+    signed_on = models.DateField("data zawarcia")
+    starts_on = models.DateField("realizacja od")
+    ends_on = models.DateField("realizacja do")
+    grant = models.BigIntegerField("kwota dotacji [gr]")
+    notes = models.CharField("uwagi", max_length=255, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-starts_on", "-pk"]
+        verbose_name = "umowa o realizację zadania publicznego"
+
+    def __str__(self):
+        return f"{self.name}" + (f" (umowa {self.agreement})" if self.agreement else "")
+
+
+class InKindDonation(models.Model):
+    """Darowizna rzeczowa — łączna wartość w roku jest potrzebna do limitu przychodów z art. 10a ust. 1 pkt 5 ustawy
+    (§ 4 ust. 1 pkt 2 rozporządzenia). Bez danych osobowych darczyńców (§ 4 ust. 2)."""
+
+    date = models.DateField("data otrzymania")
+    description = models.CharField("przedmiot darowizny", max_length=255)
+    value = models.BigIntegerField("wartość [gr]")
+    document = models.CharField("dowód (np. umowa darowizny, protokół przyjęcia)", max_length=120, blank=True)
+    statutory = models.BooleanField("przeznaczona na działalność statutową", default=True)
+    record = models.ForeignKey(Record, null=True, blank=True, on_delete=models.SET_NULL, related_name="in_kind_donations",
+                               verbose_name="zapis przychodu w zestawieniu")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-pk"]
+        verbose_name = "darowizna rzeczowa"
+        verbose_name_plural = "darowizny rzeczowe"

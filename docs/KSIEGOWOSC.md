@@ -12,6 +12,15 @@ i rozporządzenie MFiG z 22.12.2025 (Dz. U. poz. 1880). Panel → Płatności �
 - **Zamknięcie roku** (zakładka „Lata i zamknięcia”): blokuje zmiany po złożeniu CIT-8; otwarcie wymaga powodu.
 - Przychody z systemu: dzienne raporty wpływów → jeden zapis na kategorię dnia (od dnia ustawionego w ustawieniach).
 
+## Zestawienie uzupełniające (§ 4)
+- Forma działalności każdego zapisu (art. 10 ust. 1 udpp): nieodpłatna / odpłatna pożytku publicznego, pozostałe
+  (np. dochody z majątku), koszty wspólne — przychody, koszty i wynik każdej formy. Przypisanie w formularzu zapisu
+  albo zbiorczo (nowa wersja zapisu z powodem). Przychody z systemu dostają formę z ustawień.
+- Umowy o realizację zadania publicznego (art. 16 ust. 5): dotacja, przychody i koszty przypisane do umowy, pozostała kwota.
+- Darowizny rzeczowe (bez danych osobowych) i limit przychodów 1 000 000 zł bez darowizn rzeczowych na cele statutowe
+  (art. 10a ust. 1 pkt 5); kwota trafia też do podpowiedzi w uchwale o wyborze ewidencji.
+- Wydruk PDF/XLSX za rok.
+
 ## Wykaz środków trwałych i WNiP (§ 3)
 - Kolumny wg § 3 ust. 1 pkt 1–11; wydruk PDF/XLSX za rok.
 - Metody: liniowa (stawka z Wykazu stawek amortyzacyjnych — zał. nr 1 do ustawy o CIT), bez odpisów do 10 000 zł
@@ -43,5 +52,4 @@ Dane do dokumentów: „Dane stowarzyszenia” (nazwa, adres, NIP, REGON) oraz K
 organ zatwierdzający, osoby podpisujące). Każdy wygenerowany dokument jest zapamiętany i można go pobrać ponownie.
 
 ## Do zrobienia (kolejne etapy)
-- Zestawienie uzupełniające (§ 4).
 - Pobieranie faktur z API KSeF.

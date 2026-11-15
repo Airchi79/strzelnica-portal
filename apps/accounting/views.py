@@ -16,9 +16,10 @@ from apps.core.permissions import panel_required
 from . import documents, exports, ksef, services
 from apps.audit.models import AuditLog
 
-from .forms import (DESCRIPTION_HINTS, AssetForm, DisposeForm, KsefAcceptForm, KsefImportForm, PostingForm, ReasonForm, RecordForm,
+from .forms import (DESCRIPTION_HINTS, AssetForm, ClassifyForm, DonationForm, TaskForm, DisposeForm, KsefAcceptForm, KsefImportForm, PostingForm, ReasonForm, RecordForm,
                     SettingsForm, format_amount)
-from .models import AccountingSettings, AccountingYear, DepreciationPosting, FixedAsset, GeneratedDocument, KsefInvoice, Record
+from .models import (Activity, AccountingSettings, AccountingYear, DepreciationPosting, FixedAsset, GeneratedDocument, InKindDonation, KsefInvoice,
+                     PublicTask, Record)
 
 PERM = "accounting.manage_accounting"
 
@@ -75,7 +76,8 @@ def panel_add(request, kind):
             record = services.add_record(
                 kind=kind, day=d["date"], document=d["document"], description=d["description"], amount=d["amount"],
                 column=form.column_value, by=request.user, counterparty=d["counterparty"], notes=d["notes"],
-                attachment=d.get("attachment"), ksef_number=d.get("ksef_number", ""))
+                attachment=d.get("attachment"), ksef_number=d.get("ksef_number", ""), activity=d.get("activity", ""),
+                task=d.get("task"))
         except ValidationError as e:
             form.add_error(None, e.messages[0])
         else:
@@ -112,7 +114,7 @@ def panel_edit(request, pk):
             services.update_record(record, by=request.user, reason=d["reason"], day=d["date"], document=d["document"],
                                    description=d["description"], amount=d["amount"], column=form.column_value,
                                    counterparty=d["counterparty"], notes=d["notes"], ksef_number=d.get("ksef_number", ""),
-                                   attachment=d.get("attachment"))
+                                   attachment=d.get("attachment"), activity=d.get("activity", ""), task=d.get("task"))
         except ValidationError as e:
             form.add_error(None, e.messages[0])
         else:
@@ -268,7 +270,7 @@ def ksef_detail(request, pk):
         d = form.cleaned_data
         try:
             record = ksef.accept(invoice, by=request.user, day=d["date"], column=d["column"], description=d["description"],
-                                 document=d["document"], notes=d["notes"])
+                                 document=d["document"], notes=d["notes"], activity=d.get("activity", ""), task=d.get("task"))
         except ValidationError as e:
             form.add_error(None, e.messages[0])
         else:
@@ -498,3 +500,125 @@ def assets_export(request, fmt):
         raise Http404
     response["Content-Disposition"] = f'attachment; filename="wykaz-srodkow-trwalych-{year}.{fmt}"'
     return response
+
+
+# --- zestawienie uzupełniające --------------------------------------------------------------
+
+
+@panel_required(PERM)
+def supplementary(request):
+    from . import supplementary as sup
+
+    year, _ = _period(request)
+    if request.method == "POST":
+        form = ClassifyForm(request.POST)
+        ids = [int(x) for x in request.POST.getlist("zapis") if x.isdigit()]
+        if form.is_valid() and ids:
+            d = form.cleaned_data
+            activity = d["activity"] or services.KEEP
+            task = None if d["clear_task"] else (d["task"] or services.KEEP)
+            if activity is services.KEEP and task is services.KEEP:
+                messages.error(request, "Wybierz formę działalności albo umowę.")
+            else:
+                try:
+                    n = services.classify(Record.objects.filter(pk__in=ids, year=year), by=request.user, activity=activity, task=task)
+                except ValidationError as e:
+                    _error(request, e)
+                else:
+                    messages.success(request, f"Przypisano zapisów: {n}. Każda zmiana jest w historii zapisu.")
+        else:
+            messages.error(request, "Zaznacz zapisy i wybierz formę działalności albo umowę.")
+        return redirect(reverse("panel:accounting_supplementary") + f"?rok={year}&pokaz={request.POST.get('pokaz', '')}")
+    st = sup.build(year)
+    show = request.GET.get("pokaz", "nieprzypisane")
+    qs = Record.objects.filter(year=year, removed_at__isnull=True).select_related("task").order_by("number")
+    if show == "nieprzypisane":
+        qs = qs.filter(activity="")
+    page = Paginator(qs, 100).get_page(request.GET.get("page"))
+    return render(request, "panel/accounting_supplementary.html", {
+        "st": st, "years": services.years(), "page": page, "show": show, "classify_form": ClassifyForm(),
+        "activities": dict(Activity.choices),
+    })
+
+
+@panel_required(PERM)
+def supplementary_export(request, fmt):
+    from . import supplementary as sup
+
+    year, _ = _period(request)
+    st = sup.build(year)
+    association = AssociationSettings.load()
+    log_sensitive_access(None, f"ksiegowosc:uzupelniajace:{year}:{fmt}", "wydruk zestawienia uzupełniającego")
+    if fmt == "pdf":
+        response = HttpResponse(sup.to_pdf(st, association), content_type="application/pdf")
+    elif fmt == "xlsx":
+        response = HttpResponse(sup.to_xlsx(st, association),
+                                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    else:
+        raise Http404
+    response["Content-Disposition"] = f'attachment; filename="zestawienie-uzupelniajace-{year}.{fmt}"'
+    return response
+
+
+@panel_required(PERM)
+def task_form(request, pk=None):
+    from . import supplementary as sup
+
+    task = get_object_or_404(PublicTask, pk=pk) if pk else None
+    initial = {f: getattr(task, f) for f in ("name", "agreement", "grantor", "signed_on", "starts_on", "ends_on", "grant", "notes")} if task else {}
+    form = TaskForm(request.POST or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        try:
+            task = sup.save_task(form.cleaned_data, by=request.user, task=task)
+        except ValidationError as e:
+            form.add_error(None, e.messages[0])
+        else:
+            messages.success(request, f"Zapisano umowę: {task}.")
+            return redirect(reverse("panel:accounting_supplementary") + f"?rok={task.starts_on.year}")
+    return render(request, "panel/accounting_simple_form.html", {
+        "form": form, "title": "Umowa o realizację zadania publicznego" + (f" — {task}" if task else ""),
+        "intro": "Środki otrzymane na realizację umowy o wsparcie lub powierzenie realizacji zadania publicznego wyodrębnia się "
+                 "w ewidencji (art. 16 ust. 5 ustawy o działalności pożytku publicznego). Zapisy przychodów i kosztów zadania "
+                 "przypisz do umowy w karcie zapisu albo zbiorczo w zestawieniu uzupełniającym.",
+        "cancel": reverse("panel:accounting_supplementary"),
+    })
+
+
+@panel_required(PERM)
+def donation_form(request):
+    from . import supplementary as sup
+
+    form = DonationForm(request.POST or None, initial={"date": timezone.localdate()})
+    if request.method == "POST" and form.is_valid():
+        d = form.cleaned_data
+        try:
+            donation = sup.add_donation(d, by=request.user, add_revenue=d["add_revenue"])
+        except ValidationError as e:
+            form.add_error(None, e.messages[0])
+        else:
+            messages.success(request, "Zapisano darowiznę rzeczową" + (f" i przychód pod Lp. {donation.record.lp}." if donation.record else "."))
+            return redirect(reverse("panel:accounting_supplementary") + f"?rok={donation.date.year}")
+    return render(request, "panel/accounting_simple_form.html", {
+        "form": form, "title": "Darowizna rzeczowa",
+        "intro": "Łączną wartość darowizn rzeczowych ujmuje się w zestawieniu uzupełniającym (§ 4 ust. 1 pkt 2 rozporządzenia) — "
+                 "darowizny rzeczowe przeznaczone na działalność statutową nie wliczają się do limitu 1 000 000 zł przychodów "
+                 "(art. 10a ust. 1 pkt 5 ustawy). Nie wpisuj danych osobowych darczyńcy.",
+        "cancel": reverse("panel:accounting_supplementary"),
+    })
+
+
+@panel_required(PERM)
+@require_POST
+def donation_delete(request, pk):
+    from . import supplementary as sup
+
+    donation = get_object_or_404(InKindDonation, pk=pk)
+    year = donation.date.year
+    try:
+        sup.delete_donation(donation, by=request.user, reason=request.POST.get("reason", ""))
+    except ValidationError as e:
+        _error(request, e)
+    else:
+        messages.success(request, "Usunięto darowiznę z zestawienia" + (" — zapis przychodu usuń osobno w zestawieniu przychodów i kosztów."
+                                                                         if donation.record_id else "."))
+    return redirect(reverse("panel:accounting_supplementary") + f"?rok={year}")

@@ -355,6 +355,10 @@ class Principles(Doc):
             ("p", "Zestawienie uzupełniające zawiera dane służące wypełnieniu wymagań art. 10 ust. 1 pkt 1 i 2 oraz art. 16 ust. 5 "
                   "ustawy o działalności pożytku publicznego i o wolontariacie oraz łączną wartość darowizn rzeczowych niezbędną "
                   "do ustalenia limitu przychodów z art. 10a ust. 1 pkt 5 tej ustawy. Zestawienie nie zawiera danych osobowych."),
+            ("p", "W tym celu każdy zapis zestawienia przychodów i kosztów ma przypisaną formę działalności (nieodpłatna "
+                  "działalność pożytku publicznego, odpłatna działalność pożytku publicznego, pozostałe przychody i koszty, "
+                  "koszty wspólne), a zapisy dotyczące umów o realizację zadania publicznego — także umowę, z której pochodzą "
+                  "środki. Darowizny rzeczowe są ewidencjonowane z datą, przedmiotem, wartością i dowodem."),
         ]
 
 
@@ -553,7 +557,9 @@ def context(user=None):
     for year in Record.objects.values_list("year", flat=True).distinct():
         from . import services
 
-        revenue_by_year[year] = services.year_totals(year)["revenue"]
+        from .supplementary import revenue_for_limit
+
+        revenue_by_year[year] = revenue_for_limit(year)  # bez darowizn rzeczowych na działalność statutową
     return {
         "association": {"name": a.name, "address": a.address, "nip": a.nip, "regon": a.regon},
         "settings": {"tax_office": s.tax_office, "approving_body": s.approving_body, "signatories": s.signatories},

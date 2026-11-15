@@ -171,7 +171,7 @@ def import_files(uploads, *, by, own_nip=""):
     return created, duplicates, errors
 
 
-def accept(invoice, *, by, day, column, description, document=None, notes=""):
+def accept(invoice, *, by, day, column, description, document=None, notes="", activity="", task=None):
     """Przyjęcie faktury do ewidencji: zapis kosztu (zakup) albo przychodu (sprzedaż), kwota = należność ogółem (P_15)."""
     from . import services
     from .models import Record
@@ -188,7 +188,7 @@ def accept(invoice, *, by, day, column, description, document=None, notes=""):
         record = services.add_record(
             kind=Record.Kind.KSEF, day=day, document=(document or invoice.invoice_number)[:64], description=description,
             amount=invoice.gross, column=column, by=by, counterparty=counterparty[:160], notes=notes,
-            ksef_number=invoice.ksef_number)
+            ksef_number=invoice.ksef_number, activity=activity, task=task)
         invoice.status, invoice.record, invoice.status_note = KsefInvoice.Status.ACCEPTED, record, ""
         invoice.save(update_fields=["status", "record", "status_note"])
     return record

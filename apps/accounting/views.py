@@ -1,7 +1,7 @@
 from urllib.parse import urlencode
 
 from django.contrib import messages
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -471,7 +471,27 @@ def doc_detail(request, pk):
         add_url = reverse("panel:accounting_add", args=["koszt"]) + "?" + urlencode({
             "date": d.get("data_zdarzenia", ""), "document": d.get("_number", ""), "description": d.get("przedmiot", ""),
             "amount": format_amount(d.get("wartosc")), "notes": d.get("podstawa", "")})
-    return render(request, "panel/accounting_doc.html", {"obj": obj, "doc": doc, "add_url": add_url})
+    resolution = None
+    if obj.kind in documents.RESOLUTION_DOCS:
+        from apps.association.models import Resolution
+
+        if request.method == "POST":
+            if not request.user.has_perm("association.manage_resolutions"):
+                raise PermissionDenied
+            try:
+                resolution = documents.to_register(obj, by=request.user)
+            except ValidationError as e:
+                _error(request, e)
+            else:
+                messages.success(request, f"Projekt uchwały „{resolution.title}” jest w rejestrze uchwał ({resolution.get_organ_display()}).")
+                return redirect("panel:resolution", pk=resolution.pk)
+        if obj.data.get("_resolution"):
+            resolution = Resolution.objects.filter(pk=obj.data["_resolution"]).first()
+    elif request.method == "POST":
+        raise Http404
+    return render(request, "panel/accounting_doc.html", {"obj": obj, "doc": doc, "add_url": add_url, "resolution": resolution,
+                                                         "is_resolution": obj.kind in documents.RESOLUTION_DOCS,
+                                                         "can_register": request.user.has_perm("association.manage_resolutions")})
 
 
 @panel_required(PERM)

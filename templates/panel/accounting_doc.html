@@ -12,4 +12,17 @@
     <a class="btn secondary" href="{% url 'panel:accounting_doc_new' obj.kind %}">Nowy dokument tego rodzaju</a>
   </div>
 </div>
+{% if is_resolution %}
+<div class="card">
+  <h2 class="step-title">Rejestr uchwał</h2>
+  {% if resolution %}
+  <p>Projekt jest w rejestrze: <a href="{% url 'panel:resolution' resolution.pk %}">{{ resolution.get_organ_display }} — w sprawie {{ resolution.title }}</a> · <strong>{{ resolution.get_status_display }}</strong>{% if resolution.number %} · nr {{ resolution.number }}/{{ resolution.year }}{% endif %}.</p>
+  {% elif can_register %}
+  <p class="small muted">Przenieś treść do rejestru uchwał jako projekt — dalej zwykłą ścieżką: uchwała Zarządu w głosowaniu online w panelu (każdy członek Zarządu głosuje po zalogowaniu), uchwała Zebrania Członków — w głosowaniu na zebraniu. Po podjęciu uchwała dostanie numer w rejestrze.</p>
+  <form method="post" class="actions" style="margin:0">{% csrf_token %}<button class="btn" type="submit">Utwórz projekt w rejestrze uchwał</button></form>
+  {% else %}
+  <p class="small muted">Projekt w rejestrze uchwał może utworzyć osoba z uprawnieniem do uchwał.</p>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

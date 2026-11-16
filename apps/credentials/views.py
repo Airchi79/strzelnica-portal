@@ -27,7 +27,7 @@ OCR_WINDOW = 600
 @login_required
 @require_POST
 def my_read_photo(request):
-    """Odczyt danych z wgranego zdjęcia legitymacji do formularza (to samo rozpoznawanie tekstu co w kiosku).
+    """Odczyt danych z wgranego zdjęcia albo PDF legitymacji do formularza (to samo rozpoznawanie tekstu co w kiosku).
     Zwraca tylko pola dokumentu — odczytany tekst (z PESEL) nie jest zapisywany ani odsyłany; zdjęcie nie jest zapisywane."""
     from django.core.cache import cache
     from django.http import JsonResponse
@@ -46,11 +46,14 @@ def my_read_photo(request):
         return JsonResponse({"ok": False, "error": "Wybierz zdjęcie legitymacji (do 5 MB)."}, status=400)
     data = photo.read()
     kind = next((ext for sig, ext in ALLOWED_SIGNATURES.items() if data.startswith(sig)), None)
-    if kind not in (".jpg", ".png"):
-        return JsonResponse({"ok": False, "error": "Dane odczytujemy ze zdjęcia (JPG/PNG) — z PDF wpisz je ręcznie."}, status=400)
-    if not ocr.available():
+    if kind is None:
+        return JsonResponse({"ok": False, "error": "Wybierz zdjęcie (JPG/PNG) albo plik PDF legitymacji."}, status=400)
+    if kind == ".pdf":
+        text = ocr.read_pdf_text(data)  # PDF z warstwą tekstową (np. z portalu PZSS) — bez programu do odczytu obrazu
+    elif not ocr.available():
         return JsonResponse({"ok": False, "error": "Odczyt zdjęć jest chwilowo niedostępny — wpisz dane ręcznie."})
-    text = ocr.read_text(data)
+    else:
+        text = ocr.read_text(data)
     fields = ocr.extract(text)
     del text, data  # tekst legitymacji (PESEL) nie wychodzi poza tę funkcję
     found = {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in fields.items() if v}

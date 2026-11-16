@@ -79,6 +79,68 @@ def read_text(image_bytes, budget=BUDGET_SECONDS):
     return "\n".join(texts) if texts else None
 
 
+MAX_PDF_PAGES = 2
+PDF_TEXT_MIN_LETTERS = 30  # mniej liter w warstwie tekstowej = PDF to skan (obraz) — wtedy odczyt z obrazu strony
+
+
+def _has_issuer(text):
+    words = _words(text)
+    return any(_word_found(w, words, 0.84) for group in ISSUER_WORDS.values() for w in group)
+
+
+def _render_first_page(pdf):
+    page = pdf[0]
+    try:
+        image = page.render(scale=min(8.0, 2000 / max(page.get_width(), 1))).to_pil()
+        buf = BytesIO()
+        image.convert("RGB").save(buf, "PNG")
+        return buf.getvalue()
+    finally:
+        page.close()
+
+
+def read_pdf_text(pdf_bytes, budget=BUDGET_SECONDS):
+    """Tekst legitymacji z pliku PDF (np. pobranego z portalu PZSS):
+    - warstwa tekstowa (dokładna) — numer, daty, a jeśli jest, także wystawca,
+    - gdy w warstwie nie ma wystawcy (logo i nazwa związku jako grafika — tak jest w PDF z portalu PZSS), obraz strony
+      przez ten sam odczyt co zdjęcie; z tego odczytu bierzemy tylko słowa (bez cyfr), by nie mieszać numerów i dat,
+    - PDF bez warstwy tekstowej (skan) — w całości odczyt obrazu strony.
+    None, gdy pliku nie da się odczytać."""
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        return None
+    try:
+        pdf = pdfium.PdfDocument(pdf_bytes)
+    except Exception:  # uszkodzony / zaszyfrowany PDF — pdfium zgłasza własne wyjątki
+        logger.warning("OCR legitymacji: nie można otworzyć PDF")
+        return None
+    try:
+        if not len(pdf):
+            return None
+        texts = []
+        for i in range(min(len(pdf), MAX_PDF_PAGES)):
+            page = pdf[i]
+            textpage = page.get_textpage()
+            texts.append(textpage.get_text_range())
+            textpage.close()
+            page.close()
+        layer = "\n".join(texts)
+        has_layer = sum(ch.isalpha() for ch in layer) >= PDF_TEXT_MIN_LETTERS
+        if has_layer and _has_issuer(layer):
+            return layer
+        image = _render_first_page(pdf) if available() else None
+    except Exception:  # błąd odczytu strony — dane wpisze osoba
+        logger.warning("OCR legitymacji: błąd odczytu PDF")
+        return None
+    finally:
+        pdf.close()
+    seen = read_text(image, budget=budget) if image else None
+    if not has_layer:
+        return seen
+    return layer + ("\n" + re.sub(r"\d", " ", seen) if seen else "")
+
+
 def _fold(value):
     """Wielkie litery bez polskich znaków (odczyt często gubi ogonki)."""
     value = str(value or "").upper().replace("Ł", "L")
@@ -148,6 +210,7 @@ ISSUER_LABELS = {"PZSS": "PZSS (Polski Związek Strzelectwa Sportowego)", "PZŁ"
                  "LOK": "LOK (Liga Obrony Kraju)"}  # jak w kiosku (przyciski wystawców)
 NUMBER_RE = re.compile(r"\b(?:NR|NUMER)\b[\s.:_\-|]*(?:UPRAWNIEN\w*|LEGITYMACJI|LEG\.?)?[\s.:_\-|]*([A-Z0-9][A-Z0-9/\-.]{2,40})")
 DATE_RE = re.compile(r"\b(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})\b")
+ISO_DATE_RE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")  # PDF z portali: 2024-10-10
 ISSUED_WORDS = ("WYDAN", "NABYC", "WYSTAWION")
 VALID_WORDS = ("WAZN",)
 
@@ -170,7 +233,7 @@ def _dates(lines):
 
     out = []
     for i, line in enumerate(lines):
-        for d, m, y in DATE_RE.findall(line):
+        for d, m, y in DATE_RE.findall(line) + [(d, m, y) for y, m, d in ISO_DATE_RE.findall(line)]:
             try:
                 out.append((date(int(y), int(m), int(d)), i))
             except ValueError:

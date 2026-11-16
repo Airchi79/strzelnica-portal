@@ -10,6 +10,7 @@ whitenoise==6.12.0
 cryptography==50.0.2
 openpyxl==3.1.5
 reportlab==4.2.5
+pypdfium2==4.30.0  # odczyt PDF legitymacji (warstwa tekstowa albo obraz strony do OCR)
 chardet==5.2.0
 python-docx==1.2.0
 lxml==6.1.3

@@ -19,6 +19,9 @@
   {% include "panel/_kpi.html" with label="rezerwacji bez wpisu w książce" value=kpi.missing_pct suffix="%" delta=d.missing_pct unit="p.p." inverse=True %}
 </div>
 {% endwith %}
+{% if archived_count %}<p class="small muted">W tym {{ archived_count }} rezerwacji z archiwum GunTrackera. Eksport GunTrackera nie podaje kwot — ich przychód
+  ({{ estimated|pln }}) to <strong>szacunek z cennika osi</strong> (stawka z dnia rezerwacji × godziny, liczba osób = liczba stanowisk;
+  rezerwacje na kod wejścia — 0 zł, bez dopłat za prowadzącego). Rzeczywiste wpływy z tego okresu są w Księgowości (Stripe).</p>{% endif %}
 
 <div class="card table-wrap">
   <h2 class="step-title">Osie — przychód na godzinę otwarcia</h2>
@@ -42,7 +45,7 @@
     <p class="small muted" style="margin-top:0">Odbyte (zakończone, potwierdzone) rezerwacje, do których nie ma wpisu w książce pobytu — ani powiązanego z rezerwacją, ani wpisu rezerwującego / przydzielonego prowadzącego od godziny przed rozpoczęciem do końca. Odwołane i nieodbyte się nie liczą. {% if done_count %}<strong>{{ missing|length }} z {{ done_count }}</strong> odbytych.{% endif %}</p>
     <table class="days">
       <tr class="head"><th>Termin</th><th>Oś</th><th>Rezerwujący</th></tr>
-      {% for r in missing|slice:":50" %}<tr><td><a href="{% url 'panel:reservation' r.pk %}">{{ r.starts_at|date:"j.m.Y H:i" }}</a></td><td data-label="Oś">{{ r.lane }}</td><td data-label="Rezerwujący">{{ r.user.full_name }}</td></tr>
+      {% for r in missing|slice:":50" %}<tr><td>{% if r.client %}{{ r.starts_at|date:"j.m.Y H:i" }} <span class="small muted">GunTracker {{ r.number }}</span>{% else %}<a href="{% url 'panel:reservation' r.pk %}">{{ r.starts_at|date:"j.m.Y H:i" }}</a>{% endif %}</td><td data-label="Oś">{{ r.lane }}</td><td data-label="Rezerwujący">{% if r.client %}{{ r.client }}{% else %}{{ r.user.full_name }}{% endif %}</td></tr>
       {% empty %}<tr><td colspan="3" class="muted">{% if done_count %}Każda odbyta rezerwacja ma wpis ✓{% else %}Brak odbytych rezerwacji w okresie.{% endif %}</td></tr>{% endfor %}
       {% if missing|length > 50 %}<tr><td colspan="3" class="muted">… i jeszcze {{ missing|length|add:"-50" }}.</td></tr>{% endif %}
     </table>
@@ -52,7 +55,7 @@
     <p class="small muted" style="margin-top:0">Rezerwujący, których rezerwacje najczęściej nie mają wpisu — warto przypomnieć o obowiązku wpisu do książki pobytu.</p>
     <table class="days">
       <tr class="head"><th>Osoba</th><th>Bez wpisu</th><th>Ostatnio</th></tr>
-      {% for x in ranking %}<tr><td><a href="{% url 'panel:user' x.user.pk %}">{{ x.user.full_name }}</a></td><td data-label="Bez wpisu">{{ x.missing }} z {{ x.visits }}</td><td data-label="Ostatnio">{{ x.last_missing|date:"j.m.Y" }}</td></tr>
+      {% for x in ranking %}<tr><td>{% if x.user %}<a href="{% url 'panel:user' x.user.pk %}">{{ x.name }}</a>{% else %}{{ x.name }} <span class="small muted">(GunTracker)</span>{% endif %}</td><td data-label="Bez wpisu">{{ x.missing }} z {{ x.visits }}</td><td data-label="Ostatnio">{{ x.last_missing|date:"j.m.Y" }}</td></tr>
       {% empty %}<tr><td colspan="3" class="muted">Brak.</td></tr>{% endfor %}
     </table>
   </div>

@@ -2,6 +2,7 @@
   {% with u=request.resolver_match.url_name %}
   <a href="{% url 'panel:accounting' %}" class="{% if u == 'accounting' or u == 'accounting_record' or u == 'accounting_edit' %}active{% endif %}">Zestawienie</a>
   <a href="{% url 'panel:accounting_month' %}" class="{% if u == 'accounting_month' %}active{% endif %}">Lista miesiąca</a>
+  <a href="{% url 'panel:accounting_year_checklist' %}" class="{% if u == 'accounting_year_checklist' %}active{% endif %}">Zamknięcie roku</a>
   <a href="{% url 'panel:accounting_add' 'przychod' %}" class="{% if u == 'accounting_add' and kind == 'przychod' %}active{% endif %}">Dodaj przychód</a>
   <a href="{% url 'panel:accounting_add' 'koszt' %}" class="{% if u == 'accounting_add' and kind == 'koszt' %}active{% endif %}">Dodaj koszt</a>
   <a href="{% url 'panel:accounting_supplementary' %}" class="{% if u == 'accounting_supplementary' or 'accounting_task' in u or 'accounting_donation' in u %}active{% endif %}">Uzupełniające</a>

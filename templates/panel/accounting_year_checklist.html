@@ -1,0 +1,22 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Zamknięcie roku {{ year }}{% endblock %}
+{% block panel %}
+<h1>Zamknięcie roku {{ year }}</h1>
+{% include "panel/_accounting_tabs.html" %}
+<div class="card actions" style="justify-content:space-between;align-items:center">
+  <form method="get" class="actions" style="margin:0;align-items:center"><label for="rok" class="small">Rok</label>
+    <select id="rok" name="rok">{% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select>
+    <button class="btn secondary small-btn" type="submit">Pokaż</button></form>
+  <span>{% if open %}<span class="badge warn">do zrobienia / sprawdzenia: {{ open }}</span>{% else %}<span class="badge ok">bez zaległości</span>{% endif %} <span class="small muted">gotowe {{ done }} z {{ steps|length }}</span></span>
+</div>
+<p class="small muted">Kolejność: najpierw rozlicz miesiące (z grudniem), środki trwałe i formę działalności zapisów, uzgodnij saldo na 31.12, potem zestawienie przepływów, zamknięcie roku, uchwała o przeznaczeniu dochodu i zeznanie CIT-8 z CIT-8/O do {{ cit_deadline }}. „Jeszcze nie teraz” — krok wykonuje się po zakończeniu roku.</p>
+<div class="table-wrap card"><table class="days">
+  <tr class="head"><th>Krok</th><th>Stan</th><th>Szczegóły</th><th></th></tr>
+  {% for s in steps %}<tr>
+    <td><strong>{{ forloop.counter }}. {{ s.title }}</strong></td>
+    <td data-label="Stan"><span class="badge {{ s.badge }}">{{ s.label }}</span></td>
+    <td data-label="Szczegóły" class="small">{{ s.detail }}</td>
+    <td>{% if s.url and s.action %}<a class="btn{% if s.state != 'todo' %} secondary{% endif %}" href="{{ s.url }}">{{ s.action }}</a>{% endif %}</td>
+  </tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -1009,3 +1009,23 @@ def month_checklist(request):
         "prev": prev, "next": nxt if nxt <= today else None, "done": sum(s.state == "ok" for s in steps),
         "open": sum(s.state in ("todo", "warn") for s in steps),
     })
+
+
+@panel_required(PERM)
+def year_checklist(request):
+    from . import checklist
+
+    today = timezone.localdate()
+    default = today.year - 1 if today.month <= 3 else today.year
+    try:
+        year = int(request.GET.get("rok", default))
+    except ValueError:
+        year = default
+    if not 2000 <= year <= today.year:
+        year = default
+    steps = checklist.year_steps(year, today)
+    return render(request, "panel/accounting_year_checklist.html", {
+        "steps": steps, "year": year, "years": [y for y in services.years() if y <= today.year],
+        "done": sum(s.state == "ok" for s in steps), "open": sum(s.state in ("todo", "warn") for s in steps),
+        "cit_deadline": f"31.03.{year + 1}",
+    })

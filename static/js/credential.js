@@ -111,5 +111,35 @@
     }
     show(file);
     setMsg("Gotowe — zdjęcie zostanie wysłane razem z formularzem.", false);
+    if (!isPdf) readPhoto(file);
   });
+
+  // --- odczyt danych ze zdjęcia legitymacji PS (to samo rozpoznawanie tekstu co w kiosku) ---
+  // Wypełnia puste pola (albo wypełnione wcześniej odczytem); dane wpisane ręcznie zostają. Osoba sprawdza wynik.
+  const ocrUrl = form.dataset.ocrUrl;
+  const LABELS = { number: "numer", issuer: "wystawca", issued_on: "data wydania", valid_until: "ważna do" };
+  async function readPhoto(file) {
+    const kind = form.querySelector("input[name=kind]:checked");
+    if (!ocrUrl || !kind || kind.value !== "ps") return;
+    const body = new FormData();
+    body.append("scan", file);
+    body.append("csrfmiddlewaretoken", form.elements.csrfmiddlewaretoken.value);
+    setMsg("Odczytuję dane z legitymacji… (kilka sekund)", false);
+    let data;
+    try {
+      const r = await fetch(ocrUrl, { method: "POST", body, credentials: "same-origin", headers: { "X-Requested-With": "fetch" } });
+      data = await r.json();
+    } catch (e) { setMsg("Nie udało się odczytać danych — wpisz je ręcznie w kroku 3.", false); return; }
+    if (!data.ok) { setMsg(data.error || "Nie udało się odczytać danych — wpisz je ręcznie w kroku 3.", false); return; }
+    const filled = [];
+    Object.entries(data.fields || {}).forEach(([name, value]) => {
+      const el = form.elements[name];
+      if (!el || !value || (el.value.trim() && el.dataset.auto !== "1")) return;
+      el.value = value; el.dataset.auto = "1"; el.classList.add("autofilled");
+      el.addEventListener("input", () => { el.dataset.auto = ""; el.classList.remove("autofilled"); }, { once: true });
+      filled.push(LABELS[name] || name);
+    });
+    setMsg(filled.length ? `Uzupełniono ze zdjęcia: ${filled.join(", ")} — sprawdź z legitymacją i popraw, jeśli trzeba.`
+                         : "Nie udało się odczytać danych ze zdjęcia — wpisz je ręcznie w kroku 3.", false);
+  }
 })();

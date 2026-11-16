@@ -142,6 +142,83 @@ def compare(text, first_name, last_name, number, issuer):
     return [name for name, ok in checks.items() if not ok]
 
 
+# --- odczyt danych do formularza (zdjęcie najpierw — dane wypełniają się same, osoba je sprawdza) -----------------------
+
+ISSUER_LABELS = {"PZSS": "PZSS (Polski Związek Strzelectwa Sportowego)", "PZŁ": "PZŁ (Polski Związek Łowiecki)",
+                 "LOK": "LOK (Liga Obrony Kraju)"}  # jak w kiosku (przyciski wystawców)
+NUMBER_RE = re.compile(r"\b(?:NR|NUMER)\b[\s.:_\-|]*(?:UPRAWNIEN\w*|LEGITYMACJI|LEG\.?)?[\s.:_\-|]*([A-Z0-9][A-Z0-9/\-.]{2,40})")
+DATE_RE = re.compile(r"\b(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})\b")
+ISSUED_WORDS = ("WYDAN", "NABYC", "WYSTAWION")
+VALID_WORDS = ("WAZN",)
+
+
+def _clean_number(raw):
+    """„0079/BZGL0K/2022 .” → „0079/BZGLOK/2022”: bez końcowej interpunkcji; w członach z literami zero → O."""
+    raw = raw.strip(" .,;:_-|")
+    parts = []
+    for part in raw.split("/"):
+        letters = sum(ch.isalpha() for ch in part)
+        if letters >= 2 and letters >= len(part) - 1:
+            part = part.replace("0", "O")
+        parts.append(part)
+    return "/".join(parts)[:64]
+
+
+def _dates(lines):
+    """[(data, numer linii)] — tylko poprawne daty kalendarzowe."""
+    from datetime import date
+
+    out = []
+    for i, line in enumerate(lines):
+        for d, m, y in DATE_RE.findall(line):
+            try:
+                out.append((date(int(y), int(m), int(d)), i))
+            except ValueError:
+                continue
+    return out
+
+
+def _near(lines, i, words):
+    return any(w in lines[j] for j in (i - 1, i, i + 1) if 0 <= j < len(lines) for w in words)
+
+
+def extract(text, today=None):
+    """Podpowiedzi do formularza z odczytanego tekstu legitymacji: numer, wystawca, data wydania, ważna do.
+    Nie zwraca imienia, nazwiska ani PESEL — tylko pola dokumentu; brak pewności = puste pole."""
+    from django.utils import timezone
+
+    today = today or timezone.localdate()
+    out = {"number": "", "issuer": "", "issued_on": None, "valid_until": None}
+    if not text:
+        return out
+    lines = [_fold(line) for line in str(text).splitlines()]
+    words = _words(text)
+    hits = {code: sum(_word_found(w, words, 0.84) for w in group) for code, group in ISSUER_WORDS.items()}
+    best = max(hits, key=hits.get)
+    if hits[best]:
+        out["issuer"] = ISSUER_LABELS[best]
+    for line in lines:
+        if "PESEL" in line:
+            continue
+        m = NUMBER_RE.search(line)
+        if m:
+            number = _clean_number(m.group(1))
+            if sum(ch.isdigit() for ch in number) >= 2 and len(re.sub(r"[^A-Z0-9]", "", number)) >= MIN_NUMBER_LEN:
+                out["number"] = number
+                break
+    found = _dates(lines)
+    valid = [d for d, i in found if _near(lines, i, VALID_WORDS)]
+    issued = [d for d, i in found if _near(lines, i, ISSUED_WORDS) and d <= today]
+    others = sorted({d for d, i in found if d <= today and d not in valid})  # odczyt w dwóch trybach powtarza daty
+    if valid:
+        out["valid_until"] = max(valid)
+    if issued:
+        out["issued_on"] = issued[0]
+    elif len(others) == 1:
+        out["issued_on"] = others[0]  # jedna data na legitymacji (np. PZSS: „Warszawa, 10.10.2024”) — data wydania
+    return out
+
+
 def check(image_bytes, user, credential):
     """Wynik do zapisania: RESULT_OK, RESULT_UNAVAILABLE albo „niezgodne: …” (bez odczytanego tekstu)."""
     text = read_text(image_bytes)

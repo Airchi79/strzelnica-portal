@@ -659,3 +659,6 @@ tr.now-bez_rezerwacji td { background: var(--bad-bg); }
 .transfer-qr { display: flex; gap: 12px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
 .transfer-qr img { background: #fff; padding: 8px; border-radius: 8px; width: 160px; height: 160px; flex: none; }
 .transfer-qr p { margin: 0; flex: 1 1 180px; }
+
+/* pola uzupełnione odczytem ze zdjęcia legitymacji — do sprawdzenia */
+input.autofilled { outline: 2px solid var(--ok); outline-offset: 1px; }

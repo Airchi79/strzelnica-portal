@@ -1,0 +1,38 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Porządkowanie danych z GunTrackera{% endblock %}
+{% block panel %}
+<h1>Porządkowanie danych z GunTrackera</h1>
+<p class="small"><a href="{% url 'panel:persons' %}">← Osoby bez konta</a> · <a href="{% url 'panel:persons_export' %}">Pobierz kartotekę (XLSX) — zapis stanu przed zmianami</a></p>
+<div class="card">
+  <p>Wgraj <strong>plik zbiorczy</strong> (XLSX z arkuszami <strong>„Klienci”</strong> i <strong>„Rezerwacje”</strong>; arkusz „rezerwacje statystyka” jest pomijany) i — do odtworzenia archiwum książki — eksport <strong>„Księga pobytu”</strong> z GunTrackera.</p>
+  <p class="small muted">Zawsze najpierw <strong>Podgląd</strong> — nic nie zapisuje i nic nie wysyła. Wykonanie zmienia dane bez możliwości cofnięcia: przedtem pobierz kartotekę do XLSX. Rezerwacje i wpisy z nowego systemu (nasze) nie są ruszane — dotyczy to tylko danych przeniesionych z GunTrackera.</p>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    <label for="plik">Plik zbiorczy (Klienci, Rezerwacje)</label><input type="file" id="plik" name="plik" accept=".xlsx" required>
+    <label for="ksiega">Eksport „Księga pobytu” (opcjonalnie)</label><input type="file" id="ksiega" name="ksiega" accept=".xlsx">
+    <fieldset class="card" style="margin-top:12px"><legend>Co uporządkować</legend>
+      <div class="field checkbox"><label><input type="checkbox" name="persons" value="1"{% if opts.persons %} checked{% endif %}> <strong>Kartoteka „Osoby bez konta”</strong> — klienci z arkusza „Klienci”: dane z pliku (telefon, e-mail, adres, pozwolenie) zastępują dane w kartotece, duplikaty tej samej osoby są scalane</label></div>
+      <div class="field checkbox" style="margin-left:24px"><label><input type="checkbox" name="prune" value="1"{% if opts.prune %} checked{% endif %}> usuń pozostałe osoby z importów GunTrackera spoza listy klientów (osób dodanych ręcznie i połączonych z kontem nie usuwa)</label></div>
+      <div class="field checkbox"><label><input type="checkbox" name="preverified" value="1"{% if opts.preverified %} checked{% endif %}> <strong>Lista PS zweryfikowanych wcześniej</strong> — z arkusza „Klienci” (status „Zweryfikowana”); niewykorzystane wpisy spoza pliku są usuwane</label></div>
+      <div class="field checkbox"><label><input type="checkbox" name="reservations" value="1"{% if opts.reservations %} checked{% endif %}> <strong>Archiwum rezerwacji GunTrackera</strong> — wyczyść (z blokadami osi założonymi przez dawne importy) i wgraj z arkusza „Rezerwacje”</label></div>
+      <div class="field checkbox"><label><input type="checkbox" name="logbook" value="1"{% if opts.logbook %} checked{% endif %}> <strong>Archiwum książki pobytu GunTrackera</strong> — wyczyść i wgraj z eksportu „Księga pobytu”</label></div>
+      <div class="field checkbox" style="margin-left:24px"><label><input type="checkbox" name="book_persons" value="1"{% if opts.book_persons %} checked{% endif %}> dodaj do kartoteki osoby z księgi (np. strzelających z prowadzącym) — przydatne przy „Wpisie przez obsługę”</label></div>
+      <div class="field checkbox" style="margin-left:24px"><label><input type="checkbox" name="bez_ksiegi" value="1"> archiwum książki ma zostać puste (bez pliku księgi)</label></div>
+    </fieldset>
+    <div class="actions"><button class="btn secondary" type="submit" name="tryb" value="podglad">Podgląd (bez zapisu)</button>
+      <button class="btn danger" type="submit" name="tryb" value="wykonaj" data-confirm-click="Wykonać porządkowanie? Zmiany są nieodwracalne — czy pobrałeś kartotekę do XLSX?">Wykonaj</button></div>
+  </form>
+</div>
+{% if result %}
+<h2>{% if result.podglad %}Podgląd — nic nie zapisano{% else %}Wykonano{% endif %}</h2>
+<div class="card"><table>
+  <tr><th>W pliku</th><td>klienci: {{ result.klienci }} · rezerwacje: {{ result.rezerwacje }}</td></tr>
+  {% if result.kartoteka %}{% with k=result.kartoteka %}<tr><th>Kartoteka</th><td>dodane: <strong>{{ k.dodane }}</strong> · zaktualizowane: <strong>{{ k.zaktualizowane }}</strong> · scalone duplikaty: <strong>{{ k.scalone }}</strong> · usunięte spoza listy: <strong>{{ k.usuniete|length }}</strong>{% if k.karty_usuniete %} <span class="badge warn">w tym z wydrukowaną kartą QR: {{ k.karty_usuniete }}</span>{% endif %}</td></tr>{% endwith %}{% endif %}
+  {% if result.ps %}<tr><th>Lista PS</th><td>dodane: <strong>{{ result.ps.dodane }}</strong> · zmienione: {{ result.ps.zmienione }} · usunięte: {{ result.ps.usuniete }} · bez potwierdzenia legitymacji (pominięci): {{ result.ps.bez_weryfikacji }}</td></tr>{% endif %}
+  {% if result.archiwum_rezerwacji %}{% with a=result.archiwum_rezerwacji %}<tr><th>Archiwum rezerwacji</th><td>usunięte: <strong>{{ a.usuniete }}</strong> (blokady osi: {{ a.blokady_usuniete }}) · wgrane: <strong>{{ a.dodane }}</strong>{% if result.zakres %} ({{ result.zakres.0|date:"j.m.Y" }} – {{ result.zakres.1|date:"j.m.Y" }}){% endif %} · nowe blokady osi: {{ a.blokady }}{% if a.bez_osi %} · bez rozpoznanej osi: {{ a.bez_osi|length }}{% endif %}</td></tr>{% endwith %}{% endif %}
+  {% if result.ksiazka %}{% with b=result.ksiazka %}<tr><th>Archiwum książki</th><td>usunięte: <strong>{{ b.usuniete }}</strong> · wgrane: <strong>{{ b.dodane }}</strong>{% if b.zakres %} ({{ b.zakres.0|date:"j.m.Y" }} – {{ b.zakres.1|date:"j.m.Y" }}){% endif %}{% if b.osoby or b.osoby_uzupelnione %} · osoby z księgi do kartoteki: {{ b.osoby }} nowych, {{ b.osoby_uzupelnione }} uzupełnionych{% endif %}</td></tr>{% endwith %}{% endif %}
+</table>
+{% if result.kartoteka.konflikty or result.problemy or result.archiwum_rezerwacji.konflikty %}<div class="msg warning"><ul>{% for x in result.problemy %}<li>{{ x }}</li>{% endfor %}{% for x in result.kartoteka.konflikty %}<li>{{ x }}</li>{% endfor %}{% for x in result.archiwum_rezerwacji.konflikty %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+{% if result.kartoteka.usuniete %}<details><summary>{% if result.podglad %}Do usunięcia z kartoteki{% else %}Usunięte z kartoteki{% endif %} ({{ result.kartoteka.usuniete|length }})</summary><p class="small">{{ result.kartoteka.usuniete|join:", " }}</p></details>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

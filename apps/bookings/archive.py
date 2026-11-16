@@ -95,50 +95,66 @@ def parse(uploaded, year):
         if not item["number"] or not item["client"]:
             raise ValidationError(f"Wiersz {row}: brak numeru lub strzelca.")
         item["lane"] = match_lane(item["lane_label"], lanes)
-        key = {k: (v.isoformat() if hasattr(v, "isoformat") else (v.pk if isinstance(v, Lane) else v)) for k, v in item.items()}
-        item["row_hash"] = hashlib.sha256(json.dumps(key, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        item["row_hash"] = row_hash(item)
         items.append((row, item))
     return items
 
 
-def run(uploaded, *, year, by=None, preview=False, now=None, update_contacts=True):
+def new_stats():
+    return {"dodane": 0, "pominiete": 0, "blokady": 0, "bez_osi": [], "konflikty": [], "przyszle": [], "telefony": 0, "bez_kartoteki": 0}
+
+
+def store(items, *, by=None, now=None, stats=None):
+    """Zapis rezerwacji archiwalnych (wewnątrz transakcji wywołującego): pomija już zaimportowane (ten sam wiersz albo
+    numer + początek), przyszłym terminom zakłada blokadę osi (bez kolizji z rezerwacjami w nowym systemie)."""
     from . import services
 
     now = now or timezone.now()
-    items = parse(uploaded, year)
-    stats = {"dodane": 0, "pominiete": 0, "blokady": 0, "bez_osi": [], "konflikty": [], "przyszle": [], "telefony": 0, "bez_kartoteki": 0}
-    with transaction.atomic():
-        existing = set(ArchivedReservation.objects.filter(row_hash__in=[i["row_hash"] for _, i in items]).values_list("row_hash", flat=True))
-        # ta sama rezerwacja z GunTrackera (numer + początek) wgrana wcześniej z pliku w innym formacie — też pomijana
-        known = set(ArchivedReservation.objects.filter(number__in=[i["number"] for _, i in items]).values_list("number", "starts_at"))
-        for row, item in items:
-            if item["row_hash"] in existing or (item["number"], item["starts_at"]) in known:
-                stats["pominiete"] += 1
-                continue
-            existing.add(item["row_hash"])
-            known.add((item["number"], item["starts_at"]))
-            archived = ArchivedReservation.objects.create(**item, imported_by=by)
-            stats["dodane"] += 1
+    stats = stats if stats is not None else new_stats()
+    existing = set(ArchivedReservation.objects.filter(row_hash__in=[i["row_hash"] for _, i in items]).values_list("row_hash", flat=True))
+    # ta sama rezerwacja z GunTrackera (numer + początek) wgrana wcześniej z pliku w innym formacie — też pomijana
+    known = set(ArchivedReservation.objects.filter(number__in=[i["number"] for _, i in items]).values_list("number", "starts_at"))
+    for row, item in items:
+        if item["row_hash"] in existing or (item["number"], item["starts_at"]) in known:
+            stats["pominiete"] += 1
+            continue
+        existing.add(item["row_hash"])
+        known.add((item["number"], item["starts_at"]))
+        archived = ArchivedReservation.objects.create(**item, imported_by=by)
+        stats["dodane"] += 1
+        if item["lane"] is None:
+            stats["bez_osi"].append(f"wiersz {row}: {item['lane_label']}")
+        if item["ends_at"] > now:
+            label = f"{item['number']} · {timezone.localtime(item['starts_at']):%d.%m %H:%M}–{timezone.localtime(item['ends_at']):%H:%M} · {item['lane_label']}"
+            stats["przyszle"].append(label)
             if item["lane"] is None:
-                stats["bez_osi"].append(f"wiersz {row}: {item['lane_label']}")
-            if item["ends_at"] > now:
-                label = f"{item['number']} · {timezone.localtime(item['starts_at']):%d.%m %H:%M}–{timezone.localtime(item['ends_at']):%H:%M} · {item['lane_label']}"
-                stats["przyszle"].append(label)
-                if item["lane"] is None:
-                    continue
-                conflicts = list(services.block_conflicts([item["lane"]], [(item["starts_at"], item["ends_at"])]))
-                if conflicts:
-                    stats["konflikty"].append(f"{label} — koliduje z {', '.join(c.number for c in conflicts)}")
-                    continue
-                block = Block.objects.create(
-                    title=f"GunTracker {item['number']}: {item['client']}"[:120],
-                    reason=f"Rezerwacja przeniesiona z GunTrackera; prowadzący: {item['range_officer']}; płatność: {item['payment']}"[:255],
-                    starts_at=item["starts_at"], ends_at=item["ends_at"], created_by=by,
-                )
-                block.lanes.set([item["lane"]])
-                archived.block = block
-                archived.save(update_fields=["block"])
-                stats["blokady"] += 1
+                continue
+            conflicts = list(services.block_conflicts([item["lane"]], [(item["starts_at"], item["ends_at"])]))
+            if conflicts:
+                stats["konflikty"].append(f"{label} — koliduje z {', '.join(c.number for c in conflicts)}")
+                continue
+            block = Block.objects.create(
+                title=f"GunTracker {item['number']}: {item['client']}"[:120],
+                reason=f"Rezerwacja przeniesiona z GunTrackera; prowadzący: {item['range_officer']}; płatność: {item['payment']}"[:255],
+                starts_at=item["starts_at"], ends_at=item["ends_at"], created_by=by,
+            )
+            block.lanes.set([item["lane"]])
+            archived.block = block
+            archived.save(update_fields=["block"])
+            stats["blokady"] += 1
+    return stats
+
+
+def row_hash(item):
+    key = {k: (v.isoformat() if hasattr(v, "isoformat") else (v.pk if isinstance(v, Lane) else v)) for k, v in item.items()}
+    return hashlib.sha256(json.dumps(key, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def run(uploaded, *, year, by=None, preview=False, now=None, update_contacts=True):
+    items = parse(uploaded, year)
+    stats = new_stats()
+    with transaction.atomic():
+        store(items, by=by, now=now, stats=stats)
         if update_contacts:
             stats["telefony"], stats["bez_kartoteki"] = update_person_contacts(items)
         if preview:

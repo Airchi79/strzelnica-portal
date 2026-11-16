@@ -10,7 +10,8 @@
   <div class="actions"><button class="btn" type="submit">Pokaż</button>
     {% if perms.clients.manage_clients %}<a class="btn secondary" href="{% url 'panel:person_new' %}">+ Dodaj osobę</a>
     <a class="btn secondary" href="{% url 'panel:persons_export' %}">Pobierz kartotekę (XLSX)</a>
-    <a class="btn secondary" href="{% url 'panel:persons_duplicates' %}">Możliwe duplikaty</a>{% endif %}</div>
+    <a class="btn secondary" href="{% url 'panel:persons_duplicates' %}">Możliwe duplikaty</a>
+    {% if request.user.is_superuser %}<a class="btn secondary" href="{% url 'panel:guntracker_cleanup' %}">Porządkowanie danych z GunTrackera</a>{% endif %}{% endif %}</div>
 </form>
 <div class="actions" style="margin-top:0;margin-bottom:12px;align-items:center">
   <span class="muted small">{{ page.paginator.count }} z {{ total }} osób{% if not reveal %} · numery pozwoleń i adresy ukryte{% endif %}</span>

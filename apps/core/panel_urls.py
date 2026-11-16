@@ -32,6 +32,7 @@ urlpatterns = [
     path("uzytkownicy/osoby/import/", clients_views.persons_import, name="persons_import"),
     path("uzytkownicy/osoby/eksport.xlsx", clients_views.persons_export, name="persons_export"),
     path("uzytkownicy/osoby/duplikaty/", clients_views.persons_duplicates, name="persons_duplicates"),
+    path("uzytkownicy/osoby/porzadkowanie-guntracker/", clients_views.guntracker_cleanup, name="guntracker_cleanup"),
     path("uzytkownicy/osoby/karty/", clients_views.persons_cards, name="persons_cards"),
     path("uzytkownicy/osoby/<int:pk>/karta/", clients_views.person_card, name="person_card"),
     path("uzytkownicy/osoby/<int:pk>/nowa-karta/", clients_views.person_card_reset, name="person_card_reset"),

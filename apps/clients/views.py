@@ -299,3 +299,33 @@ def persons_duplicates(request):
             p.is_primary = p.pk == primary.pk
     log_sensitive_access(None, "kartoteka:duplikaty", f"przegląd możliwych duplikatów ({sum(len(g) for g in found)} osób)")
     return render(request, "panel/persons_duplicates.html", {"groups": found, "total": Person.objects.count()})
+
+
+@panel_required("clients.manage_clients")
+def guntracker_cleanup(request):
+    """Porządkowanie danych z GunTrackera (kartoteka, lista PS, archiwum rezerwacji i książki) — tylko właściciel."""
+    from django.core.exceptions import PermissionDenied
+
+    from . import guntracker_sync
+
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    result = None
+    opts = {"persons": True, "prune": True, "preverified": True, "reservations": True, "logbook": False, "book_persons": False}
+    if request.method == "POST":
+        opts = {k: request.POST.get(k) == "1" for k in opts}
+        uploaded, book = request.FILES.get("plik"), request.FILES.get("ksiega")
+        preview = request.POST.get("tryb") != "wykonaj"
+        if uploaded is None:
+            messages.error(request, "Wybierz plik zbiorczy (arkusze „Klienci” i „Rezerwacje”).")
+        elif opts["logbook"] and book is None and not preview and request.POST.get("bez_ksiegi") != "1":
+            messages.error(request, "Do czyszczenia archiwum książki dołącz eksport „Księga pobytu” (albo zaznacz, że ma zostać puste).")
+        else:
+            try:
+                result = guntracker_sync.run(uploaded, by=request.user, preview=preview, book=book, **opts)
+            except ValidationError as e:
+                messages.error(request, " ".join(e.messages))
+            else:
+                if not preview:
+                    messages.success(request, "Dane uporządkowane.")
+    return render(request, "panel/guntracker_cleanup.html", {"result": result, "opts": opts})

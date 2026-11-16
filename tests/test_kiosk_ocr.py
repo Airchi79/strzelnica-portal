@@ -316,3 +316,31 @@ def test_kiosk_read_step_api(owner, monkeypatch):
     assert body["state"]["ps"] == "brak" and "00000000000" not in r.content.decode()
     r = post("/kiosk/api/na-miejscu/odczyt/", {"ref": ref, "secret": secret, "photo": "nie-zdjecie"})
     assert r.status_code == 400 and "zdjęcia" in r.json()["error"]
+
+
+def test_ocr_skips_oversized_image_without_decoding(monkeypatch):
+    import io
+
+    from PIL import Image
+
+    from apps.kiosk import ocr
+
+    buf = io.BytesIO()
+    Image.new("1", (10000, 6000)).save(buf, "PNG")  # 60 Mpx w małym pliku
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    assert ocr.read_text(buf.getvalue()) is None
+
+
+def test_kiosk_photo_rejects_oversized_image():
+    import base64
+    import io
+
+    from django.core.exceptions import ValidationError
+    from PIL import Image
+
+    from apps.kiosk import onsite
+
+    buf = io.BytesIO()
+    Image.new("1", (10000, 6000)).save(buf, "PNG")
+    with pytest.raises(ValidationError):
+        onsite._photo_file("data:image/png;base64," + base64.b64encode(buf.getvalue()).decode())

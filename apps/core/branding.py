@@ -9,7 +9,8 @@ czy to poprawne PNG o właściwych wymiarach, i zapisuje je od nowa.
 import base64
 import io
 import re
-import xml.etree.ElementTree as ET
+from defusedxml import DefusedXmlException
+from defusedxml import ElementTree as ET  # bez encji i „bomb” XML (logo wgrywa zarząd, ale plik bywa z internetu)
 
 from django.core.exceptions import ValidationError
 from django.templatetags.static import static
@@ -40,7 +41,7 @@ def check_svg(data: bytes) -> bytes:
         raise ValidationError("Plik SVG zawiera definicje encji — zapisz go ponownie jako zwykły SVG.")
     try:
         root = ET.fromstring(text)
-    except ET.ParseError as e:
+    except (ET.ParseError, DefusedXmlException) as e:
         raise ValidationError("To nie jest poprawny plik SVG.") from e
     if _localname(root.tag) != "svg":
         raise ValidationError("To nie jest plik SVG.")

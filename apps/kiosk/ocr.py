@@ -51,7 +51,11 @@ def read_text(image_bytes, budget=BUDGET_SECONDS):
     if not available():
         return None
     try:
-        img = Image.open(BytesIO(image_bytes)).convert("L")
+        img = Image.open(BytesIO(image_bytes))
+        if img.width * img.height > MAX_PIXELS:  # wymiary z nagłówka — przed rozpakowaniem (ochrona pamięci serwera)
+            logger.warning("OCR legitymacji: obraz %sx%s px pominięty (za duży)", img.width, img.height)
+            return None
+        img = img.convert("L")
         scale = 2000 / max(img.size)
         if scale > 1:
             img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
@@ -80,6 +84,7 @@ def read_text(image_bytes, budget=BUDGET_SECONDS):
 
 
 MAX_PDF_PAGES = 2
+MAX_PIXELS = 50_000_000  # zdjęcie z telefonu ma ok. 12–50 Mpx; większe pliki to błąd albo „bomba” w małym pliku
 PDF_TEXT_MIN_LETTERS = 30  # mniej liter w warstwie tekstowej = PDF to skan (obraz) — wtedy odczyt z obrazu strony
 
 
@@ -91,7 +96,8 @@ def _has_issuer(text):
 def _render_first_page(pdf):
     page = pdf[0]
     try:
-        image = page.render(scale=min(8.0, 2000 / max(page.get_width(), 1))).to_pil()
+        # skala wg dłuższego boku: strona nietypowo wysoka nie da gigantycznej bitmapy w pamięci
+        image = page.render(scale=min(8.0, 2000 / max(page.get_width(), page.get_height(), 1))).to_pil()
         buf = BytesIO()
         image.convert("RGB").save(buf, "PNG")
         return buf.getvalue()

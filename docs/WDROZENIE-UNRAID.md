@@ -19,7 +19,7 @@ Cloudflare (certyfikat HTTPS, ochrona)
         ▼
 Unraid w domu: kontener cloudflared ──► kontener app (port 8000)
                                          ├── db (PostgreSQL)
-                                         ├── cron (zadania co godzinę)
+                                         ├── cron (zadania okresowe: run_scheduler)
                                          └── backup (kopia bazy raz na dobę)
 ```
 

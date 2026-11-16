@@ -4,7 +4,6 @@ import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
-from django.conf import settings as dj_settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -539,7 +538,6 @@ def payment_options(reservation, now=None):
 
 def payment_deadline(reservation, start, after_approval=False):
     """Termin opłacenia dla grup „tylko online”: krótki po rezerwacji, dłuższy po zatwierdzeniu przez obsługę."""
-    from django.conf import settings as dj_settings
 
     rule = group_rule(reservation)
     if rule is None or not rule.online_only or reservation.payment_status != Reservation.Payment.DUE:

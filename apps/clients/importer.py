@@ -11,7 +11,6 @@ import io
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
-from django.db.models import Q
 
 from apps.audit.services import log_event
 

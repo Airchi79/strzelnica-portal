@@ -43,7 +43,15 @@
   box.querySelector(".scan-buttons").hidden = false;
   box.querySelector("[data-scan-camera]").addEventListener("click", () => { input.setAttribute("capture", "environment"); input.click(); });
   box.querySelector("[data-scan-pick]").addEventListener("click", () => { input.removeAttribute("capture"); input.click(); });
-  box.querySelector("[data-scan-clear]").addEventListener("click", () => { input.value = ""; show(null); });
+  box.querySelector("[data-scan-clear]").addEventListener("click", () => { input.value = ""; show(null); toggleRead(); });
+  // przycisk „Odczytaj dane z pliku” — dla legitymacji PS, gdy wybrano zdjęcie albo PDF (także ponowna próba)
+  const readBox = form.querySelector("[data-ocr-actions]"), readBtn = form.querySelector("[data-ocr-read]");
+  function toggleRead() {
+    const kind = form.querySelector("input[name=kind]:checked");
+    if (readBox) readBox.hidden = !(input.files && input.files[0] && kind && kind.value === "ps");
+  }
+  if (readBtn) readBtn.addEventListener("click", () => { if (input.files && input.files[0]) readPhoto(input.files[0]); });
+  form.querySelectorAll("input[name=kind]").forEach((r) => r.addEventListener("change", toggleRead));
 
   const kb = (n) => n >= 1048576 ? (n / 1048576).toLocaleString("pl-PL", { maximumFractionDigits: 1 }) + " MB" : Math.round(n / 1024) + " kB";
   function setMsg(text, error) { msg.textContent = text; box.classList.toggle("has-error", !!error); }
@@ -111,6 +119,7 @@
     }
     show(file);
     setMsg("Gotowe — zdjęcie zostanie wysłane razem z formularzem.", false);
+    toggleRead();
     readPhoto(file);
   });
 
@@ -125,11 +134,13 @@
     body.append("scan", file);
     body.append("csrfmiddlewaretoken", form.elements.csrfmiddlewaretoken.value);
     setMsg(file.type === "application/pdf" ? "Odczytuję dane z pliku PDF…" : "Odczytuję dane z legitymacji… (kilka sekund)", false);
+    if (readBtn) readBtn.disabled = true;
     let data;
     try {
       const r = await fetch(ocrUrl, { method: "POST", body, credentials: "same-origin", headers: { "X-Requested-With": "fetch" } });
       data = await r.json();
-    } catch (e) { setMsg("Nie udało się odczytać danych — wpisz je ręcznie w kroku 3.", false); return; }
+    } catch (e) { setMsg("Nie udało się odczytać danych — spróbuj ponownie przyciskiem albo wpisz je ręcznie w kroku 3.", false); return; }
+    finally { if (readBtn) readBtn.disabled = false; }
     if (!data.ok) { setMsg(data.error || "Nie udało się odczytać danych — wpisz je ręcznie w kroku 3.", false); return; }
     const filled = [];
     Object.entries(data.fields || {}).forEach(([name, value]) => {

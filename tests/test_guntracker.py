@@ -158,3 +158,12 @@ def test_old_persons_without_account_are_purged_with_logbook(owner):
     Person.objects.filter(pk__in=[old.pk, linked.pk]).update(created_at=timezone.now() - timedelta(days=6 * 366))
     purge_expired()
     assert set(Person.objects.values_list("pk", flat=True)) == {linked.pk, fresh.pk}
+
+
+def test_reservations_archive_skips_same_number_and_start_from_differently_formatted_file(owner_client):
+    rows, future = _res_rows()
+    owner_client.post("/panel/rezerwacje/archiwum/import/", {"plik": res_file(rows), "rok": future.year, "tryb": "importuj"})
+    count = ArchivedReservation.objects.count()
+    changed = [(r[0], r[1], r[2] + " (inny zapis)", r[3], "1, 2", "", "Dodano 1", "Opłacone online", "") for r in rows]
+    owner_client.post("/panel/rezerwacje/archiwum/import/", {"plik": res_file(changed), "rok": future.year, "tryb": "importuj"})
+    assert ArchivedReservation.objects.count() == count  # ten sam numer i termin — bez duplikatu

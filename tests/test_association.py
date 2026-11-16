@@ -95,6 +95,22 @@ def test_numbering_separate_per_organ(board):
         services.add_historical(organ="zarzad", year=2026, number=1, adopted_on=date(2026, 2, 1), title="dubel", content="x", by=None)
 
 
+def test_historical_without_number_gets_next_free():
+    services.add_historical(organ="zarzad", year=2026, number=3, adopted_on=date(2026, 2, 1), title="a", content="x", by=None)
+    assert services.next_resolution_number("zarzad", 2026) == 4
+    assert services.next_resolution_number("wzc", 2026) == 1  # numeracja osobna dla organu
+    assert services.next_resolution_number("zarzad", 2027) == 1  # i dla roku
+    res = services.add_historical(organ="zarzad", year=2026, number=None, adopted_on=date(2026, 3, 1), title="b", content="x", by=None)
+    assert res.number == 4
+
+
+def test_historical_form_shows_next_numbers(owner_client):
+    year = timezone.localdate().year
+    services.add_historical(organ="zarzad", year=year, number=2, adopted_on=date(year, 1, 2), title="a", content="x", by=None)
+    page = owner_client.get("/panel/uchwaly/historyczna/").content.decode()
+    assert "Kolejne wolne numery" in page and f"<strong>3/{year}</strong>" in page and f"<strong>1/{year}</strong>" in page
+
+
 def test_action_must_match_organ():
     with pytest.raises(ValidationError):
         services.create_resolution(organ="wzc", title="t", content="x", action="przyjecie", by=None)

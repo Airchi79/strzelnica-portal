@@ -487,6 +487,8 @@ def doc_detail(request, pk):
                 return redirect("panel:resolution", pk=resolution.pk)
         if obj.data.get("_resolution"):
             resolution = Resolution.objects.filter(pk=obj.data["_resolution"]).first()
+            if documents.sync_number(obj, resolution):
+                messages.info(request, f"Numer uchwały w dokumencie ustawiono zgodnie z rejestrem: {obj.data['numer']}.")
     elif request.method == "POST":
         raise Http404
     return render(request, "panel/accounting_doc.html", {"obj": obj, "doc": doc, "add_url": add_url, "resolution": resolution,
@@ -499,6 +501,10 @@ def doc_download(request, pk, fmt):
     obj = get_object_or_404(GeneratedDocument, pk=pk)
     if obj.kind not in documents.DOCS:
         raise Http404
+    if obj.kind in documents.RESOLUTION_DOCS and obj.data.get("_resolution"):
+        from apps.association.models import Resolution
+
+        documents.sync_number(obj, Resolution.objects.filter(pk=obj.data["_resolution"]).first())
     if fmt == "pdf":
         response = HttpResponse(documents.to_pdf(obj), content_type="application/pdf")
     elif fmt == "docx":

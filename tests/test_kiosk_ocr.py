@@ -270,3 +270,49 @@ def kiosk_client(owner):
         return c.post(path, json.dumps(data), content_type="application/json", HTTP_X_KIOSK="1")
 
     return c, post
+
+
+# --- zdjęcie najpierw: odczyt danych do formularza w kiosku ------------------------------------------------------------
+
+
+def test_kiosk_read_step_returns_fields_without_saving(device, monkeypatch):
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    monkeypatch.setattr(ocr, "read_text", lambda data: LOK)
+    flow = _flow(device)
+    fields = onsite.read_ps(flow, photo_data_url())
+    assert fields == {"number": "0079/BZGLOK/2022", "issuer": "LOK (Liga Obrony Kraju)", "issued_on": "2022-01-11"}
+    assert not Credential.objects.filter(user=flow.user).exists()  # nic nie zapisano — legitymacja dopiero po sprawdzeniu danych
+    for _ in range(onsite.READ_LIMIT):
+        onsite.read_ps(flow, photo_data_url())
+    assert onsite.read_ps(flow, photo_data_url()) == {}  # limit odczytów w jednym przebiegu
+
+
+def test_kiosk_read_step_api(owner, monkeypatch):
+    import json
+
+    from django.test import Client
+
+    from apps.kiosk import services
+
+    from .test_kiosk_onsite import H
+
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    monkeypatch.setattr(ocr, "read_text", lambda data: PZSS)
+    d, code = services.create_device("Kiosk", owner)
+    c = Client()
+    c.post("/kiosk/parowanie/", {"code": code})
+
+    def post(path, data):
+        return c.post(path, json.dumps(data), content_type="application/json", **H)
+
+    r = post("/kiosk/api/na-miejscu/start/", {"email": "odczyt@example.com", "first_name": "Janusz", "last_name": "Kowalski",
+                                             "phone": "600700800"})
+    ref, secret = r.json()["ref"], r.json()["secret"]
+    assert post("/kiosk/api/na-miejscu/odczyt/", {"ref": ref, "secret": secret, "photo": photo_data_url()}).status_code == 400  # przed kodem
+    post("/kiosk/api/na-miejscu/kod/", {"ref": ref, "secret": secret, "code": last_code("odczyt@example.com")})
+    r = post("/kiosk/api/na-miejscu/odczyt/", {"ref": ref, "secret": secret, "photo": photo_data_url()})
+    body = r.json()
+    assert r.status_code == 200 and body["fields"]["number"] == "98655/2024" and body["fields"]["issuer"].startswith("PZSS")
+    assert body["state"]["ps"] == "brak" and "00000000000" not in r.content.decode()
+    r = post("/kiosk/api/na-miejscu/odczyt/", {"ref": ref, "secret": secret, "photo": "nie-zdjecie"})
+    assert r.status_code == 400 and "zdjęcia" in r.json()["error"]

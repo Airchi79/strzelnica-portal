@@ -379,3 +379,29 @@ def test_generated_resolution_goes_to_register_once(owner_client, owner):
     cit = GeneratedDocument.objects.get(kind="cit8")
     assert "Utwórz projekt w rejestrze uchwał" not in owner_client.get(f"/panel/ksiegowosc/dokumenty/{cit.pk}/").content.decode()
     assert owner_client.post(f"/panel/ksiegowosc/dokumenty/{cit.pk}/").status_code == 404
+
+
+def test_generator_suggests_next_resolution_number_and_syncs_after_adoption(owner_client, owner):
+    from django.utils import timezone
+
+    from apps.association import services as association
+    from apps.association.models import Resolution
+
+    year = timezone.localdate().year
+    association.add_historical(organ="wzc", year=year, number=4, adopted_on=date(year, 1, 2), title="a", content="x", by=None)
+    association.add_historical(organ="zarzad", year=year, number=1, adopted_on=date(year, 1, 2), title="b", content="x", by=None)
+    assert f'value="5/{year}"' in owner_client.get("/panel/ksiegowosc/dokumenty/nowy/uchwala_wybor/").content.decode()
+    assert f'value="2/{year}"' in owner_client.get("/panel/ksiegowosc/dokumenty/nowy/opis_zasad/").content.decode()
+    owner_client.post("/panel/ksiegowosc/dokumenty/nowy/opis_zasad/", {**DOC_POSTS["opis_zasad"], "numer": f"2/{year}"})
+    obj = GeneratedDocument.objects.get(kind="opis_zasad")
+    owner_client.post(f"/panel/ksiegowosc/dokumenty/{obj.pk}/")
+    res = Resolution.objects.get(title__startswith="przyjęcia opisu zasad")
+    # w międzyczasie przyjęto inną uchwałę Zarządu — numer z dokumentu się zdezaktualizował
+    association.add_historical(organ="zarzad", year=year, number=2, adopted_on=date(year, 1, 3), title="c", content="x", by=None)
+    association.finalize(res, True, timezone.localdate(), owner)
+    res.refresh_from_db()
+    assert res.number == 3
+    page = owner_client.get(f"/panel/ksiegowosc/dokumenty/{obj.pk}/").content.decode()
+    obj.refresh_from_db()
+    assert obj.data["numer"] == f"3/{year}" and "zgodnie z rejestrem" in page
+    assert owner_client.get(f"/panel/ksiegowosc/dokumenty/{obj.pk}.pdf").status_code == 200

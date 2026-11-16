@@ -139,14 +139,14 @@
 <section data-view="os-ps" hidden>
   <h1>Legitymacja prowadzącego strzelanie</h1>
   <form class="card" data-os-form="ps" novalidate autocomplete="off">
-    <p class="small muted">Wpisz dane z legitymacji, a potem zrób jej zdjęcie. Obsługa porówna dane ze zdjęciem (do {{ onsite_minutes }} minut). Zdjęcie zostanie usunięte po sprawdzeniu.</p>
+    <p class="small muted" data-os-ps-info data-manual="Wpisz dane z legitymacji, a potem zrób jej zdjęcie. Obsługa porówna dane ze zdjęciem (do {{ onsite_minutes }} minut). Zdjęcie zostanie usunięte po sprawdzeniu." data-checked="Sprawdź dane odczytane ze zdjęcia legitymacji i popraw, jeśli trzeba. Obsługa porówna je ze zdjęciem (do {{ onsite_minutes }} minut). Zdjęcie zostanie usunięte po sprawdzeniu.">Wpisz dane z legitymacji, a potem zrób jej zdjęcie. Obsługa porówna dane ze zdjęciem (do {{ onsite_minutes }} minut). Zdjęcie zostanie usunięte po sprawdzeniu.</p>
     <div class="field"><label for="os-pn">Numer legitymacji</label><input id="os-pn" name="number" maxlength="64" autocapitalize="characters" spellcheck="false"></div>
     <div class="field"><label>Kto wydał legitymację</label>
       <div class="kiosk-chips" data-os-issuers></div>
       <input id="os-pi" name="issuer" maxlength="160" placeholder="Nazwa organizacji" aria-label="Nazwa organizacji, która wydała legitymację" hidden></div>
     <div class="field"><label for="os-pd">Data wydania (na legitymacji PZŁ: data nabycia uprawnień)</label><input id="os-pd" name="issued_on" type="date"></div>
     <div class="msg error" data-os-error="ps" hidden></div>
-    <div class="actions"><button class="btn kiosk-big" type="submit">Zrób zdjęcie legitymacji</button><button class="btn secondary" type="button" data-go="home">Anuluj</button></div>
+    <div class="actions"><button class="btn kiosk-big" type="submit" data-os-ps-submit>Zrób zdjęcie legitymacji</button><button class="btn secondary" type="button" data-os-retake hidden>Zrób zdjęcie ponownie</button><button class="btn secondary" type="button" data-go="home">Anuluj</button></div>
   </form>
 </section>
 

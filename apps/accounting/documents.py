@@ -101,6 +101,21 @@ def _header(ctx, place, day):
     return [("right", f"{place}, {pl_date(day)}" if place else pl_date(day)), ("left", "\n".join(x for x in ident if x))]
 
 
+def _organ_of(text, default_board=False):
+    from apps.association.models import Resolution
+
+    t = str(text or "").lower()
+    return Resolution.Organ.BOARD if default_board or "zarząd" in t or "zarzad" in t else Resolution.Organ.GENERAL
+
+
+def suggested_number(organ_text, day=None, board=False):
+    """Kolejny wolny numer uchwały „X/RRRR” w rejestrze — numeracja osobna dla organu i roku."""
+    from apps.association.services import next_resolution_number
+
+    year = (day or timezone.localdate()).year
+    return f"{next_resolution_number(_organ_of(organ_text, board), year)}/{year}"
+
+
 def _signatures(ctx, extra=None):
     names = extra if extra is not None else _lines(ctx["settings"]["signatories"])
     return [("sign", names or ["(imię, nazwisko, funkcja, podpis)"])]
@@ -115,7 +130,9 @@ class ElectionResolution(Doc):
 
     def fields(self, ctx):
         return {
-            "numer": forms.CharField(label="Numer uchwały", max_length=40, required=False),
+            "numer": forms.CharField(label="Numer uchwały", max_length=40, required=False,
+                                     help_text="Podpowiedź: kolejny wolny numer w rejestrze uchwał tego organu. Po przyjęciu uchwały "
+                                               "w rejestrze dokument dostaje numer z rejestru."),
             "data": _date_field("Data podjęcia"),
             "miejscowosc": forms.CharField(label="Miejscowość", max_length=80, required=False),
             "organ": forms.CharField(label="Organ zatwierdzający", max_length=120),
@@ -128,7 +145,8 @@ class ElectionResolution(Doc):
 
     def initial(self, ctx):
         year = timezone.localdate().year
-        return {"data": timezone.localdate(), "organ": ctx["settings"]["approving_body"] or "Zebranie Członków",
+        organ = ctx["settings"]["approving_body"] or "Zebranie Członków"
+        return {"data": timezone.localdate(), "organ": organ, "numer": suggested_number(organ),
                 "rok": year, "miejscowosc": ctx["place"], "podpisy": "Przewodniczący zebrania\nProtokolant",
                 "przychody_poprzedni": ctx["revenue_by_year"].get(year - 1)}
 
@@ -262,7 +280,9 @@ class Principles(Doc):
 
     def fields(self, ctx):
         return {
-            "numer": forms.CharField(label="Numer uchwały zarządu", max_length=40, required=False),
+            "numer": forms.CharField(label="Numer uchwały zarządu", max_length=40, required=False,
+                                     help_text="Podpowiedź: kolejny wolny numer w rejestrze uchwał Zarządu. Po przyjęciu uchwały "
+                                               "w rejestrze dokument dostaje numer z rejestru."),
             "data": _date_field("Data uchwały"),
             "miejscowosc": forms.CharField(label="Miejscowość", max_length=80, required=False),
             "od_dnia": _date_field("Opis obowiązuje od dnia"),
@@ -275,7 +295,7 @@ class Principles(Doc):
 
     def initial(self, ctx):
         today = timezone.localdate()
-        return {"data": today, "miejscowosc": ctx["place"], "od_dnia": date(today.year, 1, 1),
+        return {"numer": suggested_number("", board=True), "data": today, "miejscowosc": ctx["place"], "od_dnia": date(today.year, 1, 1),
                 "start_programu": ctx["auto_from"] or today, "wersja": f"Portal strzelnicy — moduł Księgowość, wydanie z {today:%d.%m.%Y}",
                 "przechowywanie": f"siedziba stowarzyszenia: {ctx['association']['address']}".rstrip(": "),
                 "osoby": ctx["settings"]["signatories"], "podpisy": ctx["settings"]["signatories"]}
@@ -434,7 +454,9 @@ class IncomeResolution(Doc):
 
     def fields(self, ctx):
         return {
-            "numer": forms.CharField(label="Numer uchwały", max_length=40, required=False),
+            "numer": forms.CharField(label="Numer uchwały", max_length=40, required=False,
+                                     help_text="Podpowiedź: kolejny wolny numer w rejestrze uchwał tego organu. Po przyjęciu uchwały "
+                                               "w rejestrze dokument dostaje numer z rejestru."),
             "data": _date_field("Data podjęcia"),
             "miejscowosc": forms.CharField(label="Miejscowość", max_length=80, required=False),
             "organ": forms.CharField(label="Organ podejmujący uchwałę", max_length=120),
@@ -448,7 +470,8 @@ class IncomeResolution(Doc):
 
     def initial(self, ctx):
         today = timezone.localdate()
-        return {"data": today, "miejscowosc": ctx["place"], "organ": ctx["settings"]["approving_body"] or "Zebranie Członków",
+        organ = ctx["settings"]["approving_body"] or "Zebranie Członków"
+        return {"data": today, "miejscowosc": ctx["place"], "organ": organ, "numer": suggested_number(organ),
                 "rok": today.year - (1 if today.month <= 3 else 0), "cele": "działalność w zakresie kultury fizycznej i sportu",
                 "kierunki": self.DEFAULT_DIRECTIONS, "podpisy": "Przewodniczący zebrania\nProtokolant"}
 
@@ -737,6 +760,19 @@ RESOLUTION_DOCS = {
 }
 
 
+def sync_number(obj, resolution):
+    """Po przyjęciu uchwały w rejestrze numer dokumentu = numer z rejestru (podpowiedź mogła się zdezaktualizować).
+    Zwraca True, gdy numer zmieniono."""
+    if not resolution or not resolution.number or obj.kind not in RESOLUTION_DOCS:
+        return False
+    number = f"{resolution.number}/{resolution.year}"
+    if obj.data.get("numer") == number:
+        return False
+    obj.data = {**obj.data, "numer": number}
+    obj.save(update_fields=["data"])
+    return True
+
+
 def resolution_text(obj):
     """Treść uchwały z dokumentu (paragrafy, punkty, tabele) — bez nagłówka, tytułu i miejsc na podpisy."""
     _, blocks = blocks_for(obj)
@@ -767,9 +803,7 @@ def to_register(obj, *, by):
     if existing and Resolution.objects.filter(pk=existing).exists():
         raise ValidationError("Projekt tej uchwały jest już w rejestrze uchwał.")
     data = _restore(obj.data)
-    organ_text = str(data.get("organ") or "").lower()
-    organ = (Resolution.Organ.BOARD if obj.kind == "opis_zasad" or "zarząd" in organ_text or "zarzad" in organ_text
-             else Resolution.Organ.GENERAL)
+    organ = _organ_of(data.get("organ"), obj.kind == "opis_zasad")
     with transaction.atomic():
         res = association.create_resolution(organ=organ, title=RESOLUTION_DOCS[obj.kind](data), content=resolution_text(obj), by=by)
         obj.data = {**obj.data, "_resolution": str(res.pk)}

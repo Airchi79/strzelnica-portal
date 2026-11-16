@@ -4,5 +4,6 @@
 <h1>Wprowadzenie uchwały z dokumentu papierowego</h1>
 {% include "panel/_assoc_tabs.html" %}
 <p class="muted">Dla uchwał podjętych poza systemem (np. 1–4/2025 z zebrania założycielskiego). Skutki takich uchwał nie są wykonywane automatycznie. Nie wpisuj w treści numerów PESEL — skan dokumentu dołącz jako PDF (przechowywany prywatnie).</p>
+<div class="card"><p class="small" style="margin-top:0"><strong>Kolejne wolne numery w {{ year }} r.:</strong> {% for label, n in next_numbers %}{{ label }} — <strong>{{ n }}/{{ year }}</strong>{% if not forloop.last %} · {% endif %}{% endfor %}. Pole „Numer” zostaw puste, a numer nada się sam.</p></div>
 <div class="card"><form method="post" enctype="multipart/form-data" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Wprowadź</button></form></div>
 {% endblock %}

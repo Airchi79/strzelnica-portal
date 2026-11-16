@@ -297,7 +297,9 @@ def panel_resolution_historical(request):
         else:
             messages.success(request, f"Wprowadzono {res.display_number}.")
             return redirect("panel:resolution", pk=res.pk)
-    return render(request, "panel/resolution_historical.html", {"form": form})
+    year = timezone.localdate().year
+    next_numbers = [(label, services.next_resolution_number(value, year)) for value, label in Resolution.Organ.choices]
+    return render(request, "panel/resolution_historical.html", {"form": form, "next_numbers": next_numbers, "year": year})
 
 
 @panel_required()

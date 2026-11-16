@@ -334,7 +334,9 @@ def create_resolution(*, organ, title, content, action="", params=None, members=
 
 @transaction.atomic
 def add_historical(*, organ, year, number, adopted_on, title, content, attachment=None, by):
-    """Uchwała z dokumentu papierowego (np. 1–4/2025 z zebrania założycielskiego). Skutki nie są wykonywane."""
+    """Uchwała z dokumentu papierowego (np. 1–4/2025 z zebrania założycielskiego). Skutki nie są wykonywane.
+    Bez numeru — kolejny wolny w numeracji organu i roku."""
+    number = number or _next_number(organ, year)
     if Resolution.objects.filter(organ=organ, year=year, number=number).exists():
         raise ValidationError("Uchwała o tym numerze już istnieje w rejestrze.")
     res = Resolution.objects.create(
@@ -350,6 +352,11 @@ def add_historical(*, organ, year, number, adopted_on, title, content, attachmen
 
 def _next_number(organ, year):
     return (Resolution.objects.filter(organ=organ, year=year).aggregate(m=Max("number"))["m"] or 0) + 1
+
+
+def next_resolution_number(organ, year):
+    """Kolejny wolny numer uchwały — numeracja osobna dla każdego organu i roku („Nr X/RRRR”, decyzja z 31.10.2026)."""
+    return _next_number(organ, year)
 
 
 @transaction.atomic

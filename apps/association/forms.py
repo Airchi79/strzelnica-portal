@@ -134,7 +134,9 @@ class ResolutionForm(forms.Form):
 
 class HistoricalResolutionForm(forms.Form):
     organ = forms.ChoiceField(label="Organ", choices=Resolution.Organ.choices)
-    number = forms.IntegerField(label="Numer", min_value=1)
+    number = forms.IntegerField(label="Numer", min_value=1, required=False,
+                                help_text="Puste — kolejny wolny numer w rejestrze (numeracja osobna dla każdego organu i roku). "
+                                          "Wpisz numer, jeśli uchwała ma już numer na dokumencie papierowym.")
     year = forms.IntegerField(label="Rok", min_value=2000, max_value=2100)
     adopted_on = forms.DateField(label="Data podjęcia", widget=DateInput())
     title = forms.CharField(label="W sprawie", max_length=255)

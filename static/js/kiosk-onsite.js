@@ -1,5 +1,6 @@
-// Kiosk: rezerwacja na miejscu (dziś). Termin → dane → kod z e-maila → regulamin i oświadczenie → legitymacja PS ze zdjęciem
-// (ramka czerwona/zielona, zdjęcie robione samo, podgląd: Potwierdź / Ponów próbę) → weryfikacja przez obsługę (do 15 min)
+// Kiosk: rezerwacja na miejscu (dziś). Termin → dane → kod z e-maila → regulamin i oświadczenie → zdjęcie legitymacji PS
+// (ramka czerwona/zielona, zdjęcie robione samo, podgląd: Potwierdź / Ponów próbę) → dane odczytane ze zdjęcia do sprawdzenia
+// (bez kamery — wpisanie ręczne, potem zdjęcie) → weryfikacja przez obsługę (do 15 min)
 // → płatność kodem QR na własnym telefonie → wpis do książki pobytu. Wymaga połączenia z internetem.
 (function () {
   "use strict";
@@ -17,6 +18,7 @@
   let maxPersons = 10;
   let psData = null;
   let photo = null;
+  let lastFields = null; // pola odczytane ze zdjęcia legitymacji (krok „odczyt”)
   let pollTimer = null;
   let tickTimer = null;
   let secondsLeft = 0;
@@ -47,6 +49,7 @@
     }
     if (res.status !== 200) throw new Error(res.data.error || "Coś poszło nie tak. Spróbuj ponownie.");
     st = res.data.state;
+    lastFields = res.data.fields || null;
     return st;
   }
   async function run(errName, fn) {
@@ -253,9 +256,31 @@
   });
   async function afterRules() {
     if (st.ps === "zweryfikowana" || st.ps === "weryfikacja") { await run("slots", book); return; }
-    K.show("os-ps");
-    $("#os-pn").focus();
+    photo = null; psData = null;
+    psForm();
+    startCam(); // zdjęcie najpierw — dane odczytają się same; bez kamery wraca do wpisania ręcznego
   }
+  // Formularz danych legitymacji: po zdjęciu — do sprawdzenia i wysłania; bez zdjęcia — wpisanie, potem zdjęcie.
+  function psForm() {
+    const info = $("[data-os-ps-info]");
+    info.textContent = photo ? info.dataset.checked : info.dataset.manual;
+    $("[data-os-ps-submit]").textContent = photo ? "Wyślij do sprawdzenia" : "Zrób zdjęcie legitymacji";
+    $("[data-os-retake]").hidden = !photo;
+  }
+  function fillPs(fields) {
+    const f = $("[data-os-form=ps]").elements;
+    if (fields.number) f.number.value = fields.number;
+    if (fields.issued_on) f.issued_on.value = fields.issued_on;
+    if (fields.issuer) {
+      const code = fields.issuer.split(" (")[0];
+      const known = ISSUERS.find(([label]) => label === code);
+      issuerPick = known ? code : "Inny";
+      $("#os-pi").hidden = issuerPick !== "Inny";
+      if (!known) $("#os-pi").value = fields.issuer;
+      renderIssuers();
+    }
+  }
+  $("[data-os-retake]").addEventListener("click", () => { clearErrors(); startCam(); });
 
   // --- 4. legitymacja PS: dane, kamera z ramką, podgląd ---------------------------------------------------------------
   // Uprawnienia PS są bezterminowe — bez pola „ważna do”. Najczęstsi wystawcy jako przyciski (szybciej, pewniejszy odczyt).
@@ -271,7 +296,7 @@
     });
   }
   renderIssuers();
-  K.onShow((view) => { if (view === "home") { issuerPick = ""; $("#os-pi").hidden = true; renderIssuers(); } });
+  K.onShow((view) => { if (view === "home") { issuerPick = ""; $("#os-pi").hidden = true; renderIssuers(); photo = null; } });
   $("[data-os-form=ps]").addEventListener("submit", (e) => {
     e.preventDefault();
     const f = e.target.elements;
@@ -280,8 +305,23 @@
     psData = { number: f.number.value.trim(), issuer, issued_on: f.issued_on.value, valid_until: "" };
     if (!psData.number || !psData.issuer || !psData.issued_on) { err("ps", "Podaj numer legitymacji, kto ją wydał i datę wydania."); return; }
     if (psData.issued_on > new Date().toISOString().slice(0, 10)) { err("ps", "Data wydania nie może być z przyszłości."); return; }
-    startCam();
+    if (!photo) { startCam(); return; } // wpisane ręcznie — teraz zdjęcie
+    sendPs();
   });
+  // Wysłanie legitymacji (dane + zdjęcie) do weryfikacji, potem rezerwacja.
+  function sendPs() {
+    run("ps", async () => {
+      try {
+        await step("legitymacja", { ...psData, photo });
+      } catch (e) {
+        if (e.silent) throw e;
+        K.show("os-ps"); // błędne dane (np. data) — popraw i wyślij ponownie
+        err("ps", e.message);
+        return;
+      }
+      await book();
+    });
+  }
 
   const CARD = 85.6 / 53.98; // proporcje karty ID-1 (legitymacja)
   // Progi do dostrojenia na docelowym urządzeniu (podgląd wskaźników: adres kiosku z #diag).
@@ -322,8 +362,10 @@
       await video.play();
     } catch (e) {
       stopCam();
+      photo = null;
+      psForm();
       K.show("os-ps");
-      err("ps", "Kamera niedostępna — zezwól przeglądarce na jej użycie albo poproś obsługę o pomoc.");
+      err("ps", "Kamera niedostępna — wpisz dane z legitymacji ręcznie albo poproś obsługę o pomoc.");
       return;
     }
     cam.okRun = 0; cam.prev = null; cam.started = Date.now();
@@ -429,15 +471,16 @@
   $("[data-os-retry]").addEventListener("click", startCam);
   $("[data-os-confirm]").addEventListener("click", () => {
     run("preview", async () => {
-      try {
-        await step("legitymacja", { ...psData, photo });
-      } catch (e) {
-        if (e.silent) throw e;
-        K.show("os-ps"); // błędne dane (np. data) — popraw i zrób zdjęcie ponownie
-        err("ps", e.message);
-        return;
-      }
-      await book();
+      const manual = psData && psData.number; // dane wpisane wcześniej ręcznie (bez kamery na początku)
+      if (manual) { sendPs(); return; }
+      $("[data-os-hint]").textContent = "Odczytuję dane z legitymacji…";
+      let fields = {};
+      try { await step("odczyt", { photo }); fields = lastFields || {}; } catch (e) { if (e.silent) throw e; }
+      psForm();
+      fillPs(fields);
+      K.show("os-ps");
+      if (!fields.number) err("ps", "Nie udało się odczytać wszystkich danych — uzupełnij je z legitymacji.");
+      else $("#os-pn").focus();
     });
   });
 

@@ -302,17 +302,21 @@ def api_onsite_start(request):
 @transaction.non_atomic_requests  # krok „legitymacja”: odczyt zdjęcia (do kilkunastu s) poza transakcją — pozostałe kroki niżej w transakcji
 @api
 def api_onsite_step(request, step):
-    """Kolejne kroki przebiegu: kod, regulamin, oswiadczenie, legitymacja, rezerwacja, stan."""
+    """Kolejne kroki przebiegu: kod, regulamin, oswiadczenie, odczyt (zdjęcie legitymacji → dane), legitymacja, rezerwacja, stan."""
     data = _json(request)
     if data is None:
         return JsonResponse({"error": "Nieprawidłowe dane."}, status=400)
     flow = onsite.get_flow(request.kiosk_device, data.get("ref"), data.get("secret"))
     if flow is None:
         return JsonResponse({"error": "Rezerwacja wygasła albo jest nieznana. Zacznij od nowa.", "restart": True}, status=404)
-    if step not in ("kod", "regulamin", "oswiadczenie", "legitymacja", "rezerwacja", "rezygnacja", "gotowka", "stan"):
+    if step not in ("kod", "regulamin", "oswiadczenie", "odczyt", "legitymacja", "rezerwacja", "rezygnacja", "gotowka", "stan"):
         return JsonResponse({"error": "Nieznany krok."}, status=404)
+    fields = None
     try:
-        if step == "legitymacja":
+        if step == "odczyt":
+            # zdjęcie legitymacji najpierw — odczyt danych do formularza (bez transakcji: odczyt trwa do kilkunastu s)
+            fields = onsite.read_ps(flow, data.get("photo"))
+        elif step == "legitymacja":
             # zapis legitymacji w krótkiej transakcji, potem automatyczne porównanie bez otwartej transakcji
             onsite.submit_ps(flow, data.get("number"), data.get("issuer"), data.get("issued_on"), data.get("valid_until"),
                              data.get("photo"))
@@ -344,7 +348,10 @@ def api_onsite_step(request, step):
     except ValidationError as e:
         return _error(e)
     flow.refresh_from_db()
-    return JsonResponse({"ok": True, "state": onsite.state(flow)})
+    response = {"ok": True, "state": onsite.state(flow)}
+    if fields is not None:
+        response["fields"] = fields
+    return JsonResponse(response)
 
 
 # --- panel ------------------------------------------------------------------------------------------

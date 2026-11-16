@@ -330,6 +330,32 @@ def _photo_file(data_url):
     return SimpleUploadedFile("skan.jpg", out.getvalue(), content_type="image/jpeg")
 
 
+READ_LIMIT = 6  # odczytów zdjęcia w jednym przebiegu (ponowne zdjęcia)
+
+
+def read_ps(flow, photo):
+    """Zdjęcie legitymacji najpierw: odczyt numeru, wystawcy i dat do formularza w kiosku (osoba je sprawdza).
+    Ten sam odczyt co w formularzu na stronie; odczytany tekst (z PESEL) nie jest zapisywany. Zdjęcie nie jest tu zapisywane —
+    trafia do weryfikacji dopiero w kroku „legitymacja”. Zwraca słownik pól (puste, gdy odczyt niemożliwy)."""
+    from django.core.cache import cache
+
+    from . import ocr
+
+    _require_verified(flow)
+    key = f"kiosk-odczyt:{flow.pk}"
+    used = cache.get(key, 0)
+    if used >= READ_LIMIT:
+        return {}
+    cache.set(key, used + 1, 3600)
+    data = _photo_file(photo).read()
+    if not ocr.available():
+        return {}
+    text = ocr.read_text(data)
+    fields = ocr.extract(text)
+    del text, data
+    return {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in fields.items() if v}
+
+
 def submit_ps(flow, number, issuer, issued_on, valid_until, photo):
     """Krok 4: legitymacja PS ze zdjęciem — trafia do weryfikacji (moduł dokumentów, powiadomienie obsługi).
 

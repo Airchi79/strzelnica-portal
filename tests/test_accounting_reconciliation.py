@@ -296,3 +296,50 @@ def test_year_checklist_before_and_after_year_end(owner, owner_client):
     page = owner_client.get("/panel/ksiegowosc/zamkniecie-roku/?rok=2026").content.decode()
     assert "Zamknięcie roku 2026" in page and "Zeznanie CIT-8" in page
     assert owner_client.get("/panel/ksiegowosc/zamkniecie-roku/?rok=abc").status_code == 200
+
+
+def test_month_checklist_after_switch_from_stripe_to_axepta(owner, owner_client):
+    from django.utils import timezone
+
+    from apps.accounting.models import AccountingSettings
+    from apps.payments.models import Payment
+
+    stripe_title, axepta_title = "Płatności online (Stripe) wgrane i ujęte", "Płatności online (Axepta) w systemie"
+    commission = "Faktura prowizyjna operatora płatności (Axepta)"
+    assert stripe_title in _states(2026, 9) and axepta_title not in _states(2026, 9)  # bez daty — jak dotąd
+    s = AccountingSettings.load()
+    s.stripe_until = date(2026, 9, 15)
+    s.save()
+    sept = _states(2026, 9)  # miesiąc przejścia — oba operatory
+    assert stripe_title in sept and axepta_title in sept
+    octo = _states(2026, 10)
+    assert stripe_title not in octo and "Faktura prowizyjna za płatności online" not in octo
+    assert octo[commission].state == "ok" and "nie było płatności" in octo[commission].detail
+    paid = timezone.make_aware(timezone.datetime(2026, 10, 3, 12))
+    Payment.objects.create(amount=5000, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED, external_id="axepta:p1",
+                           completed_at=paid)
+    Payment.objects.create(amount=7000, method=Payment.Method.TPAY, status=Payment.Status.COMPLETED, external_id="tpay:t1",
+                           completed_at=paid)  # inny operator — nie liczy się
+    octo = _states(2026, 10)
+    assert octo[axepta_title].state == "ok" and "1 wpłat" in octo[axepta_title].detail and "50" in octo[axepta_title].detail
+    assert octo[commission].state == "warn" and octo[commission].explain  # 15.11 — faktury za październik nie ma
+    assert _states(2026, 10, today=date(2026, 11, 5))[commission].state == "later"
+    # wyjaśnienie (np. prowizja tylko w wyciągu) → gotowe
+    owner_client.post("/panel/ksiegowosc/miesiac/?rok=2026&miesiac=10", {"step": "prowizja_axepta", "note": "prowizja w wyciągu"})
+    assert _states(2026, 10)[commission].state == "ok"
+    owner_client.post("/panel/ksiegowosc/miesiac/?rok=2026&miesiac=10", {"step": "prowizja_axepta", "note": ""})
+    # faktura BNP Paribas wystawiona w listopadzie → do przyjęcia, potem gotowe
+    xml = invoice_xml(number="BNP/1/11/2026", gross="12.30", seller_nip="5261008546").replace(
+        b"<P_1>2026-02-10</P_1>", b"<P_1>2026-11-05</P_1>").replace(b"Hurtownia Testowa sp. z o.o.", b"BNP Paribas Bank Polska S.A.")
+    inv = ksef.import_files([SimpleUploadedFile("bnp.xml", xml)], by=owner, own_nip="1111111111")[0][0]
+    assert _states(2026, 10)[commission].state == "todo"
+    _accept(owner, inv)
+    step = _states(2026, 10)[commission]
+    assert step.state == "ok" and "BNP/1/11/2026" in step.detail
+    # nieprzypisana wpłata Axepta → do rozstrzygnięcia
+    p2 = Payment.objects.create(amount=100, method=Payment.Method.TPAY, status=Payment.Status.UNMATCHED, external_id="axepta:p2")
+    Payment.objects.filter(pk=p2.pk).update(created_at=timezone.make_aware(timezone.datetime(2026, 11, 10, 12)))
+    assert _states(2026, 11, today=date(2026, 11, 20))[axepta_title].state == "todo"
+    # ustawienie w formularzu
+    page = owner_client.get("/panel/ksiegowosc/ustawienia/").content.decode()
+    assert "stripe_until" in page

@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from apps.facilities.models import format_pln
 
-from .models import PAYMENT_OFFSET, BankOperation, ChecklistExplanation, KsefInvoice, KsefSync, StripePayout, StripePosting, StripeTransaction
+from .models import PAYMENT_OFFSET, AccountingSettings, BankOperation, ChecklistExplanation, KsefInvoice, KsefSync, StripePayout, StripePosting, StripeTransaction
 
 OK, TODO, WARN, LATER = "ok", "todo", "warn", "later"
 LABELS = {OK: "gotowe", TODO: "do zrobienia", WARN: "sprawdź", LATER: "jeszcze nie teraz"}
@@ -60,71 +60,76 @@ def month_steps(year, month, today=None):
         (f"Do decyzji: {n} (wystawione do {end:%d.%m.%Y}). " if n else "Brak faktur czekających na decyzję. ") + sync_note,
         reverse("panel:accounting_ksef"), "Przyjmij faktury" if n else "Faktury KSeF"))
 
-    # 2. faktura prowizyjna platformy za miesiąc (wystawiana w następnym miesiącu)
-    _, fee = commission_amounts(start)
-    nxt = _next_month(start)
-    commission = list(KsefInvoice.objects.filter(payment_method=PAYMENT_OFFSET, issue_date__gte=nxt,
-                                                 issue_date__lt=_next_month(nxt)).exclude(status=KsefInvoice.Status.REJECTED))
-    fees_posted = StripePosting.objects.filter(kind=StripePosting.Kind.FEES, period_start=start, record__removed_at__isnull=True).exists()
-    invoiced = sum(i.gross for i in commission)
-    if not fee and not commission:
-        steps.append(Step("Faktura prowizyjna za płatności online", OK, "W tym miesiącu Stripe nie pobrał prowizji."))
-    elif fees_posted:
-        steps.append(Step("Faktura prowizyjna za płatności online", OK,
-                          f"Prowizje {format_pln(fee)} ujęte z eksportu Stripe (bez faktury).", reverse("panel:accounting_stripe"), "Stripe"))
-    elif not commission:
-        state = WARN if today >= nxt + timedelta(days=14) else LATER
-        steps.append(Step("Faktura prowizyjna za płatności online", state,
-                          f"Prowizje Stripe za miesiąc: {format_pln(fee)}. Faktura platformy przychodzi zwykle na początku "
-                          f"{nxt:%m.%Y} przez KSeF" + (" — jeszcze jej nie ma, sprawdź z wystawcą." if state == WARN else "."),
-                          reverse("panel:accounting_ksef"), "Faktury KSeF"))
-    else:
-        not_accepted = [i for i in commission if i.status != KsefInvoice.Status.ACCEPTED]
-        numbers = ", ".join(i.invoice_number for i in commission)
-        if not_accepted:
-            steps.append(Step("Faktura prowizyjna za płatności online", TODO, f"Faktura {numbers} czeka na przyjęcie do ewidencji.",
-                              reverse("panel:accounting_ksef_invoice", args=[not_accepted[0].pk]), "Otwórz fakturę"))
-        elif invoiced != fee:
-            explained = ChecklistExplanation.objects.filter(month=start, step=ChecklistExplanation.Step.COMMISSION,
-                                                            amount_a=invoiced, amount_b=fee).select_related("created_by").first()
-            if explained:
-                who = explained.created_by.full_name or explained.created_by.email if explained.created_by else "—"
-                steps.append(Step("Faktura prowizyjna za płatności online", OK,
-                                  f"Faktura {numbers}: {format_pln(invoiced)}, prowizje w eksporcie Stripe: {format_pln(fee)} — "
-                                  f"różnica {format_pln(invoiced - fee)} wyjaśniona: {explained.note} "
-                                  f"({who}, {timezone.localtime(explained.created_at):%d.%m.%Y}).",
-                                  explain=ChecklistExplanation.Step.COMMISSION, explained=explained))
-            else:
-                steps.append(Step("Faktura prowizyjna za płatności online", WARN,
-                                  f"Faktura {numbers}: {format_pln(invoiced)}, a prowizje w eksporcie Stripe: {format_pln(fee)} — "
-                                  "sprawdź, czy eksport Stripe obejmuje cały miesiąc i czy faktura dotyczy tego okresu. "
-                                  "Jeśli przyczyna jest znana, oznacz różnicę jako wyjaśnioną.",
-                                  reverse("panel:accounting_stripe"), "Stripe", explain=ChecklistExplanation.Step.COMMISSION))
-        else:
+    stripe_until = AccountingSettings.load().stripe_until
+    if not stripe_until or start <= stripe_until:  # miesiąc (choćby częściowo) z płatnościami przez Stripe
+        stripe_last = min(last_day, stripe_until) if stripe_until else last_day
+        # 2. faktura prowizyjna platformy za miesiąc (wystawiana w następnym miesiącu)
+        _, fee = commission_amounts(start)
+        nxt = _next_month(start)
+        commission = list(KsefInvoice.objects.filter(payment_method=PAYMENT_OFFSET, issue_date__gte=nxt,
+                                                     issue_date__lt=_next_month(nxt)).exclude(status=KsefInvoice.Status.REJECTED))
+        fees_posted = StripePosting.objects.filter(kind=StripePosting.Kind.FEES, period_start=start, record__removed_at__isnull=True).exists()
+        invoiced = sum(i.gross for i in commission)
+        if not fee and not commission:
+            steps.append(Step("Faktura prowizyjna za płatności online", OK, "W tym miesiącu Stripe nie pobrał prowizji."))
+        elif fees_posted:
             steps.append(Step("Faktura prowizyjna za płatności online", OK,
-                              f"Faktura {numbers} przyjęta, kwota zgodna z prowizjami Stripe ({format_pln(fee)})."))
+                              f"Prowizje {format_pln(fee)} ujęte z eksportu Stripe (bez faktury).", reverse("panel:accounting_stripe"), "Stripe"))
+        elif not commission:
+            state = WARN if today >= nxt + timedelta(days=14) else LATER
+            steps.append(Step("Faktura prowizyjna za płatności online", state,
+                              f"Prowizje Stripe za miesiąc: {format_pln(fee)}. Faktura platformy przychodzi zwykle na początku "
+                              f"{nxt:%m.%Y} przez KSeF" + (" — jeszcze jej nie ma, sprawdź z wystawcą." if state == WARN else "."),
+                              reverse("panel:accounting_ksef"), "Faktury KSeF"))
+        else:
+            not_accepted = [i for i in commission if i.status != KsefInvoice.Status.ACCEPTED]
+            numbers = ", ".join(i.invoice_number for i in commission)
+            if not_accepted:
+                steps.append(Step("Faktura prowizyjna za płatności online", TODO, f"Faktura {numbers} czeka na przyjęcie do ewidencji.",
+                                  reverse("panel:accounting_ksef_invoice", args=[not_accepted[0].pk]), "Otwórz fakturę"))
+            elif invoiced != fee:
+                explained = ChecklistExplanation.objects.filter(month=start, step=ChecklistExplanation.Step.COMMISSION,
+                                                                amount_a=invoiced, amount_b=fee).select_related("created_by").first()
+                if explained:
+                        steps.append(Step("Faktura prowizyjna za płatności online", OK,
+                                      f"Faktura {numbers}: {format_pln(invoiced)}, prowizje w eksporcie Stripe: {format_pln(fee)} — "
+                                      f"różnica {format_pln(invoiced - fee)} wyjaśniona: {explained.note} "
+                                      f"({_who(explained)}, {timezone.localtime(explained.created_at):%d.%m.%Y}).",
+                                      explain=ChecklistExplanation.Step.COMMISSION, explained=explained))
+                else:
+                    steps.append(Step("Faktura prowizyjna za płatności online", WARN,
+                                      f"Faktura {numbers}: {format_pln(invoiced)}, a prowizje w eksporcie Stripe: {format_pln(fee)} — "
+                                      "sprawdź, czy eksport Stripe obejmuje cały miesiąc i czy faktura dotyczy tego okresu. "
+                                      "Jeśli przyczyna jest znana, oznacz różnicę jako wyjaśnioną.",
+                                      reverse("panel:accounting_stripe"), "Stripe", explain=ChecklistExplanation.Step.COMMISSION))
+            else:
+                steps.append(Step("Faktura prowizyjna za płatności online", OK,
+                                  f"Faktura {numbers} przyjęta, kwota zgodna z prowizjami Stripe ({format_pln(fee)})."))
 
-    # 3. Stripe: eksport obejmuje miesiąc, dni ujęte w ewidencji
-    last_tx = StripeTransaction.objects.aggregate(m=Max("day"))["m"]
-    days = set(StripeTransaction.objects.filter(day__gte=start, day__lte=last_day)
-               .exclude(type="payout").values_list("day", flat=True))
-    posted = set(StripePosting.objects.filter(kind=StripePosting.Kind.REVENUE, period_start__gte=start, period_start__lte=end,
-                                              record__removed_at__isnull=True).values_list("period_start", flat=True))
-    missing = sorted(days - posted)
-    if last_tx is None:
-        steps.append(Step("Płatności online (Stripe) wgrane i ujęte", WARN, "Nie wgrano jeszcze eksportu ze Stripe.",
-                          reverse("panel:accounting_stripe"), "Wgraj eksport"))
-    elif last_tx < last_day:
-        steps.append(Step("Płatności online (Stripe) wgrane i ujęte", TODO,
-                          f"Eksport kończy się na {last_tx:%d.%m.%Y} — wgraj świeży eksport (historia salda i wypłaty).",
-                          reverse("panel:accounting_stripe"), "Wgraj eksport"))
-    elif missing:
-        steps.append(Step("Płatności online (Stripe) wgrane i ujęte", TODO,
-                          f"Dni z płatnościami jeszcze nieujęte w ewidencji: {len(missing)} (od {missing[0]:%d.%m}).",
-                          reverse("panel:accounting_stripe"), "Ujmij w ewidencji"))
-    else:
-        steps.append(Step("Płatności online (Stripe) wgrane i ujęte", OK if finished else LATER,
-                          f"Ujęte dni z płatnościami: {len(posted)}." + ("" if finished else " Miesiąc jeszcze trwa.")))
+        # 3. Stripe: eksport obejmuje miesiąc, dni ujęte w ewidencji
+        last_tx = StripeTransaction.objects.aggregate(m=Max("day"))["m"]
+        days = set(StripeTransaction.objects.filter(day__gte=start, day__lte=stripe_last)
+                   .exclude(type="payout").values_list("day", flat=True))
+        posted = set(StripePosting.objects.filter(kind=StripePosting.Kind.REVENUE, period_start__gte=start, period_start__lte=end,
+                                                  record__removed_at__isnull=True).values_list("period_start", flat=True))
+        missing = sorted(days - posted)
+        if last_tx is None:
+            steps.append(Step("Płatności online (Stripe) wgrane i ujęte", WARN, "Nie wgrano jeszcze eksportu ze Stripe.",
+                              reverse("panel:accounting_stripe"), "Wgraj eksport"))
+        elif last_tx < stripe_last:
+            steps.append(Step("Płatności online (Stripe) wgrane i ujęte", TODO,
+                              f"Eksport kończy się na {last_tx:%d.%m.%Y} — wgraj świeży eksport (historia salda i wypłaty).",
+                              reverse("panel:accounting_stripe"), "Wgraj eksport"))
+        elif missing:
+            steps.append(Step("Płatności online (Stripe) wgrane i ujęte", TODO,
+                              f"Dni z płatnościami jeszcze nieujęte w ewidencji: {len(missing)} (od {missing[0]:%d.%m}).",
+                              reverse("panel:accounting_stripe"), "Ujmij w ewidencji"))
+        else:
+            steps.append(Step("Płatności online (Stripe) wgrane i ujęte", OK if finished else LATER,
+                              f"Ujęte dni z płatnościami: {len(posted)}." + ("" if finished else " Miesiąc jeszcze trwa.")))
+
+    if stripe_until and end > stripe_until:  # płatności online przez Axeptę — zapisywane w systemie automatycznie
+        steps.extend(_axepta_steps(start, end, today))
 
     # 4. wyciąg bankowy obejmuje miesiąc (kontrola: wypłaty Stripe z miesiąca mają swoje wpływy w wyciągu)
     last_op = BankOperation.objects.aggregate(m=Max("booked_on"))["m"]
@@ -334,7 +339,7 @@ def explain(start, step, note, *, by):
 
     from apps.audit.services import log_event
 
-    if step != ChecklistExplanation.Step.COMMISSION:
+    if step not in ChecklistExplanation.Step.values:
         raise ValidationError("Nieznany krok listy kontrolnej.")
     note = (note or "").strip()
     current = ChecklistExplanation.objects.filter(month=start, step=step).first()
@@ -343,13 +348,89 @@ def explain(start, step, note, *, by):
             current.delete()
             log_event("ksiegowosc.roznica_cofnieta", None, f"{start:%m.%Y}: cofnięto wyjaśnienie różnicy ({current.note})", actor=by)
         return None
-    invoiced, fee = commission_amounts(start)
-    if invoiced == fee:
-        raise ValidationError("Kwoty są zgodne — nie ma różnicy do wyjaśnienia.")
+    if step == ChecklistExplanation.Step.AXEPTA:
+        invoiced, fee = axepta_amounts(start)
+    else:
+        invoiced, fee = commission_amounts(start)
+        if invoiced == fee:
+            raise ValidationError("Kwoty są zgodne — nie ma różnicy do wyjaśnienia.")
     if current:
         current.delete()
     obj = ChecklistExplanation.objects.create(month=start, step=step, note=note[:255], amount_a=invoiced, amount_b=fee,
                                               created_by=by)
     log_event("ksiegowosc.roznica_wyjasniona", obj,
-              f"{start:%m.%Y}: faktura {format_pln(invoiced)} vs Stripe {format_pln(fee)} — {obj.note}", actor=by)
+              f"{start:%m.%Y} {obj.get_step_display()}: {format_pln(invoiced)} / {format_pln(fee)} — {obj.note}", actor=by)
     return obj
+
+
+AXEPTA_SELLER = "bnp paribas"
+
+
+def _online_payments(start, end):
+    from apps.payments.models import Payment
+
+    from django.db.models import Count
+
+    qs = Payment.objects.filter(method=Payment.Method.TPAY, external_id__startswith="axepta:")
+    done = qs.filter(status=Payment.Status.COMPLETED, completed_at__date__gte=start, completed_at__date__lte=end)
+    total = done.aggregate(n=Count("pk"), s=Sum("amount"))
+    unmatched = qs.filter(status=Payment.Status.UNMATCHED, created_at__date__gte=start, created_at__date__lte=end).count()
+    return total["n"] or 0, total["s"] or 0, unmatched
+
+
+def _axepta_invoices(start):
+    nxt = _next_month(start)
+    return list(KsefInvoice.objects.filter(seller_name__icontains=AXEPTA_SELLER, issue_date__gte=nxt, issue_date__lt=_next_month(nxt))
+                .exclude(status=KsefInvoice.Status.REJECTED).order_by("issue_date"))
+
+
+def _axepta_steps(start, end, today):
+    steps = []
+    count, total, unmatched = _online_payments(start, end)
+    if unmatched:
+        steps.append(Step("Płatności online (Axepta) w systemie", TODO,
+                          f"Wpłaty online nieprzypisane (rozbieżność z powiadomieniem operatora): {unmatched} — rozstrzygnij je.",
+                          reverse("panel:payments"), "Płatności"))
+    else:
+        steps.append(Step("Płatności online (Axepta) w systemie", OK if today > end else LATER,
+                          f"Zapisywane automatycznie: {count} wpłat, razem {format_pln(total)}. Przychody trafiają do ewidencji "
+                          "z dziennych raportów wpływów." + ("" if today > end else " Miesiąc jeszcze trwa.")))
+    invoices = _axepta_invoices(start)
+    invoiced = sum(i.gross for i in invoices)
+    nxt = _next_month(start)
+    title = "Faktura prowizyjna operatora płatności (Axepta)"
+    explained = ChecklistExplanation.objects.filter(month=start, step=ChecklistExplanation.Step.AXEPTA, amount_a=invoiced,
+                                                    amount_b=total).select_related("created_by").first()
+    if explained:
+        steps.append(Step(title, OK, f"Wyjaśnione: {explained.note} ({_who(explained)}, "
+                                     f"{timezone.localtime(explained.created_at):%d.%m.%Y}).",
+                          explain=ChecklistExplanation.Step.AXEPTA, explained=explained))
+    elif not invoices and not count:
+        steps.append(Step(title, OK, "W tym miesiącu nie było płatności online — bez prowizji."))
+    elif not invoices:
+        state = WARN if today >= nxt + timedelta(days=14) else LATER
+        steps.append(Step(title, state,
+                          f"Brak faktury od BNP Paribas za ten miesiąc (wystawionej w {nxt:%m.%Y}). Faktura przychodzi przez KSeF"
+                          + (" — sprawdź z bankiem. Jeśli prowizję rozliczono inaczej (np. tylko w wyciągu), oznacz jako wyjaśnione."
+                             if state == WARN else "."),
+                          reverse("panel:accounting_ksef"), "Faktury KSeF",
+                          explain=ChecklistExplanation.Step.AXEPTA if state == WARN else ""))
+    else:
+        numbers = ", ".join(i.invoice_number for i in invoices)
+        waiting = [i for i in invoices if i.status != KsefInvoice.Status.ACCEPTED]
+        if waiting:
+            steps.append(Step(title, TODO, f"Faktura {numbers} czeka na przyjęcie do ewidencji.",
+                              reverse("panel:accounting_ksef_invoice", args=[waiting[0].pk]), "Otwórz fakturę"))
+        else:
+            steps.append(Step(title, OK, f"Faktura {numbers} przyjęta ({format_pln(invoiced)})."))
+    return steps
+
+
+def _who(explained):
+    user = explained.created_by
+    return (user.full_name or user.email) if user else "—"
+
+
+def axepta_amounts(start):
+    end = date(start.year, start.month, monthrange(start.year, start.month)[1])
+    return sum(i.gross for i in _axepta_invoices(start)), _online_payments(start, end)[1]

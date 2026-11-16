@@ -1,6 +1,7 @@
 """Statystyki miesiąca dla zarządu: obłożenie osi (godziny i % dostępnych), rezerwacje, książka pobytu, przychód, kluby.
 Porównanie z poprzednim miesiącem. Obłożenie liczone wobec godzin otwarcia osi minus blokady administracyjne."""
 
+import re
 from datetime import date, datetime, timedelta
 
 from django.db.models import Count, Q
@@ -165,7 +166,11 @@ def occupancy(first, nxt):
     end = timezone.make_aware(datetime.combine(nxt, datetime.min.time()), tz)
     lanes = list(Lane.objects.filter(is_active=True, facility__is_active=True).prefetch_related("opening_hours")
                  .order_by("facility__order", "order"))
-    blocks = list(Block.objects.filter(starts_at__lt=end, ends_at__gt=start).prefetch_related("lanes"))
+    from apps.bookings.models import ArchivedReservation
+
+    # blokady założone za rezerwacje z GunTrackera to zajęte godziny, a nie zamknięcie osi
+    archive_blocks = ArchivedReservation.objects.filter(block__isnull=False).values("block_id")
+    blocks = list(Block.objects.filter(starts_at__lt=end, ends_at__gt=start).exclude(pk__in=archive_blocks).prefetch_related("lanes"))
     for b in blocks:
         b.lane_ids = {lane.pk for lane in b.lanes.all()}
     cap = [[0] * 24 for _ in range(7)]
@@ -187,11 +192,12 @@ def occupancy(first, nxt):
                         open_slots.add((lane.pk, d, h))
             d += timedelta(days=1)
     reservations = Reservation.objects.filter(starts_at__gte=start, starts_at__lt=end, lane__in=lanes).exclude(ACTIVE_EXCLUDE)
+    archived = ArchivedReservation.objects.filter(starts_at__gte=start, starts_at__lt=end, lane__in=lanes)
     count = 0
-    for r in reservations.only("lane_id", "starts_at", "ends_at"):
+    for r in list(reservations.only("lane_id", "starts_at", "ends_at")) + list(archived.only("lane_id", "starts_at", "ends_at")):
         count += 1
         t = timezone.localtime(r.starts_at)
-        for i in range(r.hours):
+        for i in range(_hours(r)):
             h = t.hour + i
             if h > 23:
                 break
@@ -233,6 +239,36 @@ REPORT_PERIODS = {"7": ("ostatnie 7 dni", 7), "30": ("ostatnie 30 dni", 30), "90
 ENTRY_WINDOW = timedelta(hours=1)  # wpis bez powiązania z rezerwacją, ale tej osoby, od godziny przed rozpoczęciem
 
 
+def _hours(r):
+    """Liczba pełnych godzin rezerwacji (także archiwalnej z GunTrackera)."""
+    hours = getattr(r, "hours", None)
+    if isinstance(hours, int):
+        return hours
+    return max(1, round((r.ends_at - r.starts_at).total_seconds() / 3600))
+
+
+def _archive_estimate(a, rules):
+    """Szacowany przychód osi z rezerwacji z GunTrackera (eksport nie podaje kwot): cennik osi z dnia rezerwacji × godziny;
+    liczba osób = liczba stanowisk. Kod wejścia (karnet opłacony wcześniej) — 0."""
+    if "kod" in (a.payment or "").lower():
+        return 0
+    day = timezone.localtime(a.starts_at).date()
+    key = (a.lane_id, day)
+    if key not in rules:
+        rules[key] = a.lane.price_rule_for(day)
+    rule = rules[key]
+    if rule is None:
+        return 0
+    persons = max(1, len(re.findall(r"\d+", a.positions or "")))
+    return rule.hourly_amount(persons) * _hours(a)
+
+
+def archive_logbook_missing(a):
+    """GunTracker: „Dodano” (wpis w książce elektronicznej) albo „Książka papierowa” — inna wartość = brak wpisu."""
+    text = (a.logbook_info or "").lower()
+    return not ("dodano" in text or "papier" in text)
+
+
 def _lane_revenue(r):
     """Przychód osi z rezerwacji (bez dopłaty za prowadzącego od strzelnicy); zwolniona z opłaty — 0."""
     if r.payment_status == "zwolniona":
@@ -251,7 +287,19 @@ def _period_core(first, nxt, now):
     reservations = list(Reservation.objects.filter(starts_at__gte=start, starts_at__lt=end)
                         .exclude(ACTIVE_EXCLUDE).exclude(status__in=["oczekuje", "do_zatwierdzenia"])
                         .select_related("lane", "user", "officer"))
-    lanes = {x["lane"].pk: {**x, "revenue": 0, "officer_fees": 0, "count": 0, "hours": 0} for x in occ["lanes"]}
+    lanes = {x["lane"].pk: {**x, "revenue": 0, "officer_fees": 0, "count": 0, "hours": 0, "estimated": 0} for x in occ["lanes"]}
+    from apps.bookings.models import ArchivedReservation
+
+    archived = list(ArchivedReservation.objects.filter(starts_at__gte=start, starts_at__lt=end, lane_id__in=list(lanes))
+                    .select_related("lane"))
+    rules = {}
+    for a in archived:
+        row = lanes[a.lane_id]
+        estimate = _archive_estimate(a, rules)
+        row["revenue"] += estimate
+        row["estimated"] += estimate
+        row["count"] += 1
+        row["hours"] += _hours(a)
     for r in reservations:
         row = lanes.get(r.lane_id)
         if row is None:
@@ -279,7 +327,10 @@ def _period_core(first, nxt, now):
         if any(r.starts_at - ENTRY_WINDOW <= t < r.ends_at for uid in people for t in by_user.get(uid, [])):
             continue
         missing.append(r)
-    return {"occ": occ, "reservations": reservations, "lanes": list(lanes.values()), "done": done, "missing": missing}
+    archived_done = [a for a in archived if a.ends_at <= now]
+    archived_missing = [a for a in archived_done if archive_logbook_missing(a)]
+    return {"occ": occ, "reservations": reservations, "lanes": list(lanes.values()), "done": done, "missing": missing,
+            "archived": archived, "archived_done": archived_done, "archived_missing": archived_missing}
 
 
 def reservations_report(days, today=None, now=None):
@@ -293,12 +344,14 @@ def reservations_report(days, today=None, now=None):
     prev = _period_core(first - timedelta(days=days), first, now)
 
     def kpi(core):
-        rs = core["reservations"]
+        n = len(core["reservations"]) + len(core["archived"])
         revenue = sum(row["revenue"] for row in core["lanes"])
-        hours = sum(r.hours for r in rs)
-        return {"revenue": revenue, "reservations": len(rs), "occupancy": core["occ"]["pct"],
-                "avg_value": round(revenue / len(rs)) if rs else None, "avg_hours": round(hours / len(rs), 1) if rs else None,
-                "missing_pct": round(100 * len(core["missing"]) / len(core["done"])) if core["done"] else None}
+        hours = sum(r.hours for r in core["reservations"]) + sum(_hours(a) for a in core["archived"])
+        done = len(core["done"]) + len(core["archived_done"])
+        missing = len(core["missing"]) + len(core["archived_missing"])
+        return {"revenue": revenue, "reservations": n, "occupancy": core["occ"]["pct"],
+                "avg_value": round(revenue / n) if n else None, "avg_hours": round(hours / n, 1) if n else None,
+                "missing_pct": round(100 * missing / done) if done else None}
 
     k, p = kpi(cur), kpi(prev)
     deltas = {}
@@ -310,18 +363,26 @@ def reservations_report(days, today=None, now=None):
              "pct": round(100 * (v - old) / old) if old else None})
     people = {}
     for r in cur["done"]:
-        row = people.setdefault(r.user_id, {"user": r.user, "visits": 0, "missing": 0, "last_missing": None})
+        row = people.setdefault(("u", r.user_id), {"user": r.user, "name": r.user.full_name, "visits": 0, "missing": 0,
+                                                   "last_missing": None})
         row["visits"] += 1
-    for r in cur["missing"]:
-        row = people[r.user_id]
+    for a in cur["archived_done"]:  # GunTracker: osoba tylko z nazwiska (bez konta w systemie)
+        row = people.setdefault(("a", " ".join(a.client.split()).casefold()), {"user": None, "name": a.client, "visits": 0,
+                                                                               "missing": 0, "last_missing": None})
+        row["visits"] += 1
+    for key, r in [(("u", r.user_id), r) for r in cur["missing"]] + \
+                  [(("a", " ".join(a.client.split()).casefold()), a) for a in cur["archived_missing"]]:
+        row = people[key]
         row["missing"] += 1
         row["last_missing"] = max(filter(None, [row["last_missing"], timezone.localtime(r.starts_at).date()]))
-    ranking = sorted((x for x in people.values() if x["missing"]), key=lambda x: (-x["missing"], -x["visits"], x["user"].last_name))
+    ranking = sorted((x for x in people.values() if x["missing"]), key=lambda x: (-x["missing"], -x["visits"], x["name"]))
     lanes = sorted(cur["lanes"], key=lambda x: -(x["per_open_hour"] or 0))
     best = next((x for x in lanes if x["revenue"]), None)
     return {
         "first": first, "last": today, "kpi": k, "deltas": deltas, "lanes": lanes, "best_lane": best,
         "officer_fees": sum(x["officer_fees"] for x in cur["lanes"]),
-        "done_count": len(cur["done"]), "missing": sorted(cur["missing"], key=lambda r: r.starts_at, reverse=True),
+        "done_count": len(cur["done"]) + len(cur["archived_done"]),
+        "missing": sorted(cur["missing"] + cur["archived_missing"], key=lambda r: r.starts_at, reverse=True),
+        "archived_count": len(cur["archived"]), "estimated": sum(x["estimated"] for x in cur["lanes"]),
         "ranking": ranking[:15],
     }

@@ -111,7 +111,7 @@
     }
     show(file);
     setMsg("Gotowe — zdjęcie zostanie wysłane razem z formularzem.", false);
-    if (!isPdf) readPhoto(file);
+    readPhoto(file);
   });
 
   // --- odczyt danych ze zdjęcia legitymacji PS (to samo rozpoznawanie tekstu co w kiosku) ---
@@ -124,7 +124,7 @@
     const body = new FormData();
     body.append("scan", file);
     body.append("csrfmiddlewaretoken", form.elements.csrfmiddlewaretoken.value);
-    setMsg("Odczytuję dane z legitymacji… (kilka sekund)", false);
+    setMsg(file.type === "application/pdf" ? "Odczytuję dane z pliku PDF…" : "Odczytuję dane z legitymacji… (kilka sekund)", false);
     let data;
     try {
       const r = await fetch(ocrUrl, { method: "POST", body, credentials: "same-origin", headers: { "X-Requested-With": "fetch" } });
@@ -139,7 +139,8 @@
       el.addEventListener("input", () => { el.dataset.auto = ""; el.classList.remove("autofilled"); }, { once: true });
       filled.push(LABELS[name] || name);
     });
-    setMsg(filled.length ? `Uzupełniono ze zdjęcia: ${filled.join(", ")} — sprawdź z legitymacją i popraw, jeśli trzeba.`
-                         : "Nie udało się odczytać danych ze zdjęcia — wpisz je ręcznie w kroku 3.", false);
+    const src = file.type === "application/pdf" ? "z pliku PDF" : "ze zdjęcia";
+    setMsg(filled.length ? `Uzupełniono ${src}: ${filled.join(", ")} — sprawdź z legitymacją i popraw, jeśli trzeba.`
+                         : `Nie udało się odczytać danych ${src} — wpisz je ręcznie w kroku 3.`, false);
   }
 })();

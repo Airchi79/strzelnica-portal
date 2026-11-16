@@ -79,6 +79,49 @@ def read_text(image_bytes, budget=BUDGET_SECONDS):
     return "\n".join(texts) if texts else None
 
 
+MAX_PDF_PAGES = 2
+PDF_TEXT_MIN_LETTERS = 30  # mniej liter w warstwie tekstowej = PDF to skan (obraz) — wtedy odczyt z obrazu strony
+
+
+def read_pdf_text(pdf_bytes, budget=BUDGET_SECONDS):
+    """Tekst legitymacji z pliku PDF (np. pobranego z portalu PZSS): warstwa tekstowa pierwszych stron, a gdy jej brak
+    (skan) — obraz pierwszej strony przez ten sam odczyt co zdjęcie. None, gdy pliku nie da się odczytać."""
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        return None
+    try:
+        pdf = pdfium.PdfDocument(pdf_bytes)
+    except Exception:  # uszkodzony / zaszyfrowany PDF — pdfium zgłasza własne wyjątki
+        logger.warning("OCR legitymacji: nie można otworzyć PDF")
+        return None
+    try:
+        texts = []
+        for i in range(min(len(pdf), MAX_PDF_PAGES)):
+            page = pdf[i]
+            textpage = page.get_textpage()
+            texts.append(textpage.get_text_range())
+            textpage.close()
+            page.close()
+        text = "\n".join(texts)
+        if sum(ch.isalpha() for ch in text) >= PDF_TEXT_MIN_LETTERS:
+            return text
+        if not len(pdf):
+            return None
+        page = pdf[0]
+        width = max(page.get_width(), 1)
+        image = page.render(scale=min(4.0, 2000 / width)).to_pil()
+        page.close()
+        buf = BytesIO()
+        image.convert("RGB").save(buf, "PNG")
+    except Exception:  # błąd odczytu strony — dane wpisze osoba
+        logger.warning("OCR legitymacji: błąd odczytu PDF")
+        return None
+    finally:
+        pdf.close()
+    return read_text(buf.getvalue(), budget=budget)
+
+
 def _fold(value):
     """Wielkie litery bez polskich znaków (odczyt często gubi ogonki)."""
     value = str(value or "").upper().replace("Ł", "L")
@@ -148,6 +191,7 @@ ISSUER_LABELS = {"PZSS": "PZSS (Polski Związek Strzelectwa Sportowego)", "PZŁ"
                  "LOK": "LOK (Liga Obrony Kraju)"}  # jak w kiosku (przyciski wystawców)
 NUMBER_RE = re.compile(r"\b(?:NR|NUMER)\b[\s.:_\-|]*(?:UPRAWNIEN\w*|LEGITYMACJI|LEG\.?)?[\s.:_\-|]*([A-Z0-9][A-Z0-9/\-.]{2,40})")
 DATE_RE = re.compile(r"\b(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})\b")
+ISO_DATE_RE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")  # PDF z portali: 2024-10-10
 ISSUED_WORDS = ("WYDAN", "NABYC", "WYSTAWION")
 VALID_WORDS = ("WAZN",)
 
@@ -170,7 +214,7 @@ def _dates(lines):
 
     out = []
     for i, line in enumerate(lines):
-        for d, m, y in DATE_RE.findall(line):
+        for d, m, y in DATE_RE.findall(line) + [(d, m, y) for y, m, d in ISO_DATE_RE.findall(line)]:
             try:
                 out.append((date(int(y), int(m), int(d)), i))
             except ValueError:

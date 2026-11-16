@@ -1027,6 +1027,14 @@ def month_checklist(request):
         start = previous.replace(day=1)
     if start > today or start.year < 2000:
         start = previous.replace(day=1)
+    if request.method == "POST":
+        try:
+            done = checklist.explain(start, request.POST.get("step", ""), request.POST.get("note", ""), by=request.user)
+        except ValidationError as e:
+            _error(request, e)
+        else:
+            messages.success(request, "Różnica oznaczona jako wyjaśniona." if done else "Cofnięto wyjaśnienie różnicy.")
+        return redirect(f"{reverse('panel:accounting_month')}?rok={start.year}&miesiac={start.month}")
     prev = (start - timedelta(days=1)).replace(day=1)
     nxt = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
     steps = checklist.month_steps(start.year, start.month, today)

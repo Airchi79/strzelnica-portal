@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from apps.facilities.models import format_pln
 
-from .models import PAYMENT_OFFSET, BankOperation, KsefInvoice, KsefSync, StripePayout, StripePosting, StripeTransaction
+from .models import PAYMENT_OFFSET, BankOperation, ChecklistExplanation, KsefInvoice, KsefSync, StripePayout, StripePosting, StripeTransaction
 
 OK, TODO, WARN, LATER = "ok", "todo", "warn", "later"
 LABELS = {OK: "gotowe", TODO: "do zrobienia", WARN: "sprawdź", LATER: "jeszcze nie teraz"}
@@ -25,6 +25,8 @@ class Step:
     detail: str
     url: str = ""
     action: str = ""
+    explain: str = ""  # krok z różnicą, którą można oznaczyć jako wyjaśnioną (klucz ChecklistExplanation.Step)
+    explained: object = None  # ChecklistExplanation, gdy różnicę wyjaśniono
 
     @property
     def label(self):
@@ -59,9 +61,7 @@ def month_steps(year, month, today=None):
         reverse("panel:accounting_ksef"), "Przyjmij faktury" if n else "Faktury KSeF"))
 
     # 2. faktura prowizyjna platformy za miesiąc (wystawiana w następnym miesiącu)
-    fee = 0
-    for t in StripeTransaction.objects.filter(day__gte=start, day__lte=end).exclude(type="payout"):
-        fee += t.fee if t.type in ("payment", "charge", "payment_refund", "refund") else -t.amount
+    _, fee = commission_amounts(start)
     nxt = _next_month(start)
     commission = list(KsefInvoice.objects.filter(payment_method=PAYMENT_OFFSET, issue_date__gte=nxt,
                                                  issue_date__lt=_next_month(nxt)).exclude(status=KsefInvoice.Status.REJECTED))
@@ -85,10 +85,21 @@ def month_steps(year, month, today=None):
             steps.append(Step("Faktura prowizyjna za płatności online", TODO, f"Faktura {numbers} czeka na przyjęcie do ewidencji.",
                               reverse("panel:accounting_ksef_invoice", args=[not_accepted[0].pk]), "Otwórz fakturę"))
         elif invoiced != fee:
-            steps.append(Step("Faktura prowizyjna za płatności online", WARN,
-                              f"Faktura {numbers}: {format_pln(invoiced)}, a prowizje w eksporcie Stripe: {format_pln(fee)} — "
-                              "sprawdź, czy eksport Stripe obejmuje cały miesiąc i czy faktura dotyczy tego okresu.",
-                              reverse("panel:accounting_stripe"), "Stripe"))
+            explained = ChecklistExplanation.objects.filter(month=start, step=ChecklistExplanation.Step.COMMISSION,
+                                                            amount_a=invoiced, amount_b=fee).select_related("created_by").first()
+            if explained:
+                who = explained.created_by.full_name or explained.created_by.email if explained.created_by else "—"
+                steps.append(Step("Faktura prowizyjna za płatności online", OK,
+                                  f"Faktura {numbers}: {format_pln(invoiced)}, prowizje w eksporcie Stripe: {format_pln(fee)} — "
+                                  f"różnica {format_pln(invoiced - fee)} wyjaśniona: {explained.note} "
+                                  f"({who}, {timezone.localtime(explained.created_at):%d.%m.%Y}).",
+                                  explain=ChecklistExplanation.Step.COMMISSION, explained=explained))
+            else:
+                steps.append(Step("Faktura prowizyjna za płatności online", WARN,
+                                  f"Faktura {numbers}: {format_pln(invoiced)}, a prowizje w eksporcie Stripe: {format_pln(fee)} — "
+                                  "sprawdź, czy eksport Stripe obejmuje cały miesiąc i czy faktura dotyczy tego okresu. "
+                                  "Jeśli przyczyna jest znana, oznacz różnicę jako wyjaśnioną.",
+                                  reverse("panel:accounting_stripe"), "Stripe", explain=ChecklistExplanation.Step.COMMISSION))
         else:
             steps.append(Step("Faktura prowizyjna za płatności online", OK,
                               f"Faktura {numbers} przyjęta, kwota zgodna z prowizjami Stripe ({format_pln(fee)})."))
@@ -302,3 +313,43 @@ def year_steps(year, today=None):
     steps.append(Step("Zeznanie CIT-8 z załącznikiem CIT-8/O", state, detail,
                       reverse("panel:accounting_doc_new", args=["cit8"]), "Arkusz CIT-8"))
     return steps
+
+
+def commission_amounts(start):
+    """(kwota faktur prowizyjnych, prowizje netto z eksportu Stripe) za miesiąc — w groszach."""
+    end = date(start.year, start.month, monthrange(start.year, start.month)[1])
+    fee = 0
+    for t in StripeTransaction.objects.filter(day__gte=start, day__lte=end).exclude(type="payout"):
+        fee += t.fee if t.type in ("payment", "charge", "payment_refund", "refund") else -t.amount
+    nxt = _next_month(start)
+    invoiced = sum(i.gross for i in KsefInvoice.objects.filter(payment_method=PAYMENT_OFFSET, issue_date__gte=nxt,
+                                                               issue_date__lt=_next_month(nxt))
+                   .exclude(status=KsefInvoice.Status.REJECTED))
+    return invoiced, fee
+
+
+def explain(start, step, note, *, by):
+    """Oznacza różnicę jako wyjaśnioną (z kwotami z tej chwili). Pusty `note` — cofa wyjaśnienie."""
+    from django.core.exceptions import ValidationError
+
+    from apps.audit.services import log_event
+
+    if step != ChecklistExplanation.Step.COMMISSION:
+        raise ValidationError("Nieznany krok listy kontrolnej.")
+    note = (note or "").strip()
+    current = ChecklistExplanation.objects.filter(month=start, step=step).first()
+    if not note:
+        if current:
+            current.delete()
+            log_event("ksiegowosc.roznica_cofnieta", None, f"{start:%m.%Y}: cofnięto wyjaśnienie różnicy ({current.note})", actor=by)
+        return None
+    invoiced, fee = commission_amounts(start)
+    if invoiced == fee:
+        raise ValidationError("Kwoty są zgodne — nie ma różnicy do wyjaśnienia.")
+    if current:
+        current.delete()
+    obj = ChecklistExplanation.objects.create(month=start, step=step, note=note[:255], amount_a=invoiced, amount_b=fee,
+                                              created_by=by)
+    log_event("ksiegowosc.roznica_wyjasniona", obj,
+              f"{start:%m.%Y}: faktura {format_pln(invoiced)} vs Stripe {format_pln(fee)} — {obj.note}", actor=by)
+    return obj

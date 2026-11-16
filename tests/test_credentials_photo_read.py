@@ -72,6 +72,7 @@ def test_form_shows_photo_step_first(client):
     client.force_login(make_user("foto3@example.com"))
     page = client.get("/dokumenty/dodaj/?rodzaj=ps").content.decode()
     assert page.index("2. Zdjęcie dokumentu") < page.index("3. Dane z dokumentu") and 'data-ocr-url="/dokumenty/odczyt-zdjecia/"' in page
+    assert "data-ocr-read" in page and "Odczytaj dane z pliku" in page
 
 
 @pytest.mark.skipif(not ocr.available(), reason="brak programu tesseract")

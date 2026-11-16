@@ -48,38 +48,18 @@ services:
       retries: 3
       start_period: 40s
 
-  # Zadania okresowe: co minutę zwalnianie wygasłych blokad terminów i nieopłaconych rezerwacji, lista oczekujących, zwroty Tpay i ponawianie e-maili;
-  # co 5 minut wysyłka ogłoszeń; co godzinę przypomnienia, rozliczenia rezerwacji, wygaszanie dokumentów, zamykanie pobytów
-  # i czyszczenie książki pobytu, dzienne wydruki książki pobytu, zadania stowarzyszenia, raporty, kontrola kopii zapasowych.
+  # Zadania okresowe w jednym stałym procesie (apps/core/management/commands/run_scheduler.py): co minutę zwalnianie
+  # wygasłych blokad terminów i nieopłaconych rezerwacji, lista oczekujących, zwroty i ponawianie e-maili; co 5 minut wysyłka
+  # ogłoszeń; co godzinę przypomnienia, rozliczenia rezerwacji, wygaszanie dokumentów, zamykanie pobytów i czyszczenie
+  # książki pobytu, dzienne wydruki książki pobytu, zadania stowarzyszenia, raporty, księgowość, KSeF, kontrola kopii.
+  # Django ładuje się raz (dawniej: osobny start dla każdego zadania co minutę — ok. 5 800 startów na dobę).
   cron:
     <<: *app
     depends_on:
       app:
         condition: service_healthy
-    command: >
-      sh -c 'n=0; while true; do
-        python manage.py expire_reservations;
-        python manage.py process_waitlist;
-        python manage.py process_refunds;
-        python manage.py send_outbox;
-        if [ $$((n % 5)) -eq 0 ]; then
-          python manage.py send_announcements;
-        fi;
-        if [ $$((n % 60)) -eq 0 ]; then
-          python manage.py send_reminders;
-          python manage.py settle_reservations;
-          python manage.py expire_credentials;
-          python manage.py purge_logbook;
-          python manage.py daily_logbook_print;
-          python manage.py association_tasks;
-          python manage.py sales_reports;
-          python manage.py accounting_sync;
-          python manage.py ksef_sync;
-          python manage.py check_backups;
-        fi;
-        n=$$((n + 1));
-        sleep 60;
-      done'
+    command: python manage.py run_scheduler
+    stop_grace_period: 2m   # bieżące zadanie (np. pobieranie z KSeF) kończy się przed zatrzymaniem
 
   # Tunel Cloudflare jako kontener (opcjonalnie — uruchamiany z profilem „tunel”):
   #   docker compose --profile tunel up -d

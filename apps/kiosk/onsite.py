@@ -318,6 +318,8 @@ def _photo_file(data_url):
         raise ValidationError("Zdjęcie jest za duże.")
     try:
         img = Image.open(BytesIO(data))
+        if img.width * img.height > 50_000_000:  # wymiary z nagłówka — przed rozpakowaniem
+            raise ValidationError("Zdjęcie ma za dużą rozdzielczość. Zrób je ponownie.")
         img.load()
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
         raise ValidationError("Nieprawidłowe zdjęcie. Zrób je ponownie.") from None

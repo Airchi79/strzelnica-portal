@@ -681,7 +681,6 @@ def context(user=None):
     s = AccountingSettings.load()
     revenue_by_year = {}
     for year in Record.objects.values_list("year", flat=True).distinct():
-        from . import services
 
         from .supplementary import revenue_for_limit
 

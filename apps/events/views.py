@@ -63,7 +63,6 @@ def detail(request, pk):
                 form.add_error(None, m)
     reasons = services.can_register(request.user, event) if request.user.is_authenticated and not reg else []
     from apps.core.models import AssociationSettings
-    from django.conf import settings as dj_settings
 
     return render(request, "events/detail.html", {
         "event": event, "reg": reg, "form": form, "reasons": reasons, "taken": event.taken(), "free": event.free_places(),

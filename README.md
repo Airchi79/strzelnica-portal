@@ -54,4 +54,11 @@ python -m pytest
 
 ## Zadania okresowe
 
-`send_reminders`, `settle_reservations`, `expire_credentials`, `purge_logbook`, `daily_logbook_print`, `association_tasks` (polecenia `python manage.py …`) — co godzinę (w Dockerze robi to usługa `cron`).
+Usługa `cron` uruchamia jeden stały proces `python manage.py run_scheduler` (Django ładuje się raz), który wywołuje polecenia:
+- co minutę: `expire_reservations`, `process_waitlist`, `process_refunds`, `send_outbox`,
+- co 5 minut: `send_announcements`,
+- co godzinę: `send_reminders`, `settle_reservations`, `expire_credentials`, `purge_logbook`, `daily_logbook_print`,
+  `association_tasks`, `sales_reports`, `accounting_sync`, `ksef_sync`, `check_backups`.
+
+Każde polecenie można też uruchomić ręcznie (`docker compose exec app python manage.py <polecenie>`). Błąd jednego zadania
+nie zatrzymuje pozostałych; proces kończy się sam po 24 h i Docker uruchamia go od nowa.

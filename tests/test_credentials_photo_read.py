@@ -146,3 +146,30 @@ def test_scanned_pdf_without_text_layer_uses_ocr():
     c.save()
     out = ocr.extract(ocr.read_pdf_text(buf.getvalue()))
     assert out["number"] == "0079/BZGLOK/2022" and out["issuer"].startswith("LOK") and out["issued_on"] == date(2022, 1, 11)
+
+
+@pytest.mark.skipif(not ocr.available(), reason="brak programu tesseract")
+def test_pzss_portal_pdf_header_as_graphic():
+    """Jak PDF z portalu PZSS: w warstwie tekstowej numer, osoba, PESEL i „miejscowość, RRRR-MM-DD”, a nazwa związku
+    jako grafika — wystawca z odczytu obrazu, numer i data z warstwy tekstowej."""
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+
+    header = Image.new("RGB", (1600, 300), (255, 255, 255))
+    d = ImageDraw.Draw(header)
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 56)
+    except OSError:
+        pytest.skip("brak czcionki DejaVu")
+    d.text((40, 40), "POLSKI ZWIĄZEK STRZELECTWA SPORTOWEGO", fill=(20, 20, 20), font=font)
+    d.text((40, 160), "LEGITYMACJA PROWADZĄCEGO STRZELANIE", fill=(20, 20, 20), font=font)
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=(241, 153))
+    c.drawImage(ImageReader(header), 5, 108, 231, 43)
+    c.setFont("Helvetica", 8)
+    for i, line in enumerate(["Nr PS-12345/2020", "Janusz Kowalski", "00000000000", "Warszawa, 2020-07-06"]):
+        c.drawString(10, 90 - i * 14, line)
+    c.save()
+    out = ocr.extract(ocr.read_pdf_text(buf.getvalue()))
+    assert out == {"number": "PS-12345/2020", "issuer": "PZSS (Polski Związek Strzelectwa Sportowego)",
+                   "issued_on": date(2020, 7, 6), "valid_until": None}

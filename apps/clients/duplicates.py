@@ -66,10 +66,11 @@ def groups(persons=None):
 
 
 def suggested_primary(group):
-    """Osoba z kontem, potem najpełniejsza (pozwolenie z organem, adres, kontakt), potem najstarsza."""
+    """Osoba z kontem, potem z wydrukowaną kartą QR (karta zostaje ważna — dane kopii i tak są przenoszone), potem
+    najpełniejsza (pozwolenie z organem, adres, kontakt), potem najstarsza."""
     def score(p):
-        return (bool(p.user_id), bool(p.permit_number and p.permit_issuer), bool(p.address), bool(p.email), bool(p.phone),
-                bool(p.card_printed_at), -p.pk)
+        return (bool(p.user_id), bool(p.card_printed_at), bool(p.permit_number and p.permit_issuer), bool(p.address), bool(p.email),
+                bool(p.phone), -p.pk)
     return max(group, key=score)
 
 

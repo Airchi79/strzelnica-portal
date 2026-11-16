@@ -1620,3 +1620,17 @@ def test_no_transfer_qr_without_bank_account(client, ps):
     r = _transfer_hold(ps)
     client.force_login(ps)
     assert "Kod QR do przelewu" not in client.get(f"/rezerwacje/{r.pk}/").content.decode()
+
+
+def test_wallet_transfer_data_for_phone(client, ps):
+    from apps.core.models import AssociationSettings
+
+    s = AssociationSettings.load()
+    s.bank_account = "61 1090 1014 0000 0712 1981 2874"
+    s.save()
+    client.force_login(ps)
+    body = client.get("/platnosci/").content.decode()
+    code = services.topup_code(ps)
+    assert f'data-copy="{code}"' in body and 'data-copy="61 1090 1014 0000 0712 1981 2874"' in body
+    assert "data:image/png;base64," in body and f'download="przelew-{code}.png"' in body and "z galerii" in body
+    assert "js/reservation" in body

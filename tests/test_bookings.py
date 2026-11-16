@@ -762,3 +762,19 @@ def test_series_limits(owner_client, ps, lane):
     page = owner_client.post("/panel/rezerwacje/nowa/", {**data, "repeat_until": first.isoformat()})
     assert "repeat_until" in page.context["form"].errors
     assert len(services.weekly_days(first, first + timedelta(days=366))) <= services.SERIES_MAX
+
+
+def test_readiness_collapsed_when_everything_done(rf):
+    from django.template.loader import render_to_string
+
+    steps = [{"key": "email", "state": "done", "title": "E-mail", "detail": "ok"}]
+    html = render_to_string("partials/readiness.html", {"readiness": {"steps": steps, "ready": True, "done": 1, "total": 1, "complete": True}})
+    assert "<details" in html and "pokaż szczegóły" in html and "E-mail" in html
+    steps.append({"key": "profile", "state": "tip", "title": "Dane", "detail": "uzupełnij"})
+    html = render_to_string("partials/readiness.html", {"readiness": {"steps": steps, "ready": True, "done": 1, "total": 2, "complete": False}})
+    assert "<details" not in html and "Możesz rezerwować osie" in html
+
+
+def test_readiness_complete_flag(db, ps):
+    r = services.booking_readiness(ps)
+    assert r["complete"] == (r["ready"] and r["done"] == r["total"])

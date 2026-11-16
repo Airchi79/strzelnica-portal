@@ -320,6 +320,14 @@ html.is-dark .theme-btn .when-light { display: none; }
 .readiness-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .readiness-bar { height: 6px; border-radius: 999px; background: var(--border); margin: 8px 0 4px; overflow: hidden; }
 .readiness-bar span { display: block; height: 100%; background: var(--ok); }
+.readiness-details > summary { cursor: pointer; list-style: none; }
+.readiness-details > summary::-webkit-details-marker { display: none; }
+.readiness-details > summary .muted { text-decoration: underline; }
+.readiness-details .when-open, .readiness-details[open] .when-closed { display: none; }
+.readiness-details[open] .when-open { display: inline; }
+.readiness-details[open] > summary { margin-bottom: 8px; }
+.transfer-data { display: grid; gap: 4px; }
+.transfer-data .code { word-break: break-all; }
 .steps { list-style: none; padding: 0; margin: 8px 0 0; }
 .step { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .step:last-child { border-bottom: 0; }

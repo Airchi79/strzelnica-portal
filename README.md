@@ -5,6 +5,9 @@ osie i cennik, a w kolejnych etapach rezerwacje, elektroniczna książka pobytu,
 Specyfikacja: [`docs/SPEC-etap-1-2.md`](docs/SPEC-etap-1-2.md), kolejne etapy w `docs/SPEC-etap-*.md` (panel obsługi, kiosk: [`docs/SPEC-etap-6-panel.md`](docs/SPEC-etap-6-panel.md)).
 Kiosk na telefonie lub tablecie z Androidem: [`deploy/android-kiosk/README.md`](deploy/android-kiosk/README.md). Kiosk na Raspberry Pi: [`deploy/raspberry-pi/README.md`](deploy/raspberry-pi/README.md).
 
+**Całość projektu w jednym pliku** (zasady pracy, architektura, moduły, reguły, bezpieczeństwo, eksploatacja, audyt, otwarte sprawy):
+[`docs/PROJEKT.md`](docs/PROJEKT.md).
+
 **Stos:** Python 3.12+, Django 5.2 LTS, PostgreSQL 16, strony renderowane na serwerze + PWA.
 
 ## Uruchomienie produkcyjne (Docker)

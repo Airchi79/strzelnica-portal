@@ -109,11 +109,14 @@ def run(uploaded, *, year, by=None, preview=False, now=None, update_contacts=Tru
     stats = {"dodane": 0, "pominiete": 0, "blokady": 0, "bez_osi": [], "konflikty": [], "przyszle": [], "telefony": 0, "bez_kartoteki": 0}
     with transaction.atomic():
         existing = set(ArchivedReservation.objects.filter(row_hash__in=[i["row_hash"] for _, i in items]).values_list("row_hash", flat=True))
+        # ta sama rezerwacja z GunTrackera (numer + początek) wgrana wcześniej z pliku w innym formacie — też pomijana
+        known = set(ArchivedReservation.objects.filter(number__in=[i["number"] for _, i in items]).values_list("number", "starts_at"))
         for row, item in items:
-            if item["row_hash"] in existing:
+            if item["row_hash"] in existing or (item["number"], item["starts_at"]) in known:
                 stats["pominiete"] += 1
                 continue
             existing.add(item["row_hash"])
+            known.add((item["number"], item["starts_at"]))
             archived = ArchivedReservation.objects.create(**item, imported_by=by)
             stats["dodane"] += 1
             if item["lane"] is None:

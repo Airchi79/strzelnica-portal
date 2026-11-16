@@ -8,7 +8,7 @@ from django.utils import timezone
 from apps.audit.services import diff, log_event
 from apps.core.permissions import panel_required
 
-from .forms import FacilityForm, HoursFormSet, LaneForm, NewLaneForm, PriceRuleForm
+from .forms import FacilityForm, HoursFormSet, LaneForm, NewLaneForm, PriceRuleForm, WeekHoursForm
 from .models import Facility, Lane, OpeningHours, PriceRule
 
 
@@ -63,6 +63,69 @@ def panel_lane(request, pk):
         {"lane": lane, "form": form, "hours": hours, "rules": lane.price_rules.all(), "can_delete": _lane_deletable(lane),
          "future_count": _future_reservations(lane).count()},
     )
+
+
+def _common_week(lanes):
+    """Najczęstsze godziny każdego dnia wśród osi — propozycja do formularza zmiany zbiorczej."""
+    from collections import Counter
+
+    week = {}
+    for day, _ in OpeningHours.WEEKDAYS:
+        spans = Counter()
+        for lane in lanes:
+            oh = next((h for h in lane.opening_hours.all() if h.weekday == day), None)
+            spans[(oh.opens, oh.closes) if oh else None] += 1
+        week[day] = spans.most_common(1)[0][0] if spans else None
+    return week
+
+
+def _outside_hours(lanes):
+    """Przyszłe rezerwacje tych osi, które po zmianie wypadają (choć częściowo) poza godzinami otwarcia."""
+    out = []
+    for lane in lanes:
+        hours = {h.weekday: (h.opens, h.closes) for h in lane.opening_hours.all()}
+        for r in _future_reservations(lane).select_related("lane"):
+            s, e = timezone.localtime(r.starts_at), timezone.localtime(r.ends_at)
+            span = hours.get(s.weekday())
+            end_time = e.time() if e.date() == s.date() else None
+            if not span or s.time() < span[0] or end_time is None or end_time > span[1]:
+                out.append(r)
+    return sorted(out, key=lambda r: r.starts_at)
+
+
+@panel_required("facilities.manage_facilities")
+def panel_hours_bulk(request):
+    """Godziny otwarcia całego tygodnia dla wielu osi naraz."""
+    lanes = list(Lane.objects.select_related("facility").prefetch_related("opening_hours").order_by("facility__order", "order"))
+    active = [lane for lane in lanes if lane.is_active and lane.facility.is_active]
+    if request.method == "POST":
+        form = WeekHoursForm(request.POST)
+        if form.is_valid():
+            chosen, week = list(form.cleaned_data["lanes"]), form.cleaned_data["week"]
+            with transaction.atomic():
+                for lane in chosen:
+                    before = [str(h) for h in lane.opening_hours.all()]
+                    lane.opening_hours.all().delete()
+                    OpeningHours.objects.bulk_create([OpeningHours(lane=lane, weekday=d, opens=span[0], closes=span[1])
+                                                      for d, span in week.items() if span])
+                    log_event("os.godziny_zbiorczo", lane, str(lane),
+                              changes={"przed": before, "po": [str(h) for h in lane.opening_hours.all()]}, actor=request.user)
+            messages.success(request, f"Zapisano godziny otwarcia dla osi: {len(chosen)}.")
+            outside = _outside_hours(Lane.objects.filter(pk__in=[lane.pk for lane in chosen]).prefetch_related("opening_hours"))
+            if outside:
+                listing = "; ".join(f"{r.number} ({timezone.localtime(r.starts_at):%d.%m %H:%M}, {r.lane})" for r in outside[:10])
+                messages.warning(request, f"Przyszłe rezerwacje poza nowymi godzinami: {len(outside)} — zostają ważne, sprawdź je: "
+                                          f"{listing}{' …' if len(outside) > 10 else ''}")
+            return redirect("panel:lanes")
+    else:
+        week = _common_week(active)
+        initial = {"lanes": [lane.pk for lane in active]}
+        for day, span in week.items():
+            initial[f"open_{day}"] = span is not None
+            if span:
+                initial[f"opens_{day}"], initial[f"closes_{day}"] = span
+        form = WeekHoursForm(initial=initial)
+    return render(request, "panel/lanes_hours_bulk.html", {"form": form, "lanes": lanes})
 
 
 @panel_required("facilities.manage_facilities")

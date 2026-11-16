@@ -5,6 +5,7 @@
 <div class="actions" style="margin-top:0;margin-bottom:12px">
   <a class="btn" href="{% url 'panel:facility_new' %}">+ Nowy obiekt (strzelnica)</a>
   <a class="btn secondary" href="{% url 'panel:lane_new' %}">+ Nowa oś</a>
+  <a class="btn secondary" href="{% url 'panel:lanes_hours' %}">Godziny otwarcia — zmiana zbiorcza</a>
 </div>
 {% for facility, lanes in facilities %}
 <section class="day">

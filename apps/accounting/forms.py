@@ -194,8 +194,9 @@ class KsefAcceptForm(forms.Form):
 class SettingsForm(forms.ModelForm):
     class Meta:
         model = AccountingSettings
-        fields = ["auto_from", "auto_activity", "approving_body", "tax_office", "signatories"]
+        fields = ["auto_from", "auto_activity", "stripe_until", "approving_body", "tax_office", "signatories"]
         widgets = {"auto_from": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+                   "stripe_until": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
                    "tax_office": forms.Textarea(attrs={"rows": 3}), "signatories": forms.Textarea(attrs={"rows": 3})}
 
     def __init__(self, *args, **kwargs):

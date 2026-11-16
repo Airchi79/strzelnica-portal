@@ -48,6 +48,11 @@ class AccountingSettings(models.Model):
                   "zbiorcze). Ustaw na dzień uruchomienia systemu dla strzelców — wcześniejsze przychody (GunTracker, "
                   "wyciągi bankowe) wpisuje się ręcznie. Puste = zasilanie wyłączone.")
     labels = models.JSONField("opisy przychodów z systemu", default=dict, blank=True)
+    stripe_until = models.DateField(
+        "płatności online przez Stripe (GunTracker) do dnia", null=True, blank=True,
+        help_text="Ostatni dzień płatności online przez Stripe/GunTracker. Od następnego miesiąca lista kontrolna nie prosi "
+                  "o eksport Stripe i sprawdza płatności Axepta (zapisywane w systemie automatycznie) oraz fakturę "
+                  "prowizyjną BNP Paribas. Puste = płatności nadal przez Stripe.")
     tax_office = models.TextField("urząd skarbowy (nazwa i adres)", blank=True,
                                   help_text="Naczelnik urzędu skarbowego właściwego w sprawach podatku dochodowego — do zawiadomień.")
     approving_body = models.CharField("organ zatwierdzający", max_length=120, blank=True, default="Zebranie Członków",
@@ -555,6 +560,7 @@ class ChecklistExplanation(models.Model):
 
     class Step(models.TextChoices):
         COMMISSION = "prowizja", "Faktura prowizyjna za płatności online"
+        AXEPTA = "prowizja_axepta", "Faktura prowizyjna operatora płatności (Axepta)"
 
     month = models.DateField("miesiąc (pierwszy dzień)")
     step = models.CharField("krok", max_length=20, choices=Step.choices)

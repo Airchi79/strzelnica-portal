@@ -165,3 +165,41 @@ class IssueStatusForm(forms.Form):
         from .models import Issue
 
         self.fields["status"].choices = Issue.Status.choices
+
+
+class WeekHoursForm(forms.Form):
+    """Godziny otwarcia całego tygodnia naraz dla wielu osi (zmiana zbiorcza)."""
+
+    lanes = forms.ModelMultipleChoiceField(label="Osie", queryset=Lane.objects.none(), widget=forms.CheckboxSelectMultiple)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["lanes"].queryset = Lane.objects.select_related("facility").order_by("facility__order", "order")
+        self.fields["lanes"].label_from_instance = lambda lane: f"{lane.facility} · {lane}{'' if lane.is_active else ' (wyłączona)'}"
+        for day, _ in OpeningHours.WEEKDAYS:
+            self.fields[f"open_{day}"] = forms.BooleanField(required=False)
+            self.fields[f"opens_{day}"] = forms.TimeField(required=False, widget=TimeInput())
+            self.fields[f"closes_{day}"] = forms.TimeField(required=False, widget=TimeInput())
+
+    def days(self):
+        """[(dzień, nazwa, pole otwarte, od, do)] — do siatki w szablonie."""
+        return [(day, name, self[f"open_{day}"], self[f"opens_{day}"], self[f"closes_{day}"]) for day, name in OpeningHours.WEEKDAYS]
+
+    def clean(self):
+        data = super().clean()
+        week = {}
+        for day, name in OpeningHours.WEEKDAYS:
+            if not data.get(f"open_{day}"):
+                week[day] = None
+                continue
+            opens, closes = data.get(f"opens_{day}"), data.get(f"closes_{day}")
+            if not opens or not closes:
+                self.add_error(None, f"{name.capitalize()}: podaj godzinę otwarcia i zamknięcia albo odznacz „otwarte”.")
+            elif closes <= opens:
+                self.add_error(None, f"{name.capitalize()}: zamknięcie musi być później niż otwarcie.")
+            elif opens.minute or closes.minute:
+                self.add_error(None, f"{name.capitalize()}: tylko pełne godziny (rezerwacje są w pełnych godzinach).")
+            else:
+                week[day] = (opens, closes)
+        data["week"] = week
+        return data

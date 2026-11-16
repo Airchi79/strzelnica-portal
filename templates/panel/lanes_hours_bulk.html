@@ -1,0 +1,32 @@
+{% extends "panel/base_panel.html" %}{% load satok %}
+{% block title %}Godziny otwarcia — zmiana zbiorcza{% endblock %}
+{% block panel %}
+<h1>Godziny otwarcia — zmiana zbiorcza</h1>
+<p class="small"><a href="{% url 'panel:lanes' %}">← Obiekty, osie i opłaty</a></p>
+<form method="post" novalidate>{% csrf_token %}
+  {% if form.non_field_errors %}<div class="msg error">{% for e in form.non_field_errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+  <div class="card">
+    <h2 class="step-title">Tydzień</h2>
+    <p class="small muted" style="margin-top:0">Ustaw godziny każdego dnia — zapis zastępuje cały tydzień na zaznaczonych osiach. Dzień bez zaznaczenia „otwarte” = oś zamknięta w ten dzień. Tylko pełne godziny. Podpowiedź poniżej to najczęstsze obecne godziny aktywnych osi. Jednorazowe zamknięcie (święto, zawody) ustawiaj blokadą osi, nie tutaj.</p>
+    <div class="table-wrap"><table class="days">
+      <tr class="head"><th>Dzień</th><th>Otwarte</th><th>Od</th><th>Do</th></tr>
+      {% for day, name, open, opens, closes in form.days %}<tr>
+        <td><strong>{{ name|capfirst }}</strong></td>
+        <td data-label="Otwarte">{{ open }}</td>
+        <td data-label="Od">{{ opens }}</td>
+        <td data-label="Do">{{ closes }}</td></tr>{% endfor %}
+    </table></div>
+  </div>
+  <div class="card">
+    <h2 class="step-title">Osie</h2>
+    {% if form.lanes.errors %}<div class="msg error">Zaznacz co najmniej jedną oś.</div>{% endif %}
+    <p class="small muted" style="margin-top:0"><label><input type="checkbox" data-check-all="lanes"> zaznacz / odznacz wszystkie</label></p>
+    {{ form.lanes }}
+    <details class="small" style="margin-top:8px"><summary>Obecne godziny osi</summary>
+      <table>{% for lane in lanes %}<tr><td>{{ lane.facility }} · {{ lane }}</td><td>{% with hs=lane.opening_hours.all %}{% if hs %}{{ hs|hours_summary }}{% else %}brak godzin{% endif %}{% endwith %}</td></tr>{% endfor %}</table>
+    </details>
+  </div>
+  <div class="actions"><button class="btn" type="submit" data-confirm-click="Zastąpić godziny otwarcia całego tygodnia na zaznaczonych osiach?">Zapisz godziny dla zaznaczonych osi</button>
+    <a class="btn secondary" href="{% url 'panel:lanes' %}">Anuluj</a></div>
+</form>
+{% endblock %}

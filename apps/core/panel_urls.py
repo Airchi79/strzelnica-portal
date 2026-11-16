@@ -47,6 +47,7 @@ urlpatterns = [
     path("regulaminy/wersja/<int:pk>/publikuj/", regulations_views.panel_version_publish, name="regulation_publish"),
     path("regulaminy/wersja/<int:pk>/usun/", regulations_views.panel_version_delete, name="regulation_delete"),
     path("osie/", facilities_views.panel_list, name="lanes"),
+    path("osie/godziny/", facilities_views.panel_hours_bulk, name="lanes_hours"),
     path("usterki/", facilities_views.panel_issues, name="issues"),
     path("usterki/<int:pk>/", facilities_views.panel_issue, name="issue"),
     path("usterki/<int:pk>/zdjecie/", facilities_views.panel_issue_photo, name="issue_photo"),

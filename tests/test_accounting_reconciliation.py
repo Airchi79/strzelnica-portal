@@ -4,6 +4,7 @@ z ewidencją. Dane w testach są zmyślone."""
 from datetime import date
 
 import pytest
+from apps.audit.models import AuditLog
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 
@@ -217,6 +218,21 @@ def test_month_checklist_walks_through_routine(owner, owner_client):
     _accept(owner, wrong)
     step = _states(2026, 7)["Faktura prowizyjna za płatności online"]
     assert step.state == "warn" and "3,50" in step.detail and "4\xa0zł" in step.detail
+    # różnica wyjaśniona — gotowe; zmiana kwot unieważnia wyjaśnienie; cofnięcie przywraca „sprawdź”
+    page = owner_client.get("/panel/ksiegowosc/miesiac/?rok=2026&miesiac=7").content.decode()
+    assert "Różnica wyjaśniona" in page
+    r = owner_client.post("/panel/ksiegowosc/miesiac/?rok=2026&miesiac=7", {"step": "prowizja", "note": "zwrot opłaty w następnej fakturze"})
+    assert r.status_code == 302 and r["Location"] == "/panel/ksiegowosc/miesiac/?rok=2026&miesiac=7"
+    step = _states(2026, 7)["Faktura prowizyjna za płatności online"]
+    assert step.state == "ok" and "wyjaśniona: zwrot opłaty w następnej fakturze" in step.detail
+    assert "Cofnij wyjaśnienie" in owner_client.get("/panel/ksiegowosc/miesiac/?rok=2026&miesiac=7").content.decode()
+    assert AuditLog.objects.filter(action="ksiegowosc.roznica_wyjasniona").exists()
+    owner_client.post("/panel/ksiegowosc/miesiac/?rok=2026&miesiac=7", {"step": "prowizja", "note": ""})
+    assert _states(2026, 7)["Faktura prowizyjna za płatności online"].state == "warn"
+    owner_client.post("/panel/ksiegowosc/miesiac/?rok=2026&miesiac=7", {"step": "prowizja", "note": "ok"})
+    stripe_import.import_files([bal([("txn_2", "payment", "10.00", "0.30", "9.70", "2026-07-05 10:00", "")])], by=owner)
+    assert _states(2026, 7)["Faktura prowizyjna za płatności online"].state == "warn"  # inne kwoty — wyjaśnienie nieaktualne
+    assert owner_client.post("/panel/ksiegowosc/miesiac/?rok=2026&miesiac=7", {"step": "obce", "note": "x"}).status_code == 302
     ksef.reject(_commission(owner, "GT/003", "9.99", date(2026, 8, 5)), by=owner, note="test")  # odrzucona — nie liczy się
     s = _states(2026, 7)
     assert s["Operacje z wyciągu rozstrzygnięte"].state == "ok"

@@ -14,7 +14,14 @@
   {% for s in steps %}<tr>
     <td><strong>{{ forloop.counter }}. {{ s.title }}</strong></td>
     <td data-label="Stan"><span class="badge {{ s.badge }}">{{ s.label }}</span></td>
-    <td data-label="Szczegóły" class="small">{{ s.detail }}</td>
+    <td data-label="Szczegóły" class="small">{{ s.detail }}
+      {% if s.explain %}<form method="post" class="actions" style="margin-top:.5rem;align-items:center">{% csrf_token %}
+        <input type="hidden" name="step" value="{{ s.explain }}">
+        {% if s.explained %}<input type="hidden" name="note" value="">
+        <button class="btn secondary" type="submit">Cofnij wyjaśnienie</button>
+        {% else %}<input type="text" name="note" maxlength="255" required placeholder="Przyczyna różnicy, np. zwrot opłaty rozliczy wystawca w następnej fakturze" aria-label="Przyczyna różnicy" style="flex:1;min-width:14rem">
+        <button class="btn" type="submit">Różnica wyjaśniona</button>{% endif %}
+      </form>{% endif %}</td>
     <td>{% if s.url and s.action %}<a class="btn{% if s.state != 'todo' %} secondary{% endif %}" href="{{ s.url }}">{{ s.action }}</a>{% endif %}</td>
   </tr>{% endfor %}
 </table></div>

@@ -547,3 +547,27 @@ class StripePosting(models.Model):
 
     class Meta:
         ordering = ["period_start", "kind"]
+
+
+class ChecklistExplanation(models.Model):
+    """Wyjaśniona różnica w liście kontrolnej miesiąca (np. faktura prowizyjna ≠ prowizje w eksporcie Stripe).
+    Zapisuje kwoty z chwili wyjaśnienia — gdy się zmienią, krok znów wymaga sprawdzenia."""
+
+    class Step(models.TextChoices):
+        COMMISSION = "prowizja", "Faktura prowizyjna za płatności online"
+
+    month = models.DateField("miesiąc (pierwszy dzień)")
+    step = models.CharField("krok", max_length=20, choices=Step.choices)
+    note = models.CharField("wyjaśnienie", max_length=255)
+    amount_a = models.BigIntegerField("kwota z dokumentu [gr]")
+    amount_b = models.BigIntegerField("kwota z systemu [gr]")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "wyjaśniona różnica"
+        verbose_name_plural = "wyjaśnione różnice"
+        constraints = [models.UniqueConstraint(fields=["month", "step"], name="checklist_explanation_unique")]
+
+    def __str__(self):
+        return f"{self.month:%m.%Y} {self.get_step_display()}"

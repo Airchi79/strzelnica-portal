@@ -1,4 +1,5 @@
 {% comment %}Wskazówka do kodu QR przelewu na telefonie. Kontekst: png (kod QR jako PNG w data:), name (nazwa pliku).{% endcomment %}
-{% if png %}<p class="small qr-phone"><strong>Płacisz na tym samym telefonie?</strong> Użyj przycisków „kopiuj” i wklej rachunek i tytuł do przelewu
-  albo <a href="{{ png }}" download="przelew-{{ name }}.png">zapisz kod QR w telefonie</a> — potem w aplikacji banku przy skanowaniu kodu
-  wybierz „z galerii” / „wczytaj obraz” (jeśli Twoja aplikacja to umożliwia).</p>{% endif %}
+<p class="small qr-phone"><strong>Płacisz na tym samym telefonie?</strong> Kodu ze swojego ekranu nie zeskanujesz — użyj przycisków
+  „kopiuj” i wklej rachunek, odbiorcę, tytuł{% if amount %} i kwotę{% endif %} do przelewu w aplikacji banku.{% if png %}
+  Jeśli Twoja aplikacja wczytuje kody QR z galerii (opcja „z galerii” / „wczytaj obraz”), możesz też
+  <a href="{{ png }}" download="przelew-{{ name }}.png">zapisać kod QR w telefonie</a>.{% endif %}</p>

@@ -153,12 +153,16 @@ DOC_POSTS = {
                    "przechowywanie": "siedziba", "osoby": "Jan Testowy\nEwa Testowa"},
     "przeplywy": {"rok": "2026", "kol4": "500,00", "kol5": "", "kol6": "200,00"},
     "cit8": {"rok": "2026", "cele": "działalność w zakresie kultury fizycznej i sportu", "wolny": ""},
+    "uchwala_dochod": {"numer": "2/2027", "data": "2027-03-10", "miejscowosc": "Sątok", "organ": "Zebranie Członków", "rok": "2026",
+                       "cele": "działalność w zakresie kultury fizycznej i sportu", "kierunki": "rozwój strzelnicy\nzawody", "kwota": "",
+                       "podpisy": "Przewodniczący\nProtokolant"},
     "dowod_wewnetrzny": {"rodzaj": "detal", "data": "2026-02-12", "data_zdarzenia": "2026-02-12", "przedmiot": "Taśma ostrzegawcza",
                          "ilosc": "2 szt.", "cena": "12,50", "wartosc": "25,00", "podstawa": "paragon nr 123", "sporzadzil": "Jan Testowy"},
 }
 EXPECTED_TEXT = {
     "uchwala_wybor": "45 000,00 zł", "zawiadomienie_wybor": "art. 10a ust. 3", "zawiadomienie_rezygnacja": "art. 10a ust. 5 pkt 2",
     "opis_zasad": "Ewa Testowa", "przeplywy": "300,00", "cit8": "kultury fizycznej", "dowod_wewnetrzny": "DW/1/2026",
+    "uchwala_dochod": "przeznacza się na cele statutowe",
 }
 
 
@@ -196,6 +200,29 @@ def test_cit_sheet_amounts(owner):
     table = next(v for k, v in blocks if k == "table")
     amounts = [row[1] for row in table["rows"]]
     assert amounts[:5] == ["1 000,00 zł", "400,00 zł", "600,00 zł", "600,00 zł", "0,00 zł"]
+
+
+def test_income_resolution_amounts_frozen_partial_and_loss(owner):
+    services.add_record(kind=Record.Kind.REVENUE, day=date(2026, 1, 5), document="WB 1", description="x", amount=100000,
+                        column="revenue", by=owner)
+    services.add_record(kind=Record.Kind.COST, day=date(2026, 1, 6), document="FV 1", description="y", amount=40000,
+                        column="cost_deductible", by=owner)
+    ctx = documents.context(owner)
+    doc = documents.DOCS["uchwala_dochod"]
+    base = {"numer": "", "data": date(2027, 3, 10), "miejscowosc": "Sątok", "organ": "Zebranie Członków", "rok": 2026,
+            "cele": "sport", "kierunki": "rozwój strzelnicy\nzawody", "podpisy": ""}
+    obj = documents.create(doc, {**base, "kwota": 50000}, by=owner, ctx=ctx)
+    assert "przeznaczenia dochodu za 2026" in obj.title and obj.data["_ewidencja"]["dochod"] == 60000
+    services.add_record(kind=Record.Kind.REVENUE, day=date(2026, 2, 1), document="WB 2", description="z", amount=999900,
+                        column="revenue", by=owner)  # późniejszy zapis nie zmienia treści wygenerowanej uchwały
+    text = " ".join(str(v) for _, v in documents.blocks_for(GeneratedDocument.objects.get(pk=obj.pk))[1])
+    assert "dochód w wysokości 600,00 zł" in text and "500,00 zł przeznacza się" in text and "Pozostała część dochodu w wysokości 100,00 zł" in text
+    assert "rozwój strzelnicy," in text and "zawody." in text
+    services.add_record(kind=Record.Kind.COST, day=date(2026, 3, 1), document="FV 2", description="k", amount=5000000,
+                        column="cost_deductible", by=owner)
+    loss = documents.create(doc, {**base, "kwota": None}, by=owner, ctx=ctx)
+    text = " ".join(str(v) for _, v in documents.blocks_for(loss)[1])
+    assert "stratę" in text and "nie dokonuje się jego podziału" in text
 
 
 def test_internal_proof_numbering_and_prefill_link(owner_client):

@@ -86,6 +86,10 @@ class Doc:
     def after_create(self, d, ctx):
         """Zapis skutków ubocznych (np. danych do zestawienia przepływów)."""
 
+    def prepare(self, cleaned, ctx):
+        """Uzupełnienie danych przed zapisem (np. kwot z ewidencji — dokument ma tę samą treść przy ponownym pobraniu)."""
+        return cleaned
+
 
 def _header(ctx, place, day):
     a = ctx["association"]
@@ -415,6 +419,100 @@ class Flows(Doc):
         ] + _signatures(ctx)
 
 
+class IncomeResolution(Doc):
+    key = "uchwala_dochod"
+    title = "Uchwała w sprawie przeznaczenia dochodu na cele statutowe"
+    group = "Uchwały"
+    legal = "art. 17 ust. 1 pkt 4 ustawy o CIT"
+    hint = ("Dochód stowarzyszenia jest wolny od podatku w części przeznaczonej na cele statutowe (art. 17 ust. 1 pkt 4 "
+            "ustawy o CIT). Uchwała dokumentuje to przeznaczenie — podejmij ją po zakończeniu roku, przed złożeniem CIT-8 "
+            "(do 31 marca). Kwoty pochodzą z ewidencji w chwili tworzenia dokumentu.")
+
+    DEFAULT_DIRECTIONS = ("utrzymanie, wyposażenie i rozwój strzelnicy\n"
+                          "organizacja treningów, zawodów i szkoleń strzeleckich\n"
+                          "pokrycie bieżących kosztów działalności statutowej")
+
+    def fields(self, ctx):
+        return {
+            "numer": forms.CharField(label="Numer uchwały", max_length=40, required=False),
+            "data": _date_field("Data podjęcia"),
+            "miejscowosc": forms.CharField(label="Miejscowość", max_length=80, required=False),
+            "organ": forms.CharField(label="Organ podejmujący uchwałę", max_length=120),
+            "rok": forms.IntegerField(label="Rok podatkowy, którego dotyczy dochód", min_value=2026, max_value=2100),
+            "cele": forms.CharField(label="Cel statutowy (art. 17 ust. 1 pkt 4 CIT)", max_length=255),
+            "kierunki": forms.CharField(label="Na co zostanie przeznaczony dochód (każdy kierunek w osobnym wierszu)",
+                                        widget=forms.Textarea(attrs={"rows": 4})),
+            "kwota": _amount_field("Kwota przeznaczona na cele statutowe [zł] (puste = cały dochód)"),
+            "podpisy": forms.CharField(label="Podpisy (każdy w osobnym wierszu)", widget=forms.Textarea(attrs={"rows": 3}), required=False),
+        }
+
+    def initial(self, ctx):
+        today = timezone.localdate()
+        return {"data": today, "miejscowosc": ctx["place"], "organ": ctx["settings"]["approving_body"] or "Zebranie Członków",
+                "rok": today.year - (1 if today.month <= 3 else 0), "cele": "działalność w zakresie kultury fizycznej i sportu",
+                "kierunki": self.DEFAULT_DIRECTIONS, "podpisy": "Przewodniczący zebrania\nProtokolant"}
+
+    def prepare(self, cleaned, ctx):
+        f = flows_data(cleaned["rok"])
+        cleaned["_ewidencja"] = {"przychody": f["col1"], "koszty": f["col2"], "dochod": f["col3"], "kol7": f["cost_other"]}
+        return cleaned
+
+    def doc_title(self, d):
+        return f"Uchwała {d.get('numer') or ''} w sprawie przeznaczenia dochodu za {d['rok']} r.".replace("  ", " ")
+
+    def blocks(self, d, ctx):
+        name = ctx["association"]["name"]
+        e = d.get("_ewidencja") or {}
+        if not e:
+            f = flows_data(d["rok"])
+            e = {"przychody": f["col1"], "koszty": f["col2"], "dochod": f["col3"], "kol7": f["cost_other"]}
+        income = e["dochod"]
+        out = [
+            ("right", f"{d.get('miejscowosc') or ''}, {pl_date(d['data'])}".lstrip(", ")),
+            ("title", f"UCHWAŁA{(' NR ' + d['numer']) if d.get('numer') else ''}"),
+            ("subtitle", f"{d['organ']} {name}\nz dnia {pl_date(d['data'])}\nw sprawie przeznaczenia dochodu za rok {d['rok']}"),
+            ("p", f"Na podstawie art. 17 ust. 1 pkt 4 {CIT} oraz regulaminu stowarzyszenia postanawia się, co następuje:"),
+            ("section", "§ 1"),
+            ("p", f"Stwierdza się, że według uproszczonej ewidencji przychodów i kosztów prowadzonej na podstawie {ROZP} "
+                  f"{name} osiągnęło w roku podatkowym {d['rok']}:"),
+            ("list", [f"przychody w wysokości {pln(e['przychody'])},",
+                      f"koszty uzyskania przychodów w wysokości {pln(e['koszty'])},",
+                      (f"dochód w wysokości {pln(income)}." if income > 0 else
+                       f"{'stratę' if income < 0 else 'wynik zerowy'} w wysokości {pln(abs(income))}.")]),
+        ]
+        if income > 0:
+            amount = d.get("kwota") if d.get("kwota") is not None else income
+            amount = min(amount, income)
+            directions = [x.rstrip(",.;") + "," for x in _lines(d.get("kierunki"))]
+            if directions:
+                directions[-1] = directions[-1].rstrip(",") + "."
+            out += [
+                ("section", "§ 2"),
+                ("p", f"Dochód za rok {d['rok']} w wysokości {pln(amount)} przeznacza się na cele statutowe stowarzyszenia: "
+                      f"{d['cele']}" + (", w szczególności na:" if directions else ".")),
+            ]
+            if directions:
+                out.append(("list", directions))
+            if amount < income:
+                out.append(("p", f"Pozostała część dochodu w wysokości {pln(income - amount)} nie jest objęta niniejszą uchwałą "
+                                 "i podlega opodatkowaniu na zasadach ogólnych."))
+            out += [
+                ("section", "§ 3"),
+                ("p", "Zobowiązuje się Zarząd do wydatkowania dochodu zgodnie z § 2 oraz do wykazania dochodu wolnego od podatku "
+                      "w zeznaniu CIT-8 z załącznikiem CIT-8/O i w zestawieniu przepływów finansowych za ten rok."),
+                ("section", "§ 4"),
+            ]
+        else:
+            out += [
+                ("section", "§ 2"),
+                ("p", f"Wobec braku dochodu za rok {d['rok']} nie dokonuje się jego podziału. Zobowiązuje się Zarząd do wykazania "
+                      "wyniku w zeznaniu CIT-8 za ten rok."),
+                ("section", "§ 3"),
+            ]
+        out.append(("p", "Uchwała wchodzi w życie z dniem podjęcia."))
+        return out + _signatures(ctx, _lines(d.get("podpisy")))
+
+
 class CitSheet(Doc):
     key = "cit8"
     title = "Arkusz danych do zeznania CIT-8 i załącznika CIT-8/O"
@@ -532,7 +630,8 @@ class InternalProof(Doc):
         ]
 
 
-DOCS = {cls.key: cls() for cls in (ElectionResolution, ElectionNotice, ResignationNotice, Principles, Flows, CitSheet, InternalProof)}
+DOCS = {cls.key: cls() for cls in (ElectionResolution, ElectionNotice, ResignationNotice, Principles, Flows, IncomeResolution, CitSheet,
+                                    InternalProof)}
 
 
 def flows_data(year, col4=None, col5=None, col6=None):
@@ -597,6 +696,7 @@ def _restore(data):
 
 def create(doc, cleaned, *, by, ctx):
     year = cleaned["data"].year if isinstance(cleaned.get("data"), date) else timezone.localdate().year
+    cleaned = doc.prepare(dict(cleaned), ctx)
     data = _jsonable(cleaned)
     data["_context"] = {"association": ctx["association"], "settings": ctx["settings"]}
     for _ in range(3):

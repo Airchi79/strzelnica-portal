@@ -270,13 +270,21 @@ def year_steps(year, today=None):
     resolution = (Resolution.objects.filter(title__icontains="dochod", status=Resolution.Status.ADOPTED,
                                             adopted_on__gt=date(year, 1, 1), adopted_on__lte=cit_deadline)
                   .order_by("-adopted_on").first())
-    steps.append(Step("Uchwała o przeznaczeniu dochodu na cele statutowe (zalecane)",
-                      OK if resolution else (WARN if finished else LATER),
-                      f"Przyjęta {resolution.adopted_on:%d.%m.%Y}: „{resolution.title}”." if resolution else
-                      f"Dochód zwolniony z CIT (art. 17 ust. 1 pkt 4) musi być przeznaczony na cele statutowe — najlepiej "
-                      f"udokumentować to uchwałą (w tytule słowo „dochód”) przed złożeniem CIT-8, do {cit_deadline:%d.%m.%Y}.",
-                      reverse("panel:resolutions") if resolution else reverse("panel:resolution_new"),
-                      "Uchwały" if resolution else "Nowa uchwała"))
+    draft = GeneratedDocument.objects.filter(kind="uchwala_dochod", data__rok=year).order_by("-created_at").first()
+    if resolution:
+        state, detail = OK, f"Przyjęta {resolution.adopted_on:%d.%m.%Y}: „{resolution.title}”."
+        url, action = reverse("panel:resolutions"), "Uchwały"
+    elif draft:
+        state = WARN if finished else LATER
+        detail = (f"Uchwała przygotowana w generatorze {timezone.localtime(draft.created_at):%d.%m.%Y} — po podjęciu wprowadź ją do "
+                  f"rejestru uchwał („Wprowadź uchwałę z dokumentu”), do {cit_deadline:%d.%m.%Y}.")
+        url, action = reverse("panel:resolution_historical"), "Wprowadź do rejestru"
+    else:
+        state = WARN if finished else LATER
+        detail = (f"Dochód zwolniony z CIT (art. 17 ust. 1 pkt 4) musi być przeznaczony na cele statutowe — najlepiej "
+                  f"udokumentować to uchwałą przed złożeniem CIT-8, do {cit_deadline:%d.%m.%Y}. Wzór z kwotami z ewidencji jest w generatorze.")
+        url, action = reverse("panel:accounting_doc_new", args=["uchwala_dochod"]), "Generuj uchwałę"
+    steps.append(Step("Uchwała o przeznaczeniu dochodu na cele statutowe (zalecane)", state, detail, url, action))
 
     # 8. CIT-8 z CIT-8/O
     sheet = GeneratedDocument.objects.filter(kind="cit8", data__rok=year).order_by("-created_at").first()

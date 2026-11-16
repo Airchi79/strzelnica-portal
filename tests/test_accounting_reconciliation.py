@@ -268,7 +268,14 @@ def test_year_checklist_before_and_after_year_end(owner, owner_client):
                   "Uchwała o przeznaczeniu dochodu na cele statutowe (zalecane)", "Zeznanie CIT-8 z załącznikiem CIT-8/O"):
         assert s[title].state == "ok", title
     assert "po terminie" not in s["Zeznanie CIT-8 z załącznikiem CIT-8/O"].detail
+    Resolution.objects.all().delete()
+    GeneratedDocument.objects.create(kind="uchwala_dochod", year=2027, number=1, title="Uchwała w sprawie przeznaczenia dochodu za 2026 r.",
+                                     data={"rok": 2026}, created_by=owner)
+    step = states(date(2027, 3, 15))["Uchwała o przeznaczeniu dochodu na cele statutowe (zalecane)"]
+    assert step.state == "warn" and "przygotowana w generatorze" in step.detail and step.action == "Wprowadź do rejestru"
     GeneratedDocument.objects.all().delete()
+    step = states(date(2027, 3, 15))["Uchwała o przeznaczeniu dochodu na cele statutowe (zalecane)"]
+    assert step.action == "Generuj uchwałę" and step.url.endswith("/uchwala_dochod/")
     assert "Termin minął" in states(date(2027, 4, 2))["Zeznanie CIT-8 z załącznikiem CIT-8/O"].detail
     page = owner_client.get("/panel/ksiegowosc/zamkniecie-roku/?rok=2026").content.decode()
     assert "Zamknięcie roku 2026" in page and "Zeznanie CIT-8" in page

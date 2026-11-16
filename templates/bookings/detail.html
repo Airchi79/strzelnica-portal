@@ -86,12 +86,13 @@
     {% else %}<p class="small muted">Przelew tradycyjny niedostępny — do terminu zostało za mało czasu na zaksięgowanie.</p>{% endif %}{% endif %}
   {% elif r.status == 'oczekuje' and r.pay_method == 'przelew' or pay_options.transfer and r.status == 'potwierdzona' and r.pay_method != 'gotowka' %}
     <div class="res-offline"><strong>{% if tpay_enabled and pay_options.online %}Przelew tradycyjny{% else %}Jak zapłacić{% endif %}</strong>
-      <p class="small">Kwota: <strong>{{ remaining|pln }}</strong>{% if r.pay_by %} · zaksięguj do {{ r.pay_by|date:"j.m.Y H:i" }}{% endif %}</p>
+      <p class="small">Kwota: <strong>{{ remaining|pln }}</strong> <button type="button" class="link-btn" data-copy="{{ remaining|amount_plain }}">kopiuj</button>{% if r.pay_by %} · zaksięguj do {{ r.pay_by|date:"j.m.Y H:i" }}{% endif %}</p>
       <p class="small">Tytuł przelewu: <strong class="code" data-copy-text>{{ r.number }}</strong> <button type="button" class="link-btn" data-copy="{{ r.number }}">kopiuj</button>
-      {% if association.bank_account %}<br>Rachunek: <strong class="code">{{ association.bank_account }}</strong> <button type="button" class="link-btn" data-copy="{{ association.bank_account }}">kopiuj</button>{% endif %}</p>
+      {% if association.bank_account %}<br>Rachunek: <strong class="code">{{ association.bank_account }}</strong> <button type="button" class="link-btn" data-copy="{{ association.bank_account }}">kopiuj</button>
+      <br>Odbiorca: {{ association.name }} <button type="button" class="link-btn" data-copy="{{ association.name }}">kopiuj</button>{% endif %}</p>
       {% transfer_qr association remaining r.number as qr %}{% if qr %}<div class="transfer-qr"><img src="{{ qr }}" alt="Kod QR do przelewu" width="160" height="160">
         <p class="small muted">Zeskanuj w aplikacji banku („Zeskanuj i zapłać”, „Płatność kodem QR”) — rachunek, kwota i tytuł wpiszą się same.</p>
-        {% transfer_qr_png association remaining r.number as png %}{% include "partials/transfer_qr_phone.html" with png=png name=r.number %}</div>{% endif %}
+        {% transfer_qr_png association remaining r.number as png %}{% include "partials/transfer_qr_phone.html" with png=png name=r.number amount=1 %}</div>{% endif %}
     </div>
   {% elif not tpay_enabled %}<p class="small muted">Płatności online są chwilowo niedostępne — skontaktuj się z obsługą strzelnicy.</p>{% endif %}
   <p class="small"><a href="{% url 'payments:wallet' %}">Moje płatności</a></p>

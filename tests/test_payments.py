@@ -1613,6 +1613,11 @@ def test_transfer_qr_on_reservation_and_wallet_pages(client, ps):
     client.force_login(ps)
     page = client.get(f"/rezerwacje/{r.pk}/").content.decode()
     assert 'alt="Kod QR do przelewu"' in page and "Zeskanuj w aplikacji banku" in page
+    from apps.core.templatetags.satok import amount_plain
+
+    remaining = max(r.amount - r.paid_amount, 0)
+    assert f'data-copy="{amount_plain(remaining)}"' in page and "i kwotę" in page and "nie zeskanujesz" in page
+    assert amount_plain(24000) == "240,00" and amount_plain(5) == "0,05" and amount_plain("x") == ""
     assert 'alt="Kod QR do przelewu z Twoim kodem w tytule"' in client.get("/platnosci/").content.decode()
 
 

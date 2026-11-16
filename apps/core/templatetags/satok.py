@@ -33,6 +33,16 @@ def _linkify(escaped_line):
 
 
 @register.filter
+def amount_plain(grosze):
+    """Kwota do wklejenia w przelewie: „240,00” (bez „zł” i spacji)."""
+    try:
+        grosze = int(grosze or 0)
+    except (TypeError, ValueError):
+        return ""
+    return f"{grosze // 100},{grosze % 100:02d}"
+
+
+@register.filter
 def regulation_text(text):
     """Prosty format treści regulaminu: akapity, wyróżnione paragrafy (§) i klikalne adresy https://.
     Treść jest zawsze escapowana — HTML wpisany w treść nie działa."""

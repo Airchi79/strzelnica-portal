@@ -163,6 +163,17 @@ def hours_summary(hours):
 
 
 @register.simple_tag
+def transfer_qr_png(association, amount_grosze, title):
+    """Kod QR do przelewu jako PNG (data:) — przycisk „Zapisz kod QR” na telefonie; '' bez numeru rachunku."""
+    from apps.payments.transfer_qr import qr_png_for
+
+    try:
+        return qr_png_for(association, amount_grosze, title)
+    except Exception:  # noqa: BLE001 — jak wyżej
+        return ""
+
+
+@register.simple_tag
 def transfer_qr(association, amount_grosze, title):
     """Kod QR do przelewu (standard ZBP) — obraz SVG w adresie data: albo '' bez numeru rachunku."""
     from apps.payments.transfer_qr import qr_for

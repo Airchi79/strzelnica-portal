@@ -8,7 +8,7 @@ Nazwa i tytuł bez polskich znaków — nie każda aplikacja bankowa poprawnie j
 import re
 import unicodedata
 
-from apps.core.qr import qr_svg_data_uri
+from apps.core.qr import qr_png_data_uri, qr_svg_data_uri
 
 MAX_LEN = 160
 NAME_MAX = 20
@@ -47,3 +47,9 @@ def qr_for(association, amount_grosze, title):
     """Kod QR (obraz SVG w adresie data:) dla danych stowarzyszenia albo '' (brak rachunku)."""
     text = payload(association.bank_account, amount_grosze, title, association.nip, association.name)
     return qr_svg_data_uri(text, box_size=5) if text else ""
+
+
+def qr_png_for(association, amount_grosze, title):
+    """Ten sam kod QR jako PNG (do pobrania na telefon) albo ''."""
+    text = payload(association.bank_account, amount_grosze, title, association.nip, association.name)
+    return qr_png_data_uri(text) if text else ""

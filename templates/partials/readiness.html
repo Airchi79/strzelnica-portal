@@ -1,10 +1,14 @@
 {% comment %}Lista kontrolna „co jeszcze, żeby zarezerwować”. Kontekst: readiness (z bookings.services.booking_readiness).{% endcomment %}
 <div class="card readiness{% if readiness.ready %} ready{% endif %}">
+  {% if readiness.complete %}<details class="readiness-details"><summary class="readiness-head">
+    <strong>✓ Możesz rezerwować osie</strong>
+    <span class="small muted">{{ readiness.done }} z {{ readiness.total }} gotowe · <span class="when-closed">pokaż szczegóły</span><span class="when-open">ukryj szczegóły</span></span>
+  </summary>{% else %}
   <div class="readiness-head">
     <strong>{% if readiness.ready %}Możesz rezerwować osie{% else %}Co jeszcze, żeby zarezerwować oś{% endif %}</strong>
     <span class="small muted">{{ readiness.done }} z {{ readiness.total }} gotowe</span>
   </div>
-  <div class="readiness-bar" aria-hidden="true"><span style="width: {% widthratio readiness.done readiness.total 100 %}%"></span></div>
+  <div class="readiness-bar" aria-hidden="true"><span style="width: {% widthratio readiness.done readiness.total 100 %}%"></span></div>{% endif %}
   <ol class="steps">
     {% for s in readiness.steps %}
     <li class="step {{ s.state }}">
@@ -17,7 +21,7 @@
       {% if s.url %}<a class="btn {% if s.state == 'missing' %}danger{% else %}secondary{% endif %} small-btn" href="{{ s.url }}">{{ s.action }}</a>{% endif %}
     </li>
     {% endfor %}
-  </ol>
+  </ol>{% if readiness.complete %}</details>{% endif %}
   {% if readiness.ready or logbook_actions %}<div class="actions quick-actions" style="margin-top:8px">
     {% if readiness.ready %}<a class="btn" href="{% url 'bookings:new' %}">Zarezerwuj oś</a>{% endif %}
     {% if logbook_actions %}

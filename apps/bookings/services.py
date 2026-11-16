@@ -190,7 +190,8 @@ def booking_readiness(user):
     })
     blocking = [s for s in steps if s["state"] in ("missing", "waiting")]
     done = sum(1 for s in steps if s["state"] == "done")
-    return {"steps": steps, "ready": not blocking, "done": done, "total": len(steps)}
+    return {"steps": steps, "ready": not blocking, "done": done, "total": len(steps),
+            "complete": not blocking and done == len(steps)}  # wszystko zrobione — lista zwinięta na pulpicie
 
 
 def validate_request(lane, day: date, start_hour: int, end_hour: int, persons: int, now=None, enforce_lead=False, user=None,

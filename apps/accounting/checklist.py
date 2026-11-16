@@ -167,3 +167,130 @@ def month_steps(year, month, today=None):
         steps.append(Step("Saldo rachunku uzgodnione z ewidencją", OK,
                           f"Saldo na {end:%d.%m.%Y}: {format_pln(r['closing'])} — wszystkie różnice wyjaśnione.", url, "Uzgodnienie salda"))
     return steps
+
+
+# --- lista kontrolna zamknięcia roku --------------------------------------------------------------------------------------
+
+MONTH_NAMES = ["", "styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik",
+               "listopad", "grudzień"]
+
+
+def year_steps(year, today=None):
+    """Kroki od grudnia do terminu CIT-8 (31 marca roku następnego): miesiące rozliczone, środki trwałe i odpisy,
+    forma działalności (zestawienie uzupełniające), saldo na 31.12, przepływy, zamknięcie roku, uchwała o dochodzie, CIT-8."""
+    from apps.association.models import Resolution
+
+    from . import assets, reconciliation
+    from .models import AccountingYear, DepreciationPosting, GeneratedDocument, Record
+
+    today = today or timezone.localdate()
+    end = date(year, 12, 31)
+    finished = today > end
+    cit_deadline = date(year + 1, 3, 31)
+    steps = []
+
+    # 1. miesiące rozliczone
+    open_months = []
+    for m in range(1, 13):
+        if date(year, m, 1) > today:
+            break
+        bad = [s for s in month_steps(year, m, today) if s.state in (TODO, WARN)]
+        if bad:
+            open_months.append((m, bad))
+    todo = any(s.state == TODO for _, bad in open_months for s in bad)
+    steps.append(Step(
+        "Wszystkie miesiące rozliczone (lista miesiąca)", TODO if todo else (WARN if open_months else (OK if finished else LATER)),
+        ("Do uzupełnienia: " + ", ".join(f"{MONTH_NAMES[m]} ({len(bad)})" for m, bad in open_months) + ".") if open_months
+        else ("Każdy miesiąc rozliczony." if finished else "Dotychczasowe miesiące rozliczone — grudzień po jego zakończeniu."),
+        reverse("panel:accounting_month") + (f"?rok={year}&miesiac={open_months[0][0]}" if open_months else f"?rok={year}&miesiac=12"),
+        "Otwórz miesiąc" if open_months else "Lista miesiąca"))
+
+    # 2. środki trwałe i odpisy amortyzacyjne
+    items = assets.active_in(year)
+    expected = sum(assets.year_figures(a, year)["year"] for a in items)
+    posted = sum(DepreciationPosting.objects.filter(year=year, record__removed_at__isnull=True).values_list("amount", flat=True))
+    url = reverse("panel:accounting_assets") + f"?rok={year}"
+    if not items:
+        steps.append(Step("Wykaz środków trwałych i odpisy", OK,
+                          "Brak środków trwałych w wykazie. Sprawdź, czy w roku nie kupiono sprzętu o wartości ponad 10 000 zł "
+                          "(środek trwały) — wtedy wpisz go do wykazu.", url, "Wykaz"))
+    elif expected and posted < expected:
+        steps.append(Step("Wykaz środków trwałych i odpisy", TODO if finished else LATER,
+                          f"Odpisy za rok według wykazu: {format_pln(expected)}, ujęte w ewidencji: {format_pln(posted)}. "
+                          "Zaksięguj brakujące odpisy (miesięcznie albo za cały rok po jego zakończeniu).", url, "Zaksięguj odpisy"))
+    else:
+        steps.append(Step("Wykaz środków trwałych i odpisy", OK,
+                          f"Pozycji w wykazie: {len(items)}; odpisy za rok ujęte ({format_pln(posted)}).", url, "Wykaz"))
+
+    # 3. forma działalności — zestawienie uzupełniające (§ 4)
+    records = Record.objects.filter(year=year, removed_at__isnull=True)
+    missing = records.filter(activity="").count()
+    url = reverse("panel:accounting_supplementary") + f"?rok={year}"
+    steps.append(Step("Forma działalności przypisana zapisom (zestawienie uzupełniające)", TODO if missing else OK,
+                      f"Zapisy bez formy działalności: {missing} — przypisz je (np. „pozostałe przychody i koszty”), inaczej "
+                      "zestawienie uzupełniające będzie niepełne." if missing else
+                      f"Wszystkie zapisy ({records.count()}) mają formę działalności. Pobierz zestawienie uzupełniające (PDF/XLSX).",
+                      reverse("panel:accounting") + f"?rok={year}&miesiac=0" if missing else url,
+                      "Zestawienie" if missing else "Zestawienie uzupełniające"))
+
+    # 4. saldo rachunku na 31.12 uzgodnione
+    r = reconciliation.reconcile(year, end)
+    url = reverse("panel:accounting_reconciliation") + f"?rok={year}&do={end:%Y-%m-%d}"
+    pending = next((g for g in r["groups"] if g.key == "pending"), None)
+    if not r["ops_count"]:
+        steps.append(Step("Saldo rachunku na 31.12 uzgodnione", WARN, "Brak operacji z wyciągu w tym roku.", url, "Uzgodnienie salda"))
+    elif r["unexplained"] or pending:
+        steps.append(Step("Saldo rachunku na 31.12 uzgodnione", TODO if finished else LATER,
+                          (f"Różnica niewyjaśniona: {format_pln(r['unexplained'])}. " if r["unexplained"] else "")
+                          + (f"Operacje do decyzji: {pending.count}." if pending else ""), url, "Uzgodnienie salda"))
+    else:
+        steps.append(Step("Saldo rachunku na 31.12 uzgodnione", OK if finished else LATER,
+                          f"Saldo z wyciągu: {format_pln(r['closing'])}, różnice wyjaśnione." + ("" if finished else
+                                                                                                  " Sprawdź ponownie po wgraniu wyciągu za grudzień."),
+                          url, "Uzgodnienie salda"))
+
+    # 5. zestawienie przepływów (załącznik nr 2) — kol. 4–6
+    obj = AccountingYear.objects.filter(year=year).first()
+    flows_done = obj is not None and obj.free_income is not None
+    steps.append(Step("Zestawienie przepływów finansowych (załącznik nr 2)", OK if flows_done else (TODO if finished else LATER),
+                      "Kolumny 4–6 uzupełnione — zestawienie w generatorze dokumentów." if flows_done else
+                      "Po zakończeniu roku: wygeneruj zestawienie (kol. 4 — dochód wolny przeznaczony na cele statutowe, "
+                      "kol. 6 — wydatki z dochodu wolnego). Formularz podpowiada wartości z ewidencji.",
+                      reverse("panel:accounting_doc_new", args=["przeplywy"]), "Generuj" if not flows_done else "Dokumenty"))
+
+    # 6. zamknięcie roku w ewidencji
+    closed = obj is not None and obj.closed_at is not None
+    steps.append(Step("Zamknięcie roku w ewidencji", OK if closed else (TODO if finished else LATER),
+                      f"Rok zamknięty {timezone.localtime(obj.closed_at):%d.%m.%Y} — zapisy są zablokowane." if closed else
+                      "Po zakończeniu roku i uzgodnieniu wszystkiego: pobierz zestawienie przychodów i kosztów za rok (PDF/XLSX), "
+                      "potem zamknij rok — blokuje to dalsze zmiany zapisów (§ 7).",
+                      reverse("panel:accounting_years"), "Lata i zamknięcia"))
+
+    # 7. uchwała o przeznaczeniu dochodu na cele statutowe (zalecane — dokumentuje zwolnienie z art. 17 ust. 1 pkt 4)
+    resolution = (Resolution.objects.filter(title__icontains="dochod", status=Resolution.Status.ADOPTED,
+                                            adopted_on__gt=date(year, 1, 1), adopted_on__lte=cit_deadline)
+                  .order_by("-adopted_on").first())
+    steps.append(Step("Uchwała o przeznaczeniu dochodu na cele statutowe (zalecane)",
+                      OK if resolution else (WARN if finished else LATER),
+                      f"Przyjęta {resolution.adopted_on:%d.%m.%Y}: „{resolution.title}”." if resolution else
+                      f"Dochód zwolniony z CIT (art. 17 ust. 1 pkt 4) musi być przeznaczony na cele statutowe — najlepiej "
+                      f"udokumentować to uchwałą (w tytule słowo „dochód”) przed złożeniem CIT-8, do {cit_deadline:%d.%m.%Y}.",
+                      reverse("panel:resolutions") if resolution else reverse("panel:resolution_new"),
+                      "Uchwały" if resolution else "Nowa uchwała"))
+
+    # 8. CIT-8 z CIT-8/O
+    sheet = GeneratedDocument.objects.filter(kind="cit8", data__rok=year).order_by("-created_at").first()
+    days_left = (cit_deadline - today).days
+    if not finished:
+        state, detail = LATER, f"Po zakończeniu roku: arkusz danych do CIT-8 i CIT-8/O, zeznanie do {cit_deadline:%d.%m.%Y}."
+    elif sheet:
+        state = OK
+        detail = (f"Arkusz przygotowany {timezone.localtime(sheet.created_at):%d.%m.%Y}. Złóż zeznanie elektronicznie do "
+                  f"{cit_deadline:%d.%m.%Y} i zachowaj UPO.")
+    else:
+        state = TODO if days_left >= 0 else WARN
+        detail = (f"Termin złożenia: {cit_deadline:%d.%m.%Y} (zostało {days_left} dni)." if days_left >= 0 else
+                  f"Termin minął {cit_deadline:%d.%m.%Y} — złóż zeznanie jak najszybciej (rozważ czynny żal).")
+    steps.append(Step("Zeznanie CIT-8 z załącznikiem CIT-8/O", state, detail,
+                      reverse("panel:accounting_doc_new", args=["cit8"]), "Arkusz CIT-8"))
+    return steps

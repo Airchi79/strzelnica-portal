@@ -229,3 +229,47 @@ def test_month_checklist_walks_through_routine(owner, owner_client):
     page = owner_client.get("/panel/ksiegowosc/miesiac/?rok=2026&miesiac=7").content.decode()
     assert "Lista kontrolna — lipiec 2026" in page and "Faktura prowizyjna za płatności online" in page and "następny miesiąc" in page
     assert owner_client.get("/panel/ksiegowosc/miesiac/?rok=abc").status_code == 200
+
+
+# --- lista kontrolna zamknięcia roku --------------------------------------------------------------------------------------
+
+
+def test_year_checklist_before_and_after_year_end(owner, owner_client):
+    from apps.accounting import checklist, services
+    from apps.accounting.models import AccountingYear, GeneratedDocument, Record
+    from django.utils import timezone
+
+    from apps.association.models import Resolution
+
+    def states(today):
+        return {s.title: s for s in checklist.year_steps(2026, today)}
+
+    services.add_record(kind=Record.Kind.REVENUE, day=date(2026, 7, 1), document="D/1", description="Darowizna", amount=19127,
+                        column="revenue", by=owner)
+    s = states(date(2026, 11, 16))
+    assert s["Zamknięcie roku w ewidencji"].state == "later" and s["Zeznanie CIT-8 z załącznikiem CIT-8/O"].state == "later"
+    assert s["Forma działalności przypisana zapisom (zestawienie uzupełniające)"].state == "todo"  # zapis bez formy działalności
+    Record.objects.update(activity="pozostala")
+    s = states(date(2027, 2, 1))
+    assert s["Forma działalności przypisana zapisom (zestawienie uzupełniające)"].state == "ok"
+    assert s["Zestawienie przepływów finansowych (załącznik nr 2)"].state == "todo"
+    assert s["Zamknięcie roku w ewidencji"].state == "todo"
+    cit = s["Zeznanie CIT-8 z załącznikiem CIT-8/O"]
+    assert cit.state == "todo" and "31.03.2027" in cit.detail and "zostało 58 dni" in cit.detail
+    assert s["Uchwała o przeznaczeniu dochodu na cele statutowe (zalecane)"].state == "warn"
+    assert s["Wykaz środków trwałych i odpisy"].state == "ok"
+    # po wykonaniu kroków
+    AccountingYear.objects.update_or_create(year=2026, defaults={"free_income": 19127, "closed_at": timezone.now(), "closed_by": owner})
+    GeneratedDocument.objects.create(kind="cit8", year=2027, number=1, title="Arkusz CIT-8 za 2026", data={"rok": 2026}, created_by=owner)
+    Resolution.objects.create(organ="wzc", title="przeznaczenia dochodu za 2026 r. na cele statutowe", content="…",
+                              status="przyjeta", adopted_on=date(2027, 3, 10), created_by=owner)
+    s = states(date(2027, 3, 15))
+    for title in ("Zestawienie przepływów finansowych (załącznik nr 2)", "Zamknięcie roku w ewidencji",
+                  "Uchwała o przeznaczeniu dochodu na cele statutowe (zalecane)", "Zeznanie CIT-8 z załącznikiem CIT-8/O"):
+        assert s[title].state == "ok", title
+    assert "po terminie" not in s["Zeznanie CIT-8 z załącznikiem CIT-8/O"].detail
+    GeneratedDocument.objects.all().delete()
+    assert "Termin minął" in states(date(2027, 4, 2))["Zeznanie CIT-8 z załącznikiem CIT-8/O"].detail
+    page = owner_client.get("/panel/ksiegowosc/zamkniecie-roku/?rok=2026").content.decode()
+    assert "Zamknięcie roku 2026" in page and "Zeznanie CIT-8" in page
+    assert owner_client.get("/panel/ksiegowosc/zamkniecie-roku/?rok=abc").status_code == 200

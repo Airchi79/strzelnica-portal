@@ -728,6 +728,55 @@ def blocks_for(obj):
     return doc, doc.blocks(data, ctx)
 
 
+# --- uchwały z generatora → rejestr uchwał stowarzyszenia ----------------------------------------
+
+RESOLUTION_DOCS = {
+    "uchwala_wybor": lambda d: f"prowadzenia uproszczonej ewidencji przychodów i kosztów od {d['rok']} r.",
+    "uchwala_dochod": lambda d: f"przeznaczenia dochodu za {d['rok']} r. na cele statutowe",
+    "opis_zasad": lambda d: "przyjęcia opisu zasad prowadzenia uproszczonej ewidencji przychodów i kosztów",
+}
+
+
+def resolution_text(obj):
+    """Treść uchwały z dokumentu (paragrafy, punkty, tabele) — bez nagłówka, tytułu i miejsc na podpisy."""
+    _, blocks = blocks_for(obj)
+    out = []
+    for kind, value in blocks:
+        if kind in ("section", "heading"):
+            out.append(f"\n{value}")
+        elif kind in ("p", "note"):
+            out.append(value)
+        elif kind == "list":
+            out.extend(f"– {item}" for item in value)
+        elif kind == "table":
+            out.extend(" | ".join(str(c) for c in row) for row in value["rows"])
+    return "\n".join(out).strip()
+
+
+def to_register(obj, *, by):
+    """Projekt uchwały w rejestrze (moduł Stowarzyszenie): dalej zwykła ścieżka — głosowanie Zarządu online albo
+    głosowanie na zebraniu. Jeden dokument = jeden projekt."""
+    from django.core.exceptions import ValidationError
+
+    from apps.association import services as association
+    from apps.association.models import Resolution
+
+    if obj.kind not in RESOLUTION_DOCS:
+        raise ValidationError("Ten dokument nie jest uchwałą.")
+    existing = obj.data.get("_resolution")
+    if existing and Resolution.objects.filter(pk=existing).exists():
+        raise ValidationError("Projekt tej uchwały jest już w rejestrze uchwał.")
+    data = _restore(obj.data)
+    organ_text = str(data.get("organ") or "").lower()
+    organ = (Resolution.Organ.BOARD if obj.kind == "opis_zasad" or "zarząd" in organ_text or "zarzad" in organ_text
+             else Resolution.Organ.GENERAL)
+    with transaction.atomic():
+        res = association.create_resolution(organ=organ, title=RESOLUTION_DOCS[obj.kind](data), content=resolution_text(obj), by=by)
+        obj.data = {**obj.data, "_resolution": str(res.pk)}
+        obj.save(update_fields=["data"])
+    return res
+
+
 # --- wydruk PDF i DOCX ------------------------------------------------------------------
 
 

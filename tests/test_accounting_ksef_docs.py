@@ -347,3 +347,35 @@ def test_flows_form_suggests_col6_from_column7_costs(owner_client, owner):
     page = owner_client.get("/panel/ksiegowosc/dokumenty/nowy/przeplywy/").content.decode()
     assert 'value="4000,00"' in page  # kol. 4 = dochód 5 000 − 1 000
     assert 'value="1234,56"' in page  # kol. 6 = koszty z kol. 7
+
+
+def test_generated_resolution_goes_to_register_once(owner_client, owner):
+    from apps.association.models import Resolution
+
+    services.add_record(kind=Record.Kind.REVENUE, day=date(2026, 1, 5), document="WB 1", description="x", amount=100000,
+                        column="revenue", by=owner)
+    owner_client.post("/panel/ksiegowosc/dokumenty/nowy/uchwala_dochod/", DOC_POSTS["uchwala_dochod"])
+    obj = GeneratedDocument.objects.get()
+    page = owner_client.get(f"/panel/ksiegowosc/dokumenty/{obj.pk}/").content.decode()
+    assert "Utwórz projekt w rejestrze uchwał" in page
+    r = owner_client.post(f"/panel/ksiegowosc/dokumenty/{obj.pk}/")
+    res = Resolution.objects.get()
+    assert r.status_code == 302 and r["Location"] == f"/panel/uchwaly/{res.pk}/"
+    assert res.organ == Resolution.Organ.GENERAL and res.status == Resolution.Status.DRAFT
+    assert res.title == "przeznaczenia dochodu za 2026 r. na cele statutowe"
+    assert "§ 2" in res.content and "1 000,00 zł przeznacza się na cele statutowe" in res.content and "– rozwój strzelnicy," in res.content
+    assert "Przewodniczący" not in res.content  # bez miejsc na podpisy
+    owner_client.post(f"/panel/ksiegowosc/dokumenty/{obj.pk}/")  # drugi raz — bez duplikatu
+    assert Resolution.objects.count() == 1
+    page = owner_client.get(f"/panel/ksiegowosc/dokumenty/{obj.pk}/").content.decode()
+    assert "Projekt jest w rejestrze" in page and "Utwórz projekt w rejestrze uchwał" not in page
+    # opis zasad — uchwała Zarządu (głosowanie online)
+    owner_client.post("/panel/ksiegowosc/dokumenty/nowy/opis_zasad/", DOC_POSTS["opis_zasad"])
+    principles = GeneratedDocument.objects.get(kind="opis_zasad")
+    owner_client.post(f"/panel/ksiegowosc/dokumenty/{principles.pk}/")
+    assert Resolution.objects.get(title__startswith="przyjęcia opisu zasad").organ == Resolution.Organ.BOARD
+    # dokument, który nie jest uchwałą — bez przycisku i bez akcji
+    owner_client.post("/panel/ksiegowosc/dokumenty/nowy/cit8/", DOC_POSTS["cit8"])
+    cit = GeneratedDocument.objects.get(kind="cit8")
+    assert "Utwórz projekt w rejestrze uchwał" not in owner_client.get(f"/panel/ksiegowosc/dokumenty/{cit.pk}/").content.decode()
+    assert owner_client.post(f"/panel/ksiegowosc/dokumenty/{cit.pk}/").status_code == 404

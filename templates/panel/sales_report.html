@@ -2,7 +2,7 @@
 {% block title %}{{ r.number }}{% endblock %}
 {% block panel %}
 <h1>Raport {{ r.number }}</h1>
-{% include "panel/_payments_tabs.html" %}
+{% include "panel/_reports_tabs.html" %}
 <div class="card"><table>
   <tr><th>Rodzaj</th><td>{{ r.get_kind_display }}</td></tr>
   <tr><th>Okres</th><td>{{ r.period_start|date:"j.m.Y" }}{% if r.period_end != r.period_start %} – {{ r.period_end|date:"j.m.Y" }}{% endif %}</td></tr>

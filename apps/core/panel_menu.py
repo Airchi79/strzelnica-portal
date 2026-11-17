@@ -2,12 +2,27 @@
 
 from django.urls import reverse
 
-# (etykieta, nazwa widoku, ikona, uprawnienie lub None, widoki, przy których pozycja jest aktywna; „*” na końcu = prefiks)
+# (etykieta, cel, ikona, uprawnienie, widoki, przy których pozycja jest aktywna; „*” na końcu = prefiks).
+# Cel: nazwa widoku albo lista par (widok, uprawnienie) — pierwszy dostępny dla osoby (jedna pozycja zamiast kilku).
+# Uprawnienie: None, nazwa albo krotka (wystarczy jedno z nich).
+SETTINGS_PAGES = [  # strona „Ustawienia” — wszystkie ustawienia w jednym miejscu
+    ("panel:settings", "core.manage_settings", "Dane stowarzyszenia", "Nazwa, adres, NIP, rachunek, logo, kontakt, dane do dokumentów."),
+    ("panel:booking_settings", "bookings.manage_booking_settings", "Rezerwacje",
+     "Anulowanie, terminy płatności, wyprzedzenie, grupy strzelców, prowadzący od strzelnicy."),
+    ("panel:logbook_settings", "logbook.manage_logbook", "Książka pobytu", "Okres przechowywania, oświadczenie, kod QR wejścia, plakat."),
+    ("panel:kiosks", "logbook.manage_logbook", "Kioski", "Parowanie urządzeń przy wejściu, kamera, wyłączanie."),
+    ("panel:payment_settings", "payments.manage_payments", "Płatności", "Opłata za płatność online, saldo, sposoby płatności."),
+    ("panel:accounting_settings", "accounting.manage_accounting", "Księgowość",
+     "Przychody z systemu od dnia, organ zatwierdzający, urząd skarbowy, koniec płatności przez Stripe."),
+    ("panel:lanes", "facilities.manage_facilities", "Osie, godziny i opłaty", "Godziny otwarcia (także zbiorczo), cennik osi."),
+]
+SETTINGS_PERMS = tuple(sorted({perm for _, perm, _, _ in SETTINGS_PAGES}))
+
 SECTIONS = [
     (None, [
         ("Przegląd", "panel:home", "home", None, ["home"]),
-        ("Teraz na strzelnicy", "panel:now", "target", "logbook.view_logbook", ["now"]),
-        ("Dziś na strzelnicy", "panel:today", "calendar", "bookings.manage_reservations", ["today"]),
+        ("Dziś na strzelnicy", [("panel:today", "bookings.manage_reservations"), ("panel:now", "logbook.view_logbook")], "calendar",
+         ("bookings.manage_reservations", "logbook.view_logbook"), ["today", "now"]),
         ("Powiadomienia", "panel:notifications", "bell", None, ["notification*"]),
     ]),
     ("Rezerwacje", [
@@ -16,16 +31,11 @@ SECTIONS = [
         ("Kalendarz osi", "panel:bookings", "grid", "bookings.manage_reservations", ["bookings"]),
         ("Blokady osi", "panel:blocks", "lock", "bookings.manage_reservations", ["block*"]),
         ("Wydarzenia i zawody", "panel:events", "calendar", "events.manage_events", ["event*"]),
-        ("Archiwum GunTracker", "panel:reservations_archive", "archive", "bookings.manage_reservations", ["reservations_archive*"]),
-        ("Ustawienia rezerwacji", "panel:booking_settings", "sliders", "bookings.manage_booking_settings", ["booking_settings"]),
     ]),
     ("Strzelnica", [
         ("Książka pobytu", "panel:logbook", "book", "logbook.view_logbook",
          ["logbook", "logbook_entry", "logbook_add", "logbook_print", "logbook_export"]),
-        ("Archiwum książki", "panel:logbook_archive", "archive", "logbook.view_logbook", ["logbook_archive*"]),
         ("Kioski", "panel:kiosks", "tablet", "logbook.manage_logbook", ["kiosks"]),
-        ("Ustawienia książki", "panel:logbook_settings", "sliders", "logbook.manage_logbook",
-         ["logbook_settings", "logbook_rotate", "logbook_poster"]),
         ("Osie i opłaty", "panel:lanes", "target", "facilities.manage_facilities", ["lane*", "facility*", "price_add"]),
         ("Usterki", "panel:issues", "alert", "facilities.manage_facilities", ["issue*"]),
         ("Regulaminy", "panel:regulations", "file", "regulations.publish_regulation", ["regulation*"]),
@@ -40,7 +50,6 @@ SECTIONS = [
     ("Płatności", [
         ("Wpłaty", "panel:payments", "receipt", "payments.manage_payments", ["payment*"]),
         ("Salda", "panel:wallets", "wallet", "payments.manage_payments", ["wallet*"]),
-        ("Raporty wpływów", "panel:sales_reports", "chart", "reports.view_salesreport", ["sales_report*"]),
         ("Księgowość", "panel:accounting", "book", "accounting.manage_accounting", ["accounting*"]),
     ]),
     ("Stowarzyszenie", [
@@ -50,10 +59,19 @@ SECTIONS = [
         ("Uchwały", "panel:resolutions", "filecheck", "association.manage_resolutions", ["resolution*"]),
         ("Zebrania", "panel:meetings", "calendar", "association.manage_resolutions", ["meeting*"]),
         ("Kluby i kody", "panel:clubs", "key", "association.manage_clubs", ["club*"]),
-        ("Raporty", "panel:reports", "chart", "association.view_reports", ["reports"]),
+    ]),
+    ("Raporty", [
+        ("Statystyki i raporty", "panel:reports", "chart", "association.view_reports",
+         ["reports", "month_stats", "occupancy", "reservations_report"]),
+        ("Raporty wpływów", "panel:sales_reports", "receipt", "reports.view_salesreport", ["sales_report*"]),
     ]),
     ("System", [
-        ("Dane stowarzyszenia", "panel:settings", "building", "core.manage_settings", ["settings"]),
+        ("Ustawienia", "panel:settings_hub", "sliders", SETTINGS_PERMS,
+         ["settings_hub", "settings", "booking_settings", "logbook_settings", "logbook_rotate", "logbook_poster", "payment_settings",
+          "accounting_settings"]),
+        ("Archiwum GunTracker", [("panel:reservations_archive", "bookings.manage_reservations"),
+                                 ("panel:logbook_archive", "logbook.view_logbook")], "archive",
+         ("bookings.manage_reservations", "logbook.view_logbook"), ["reservations_archive*", "logbook_archive*"]),
         ("Dziennik zdarzeń", "panel:audit", "history", "audit.view_auditlog", ["audit"]),
         ("Kopie zapasowe", "panel:backups", "archive", "core.manage_settings", ["backups"]),
         ("Widżet na stronę", "panel:widget", "external", "core.manage_settings", ["widget"]),
@@ -80,6 +98,24 @@ def _counts(user):
     return counts
 
 
+def has_any(user, perm):
+    if not perm:
+        return True
+    return any(user.has_perm(p) for p in (perm if isinstance(perm, (list, tuple)) else [perm]))
+
+
+def _target(user, target):
+    """Nazwa widoku dla pozycji menu: stała albo pierwsza z listy (widok, uprawnienie) dostępna dla osoby."""
+    if isinstance(target, str):
+        return target
+    return next((name for name, perm in target if has_any(user, perm)), None)
+
+
+def settings_pages(user):
+    return [{"url": reverse(name), "title": title, "text": text} for name, perm, title, text in SETTINGS_PAGES
+            if has_any(user, perm)]
+
+
 def build(request):
     user = request.user
     current = getattr(request.resolver_match, "url_name", "") or ""
@@ -87,8 +123,9 @@ def build(request):
     counts = _counts(user)
     for title, items in SECTIONS:
         visible = []
-        for label, name, icon, perm, patterns in items:
-            if perm and not user.has_perm(perm):
+        for label, target, icon, perm, patterns in items:
+            name = _target(user, target) if has_any(user, perm) else None
+            if name is None:
                 continue
             visible.append({"label": label, "url": reverse(name), "icon": icon, "active": _matches(current, patterns),
                             "badge": "notifications" if name == "panel:notifications" else "", "count": counts.get(name, 0)})

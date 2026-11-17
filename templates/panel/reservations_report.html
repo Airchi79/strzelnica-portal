@@ -6,7 +6,7 @@
     <p class="daylabel week-label" style="margin:0">{{ period_label|capfirst }}: {{ first|date:"j.m.Y" }} – {{ last|date:"j.m.Y" }} · zmiany wobec poprzedniego okresu tej samej długości</p></div>
   <div class="actions no-print" style="margin:0"><button type="button" class="btn small-btn" data-print>Drukuj</button></div>
 </div>
-<div class="no-print">{% include "panel/_assoc_tabs.html" %}</div>
+<div class="no-print">{% include "panel/_reports_tabs.html" %}</div>
 <nav class="tabs no-print" aria-label="Okres">{% for k, l in periods %}<a href="?okres={{ k }}" class="{% if k == period %}active{% endif %}"{% if k == period %} aria-current="page"{% endif %}>{{ l|capfirst }}</a>{% endfor %}</nav>
 
 {% with d=deltas %}

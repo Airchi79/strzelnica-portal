@@ -2,6 +2,7 @@
 {% block title %}Ustawienia księgowości{% endblock %}
 {% block panel %}
 <h1>Ustawienia księgowości</h1>
+<p class="small no-print" style="margin-top:-4px"><a href="{% url 'panel:settings_hub' %}">← Wszystkie ustawienia</a></p>
 {% include "panel/_accounting_tabs.html" %}
 <p class="muted">Opisy zdarzeń dla przychodów z systemu wpisuje się w kol. 4 zestawienia. Kwalifikację przychodów ustala zarząd — domyślnie opłaty za korzystanie ze strzelnicy to dochody z majątku stowarzyszenia (art. 42 ust. 2 Prawa o stowarzyszeniach — udostępnianie strzelnicy). Zmiana opisu dotyczy tylko nowych zapisów.</p>
 <form method="post" class="card" novalidate>{% csrf_token %}

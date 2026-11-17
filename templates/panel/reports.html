@@ -2,7 +2,7 @@
 {% block title %}Raporty {{ year }}{% endblock %}
 {% block panel %}
 <h1>Raporty {{ year }}</h1>
-{% include "panel/_assoc_tabs.html" %}
+{% include "panel/_reports_tabs.html" %}
 <form method="get" class="card filters"><div><label for="r">Rok</label><input type="number" id="r" name="rok" value="{{ year }}"></div>
   <div class="actions"><button class="btn" type="submit">Pokaż</button><button class="btn secondary" name="format" value="csv">Eksport CSV</button></div></form>
 <div class="grid">

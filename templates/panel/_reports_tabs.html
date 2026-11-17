@@ -1,0 +1,9 @@
+<div class="tabs">
+  {% with u=request.resolver_match.url_name %}
+  {% if perms.association.view_reports %}<a href="{% url 'panel:reports' %}" class="{% if u == 'reports' %}active{% endif %}">Raport roczny</a>
+  <a href="{% url 'panel:month_stats' %}" class="{% if u == 'month_stats' %}active{% endif %}">Statystyki miesiąca</a>
+  <a href="{% url 'panel:occupancy' %}" class="{% if u == 'occupancy' %}active{% endif %}">Obłożenie godzinowe</a>
+  <a href="{% url 'panel:reservations_report' %}" class="{% if u == 'reservations_report' %}active{% endif %}">Rezerwacje i osie</a>{% endif %}
+  {% if perms.reports.view_salesreport %}<a href="{% url 'panel:sales_reports' %}" class="{% if 'sales_report' in u %}active{% endif %}">Raporty wpływów</a>{% endif %}
+  {% endwith %}
+</div>

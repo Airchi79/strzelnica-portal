@@ -58,6 +58,7 @@ urlpatterns = [
     path("osie/obiekt/<int:pk>/", facilities_views.panel_facility, name="facility"),
     path("osie/<int:pk>/oplaty/", facilities_views.panel_price_add, name="price_add"),
     path("ustawienia/", views.panel_settings, name="settings"),
+    path("ustawienia/wszystkie/", views.panel_settings_hub, name="settings_hub"),
     path("dzis/", bookings_views.panel_today, name="today"),
     path("teraz/", logbook_views.panel_now, name="now"),
     path("rezerwacje/", bookings_views.panel_calendar, name="bookings"),

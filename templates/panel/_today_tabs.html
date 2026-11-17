@@ -1,0 +1,4 @@
+{% with u=request.resolver_match.url_name %}{% if perms.bookings.manage_reservations %}<div class="tabs no-print">
+  <a href="{% url 'panel:now' %}" class="{% if u == 'now' %}active{% endif %}">Teraz na terenie</a>
+  <a href="{% url 'panel:today' %}" class="{% if u == 'today' %}active{% endif %}">Plan dnia</a>
+</div>{% endif %}{% endwith %}

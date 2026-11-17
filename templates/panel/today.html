@@ -1,6 +1,7 @@
 {% extends "panel/base_panel.html" %}{% load satok %}
 {% block title %}Dziś na strzelnicy — {{ day|date:"j.m.Y" }}{% endblock %}
 {% block panel %}
+{% include "panel/_today_tabs.html" %}
 <div class="today-head">
   <div>
     <h1 style="margin-bottom:2px">{% if is_today %}Dziś na strzelnicy{% else %}Raport dnia{% endif %}</h1>

@@ -2,6 +2,7 @@
 {% block title %}Stowarzyszenie{% endblock %}
 {% block panel %}
 <h1>Dane stowarzyszenia</h1>
+<p class="small no-print" style="margin-top:-4px"><a href="{% url 'panel:settings_hub' %}">← Wszystkie ustawienia</a></p>
 <div class="card"><form method="post" novalidate>{% csrf_token %}{% include "partials/form.html" %}<button class="btn" type="submit">Zapisz</button></form></div>
 
 <h2 id="logo">Logo</h2>

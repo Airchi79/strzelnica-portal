@@ -52,21 +52,26 @@ def month_stats(year, month):
         Reservation.objects.filter(starts_at__gte=start, starts_at__lt=end).exclude(ACTIVE_EXCLUDE)
         .select_related("lane", "access_code__club")
     )
-    blocks = list(Block.objects.filter(starts_at__lt=end, ends_at__gt=start).prefetch_related("lanes"))
+    from apps.bookings.models import ArchivedReservation
+
+    # rezerwacje z GunTrackera (archiwum) liczą się jak rezerwacje; ich blokady osi to zajęte godziny, nie zamknięcie
+    archived = list(ArchivedReservation.objects.filter(starts_at__gte=start, starts_at__lt=end, lane__isnull=False))
+    archive_blocks = ArchivedReservation.objects.filter(block__isnull=False).values("block_id")
+    blocks = list(Block.objects.filter(starts_at__lt=end, ends_at__gt=start).exclude(pk__in=archive_blocks).prefetch_related("lanes"))
     for b in blocks:
         b.lane_ids = {lane.pk for lane in b.lanes.all()}
 
     lanes = []
     for lane in Lane.objects.filter(is_active=True).prefetch_related("opening_hours").order_by("facility__order", "order"):
-        booked = sum(r.hours for r in reservations if r.lane_id == lane.pk)
+        booked = sum(r.hours for r in reservations if r.lane_id == lane.pk) + sum(_hours(a) for a in archived if a.lane_id == lane.pk)
         capacity = _lane_capacity(lane, first, nxt, blocks)
         lanes.append({"lane": lane, "booked": booked, "capacity": capacity,
                       "pct": round(100 * booked / capacity) if capacity else None})
 
     heat = [[0] * 24 for _ in range(7)]
-    for r in reservations:
+    for r in list(reservations) + archived:
         t = timezone.localtime(r.starts_at)
-        for i in range(r.hours):
+        for i in range(_hours(r)):
             h = (t.hour + i) % 24
             heat[t.weekday()][h] += 1
     from apps.facilities.models import OpeningHours
@@ -104,11 +109,11 @@ def month_stats(year, month):
     return {
         "year": year, "month": month, "first": first,
         "kpi": {
-            "reservations": len(reservations),
+            "reservations": len(reservations) + len(archived),
             "hours": booked_total,
             "occupancy": round(100 * booked_total / capacity_total) if capacity_total else None,
-            "persons": sum(r.persons for r in reservations),
-            "officers": len({r.user_id for r in reservations}),
+            "persons": sum(r.persons for r in reservations) + sum(max(1, len(re.findall(r"\d+", a.positions or ""))) for a in archived),
+            "officers": len({r.user_id for r in reservations}) + len({" ".join(a.client.split()).casefold() for a in archived}),
             "entries": entry_stats["n"],
             "shooters": entry_stats["shooters"],
             "people": (entry_stats["people"] or 0) + guests,
@@ -123,6 +128,7 @@ def month_stats(year, month):
         "income": sorted(((labels.get(m, m), v) for m, v in by_method.items()), key=lambda x: -x[1]),
         "cancelled_late": sum(1 for r in reservations if r.status == "anulowana"),
         "no_show": sum(1 for r in reservations if r.status == "nieodbyta"),
+        "archived": len(archived),
     }
 
 

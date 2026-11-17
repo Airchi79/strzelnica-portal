@@ -151,9 +151,9 @@ Zarząd głosuje online (remis — Prezes); WZC — głosy ważone, pełnomocnic
   prowizje netto Stripe 215,14 zł) wyjaśniona — do sprawdzenia przy fakturze za listopad.
 
 ### 5.6 Archiwum GunTrackera w statystykach
-„Rezerwacje i osie” i „Obłożenie godzinowe” liczą rezerwacje z archiwum (oś przypisana przy imporcie); blokady
+„Rezerwacje i osie”, „Obłożenie godzinowe” i „Statystyki miesiąca” liczą rezerwacje z archiwum (oś przypisana przy imporcie); blokady
 założone za przyszłe rezerwacje GunTrackera liczą się jako zajęte godziny. Przychód archiwalny to **szacunek z cennika**
-(eksport nie podaje kwot); „Książka papierowa” i „Dodano” = wpis. „Statystyki miesiąca” — bez archiwum.
+(eksport nie podaje kwot); „Książka papierowa” i „Dodano” = wpis.
 
 ---
 
@@ -210,7 +210,7 @@ stan: `/healthz`. Błędy 500 → e-mail na `ERROR_EMAIL`.
 
 ## 8. Testy i CI
 
-- `pytest` na PostgreSQL (blokady i triggery bazy są częścią testów). Stan 16.11.2026: **739 testów, wszystkie zaliczone.**
+- `pytest` na PostgreSQL (blokady i triggery bazy są częścią testów). Stan 17.11.2026: **744 testy, wszystkie zaliczone.**
 - CI (`.github/workflows/testy.yml`, każdy PR do `main`): instalacja zależności + Tesseract (pol), `makemigrations --check`,
   `manage.py check`, pełne testy.
 - Lokalnie: `export DJANGO_DEBUG=1 POSTGRES_HOST=localhost; python manage.py migrate; python -m pytest`.
@@ -236,16 +236,18 @@ osobowych, `manage.py check --deploy` (jedyna uwaga: HSTS preload — świadomie
 - zadanie Hybrid Backup Sync (kopia poza QNAP) działa i ma ostatni udany przebieg;
 - treść `.env` zapisana poza serwerem.
 
-**Rekomendacje (układ i obsługa — do decyzji, niewdrożone):**
-- „Teraz na strzelnicy” i „Dziś na strzelnicy” — jedna strona z dwiema sekcjami.
-- Raporty rozproszone (Płatności → Raporty wpływów; Stowarzyszenie → Raport roczny, Statystyki miesiąca, Obłożenie,
-  Rezerwacje i osie) — jedna grupa „Raporty” w menu.
-- Ustawienia w pięciu miejscach (rezerwacje, książka, dane stowarzyszenia, księgowość, płatności) — wspólna strona
-  „Ustawienia” z odnośnikami.
-- Po zakończeniu okresu przejściowego: „Archiwum GunTracker” i „Archiwum książki” jako jedna pozycja w „System”.
-- „Statystyki miesiąca” bez archiwum GunTrackera — dla spójności z „Rezerwacje i osie” można je dołączyć.
-- Blokada logowania po 5 nieudanych próbach dotyczy adresu e-mail — ktoś znający e-mail może zablokować logowanie tej
-  osoby na 15 minut (świadomy kompromis; alternatywa: CAPTCHA po kilku próbach).
+**Uproszczenie panelu (wdrożone 17.11.2026 na prośbę właściciela, PR #72):**
+- jedna pozycja „Dziś na strzelnicy” z zakładkami „Teraz na terenie” / „Plan dnia” (osoba tylko z uprawnieniem do
+  książki trafia od razu do „Teraz”);
+- grupa menu **„Raporty”**: „Statystyki i raporty” (Raport roczny, Statystyki miesiąca, Obłożenie godzinowe,
+  Rezerwacje i osie) i „Raporty wpływów” — wspólny pasek zakładek;
+- **„Ustawienia”** (System) — jedna strona z kafelkami wszystkich ustawień (dane stowarzyszenia, rezerwacje, książka,
+  kioski, płatności, księgowość, osie), widoczne wg uprawnień; każda strona ustawień ma powrót „← Wszystkie ustawienia”;
+- **„Archiwum GunTracker”** (System) — jedna pozycja z zakładkami „Rezerwacje” / „Książka pobytu”;
+- „Statystyki miesiąca” liczą też archiwum GunTrackera (jak „Rezerwacje i osie”).
+
+**Świadomy kompromis (bez zmian):** blokada logowania po 5 nieudanych próbach dotyczy adresu e-mail — ktoś znający
+e-mail może zablokować logowanie tej osoby na 15 minut (alternatywa: CAPTCHA po kilku próbach).
 
 ---
 
@@ -256,7 +258,7 @@ osobowych, `manage.py check --deploy` (jedyna uwaga: HSTS preload — świadomie
 | początek grudnia 2026 | zamknięcie listopada w „Liście miesiąca”; sprawdzić, czy faktura GunTrackera wyrówna 4,80 zł |
 | przejście na Axeptę | umowa z BNP, dane sklepu w `.env`, test w sandboxie (`docs/AXEPTA.md`); data końca Stripe w ustawieniach księgowości; po 1. miesiącu — sprawdzić rozpoznanie faktury BNP i wypłat |
 | styczeń–marzec 2027 | zamknięcie roku 2026, uchwała WZC 1/2027 o przeznaczeniu dochodu, **wykaz rubryk CIT-8 z kwotami** (do zbudowania po publikacji formularza), CIT-8 do 31.03.2027 |
-| odłożone | karnety i wypłata salda (SPEC etap 5), rekomendacje układu z rozdz. 9 |
+| odłożone | karnety i wypłata salda (SPEC etap 5) |
 
 ---
 

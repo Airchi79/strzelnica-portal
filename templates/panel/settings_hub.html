@@ -1,0 +1,9 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Ustawienia{% endblock %}
+{% block panel %}
+<h1>Ustawienia</h1>
+<p class="muted">Wszystkie ustawienia systemu w jednym miejscu. Widzisz te, do których masz uprawnienia.</p>
+<div class="grid settings-hub">
+  {% for p in pages %}<a class="card settings-tile" href="{{ p.url }}"><strong>{{ p.title }}</strong><span class="small muted">{{ p.text }}</span></a>{% endfor %}
+</div>
+{% endblock %}

@@ -9,7 +9,8 @@
     <button type="button" class="btn small-btn" data-print>Drukuj</button>
   </div>
 </div>
-<div class="no-print">{% include "panel/_assoc_tabs.html" %}</div>
+<div class="no-print">{% include "panel/_reports_tabs.html" %}</div>
+{% if archived %}<p class="small muted">W tym {{ archived }} rezerwacji z archiwum GunTrackera (liczba osób = liczba stanowisk, prowadzący — po imieniu i nazwisku).</p>{% endif %}
 
 {% with d=deltas %}
 <div class="today-tiles kpi-tiles">

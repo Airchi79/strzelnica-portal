@@ -72,6 +72,30 @@ Skrypt:
 `sh /share/CACHEDEV3_DATA/strzelnica-test/deploy/kopia-testowa.sh` — dane testu zostaną
 **zastąpione** aktualnymi danymi produkcji (próby z testu znikną). Kiosk testowy trzeba potem sparować ponownie.
 
+## Testerzy (klienci testujący swoje konta)
+
+Testerzy korzystają z kopii testowej jak strzelcy — każdy widzi tylko swoje konto, rezerwacje i płatności (bez panelu).
+
+1. **Dostęp do strony** — Cloudflare → Zero Trust → Access → Applications → aplikacja testu (`test.strzelnicasatok.pl`)
+   → Policies → polityka „Allow” → **Include → Emails**: dopisz adresy testerów → Save. Tester przy wejściu podaje
+   swój e-mail i wpisuje kod, który dostaje od Cloudflare. Bez tego strona testu jest niedostępna (i tak ma zostać).
+2. **E-maile do testerów** — na QNAP, w folderze testu (adresy oddzielone przecinkami, bez spacji):
+   ```
+   cd /share/CACHEDEV3_DATA/strzelnica-test && sh deploy/ustaw-env.sh EMAIL_TEST_RECIPIENTS && docker compose up -d app cron
+   ```
+   Testerzy dostają swoje wiadomości bezpośrednio (temat `[TEST] …`: potwierdzenie adresu, reset hasła, rezerwacje,
+   przypomnienia), wszystkie pozostałe e-maile nadal idą na biuro@. Lista zostaje przy odświeżaniu danych.
+   Uwaga: tester z prawdziwymi rezerwacjami na produkcji może dostać z testu przypomnienia o nich — z oznaczeniem `[TEST]`.
+3. **Logowanie testera** — kontem z produkcji (e-mail i hasło takie jak na produkcji w chwili ostatniego odświeżenia)
+   albo nowym kontem założonym w teście (potwierdzenie przyjdzie na adres z listy).
+4. **Co przekazać testerom:**
+   - adres: `https://test.strzelnicasatok.pl` (czerwony pasek „WERSJA TESTOWA” — to nie jest prawdziwa strzelnica);
+   - rezerwacje i wpisy w teście są próbne — nie obowiązują na strzelnicy;
+   - płatności są testowe: BLIK kod `777123` = udana, `960111` = odrzucona; karta `4111 1111 1111 1111`, 12/29, CVV 123;
+   - po odświeżeniu danych z produkcji wszystko, co zrobili w teście, znika.
+5. **Odświeżenie danych z produkcji** (tylko ręcznie, gdy zdecydujesz):
+   `sh /share/CACHEDEV3_DATA/strzelnica-test/deploy/kopia-testowa.sh` — test dostaje aktualne dane produkcji.
+
 ## Logowanie w teście
 
 Konta i hasła są takie jak na produkcji w chwili kopiowania (logowanie 2FA też — ten sam kod z aplikacji).

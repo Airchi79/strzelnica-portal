@@ -181,7 +181,7 @@ założone za przyszłe rezerwacje GunTrackera liczą się jako zajęte godziny.
 `DJANGO_SECRET_KEY, DJANGO_ALLOWED_HOSTS, DJANGO_CSRF_TRUSTED_ORIGINS, SITE_URL, TRUST_X_FORWARDED_FOR, APP_PORT, APP_BIND,
 PUID, PGID, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, EMAIL_* , DEFAULT_FROM_EMAIL, ERROR_EMAIL, TPAY_*, AXEPTA_*,
 ONLINE_PAYMENTS_PROVIDER, TUNNEL_TOKEN, KSEF_TOKEN, KSEF_ENVIRONMENT`; kopia testowa dodatkowo `SITE_ENVIRONMENT=test`,
-`EMAIL_REDIRECT_TO`, `IMAGE_NAME`. Wzór: `.env.example`.
+`EMAIL_REDIRECT_TO`, `EMAIL_TEST_RECIPIENTS` (testerzy dostają swoje e-maile bezpośrednio), `IMAGE_NAME`. Wzór: `.env.example`.
 
 ### 7.2 Kopie zapasowe
 Codziennie `backups/satok-RRRR-MM-DD.dump` (7 ostatnich), każda sprawdzana odtworzeniem do bazy `satok_verify`;

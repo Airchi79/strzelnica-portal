@@ -41,6 +41,21 @@ def test_all_mail_redirected_with_original_recipient():
     assert "czlonek@example.com" in msg.body and msg.extra_headers["X-Satok-Original-To"] == "czlonek@example.com"
 
 
+@override_settings(**REDIRECT, EMAIL_TEST_RECIPIENTS={"tester@example.com"})
+def test_testers_get_their_mail_directly_others_redirected():
+    mail.send_mail("Potwierdź adres", "Link", "noreply@example.com", ["Tester <Tester@Example.com>"], fail_silently=False)
+    msg = mail.outbox[-1]
+    assert msg.to == ["Tester <Tester@Example.com>"] and msg.subject == "[TEST] Potwierdź adres"
+    assert msg.body.startswith("[Kopia testowa systemu strzelnicy") and "Link" in msg.body
+    mail.outbox.clear()
+    mail.send_mail("Ogłoszenie", "Treść", "noreply@example.com", ["tester@example.com", "czlonek@example.com"], fail_silently=False)
+    assert len(mail.outbox) == 2
+    direct, redirected = mail.outbox
+    assert direct.to == ["tester@example.com"]
+    assert redirected.to == ["biuro@example.com"] and redirected.subject == "[TEST → czlonek@example.com] Ogłoszenie"
+    assert "tester@example.com" not in redirected.extra_headers["X-Satok-Original-To"]
+
+
 def test_push_in_test_copy_only_to_devices_registered_after_preparation(monkeypatch):
     u = make_user("czlonek@example.com")
     _, p256dh, auth_b64, _ = _receiver()

@@ -39,9 +39,9 @@ cd /share/strzelnica && wget -O tmp/strzelnica.tar.gz https://github.com/Airchi7
    **`qnap-test`**. Skopiuj tylko ciąg po `--token` (nie do czatu). Trasa: Routes → **Add route** → Published application
    `test` / `strzelnicasatok.pl`, typ **HTTP**, URL **`app:8000`**. Tunel produkcji (`qnap`) nie może być użyty:
    kontenery na QNAP nie łączą się z adresem serwera w sieci domowej, a tunel produkcji nie widzi sieci testu.
-2. **Zalecane — dostęp tylko dla Ciebie**: Cloudflare → Zero Trust → Access → Applications → Add → Self-hosted →
-   `test.strzelnicasatok.pl`, polityka „Allow” dla Twojego adresu e-mail (logowanie kodem z e-maila). Bez tego kopia
-   testowa jest dostępna dla każdego, kto zna adres.
+2. **Opcjonalnie — ograniczenie dostępu**: Cloudflare → Zero Trust → Access → Applications → Add → Self-hosted →
+   `test.strzelnicasatok.pl`, polityka „Allow” z adresami e-mail osób (logowanie kodem z e-maila). Bez tego kopia
+   testowa jest dostępna dla każdego, kto zna adres (stan od 17.11.2026).
 3. **Na QNAP** (zakłada folder, `.env` testu, kopiuje bazę i pliki z produkcji, uruchamia test):
 
 ```
@@ -76,9 +76,11 @@ Skrypt:
 
 Testerzy korzystają z kopii testowej jak strzelcy — każdy widzi tylko swoje konto, rezerwacje i płatności (bez panelu).
 
-1. **Dostęp do strony** — Cloudflare → Zero Trust → Access → Applications → aplikacja testu (`test.strzelnicasatok.pl`)
-   → Policies → polityka „Allow” → **Include → Emails**: dopisz adresy testerów → Save. Tester przy wejściu podaje
-   swój e-mail i wpisuje kod, który dostaje od Cloudflare. Bez tego strona testu jest niedostępna (i tak ma zostać).
+1. **Dostęp do strony** — od 17.11.2026 test jest dostępny jak produkcja (bez Cloudflare Access; decyzja właściciela —
+   testują zaufane osoby). Każdy, kto zna adres, może wejść; logowanie jak na produkcji (konto, 2FA w panelu).
+   Wyszukiwarki nie indeksują testu (nagłówek `X-Robots-Tag: noindex` i znacznik w stronach). Gdyby trzeba było
+   znów ograniczyć dostęp: Cloudflare → Zero Trust → Access → Applications → Add → Self-hosted → `test.strzelnicasatok.pl`,
+   polityka „Allow” z adresami e-mail osób.
 2. **E-maile do testerów** — na QNAP, w folderze testu (adresy oddzielone przecinkami, bez spacji):
    ```
    cd /share/CACHEDEV3_DATA/strzelnica-test && sh deploy/ustaw-env.sh EMAIL_TEST_RECIPIENTS && docker compose up -d app cron
@@ -103,6 +105,10 @@ Konto panelu działa wyłącznie jako panel; do prób jako strzelec załóż w t
 potwierdzenie przyjdzie na biuro@ z dopiskiem, do kogo było adresowane.
 
 ## Płatności online w teście (Cloudflare Access)
+
+> Od 17.11.2026 test działa bez Cloudflare Access — powiadomienia operatora docierają bezpośrednio, a aplikacja
+> „Axepta – powiadomienia (test)” w Zero Trust nie jest potrzebna (można ją usunąć). Poniższy opis dotyczy sytuacji,
+> gdyby ochrona Access została przywrócona.
 
 Strona testowa jest chroniona logowaniem Cloudflare Access (aplikacja „strzelnica-test”). Operator płatności nie
 przejdzie przez to logowanie, więc jego powiadomienia o płatnościach i zwrotach dostają przekierowanie do strony

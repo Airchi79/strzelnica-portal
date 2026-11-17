@@ -25,6 +25,13 @@ REDIRECT = {"EMAIL_BACKEND": "apps.core.mail_redirect.RedirectingEmailBackend",
             "EMAIL_INNER_BACKEND": "django.core.mail.backends.locmem.EmailBackend", "EMAIL_REDIRECT_TO": "biuro@example.com"}
 
 
+def test_test_copy_not_indexed(client):
+    assert "X-Robots-Tag" not in client.get("/").headers
+    with override_settings(**TEST_COPY):
+        assert client.get("/").headers["X-Robots-Tag"] == "noindex, nofollow"
+        assert client.get("/healthz").headers["X-Robots-Tag"] == "noindex, nofollow"
+
+
 def test_banner_only_in_test_copy(client):
     assert "WERSJA TESTOWA" not in client.get("/").content.decode()
     with override_settings(**TEST_COPY):

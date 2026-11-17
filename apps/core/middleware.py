@@ -1,5 +1,6 @@
 """Zabezpieczenia na poziomie żądania: limit wielkości żądania, nagłówki Permissions-Policy i Content-Security-Policy."""
 
+from django.conf import settings
 from django.http import HttpResponse
 
 MAX_REQUEST_BYTES = 15 * 1024 * 1024  # największe dozwolone pliki mają 5 MB; zapas na formularz i kodowanie
@@ -39,6 +40,8 @@ class SecurityLimitsMiddleware:
             return HttpResponse("Za duży plik lub formularz (najwyżej 15 MB).", status=413, content_type="text/plain; charset=utf-8")
         response = self.get_response(request)
         response.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
+        if settings.IS_TEST_COPY:  # kopia testowa bywa publiczna — wyszukiwarki nie indeksują niczego (strony, PDF, pliki)
+            response["X-Robots-Tag"] = "noindex, nofollow"
         if "Content-Security-Policy" not in response:  # np. logo SVG ma własną, ostrzejszą politykę
             # osadzanie w ramce tylko tam, gdzie widok na to pozwala (podgląd PDF w weryfikacji dokumentów)
             if getattr(response, "xframe_options_exempt", False):

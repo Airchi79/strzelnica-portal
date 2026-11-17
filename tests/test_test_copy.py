@@ -63,6 +63,37 @@ def test_testers_get_their_mail_directly_others_redirected():
     assert "tester@example.com" not in redirected.extra_headers["X-Satok-Original-To"]
 
 
+@override_settings(**REDIRECT)
+def test_people_using_test_copy_get_mail_like_in_production():
+    from django.contrib.auth import get_user_model
+
+    copied = make_user("z-produkcji@example.com")
+    copied_user_active = make_user("loguje-sie@example.com")
+    send = lambda to: mail.send_mail("Przypomnienie", "Treść", "noreply@example.com", [to], fail_silently=False)  # noqa: E731
+    send("z-produkcji@example.com")
+    assert mail.outbox[-1].to == ["biuro@example.com"]  # kopia nieprzygotowana — wszystko na adres zbiorczy
+    AuditLog.objects.create(action="system.kopia_testowa")
+    get_user_model().objects.filter(pk__in=[copied.pk, copied_user_active.pk]).update(date_joined=timezone.now() - timedelta(days=30))
+    get_user_model().objects.filter(pk=copied_user_active.pk).update(last_login=timezone.now() + timedelta(seconds=1))
+    new = make_user("Nowy-Tester@Example.com")  # rejestracja w teście
+    get_user_model().objects.filter(pk=new.pk).update(date_joined=timezone.now() + timedelta(seconds=1))
+    mail.outbox.clear()
+    for to in ["z-produkcji@example.com", "loguje-sie@example.com", new.email, "obcy@example.com"]:
+        send(to)
+    assert [m.to for m in mail.outbox] == [["biuro@example.com"], ["loguje-sie@example.com"], [new.email], ["biuro@example.com"]]
+    assert mail.outbox[1].subject == "[TEST] Przypomnienie"
+
+
+@override_settings(**REDIRECT)
+def test_password_reset_in_test_copy_goes_to_given_address(client):
+    make_user("z-produkcji@example.com")
+    AuditLog.objects.create(action="system.kopia_testowa")
+    mail.outbox.clear()
+    client.post("/konto/haslo/reset/", {"email": "z-produkcji@example.com"})
+    assert len(mail.outbox) == 1 and mail.outbox[0].to == ["z-produkcji@example.com"]
+    assert mail.outbox[0].subject.startswith("[TEST]") and "X-Satok-Direct" not in mail.outbox[0].extra_headers
+
+
 def test_push_in_test_copy_only_to_devices_registered_after_preparation(monkeypatch):
     u = make_user("czlonek@example.com")
     _, p256dh, auth_b64, _ = _receiver()

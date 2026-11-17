@@ -22,7 +22,7 @@ from apps.core.qr import qr_svg_data_uri
 
 from . import ratelimit
 from .backends import EmailBackend
-from .forms import DeactivateForm, LoginForm, OTPTokenForm, PanelProfileForm, ProfileForm, RegistrationForm, ResendVerificationForm
+from .forms import DeactivateForm, DirectPasswordResetForm, LoginForm, OTPTokenForm, PanelProfileForm, ProfileForm, RegistrationForm, ResendVerificationForm
 from .models import User
 from .tokens import email_verification_token
 
@@ -287,6 +287,7 @@ def _mail_allowed(request, kind, email):
 class PasswordResetView(auth_views.PasswordResetView):
     template_name = "accounts/password_reset.html"
     extra_context = {"heading": "Reset hasła"}
+    form_class = DirectPasswordResetForm
     email_template_name = "emails/password_reset.txt"
     extra_email_context = {"site_url": settings.SITE_URL}
     subject_template_name = "emails/password_reset_subject.txt"

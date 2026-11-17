@@ -2,7 +2,7 @@ import re
 
 from django import forms
 from django.contrib.auth import password_validation
-from django.contrib.auth.forms import SetPasswordForm
+from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 
 from .models import User
 
@@ -102,3 +102,24 @@ class DeactivateForm(forms.Form):
 
 class StrictSetPasswordForm(SetPasswordForm):
     pass
+
+
+class DirectPasswordResetForm(PasswordResetForm):
+    """Reset hasła: wiadomość oznaczona nagłówkiem — w kopii testowej trafia na adres podany przez osobę (a nie na adres
+    zbiorczy testu), jak na produkcji. Link może wykorzystać tylko właściciel skrzynki."""
+
+    def send_mail(self, subject_template_name, email_template_name, context, from_email, to_email, html_email_template_name=None):
+        from django.core.mail import EmailMultiAlternatives
+        from django.template import loader
+
+        from apps.core.mail_redirect import DIRECT_HEADER
+
+        subject = "".join(loader.render_to_string(subject_template_name, context).splitlines())
+        body = loader.render_to_string(email_template_name, context)
+        message = EmailMultiAlternatives(subject, body, from_email, [to_email], headers={DIRECT_HEADER: "1"})
+        try:
+            message.send()
+        except Exception:  # noqa: BLE001 — jak w Django: błąd poczty nie ujawnia, czy konto istnieje
+            import logging
+
+            logging.getLogger(__name__).exception("Nie wysłano e-maila resetu hasła (użytkownik %s)", context["user"].pk)

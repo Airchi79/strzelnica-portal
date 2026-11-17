@@ -81,12 +81,16 @@ Testerzy korzystają z kopii testowej jak strzelcy — każdy widzi tylko swoje 
    Wyszukiwarki nie indeksują testu (nagłówek `X-Robots-Tag: noindex` i znacznik w stronach). Gdyby trzeba było
    znów ograniczyć dostęp: Cloudflare → Zero Trust → Access → Applications → Add → Self-hosted → `test.strzelnicasatok.pl`,
    polityka „Allow” z adresami e-mail osób.
-2. **E-maile do testerów** — na QNAP, w folderze testu (adresy oddzielone przecinkami, bez spacji):
+2. **E-maile w teście działają jak na produkcji dla każdego, kto korzysta z testu**: konto założone w teście albo
+   zalogowanie się w nim (po przygotowaniu kopii) = wiadomości na podany adres (temat `[TEST] …`); reset hasła zawsze na
+   podany adres. Osoby skopiowane z produkcji, które z testu nie korzystają, nic z testu nie dostają (ich wiadomości
+   idą na biuro@) — dzięki temu przypomnienia i ogłoszenia z testu nie trafiają do wszystkich członków.
+   Dodatkowo można wpisać stałą listę adresów (np. przed pierwszym logowaniem) — na QNAP, w folderze testu
+   (adresy oddzielone przecinkami, bez spacji):
    ```
    cd /share/CACHEDEV3_DATA/strzelnica-test && sh deploy/ustaw-env.sh EMAIL_TEST_RECIPIENTS && docker compose up -d app cron
    ```
-   Testerzy dostają swoje wiadomości bezpośrednio (temat `[TEST] …`: potwierdzenie adresu, reset hasła, rezerwacje,
-   przypomnienia), wszystkie pozostałe e-maile nadal idą na biuro@. Lista zostaje przy odświeżaniu danych.
+   Lista zostaje przy odświeżaniu danych.
    Uwaga: tester z prawdziwymi rezerwacjami na produkcji może dostać z testu przypomnienia o nich — z oznaczeniem `[TEST]`.
 3. **Logowanie testera** — kontem z produkcji (e-mail i hasło takie jak na produkcji w chwili ostatniego odświeżenia)
    albo nowym kontem założonym w teście (potwierdzenie przyjdzie na adres z listy).
@@ -95,6 +99,8 @@ Testerzy korzystają z kopii testowej jak strzelcy — każdy widzi tylko swoje 
    - rezerwacje i wpisy w teście są próbne — nie obowiązują na strzelnicy;
    - płatności są testowe: BLIK kod `777123` = udana, `960111` = odrzucona; karta `4111 1111 1111 1111`, 12/29, CVV 123;
    - po odświeżeniu danych z produkcji wszystko, co zrobili w teście, znika.
+6. **Po uruchomieniu produkcji dla wszystkich** test przestaje być ogólnodostępny (decyzja właściciela z 17.11.2026):
+   zatrzymanie testu `cd /share/CACHEDEV3_DATA/strzelnica-test && docker compose stop` albo przywrócenie Cloudflare Access.
 5. **Odświeżenie danych z produkcji** (tylko ręcznie, gdy zdecydujesz):
    `sh /share/CACHEDEV3_DATA/strzelnica-test/deploy/kopia-testowa.sh` — test dostaje aktualne dane produkcji.
 

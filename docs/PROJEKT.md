@@ -231,10 +231,12 @@ osobowych, `manage.py check --deploy` (jedyna uwaga: HSTS preload — świadomie
 2. Ochrona pamięci przy odczycie zdjęć/PDF legitymacji (obraz-„bomba”, nietypowo wysoka strona PDF).
 3. Logo SVG przez `defusedxml`; gunicorn z okresową wymianą procesów; nieużywane importy; dokumentacja harmonogramu.
 
-**Do potwierdzenia przez właściciela (konfiguracja serwera, nie kod):**
-- w produkcyjnym `.env` jest `TRUST_X_FORWARDED_FOR=true` (inaczej limity prób są wspólne dla wszystkich za tunelem);
-- zadanie Hybrid Backup Sync (kopia poza QNAP) działa i ma ostatni udany przebieg;
-- treść `.env` zapisana poza serwerem.
+**Konfiguracja serwera — potwierdzona przez właściciela 17.11.2026:**
+- w produkcyjnym `.env` jest `TRUST_X_FORWARDED_FOR=true`;
+- kopia poza QNAP (Hybrid Backup Sync) wykonuje się prawidłowo;
+- treść `.env` zapisana poza serwerem; plik `.env` niedostępny przez udział sieciowy (uprawnienia tylko dla właściciela);
+- usunięte zbędne pliki z folderu projektu: `.env.swp` (plik roboczy edytora z kopią haseł) i `satok-migracja.dump`
+  (kopia bazy z przeprowadzki).
 
 **Uproszczenie panelu (wdrożone 17.11.2026 na prośbę właściciela, PR #72):**
 - jedna pozycja „Dziś na strzelnicy” z zakładkami „Teraz na terenie” / „Plan dnia” (osoba tylko z uprawnieniem do

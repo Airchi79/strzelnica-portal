@@ -178,6 +178,9 @@ IS_TEST_COPY = SITE_ENVIRONMENT == "test"
 EMAIL_REDIRECT_TO = env("EMAIL_REDIRECT_TO", "").strip()
 if IS_TEST_COPY and not EMAIL_REDIRECT_TO:
     raise ImproperlyConfigured("Kopia testowa wymaga EMAIL_REDIRECT_TO — inaczej e-maile z testów trafiłyby do członków.")
+# Testerzy (kopia testowa): e-maile do tych adresów idą bezpośrednio do nich (z oznaczeniem [TEST]), do pozostałych
+# osób — na EMAIL_REDIRECT_TO. Adresy oddzielone przecinkami; wielkość liter bez znaczenia.
+EMAIL_TEST_RECIPIENTS = {a.strip().lower() for a in env("EMAIL_TEST_RECIPIENTS", "").split(",") if a.strip()}
 if EMAIL_REDIRECT_TO:
     EMAIL_INNER_BACKEND = EMAIL_BACKEND
     EMAIL_BACKEND = "apps.core.mail_redirect.RedirectingEmailBackend"

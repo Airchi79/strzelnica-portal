@@ -1,8 +1,8 @@
 {% extends "panel/base_panel.html" %}
 {% block title %}Archiwum rezerwacji{% endblock %}
 {% block panel %}
-<h1>Archiwum rezerwacji (GunTracker)</h1>
-{% include "panel/_bookings_tabs.html" %}
+<h1>Archiwum GunTracker</h1>
+{% include "panel/_archive_tabs.html" %}
 <p class="muted">Rezerwacje z poprzedniego systemu — do wglądu. Przyszłe terminy mają blokadę osi (w kalendarzu publicznym „niedostępne”).</p>
 <form method="get" class="card filters">
   <div><label for="q">Szukaj</label><input type="search" id="q" name="q" value="{{ q }}" placeholder="strzelec, numer, prowadzący, telefon"></div>

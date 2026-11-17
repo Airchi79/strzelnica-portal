@@ -189,6 +189,17 @@ def offline(request):
 
 
 @panel_required()
+def panel_settings_hub(request):
+    """Wszystkie ustawienia w jednym miejscu — kafelki stron ustawień, do których osoba ma uprawnienia."""
+    from .panel_menu import settings_pages
+
+    pages = settings_pages(request.user)
+    if not pages:
+        raise PermissionDenied
+    return render(request, "panel/settings_hub.html", {"pages": pages})
+
+
+@panel_required()
 def panel_home(request):
     from .overview import FEED_GROUPS, attention, feed
 

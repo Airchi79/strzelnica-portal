@@ -1,0 +1,6 @@
+<div class="tabs">
+  {% with u=request.resolver_match.url_name %}
+  {% if perms.bookings.manage_reservations %}<a href="{% url 'panel:reservations_archive' %}" class="{% if 'reservations_archive' in u %}active{% endif %}">Rezerwacje</a>{% endif %}
+  {% if perms.logbook.view_logbook %}<a href="{% url 'panel:logbook_archive' %}" class="{% if 'logbook_archive' in u %}active{% endif %}">Książka pobytu</a>{% endif %}
+  {% endwith %}
+</div>

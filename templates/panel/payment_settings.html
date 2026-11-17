@@ -2,6 +2,7 @@
 {% block title %}Ustawienia płatności{% endblock %}
 {% block panel %}
 <h1>Ustawienia płatności</h1>
+<p class="small no-print" style="margin-top:-4px"><a href="{% url 'panel:settings_hub' %}">← Wszystkie ustawienia</a></p>
 {% include "panel/_payments_tabs.html" %}
 {% if fee_missing_in_rules %}<div class="card">
   <div class="msg warning"><strong>Regulamin nie wspomina o opłacie za płatność online.</strong> Opłata jest włączona — dopisz ją do regulaminu

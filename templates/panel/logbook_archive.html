@@ -1,7 +1,8 @@
 {% extends "panel/base_panel.html" %}
 {% block title %}Archiwum książki pobytu{% endblock %}
 {% block panel %}
-<h1>Archiwum książki pobytu (GunTracker)</h1>
+<h1>Archiwum GunTracker</h1>
+{% include "panel/_archive_tabs.html" %}
 <p class="muted">Wpisy z poprzedniego systemu — tylko do odczytu, przechowywane osobno od bieżącej książki. Potwierdzenia i podpisy tych wpisów były składane w GunTrackerze.</p>
 <div class="actions" style="margin-top:0;margin-bottom:12px">
   <a class="btn secondary" href="{% url 'panel:logbook' %}">← Bieżąca książka pobytu</a>

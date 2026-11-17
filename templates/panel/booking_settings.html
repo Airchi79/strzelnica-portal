@@ -2,6 +2,7 @@
 {% block title %}Ustawienia rezerwacji{% endblock %}
 {% block panel %}
 <h1>Ustawienia rezerwacji</h1>
+<p class="small no-print" style="margin-top:-4px"><a href="{% url 'panel:settings_hub' %}">← Wszystkie ustawienia</a></p>
 {% include "panel/_bookings_tabs.html" %}
 <form method="post" novalidate>{% csrf_token %}
 <h2>Zasady według grup strzelców</h2>

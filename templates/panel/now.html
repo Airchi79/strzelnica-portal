@@ -2,6 +2,7 @@
 {% block title %}Teraz na strzelnicy{% endblock %}
 {% block extra_head %}<meta http-equiv="refresh" content="60">{% endblock %}
 {% block panel %}
+{% include "panel/_today_tabs.html" %}
 <div class="today-head"><div><h1 style="margin-bottom:2px">Teraz na strzelnicy</h1><p class="daylabel week-label" style="margin:0">stan o {{ now|time:"H:i" }} · odświeża się co minutę</p></div></div>
 {% if alarms %}<div class="res-banner bad-banner"><strong>✕ {{ alarms }} os. na terenie bez rezerwacji</strong><span>Nikt nie ma teraz rezerwacji — sprawdź, kto i dlaczego przebywa na strzelnicy.</span></div>
 {% elif warnings %}<div class="res-banner warn"><strong>⚠ Do sprawdzenia: {{ warnings }}</strong><span>Rezerwacja po czasie albo oś z rezerwacją bez wpisów w książce.</span></div>

@@ -670,3 +670,7 @@ tr.now-bez_rezerwacji td { background: var(--bad-bg); }
 
 /* pola uzupełnione odczytem ze zdjęcia legitymacji — do sprawdzenia */
 input.autofilled { outline: 2px solid var(--ok); outline-offset: 1px; }
+
+/* Ustawienia — kafelki stron ustawień */
+.settings-tile { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: inherit; }
+.settings-tile:hover, .settings-tile:focus-visible { border-color: var(--brand); }

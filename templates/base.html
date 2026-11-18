@@ -60,6 +60,7 @@
 <footer>Stowarzyszenie „STRZELNICA SĄTOK” · strzelnica niekomercyjna · <a href="{% url 'core:faq' %}">Częste pytania</a> · <a href="{% url 'regulations:list' %}">Regulaminy i RODO</a></footer>
 {% endblock %}
 <script src="{% static 'js/app.js' %}" defer></script>
+<script src="{% static 'js/install.js' %}" defer></script>
 <script src="{% static 'js/password.js' %}" defer></script>
 {% if user.is_authenticated %}<script src="{% static 'js/push-auto.js' %}" defer></script>{% endif %}
 </body>

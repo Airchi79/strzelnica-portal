@@ -97,3 +97,11 @@ def test_month_stats_include_guntracker_archive():
     assert after["kpi"]["hours"] == before["kpi"]["hours"] + 3
     assert after["kpi"]["persons"] == before["kpi"]["persons"] + 6
     assert after["kpi"]["officers"] == before["kpi"]["officers"] + 2  # ta sama osoba mimo innej pisowni
+
+
+def test_install_app_card_on_dashboard_and_panel(client, owner_client, user):
+    page = owner_client.get("/panel/").content.decode()
+    assert "data-install-card" in page and "js/install" in page
+    client.force_login(user)
+    page = client.get("/pulpit/").content.decode()
+    assert "data-install-card" in page and "Zainstaluj aplikację" in page and "Dodaj do Docka" in page and "Do ekranu początkowego" in page

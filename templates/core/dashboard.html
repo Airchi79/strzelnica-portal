@@ -3,6 +3,7 @@
 {% block content %}
 <h1>Witaj, {{ user.first_name }}</h1>
 {% include "partials/readiness.html" %}
+{% include "partials/install_app.html" %}
 <div class="grid">
   <a class="card tile" href="{% url 'credentials:my_list' %}">
     <strong>Moje dokumenty i uprawnienia</strong>

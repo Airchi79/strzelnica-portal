@@ -3,6 +3,7 @@
 {% block panel %}
 <h1>Przegląd</h1>
 <p class="muted" style="margin-top:-8px">Co wymaga uwagi i co się dzieje na strzelnicy.</p>
+{% include "partials/install_app.html" %}
 <div class="attention">
   {% for title, sub, n, url in tiles %}
   <a class="card tile att{% if n %} hot{% endif %}" href="{{ url }}"><span class="stat">{{ n }}</span><span><strong>{{ title }}</strong><span class="muted small">{{ sub }}</span></span></a>

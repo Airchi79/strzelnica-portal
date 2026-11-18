@@ -674,3 +674,8 @@ input.autofilled { outline: 2px solid var(--ok); outline-offset: 1px; }
 /* Ustawienia — kafelki stron ustawień */
 .settings-tile { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: inherit; }
 .settings-tile:hover, .settings-tile:focus-visible { border-color: var(--brand); }
+
+/* Karta „Zainstaluj aplikację” */
+.install-card { border-left: 4px solid var(--brand); }
+.install-head { display: flex; gap: 12px; align-items: center; }
+.install-head img { border-radius: 10px; flex: none; }

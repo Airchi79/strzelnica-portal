@@ -1,0 +1,26 @@
+{% comment %}Karta „Zainstaluj aplikację” — ukryta, dopóki przeglądarka nie pozwoli zainstalować (static/js/install.js).{% endcomment %}
+<div class="card install-card" data-install-card hidden>
+  <div class="install-head">
+    <img src="{{ BRAND.icon_192 }}" alt="" width="48" height="48">
+    <div><strong>Aplikacja {{ SITE_NAME }}</strong>
+      <div class="small muted">Ikona na ekranie telefonu albo w Docku/menu Start — otwiera się jak zwykły program, bez szukania w przeglądarce.</div></div>
+  </div>
+  <div data-install-mode="button" hidden class="actions" style="margin-bottom:0">
+    <button type="button" class="btn" data-install-button>Zainstaluj aplikację</button>
+    <button type="button" class="btn secondary" data-install-dismiss>Nie teraz</button>
+  </div>
+  <div data-install-mode="ios" hidden>
+    <ol class="small" style="margin:8px 0">
+      <li>W Safari naciśnij <strong>Udostępnij</strong> (kwadrat ze strzałką w górę, na dole ekranu).</li>
+      <li>Wybierz <strong>„Do ekranu początkowego”</strong> → <strong>Dodaj</strong>.</li>
+    </ol>
+    <button type="button" class="btn secondary small-btn" data-install-dismiss>Nie teraz</button>
+  </div>
+  <div data-install-mode="mac-safari" hidden>
+    <ol class="small" style="margin:8px 0">
+      <li>W Safari wybierz z menu u góry <strong>Plik → Dodaj do Docka…</strong></li>
+      <li>Kliknij <strong>Dodaj</strong> — aplikacja pojawi się w Docku i w Launchpadzie.</li>
+    </ol>
+    <button type="button" class="btn secondary small-btn" data-install-dismiss>Nie teraz</button>
+  </div>
+</div>

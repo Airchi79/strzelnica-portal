@@ -93,14 +93,19 @@ def context_data(event=None, days=7):
     events = []
     for e in Event.objects.filter(status=Event.Status.PUBLISHED, ends_at__gte=timezone.now()).order_by("starts_at")[:5]:
         events.append(_event_data(e))
+    guntracker = ps.booking_target == ps.Target.GUNTRACKER
     data = {
         "strzelnica": {"nazwa": "Strzelnica Sątok", "stowarzyszenie": assoc.name, "adres": assoc.range_place or assoc.address,
                        "telefon": assoc.contact_phone, "e-mail": assoc.contact_email, "strona": "https://strzelnicasatok.pl"},
         "rezerwacja": ps.booking_url(),
         "stałe_informacje": ps.facts,
         "osie_i_cennik": lanes,
-        "zasada_ceny": "za godzinę płaci się mniejszą z kwot: liczba osób × cena za osobę albo cena wyłączności",
-        "wolne_terminy_najbliższe_dni": free,
+        "zasada_ceny": None if guntracker else "za godzinę płaci się mniejszą z kwot: liczba osób × cena za osobę albo cena wyłączności",
+        "wolne_terminy_najbliższe_dni": [] if guntracker else free,
+        "uwaga_o_rezerwacjach": (
+            "Rezerwacje prowadzi jeszcze GunTracker — nie podawaj konkretnych wolnych godzin ani zasad naliczania ceny "
+            "(mogą być nieaktualne); zachęć do sprawdzenia aktualnej dostępności i ceny pod linkiem do rezerwacji. "
+            "Wolne terminy wymienione w poleceniu zarządu możesz podać." if guntracker else ""),
         "nadchodzące_wydarzenia": events,
         "dzisiaj": today.isoformat(),
     }

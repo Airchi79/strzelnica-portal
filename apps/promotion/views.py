@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.db import transaction
 
@@ -8,7 +9,7 @@ from apps.audit.services import log_event
 from apps.core.permissions import panel_required
 
 from . import services
-from .forms import BriefForm, PostForm, PromotionSettingsForm
+from .forms import BriefForm, PhotoForm, PostForm, PromotionSettingsForm
 from .models import Post, PromotionSettings
 
 PERM = "promotion.manage_promotion"
@@ -44,6 +45,17 @@ def panel_post(request, pk):
     if request.method == "POST":
         action = request.POST.get("action", "save")
         try:
+            if action in ("photo", "photo_remove"):
+                if action == "photo":
+                    photo_form = PhotoForm(request.POST, request.FILES)
+                    if not photo_form.is_valid():
+                        raise ValidationError("Wybierz zdjęcie (JPG lub PNG).")
+                    services.set_photo(post, photo_form.cleaned_data["photo"], by=request.user)
+                    messages.success(request, "Dodano zdjęcie — grafiki zostały odświeżone.")
+                else:
+                    services.set_photo(post, None, by=request.user)
+                    messages.success(request, "Usunięto zdjęcie — grafika ma tło w barwach strzelnicy.")
+                return redirect("panel:promotion_post", pk=post.pk)
             if action == "save":
                 if form is None or not form.is_valid():
                     raise ValidationError("Popraw formularz.")
@@ -58,7 +70,30 @@ def panel_post(request, pk):
         except ValidationError as e:
             messages.error(request, e.messages[0])
         return redirect("panel:promotion_post", pk=post.pk)
-    return render(request, "panel/promotion_post.html", {"post": post, "form": form})
+    ps = PromotionSettings.load()
+    return render(request, "panel/promotion_post.html", {"post": post, "form": form, "photo_form": PhotoForm() if editable else None,
+                                                         "booking_url": ps.booking_url(), "version": int(post.updated_at.timestamp())})
+
+
+@panel_required(PERM)
+def panel_graphic(request, pk, fmt):
+    from apps.core.branding import icon_png_for_pdf
+
+    from . import graphics
+
+    post = get_object_or_404(Post, pk=pk)
+    if fmt not in graphics.FORMATS:
+        raise Http404
+    photo = None
+    if post.photo:
+        with post.photo.open("rb") as f:
+            photo = f.read()
+    png = graphics.render(post, fmt, photo_bytes=photo, icon_bytes=icon_png_for_pdf())
+    response = HttpResponse(png, content_type="image/png")
+    response["Cache-Control"] = "private, max-age=3600"
+    if request.GET.get("pobierz"):
+        response["Content-Disposition"] = f'attachment; filename="promocja-{post.pk}-{fmt}.png"'
+    return response
 
 
 @panel_required(PERM)

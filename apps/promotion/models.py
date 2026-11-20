@@ -5,6 +5,14 @@ Każda publikacja zaczyna jako szkic; trafia do mediów dopiero po zatwierdzeniu
 from django.conf import settings
 from django.db import models
 
+from apps.credentials.models import get_private_storage
+
+def promotion_photo_upload_to(instance, filename):
+    import uuid
+
+    return f"promocja/{uuid.uuid4().hex}.jpg"
+
+
 GUNTRACKER_URL = "https://www.guntracker.pl/p/strzelnica-satok"
 DEFAULT_TONE = ("Rzeczowo i życzliwie, sportowo, bez przesady i wykrzykników w każdym zdaniu. Zwracamy się do czytelnika "
                 "na „Ty”. Podkreślamy bezpieczeństwo, dobrą organizację i przyjazną atmosferę strzelnicy.")
@@ -67,10 +75,15 @@ class Post(models.Model):
     website_title = models.CharField("strona — tytuł wpisu", max_length=200, blank=True)
     website_body = models.TextField("strona — treść wpisu", blank=True)
     hashtags = models.CharField("hasztagi", max_length=400, blank=True)
+    graphic_headline = models.CharField("grafika — nagłówek", max_length=70, blank=True)
+    graphic_subtitle = models.CharField("grafika — podtytuł", max_length=110, blank=True)
+    graphic_details = models.TextField("grafika — szczegóły (każdy w osobnym wierszu, najwyżej 4)", max_length=400, blank=True)
+    photo = models.FileField("zdjęcie w tle grafiki", upload_to=promotion_photo_upload_to, blank=True, storage=get_private_storage)
     model = models.CharField("model", max_length=60, blank=True)
     usage = models.JSONField("zużycie (tokeny)", default=dict, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     decided_at = models.DateTimeField(null=True, blank=True)
     note = models.CharField("uwagi", max_length=255, blank=True)
@@ -82,3 +95,11 @@ class Post(models.Model):
 
     def __str__(self):
         return self.title or self.brief[:60]
+
+    @property
+    def tiktok_caption(self):
+        """Opis filmu (część po „OPIS FILMU”/„OPIS”), bez scenariusza ujęć — do podglądu TikToka."""
+        import re
+
+        m = re.search(r"OPIS(?: FILMU)?\s*:?\s*(.+)", self.tiktok or "", re.S | re.I)
+        return (m.group(1) if m else self.tiktok or "").strip()

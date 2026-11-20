@@ -7,6 +7,46 @@
   · {{ post.get_kind_display }} · przygotowano {{ post.created_at|date:"j.m.Y H:i" }}{% if post.created_by %} ({{ post.created_by.full_name }}){% endif %}
   {% if post.decided_by %} · decyzja: {{ post.decided_by.full_name }}, {{ post.decided_at|date:"j.m.Y H:i" }}{% endif %}{% if post.event %} · wydarzenie: {{ post.event.title }}{% endif %}</p>
 <div class="card"><strong>Polecenie</strong><p class="small" style="margin-bottom:0;white-space:pre-line">{{ post.brief }}</p></div>
+
+{% url 'panel:promotion_graphic' post.pk 'kwadrat' as sq %}{% url 'panel:promotion_graphic' post.pk 'pion' as vert %}
+<h2 class="step-title">Podgląd</h2>
+<p class="small muted" style="margin-top:0">Tak publikacja będzie wyglądać w poszczególnych miejscach (układ przybliżony). Po zmianie tekstów kliknij „Zapisz zmiany”, żeby odświeżyć podgląd i grafiki.</p>
+<div class="promo-preview">
+  <div class="mock mock-fb">
+    <div class="mock-head"><img src="{{ BRAND.icon_192 }}" alt=""><div><strong>Strzelnica Sątok</strong><span>teraz · publicznie</span></div></div>
+    <div class="mock-text">{{ post.facebook|linebreaksbr }}</div>
+    <img class="mock-img" src="{{ sq }}?v={{ version }}" alt="Grafika — kwadrat">
+    <div class="mock-bar">👍 Lubię to · 💬 Komentarz · ↗ Udostępnij</div>
+    <div class="mock-label">Facebook</div>
+  </div>
+  <div class="mock mock-ig">
+    <div class="mock-head"><img src="{{ BRAND.icon_192 }}" alt=""><div><strong>strzelnicasatok</strong></div></div>
+    <img class="mock-img" src="{{ sq }}?v={{ version }}" alt="Grafika — kwadrat">
+    <div class="mock-bar">♡ 💬 ✈</div>
+    <div class="mock-text"><strong>strzelnicasatok</strong> {{ post.instagram|linebreaksbr }}<div class="mock-tags">{{ post.hashtags }}</div></div>
+    <div class="mock-label">Instagram</div>
+  </div>
+  <div class="mock mock-tt">
+    <div class="mock-phone"><img src="{{ vert }}?v={{ version }}" alt="Grafika — pion">
+      <div class="mock-tt-cap"><strong>@strzelnicasatok</strong><br>{{ post.tiktok_caption|truncatechars:160 }}</div></div>
+    <div class="mock-label">TikTok / Stories (okładka; film nagrywasz według scenariusza)</div>
+  </div>
+  <div class="mock mock-www">
+    <img class="mock-img" src="{{ sq }}?v={{ version }}" alt="Grafika">
+    <div class="mock-text"><strong class="mock-www-title">{{ post.website_title }}</strong>{{ post.website_body|linebreaks|truncatewords_html:60 }}<a href="{{ booking_url }}" rel="noopener" target="_blank">Zarezerwuj →</a></div>
+    <div class="mock-label">Strona — Aktualności</div>
+  </div>
+</div>
+<div class="card actions" style="align-items:center">
+  <a class="btn secondary" href="{{ sq }}?pobierz=1">Pobierz grafikę — kwadrat (FB, Instagram)</a>
+  <a class="btn secondary" href="{{ vert }}?pobierz=1">Pobierz grafikę — pion (TikTok, Stories)</a>
+</div>
+{% if photo_form %}<form method="post" enctype="multipart/form-data" class="card">{% csrf_token %}
+  <strong>Zdjęcie w tle grafiki</strong>{% if post.photo %} <span class="badge ok">dodane</span>{% else %} <span class="small muted">— brak, tło w barwach strzelnicy</span>{% endif %}
+  {% with form=photo_form %}{% include "partials/form.html" %}{% endwith %}
+  <div class="actions"><button class="btn secondary" name="action" value="photo">Wgraj zdjęcie</button>
+    {% if post.photo %}<button class="btn secondary" name="action" value="photo_remove" formnovalidate>Usuń zdjęcie</button>{% endif %}</div>
+</form>{% endif %}
 {% if form %}
 <form method="post" class="card">{% csrf_token %}
   <p class="small muted" style="margin-top:0">Sprawdź fakty (daty, godziny, ceny, linki) i popraw teksty. Przyciski „kopiuj” kopiują tekst do schowka — wklejasz go w Meta Business Suite / TikToku, dopóki publikacja automatyczna nie jest podłączona.</p>

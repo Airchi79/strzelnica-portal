@@ -8,7 +8,8 @@ from apps.audit.services import log_event
 from . import generator
 from .models import Post
 
-TEXT_FIELDS = ["title", "facebook", "instagram", "tiktok", "website_title", "website_body", "hashtags"]
+TEXT_FIELDS = ["title", "facebook", "instagram", "tiktok", "website_title", "website_body", "hashtags",
+               "graphic_headline", "graphic_subtitle", "graphic_details"]
 
 
 def create_draft(brief, *, by, event=None, kind=Post.Kind.MANUAL):
@@ -24,6 +25,8 @@ def create_draft(brief, *, by, event=None, kind=Post.Kind.MANUAL):
         title=str(result.get("title", ""))[:160], facebook=result.get("facebook", ""), instagram=result.get("instagram", ""),
         tiktok=result.get("tiktok", ""), website_title=str(result.get("website_title", ""))[:200],
         website_body=result.get("website_body", ""), hashtags=" ".join(result.get("hashtags", []))[:400],
+        graphic_headline=str(result.get("graphic_headline", ""))[:70], graphic_subtitle=str(result.get("graphic_subtitle", ""))[:110],
+        graphic_details="\n".join(str(x) for x in result.get("graphic_details", [])[:4])[:400],
     )
     log_event("promocja.szkic", post, f"{post.title} ({post.get_kind_display()})", actor=by)
     return post
@@ -57,4 +60,22 @@ def decide(post, action, *, by, note=""):
         post.note = note[:255]
     post.save(update_fields=["status", "decided_by", "decided_at", "note"])
     log_event(event, post, post.title, actor=by)
+    return post
+
+
+def set_photo(post, uploaded, *, by):
+    """Zdjęcie w tle grafiki: sprawdzone i zmniejszone (bez danych GPS); None — usuwa zdjęcie."""
+    from apps.facilities.issues import clean_photo
+
+    if post.status in (Post.Status.PUBLISHED, Post.Status.REJECTED):
+        raise ValidationError("Opublikowanej ani odrzuconej publikacji nie można już zmieniać.")
+    old = post.photo.name if post.photo else ""
+    if uploaded is None:
+        post.photo = ""
+    else:
+        post.photo = clean_photo(uploaded)
+    post.save()
+    if old:
+        post.photo.storage.delete(old)
+    log_event("promocja.zdjecie", post, post.title + (" — usunięto zdjęcie" if uploaded is None else " — nowe zdjęcie"), actor=by)
     return post

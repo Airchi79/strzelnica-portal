@@ -68,7 +68,7 @@ SECTIONS = [
         ("Raporty wpływów", "panel:sales_reports", "receipt", "reports.view_salesreport", ["sales_report*"]),
     ]),
     ("Promocja", [
-        ("Publikacje", "panel:promotion", "external", "promotion.manage_promotion", ["promotion", "promotion_post"]),
+        ("Publikacje", "panel:promotion", "external", "promotion.manage_promotion", ["promotion", "promotion_post", "promotion_graphic"]),
     ]),
     ("System", [
         ("Ustawienia", "panel:settings_hub", "sliders", SETTINGS_PERMS,

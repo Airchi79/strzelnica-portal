@@ -123,3 +123,13 @@ def test_promotion_requires_permission(client):
     other = grant(make_user("inny@example.com"), "logbook.view_logbook")
     login_with_otp(client, other)
     assert client.get("/panel/promocja/").status_code == 403
+
+
+def test_guntracker_period_hides_slot_hours_and_price_rule():
+    data, ps = generator.context_data()
+    assert ps.booking_target == "guntracker"
+    assert data["wolne_terminy_najbliższe_dni"] == [] and data["zasada_ceny"] is None and "GunTracker" in data["uwaga_o_rezerwacjach"]
+    ps.booking_target = PromotionSettings.Target.SYSTEM
+    ps.save()
+    data, _ = generator.context_data()
+    assert data["zasada_ceny"] and data["uwaga_o_rezerwacjach"] == "" and data["wolne_terminy_najbliższe_dni"]

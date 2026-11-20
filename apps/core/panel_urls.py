@@ -1,6 +1,7 @@
 from django.urls import path, re_path
 from django.views.generic import RedirectView
 
+from apps.promotion import views as promotion_views
 from apps.association import views as association_views
 from apps.bookings import views as bookings_views
 from apps.credentials import views as credentials_views
@@ -59,6 +60,9 @@ urlpatterns = [
     path("osie/<int:pk>/oplaty/", facilities_views.panel_price_add, name="price_add"),
     path("ustawienia/", views.panel_settings, name="settings"),
     path("ustawienia/wszystkie/", views.panel_settings_hub, name="settings_hub"),
+    path("promocja/", promotion_views.panel_list, name="promotion"),
+    path("promocja/<int:pk>/", promotion_views.panel_post, name="promotion_post"),
+    path("promocja/ustawienia/", promotion_views.panel_settings, name="promotion_settings"),
     path("dzis/", bookings_views.panel_today, name="today"),
     path("teraz/", logbook_views.panel_now, name="now"),
     path("rezerwacje/", bookings_views.panel_calendar, name="bookings"),

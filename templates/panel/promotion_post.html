@@ -1,0 +1,35 @@
+{% extends "panel/base_panel.html" %}{% load static %}
+{% block title %}{{ post }}{% endblock %}
+{% block panel %}
+<h1>{{ post }}</h1>
+{% include "panel/_promotion_tabs.html" %}
+<p class="small muted"><span class="badge {% if post.status == 'zatwierdzony' or post.status == 'opublikowany' %}ok{% elif post.status == 'szkic' %}warn{% endif %}">{{ post.get_status_display }}</span>
+  · {{ post.get_kind_display }} · przygotowano {{ post.created_at|date:"j.m.Y H:i" }}{% if post.created_by %} ({{ post.created_by.full_name }}){% endif %}
+  {% if post.decided_by %} · decyzja: {{ post.decided_by.full_name }}, {{ post.decided_at|date:"j.m.Y H:i" }}{% endif %}{% if post.event %} · wydarzenie: {{ post.event.title }}{% endif %}</p>
+<div class="card"><strong>Polecenie</strong><p class="small" style="margin-bottom:0;white-space:pre-line">{{ post.brief }}</p></div>
+{% if form %}
+<form method="post" class="card">{% csrf_token %}
+  <p class="small muted" style="margin-top:0">Sprawdź fakty (daty, godziny, ceny, linki) i popraw teksty. Przyciski „kopiuj” kopiują tekst do schowka — wklejasz go w Meta Business Suite / TikToku, dopóki publikacja automatyczna nie jest podłączona.</p>
+  {% for field in form.visible_fields %}{% include "partials/field.html" %}
+    {% if field.name != "title" and field.name != "website_title" %}<p class="small" style="margin:-8px 0 12px"><button type="button" class="link-btn" data-copy-from="{{ field.id_for_label }}">kopiuj „{{ field.label }}”</button></p>{% endif %}
+  {% endfor %}
+  <div class="actions">
+    <button class="btn secondary" name="action" value="save">Zapisz zmiany</button>
+    {% if post.status == 'szkic' %}<button class="btn" name="action" value="approve">Zatwierdź</button>{% endif %}
+    {% if post.status == 'zatwierdzony' %}<button class="btn" name="action" value="published">Oznacz jako opublikowane</button><button class="btn secondary" name="action" value="reopen">Do poprawy</button>{% endif %}
+    <button class="btn danger" name="action" value="reject" data-confirm="Odrzucić tę publikację?">Odrzuć</button>
+  </div>
+</form>
+{% else %}
+<div class="card">
+  <p><strong>Facebook</strong></p><p style="white-space:pre-line">{{ post.facebook }}</p>
+  <p><strong>Instagram</strong></p><p style="white-space:pre-line">{{ post.instagram }}</p>
+  <p><strong>TikTok</strong></p><p style="white-space:pre-line">{{ post.tiktok }}</p>
+  <p><strong>{{ post.website_title }}</strong></p><p style="white-space:pre-line">{{ post.website_body }}</p>
+  <p class="small">{{ post.hashtags }}</p>
+  {% if post.status == 'odrzucony' %}<form method="post">{% csrf_token %}<button class="btn secondary" name="action" value="reopen">Przywróć do poprawy</button></form>{% endif %}
+</div>
+{% endif %}
+<p class="small muted">Model: {{ post.model|default:"—" }}{% if post.usage %} · tokeny: {{ post.usage.input }} + {{ post.usage.output }}{% endif %}</p>
+<script src="{% static 'js/promotion.js' %}" defer></script>
+{% endblock %}

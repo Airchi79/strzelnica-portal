@@ -1,0 +1,6 @@
+<div class="tabs">
+  {% with u=request.resolver_match.url_name %}
+  <a href="{% url 'panel:promotion' %}" class="{% if u == 'promotion' or u == 'promotion_post' %}active{% endif %}">Publikacje</a>
+  <a href="{% url 'panel:promotion_settings' %}" class="{% if u == 'promotion_settings' %}active{% endif %}">Ustawienia</a>
+  {% endwith %}
+</div>

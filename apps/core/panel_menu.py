@@ -15,6 +15,8 @@ SETTINGS_PAGES = [  # strona „Ustawienia” — wszystkie ustawienia w jednym 
     ("panel:accounting_settings", "accounting.manage_accounting", "Księgowość",
      "Przychody z systemu od dnia, organ zatwierdzający, urząd skarbowy, koniec płatności przez Stripe."),
     ("panel:lanes", "facilities.manage_facilities", "Osie, godziny i opłaty", "Godziny otwarcia (także zbiorczo), cennik osi."),
+    ("panel:promotion_settings", "promotion.manage_promotion", "Promocja",
+     "Dokąd prowadzą linki do rezerwacji (GunTracker / nasz system), styl tekstów, hasztagi, stałe informacje."),
 ]
 SETTINGS_PERMS = tuple(sorted({perm for _, perm, _, _ in SETTINGS_PAGES}))
 
@@ -65,10 +67,13 @@ SECTIONS = [
          ["reports", "month_stats", "occupancy", "reservations_report"]),
         ("Raporty wpływów", "panel:sales_reports", "receipt", "reports.view_salesreport", ["sales_report*"]),
     ]),
+    ("Promocja", [
+        ("Publikacje", "panel:promotion", "external", "promotion.manage_promotion", ["promotion", "promotion_post"]),
+    ]),
     ("System", [
         ("Ustawienia", "panel:settings_hub", "sliders", SETTINGS_PERMS,
          ["settings_hub", "settings", "booking_settings", "logbook_settings", "logbook_rotate", "logbook_poster", "payment_settings",
-          "accounting_settings"]),
+          "accounting_settings", "promotion_settings"]),
         ("Archiwum GunTracker", [("panel:reservations_archive", "bookings.manage_reservations"),
                                  ("panel:logbook_archive", "logbook.view_logbook")], "archive",
          ("bookings.manage_reservations", "logbook.view_logbook"), ["reservations_archive*", "logbook_archive*"]),

@@ -1,0 +1,26 @@
+{% extends "panel/base_panel.html" %}{% load static %}
+{% block title %}Promocja{% endblock %}
+{% block panel %}
+<h1>Promocja</h1>
+{% include "panel/_promotion_tabs.html" %}
+{% if not api_ready %}<div class="res-banner warn"><strong>Generowanie wyłączone</strong><span>Brak klucza API Claude na serwerze (ANTHROPIC_API_KEY w .env).</span></div>{% endif %}
+<div class="card">
+  <h2 class="step-title">Nowa publikacja</h2>
+  <p class="small muted" style="margin-top:0">System przygotuje szkic na Facebook, Instagram, TikTok (scenariusz filmu) i stronę — z aktualnymi wolnymi terminami, cennikiem i wydarzeniami. Nic nie jest publikowane bez Twojego zatwierdzenia. Linki do rezerwacji prowadzą teraz do: <strong>{{ ps.get_booking_target_display }}</strong>.</p>
+  <form method="post" data-busy="Przygotowuję szkic… (do minuty)">{% csrf_token %}
+    {% include "partials/form.html" %}
+    <div class="actions"><button class="btn" type="submit"{% if not api_ready %} disabled{% endif %}>Przygotuj szkic</button></div>
+  </form>
+</div>
+<nav class="tabs" aria-label="Stan"><a href="?" class="{% if not status %}active{% endif %}">Wszystkie</a>{% for v, l in statuses %}<a href="?status={{ v }}" class="{% if status == v %}active{% endif %}">{{ l }}</a>{% endfor %}</nav>
+<div class="card table-wrap"><table>
+  <tr class="head"><th>Publikacja</th><th>Rodzaj</th><th>Stan</th><th>Przygotowano</th></tr>
+  {% for p in posts %}<tr>
+    <td><a href="{% url 'panel:promotion_post' p.pk %}"><strong>{{ p }}</strong></a></td>
+    <td data-label="Rodzaj" class="small">{{ p.get_kind_display }}</td>
+    <td data-label="Stan"><span class="badge {% if p.status == 'zatwierdzony' or p.status == 'opublikowany' %}ok{% elif p.status == 'szkic' %}warn{% endif %}">{{ p.get_status_display|cut:" — do sprawdzenia" }}</span></td>
+    <td data-label="Przygotowano" class="small nowrap">{{ p.created_at|date:"j.m.Y H:i" }}{% if p.created_by %} · {{ p.created_by.full_name }}{% endif %}</td>
+  </tr>{% empty %}<tr><td colspan="4" class="muted">Brak publikacji.</td></tr>{% endfor %}
+</table></div>
+<script src="{% static 'js/promotion.js' %}" defer></script>
+{% endblock %}

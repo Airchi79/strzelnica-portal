@@ -1,0 +1,10 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Ustawienia promocji{% endblock %}
+{% block panel %}
+<h1>Ustawienia promocji</h1>
+{% include "panel/_promotion_tabs.html" %}
+<form method="post" class="card">{% csrf_token %}
+  {% include "partials/form.html" %}
+  <div class="actions"><button class="btn" type="submit">Zapisz</button></div>
+</form>
+{% endblock %}

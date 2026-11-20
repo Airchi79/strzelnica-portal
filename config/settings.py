@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "apps.accounting",
     "apps.kiosk",
     "apps.events",
+    "apps.promotion",
 ]
 
 MIDDLEWARE = [
@@ -168,6 +169,11 @@ EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", not EMAIL_USE_SSL) and not EMAIL_USE_SSL
 EMAIL_TIMEOUT = 20
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Strzelnica Sątok <no-reply@localhost>")
+
+# Promocja: teksty publikacji przygotowuje API Claude (Anthropic). Klucz wyłącznie w .env serwera; bez klucza moduł działa,
+# ale generowanie jest wyłączone.
+ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", "").strip()
+PROMOTION_MODEL = env("PROMOTION_MODEL", "claude-opus-5-5").strip()
 
 # Kopia testowa (SITE_ENVIRONMENT=test): pasek „WERSJA TESTOWA”, wszystkie e-maile na jeden adres (EMAIL_REDIRECT_TO),
 # tylko testowe Tpay, push wyłącznie do urządzeń zarejestrowanych w kopii testowej. Brak tych ustawień = błąd startu.

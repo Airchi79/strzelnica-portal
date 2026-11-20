@@ -679,3 +679,20 @@ input.autofilled { outline: 2px solid var(--ok); outline-offset: 1px; }
 .install-card { border-left: 4px solid var(--brand); }
 .install-head { display: flex; gap: 12px; align-items: center; }
 .install-head img { border-radius: 10px; flex: none; }
+
+/* Promocja — podgląd publikacji (makiety platform, zawsze jasne jak w aplikacjach) */
+.promo-preview { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); align-items: start; margin-bottom: var(--gap); }
+.mock { background: #fff; color: #1c1e21; border: 1px solid #dadde1; border-radius: 10px; overflow: hidden; font-size: 14px; line-height: 1.35; }
+.mock-head { display: flex; gap: 8px; align-items: center; padding: 10px 12px; }
+.mock-head img { width: 36px; height: 36px; border-radius: 50%; }
+.mock-head span { display: block; font-size: 12px; color: #65676b; }
+.mock-text { padding: 8px 12px; max-height: 260px; overflow: hidden; word-wrap: break-word; }
+.mock-img { display: block; width: 100%; height: auto; }
+.mock-bar { padding: 8px 12px; border-top: 1px solid #e4e6eb; color: #65676b; font-size: 13px; }
+.mock-tags { color: #00376b; margin-top: 4px; }
+.mock-label { background: #f0f2f5; color: #444; font-size: 12px; padding: 6px 12px; font-weight: 600; }
+.mock-tt .mock-phone { position: relative; background: #000; }
+.mock-tt .mock-phone img { display: block; width: 100%; height: auto; opacity: .95; }
+.mock-tt-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px; color: #fff; font-size: 13px;
+  background: linear-gradient(transparent, rgba(0,0,0,.75)); }
+.mock-www-title { display: block; font-size: 17px; margin-bottom: 6px; }

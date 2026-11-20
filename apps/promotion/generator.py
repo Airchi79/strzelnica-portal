@@ -26,8 +26,13 @@ SCHEMA = {
         "website_title": {"type": "string", "description": "Tytuł wpisu w Aktualnościach na stronie."},
         "website_body": {"type": "string", "description": "Treść wpisu na stronę: akapity rozdzielone pustą linią, link do rezerwacji lub zapisów."},
         "hashtags": {"type": "array", "items": {"type": "string"}, "description": "5–10 hasztagów, w tym stałe hasztagi strzelnicy."},
+        "graphic_headline": {"type": "string", "description": "Nagłówek na grafikę: 2–6 słów, bez kropki (np. „Wolne osie w sobotę”)."},
+        "graphic_subtitle": {"type": "string", "description": "Podtytuł na grafikę: jedno krótkie zdanie, najwyżej 90 znaków."},
+        "graphic_details": {"type": "array", "items": {"type": "string"},
+                            "description": "Do 4 bardzo krótkich wierszy na grafikę (np. „Sobota 21.11”, „Oś 100 m”, „Zapisy online”); tylko fakty z danych."},
     },
-    "required": ["title", "facebook", "instagram", "tiktok", "website_title", "website_body", "hashtags"],
+    "required": ["title", "facebook", "instagram", "tiktok", "website_title", "website_body", "hashtags",
+                 "graphic_headline", "graphic_subtitle", "graphic_details"],
     "additionalProperties": False,
 }
 

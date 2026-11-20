@@ -23,8 +23,10 @@ class BriefForm(forms.Form):
 class PostForm(forms.ModelForm):
     class Meta:
         model = Post
-        fields = ["title", "facebook", "instagram", "tiktok", "website_title", "website_body", "hashtags"]
-        widgets = {f: forms.Textarea(attrs={"rows": 8}) for f in ["facebook", "instagram", "tiktok", "website_body"]}
+        fields = ["title", "graphic_headline", "graphic_subtitle", "graphic_details", "facebook", "instagram", "tiktok",
+                  "website_title", "website_body", "hashtags"]
+        widgets = {**{f: forms.Textarea(attrs={"rows": 8}) for f in ["facebook", "instagram", "tiktok", "website_body"]},
+                   "graphic_details": forms.Textarea(attrs={"rows": 4})}
 
 
 class PromotionSettingsForm(forms.ModelForm):
@@ -32,3 +34,8 @@ class PromotionSettingsForm(forms.ModelForm):
         model = PromotionSettings
         fields = ["booking_target", "guntracker_url", "tone", "hashtags", "facts"]
         widgets = {"tone": forms.Textarea(attrs={"rows": 3}), "facts": forms.Textarea(attrs={"rows": 5})}
+
+
+class PhotoForm(forms.Form):
+    photo = forms.FileField(label="Zdjęcie w tle grafiki", help_text="JPG lub PNG z telefonu — system je zmniejszy i usunie dane GPS. "
+                                                                    "Pamiętaj o zgodzie osób rozpoznawalnych na zdjęciu.")

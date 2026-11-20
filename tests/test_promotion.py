@@ -15,7 +15,9 @@ from .conftest import add_credential, approve, grant, login_with_otp, make_user
 pytestmark = pytest.mark.django_db
 
 RESULT = {"title": "Trening w sobotę", "facebook": "FB tekst https://x", "instagram": "IG tekst", "tiktok": "Ujęcie 1…",
-          "website_title": "Wolne osie w sobotę", "website_body": "Akapit 1\n\nAkapit 2", "hashtags": ["#StrzelnicaSątok", "#trening"]}
+          "website_title": "Wolne osie w sobotę", "website_body": "Akapit 1\n\nAkapit 2", "hashtags": ["#StrzelnicaSątok", "#trening"],
+          "graphic_headline": "Wolne osie w sobotę", "graphic_subtitle": "Spokojny trening na 100 m",
+          "graphic_details": ["Sobota 21.11", "Oś 100 m", "Zapisy online", "Za dużo", "Ponad limit"]}
 
 
 class FakeClient:
@@ -133,3 +135,63 @@ def test_guntracker_period_hides_slot_hours_and_price_rule():
     ps.save()
     data, _ = generator.context_data()
     assert data["zasada_ceny"] and data["uwaga_o_rezerwacjach"] == "" and data["wolne_terminy_najbliższe_dni"]
+
+
+def _png(size=(1600, 1200), color=(120, 90, 60)):
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", size, color).save(buf, "PNG")
+    return buf.getvalue()
+
+
+def test_graphics_render_both_formats_with_and_without_photo():
+    import io
+
+    from PIL import Image
+
+    from apps.promotion import graphics
+
+    post = Post(title="t", graphic_headline="Wolne osie w sobotę — zapraszamy na dłuższy trening z prowadzącym",
+                graphic_subtitle="Bezpieczny trening na osi 100 m ąęśćżźółń", graphic_details="Sobota 21.11\nOś 100 m\n10:00–14:00\nZapisy\nNadmiar")
+    for fmt, size in graphics.FORMATS.items():
+        for photo in (None, _png()):
+            img = Image.open(io.BytesIO(graphics.render(post, fmt, photo_bytes=photo, icon_bytes=_png((512, 512)))))
+            assert img.size == size and img.format == "PNG"
+    graphics.render(post, "kwadrat", photo_bytes=b"to nie jest obraz", icon_bytes=b"zly")  # zły plik — tło domyślne
+
+
+def test_panel_graphics_photo_and_preview(client, monkeypatch, settings):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    settings.ANTHROPIC_API_KEY = "test"
+    monkeypatch.setattr(generator, "_client", lambda: FakeClient())
+    staff = grant(make_user("grafik@example.com"), "promotion.manage_promotion")
+    login_with_otp(client, staff)
+    client.post("/panel/promocja/", {"brief": "Zaproś na sobotni trening"})
+    post = Post.objects.get()
+    assert post.graphic_headline == "Wolne osie w sobotę" and post.graphic_details.count("\n") == 3  # najwyżej 4 wiersze
+    page = client.get(f"/panel/promocja/{post.pk}/").content.decode()
+    assert "mock-fb" in page and "mock-ig" in page and "mock-tt" in page and "mock-www" in page and "guntracker.pl" in page
+    r = client.get(f"/panel/promocja/{post.pk}/grafika/kwadrat.png")
+    assert r.status_code == 200 and r["Content-Type"] == "image/png"
+    r = client.get(f"/panel/promocja/{post.pk}/grafika/pion.png?pobierz=1")
+    assert "attachment" in r["Content-Disposition"]
+    assert client.get(f"/panel/promocja/{post.pk}/grafika/inny.png").status_code == 404
+    client.post(f"/panel/promocja/{post.pk}/", {"action": "photo", "photo": SimpleUploadedFile("z.png", _png(), "image/png")})
+    post.refresh_from_db()
+    assert post.photo and post.photo.name.endswith(".jpg")
+    assert client.get(f"/panel/promocja/{post.pk}/grafika/kwadrat.png").status_code == 200
+    r = client.post(f"/panel/promocja/{post.pk}/", {"action": "photo", "photo": SimpleUploadedFile("z.png", b"tekst", "image/png")}, follow=True)
+    assert "zdjęcie" in r.content.decode().lower()
+    name = post.photo.name
+    client.post(f"/panel/promocja/{post.pk}/", {"action": "photo_remove"})
+    post.refresh_from_db()
+    assert not post.photo and not post.photo.storage.exists(name)
+
+
+def test_tiktok_caption():
+    assert Post(tiktok="Ujęcie 1: tarcza\nOPIS FILMU: Sobota na 100 m").tiktok_caption == "Sobota na 100 m"
+    assert Post(tiktok="Krótki opis").tiktok_caption == "Krótki opis"
